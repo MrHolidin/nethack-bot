@@ -229,6 +229,7 @@ class PolicyMixin:
 
     def step_history(self, c):
         lv, y, x, hostiles = c.lv, c.y, c.x, c.hostiles
+        self.danger_tick(c.t, c.hp, hostiles)
         vis_n = len(self.visible_hostiles(lv))
         km = self.kinds(lv)
         sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
