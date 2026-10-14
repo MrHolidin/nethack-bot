@@ -44,9 +44,11 @@ def main():
     t = time.monotonic()
     with mp.Pool(a.j) as pool:
         res = pool.map(play, [(s, kw) for s in range(a.start, a.start + a.n)], chunksize=1)
-    with open(a.out, "w") as f:
-        for r in res:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        # written before the pool exits: its terminate() has failed under libfaketime (time.sleep(0):
+        # OSError EINVAL) and took a whole shard's results with it
+        with open(a.out, "w") as f:
+            for r in res:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
     crashes = [r for r in res if "crash" in r]
     ok = [r for r in res if "crash" not in r]
     sc = [r["score"] for r in ok]

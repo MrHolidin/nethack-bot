@@ -7,6 +7,8 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
+    "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
+                               #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
     "pickup_pages": False,     # A/B: the pick-up menu is paged: what we want on every page (else the first only)
