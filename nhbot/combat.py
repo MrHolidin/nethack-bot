@@ -10,7 +10,7 @@ from nhbot import glyphs as G
 from nhbot.items import WAND_SPENT_RE
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
 from nhbot.goals import GOALS
-from nhbot.monsters import RANGED_TARGETS
+from nhbot.monsters import NEVER_MELEE_T, RANGED_TARGETS
 from nhbot.nav import line_clear
 
 
@@ -100,7 +100,7 @@ class CombatMixin:
             if d == 0 or d > 6 or not (dy == 0 or dx == 0 or abs(dy) == abs(dx)):
                 continue
             name = G.monster_name(g[ty, tx])
-            if name not in RANGED_TARGETS:
+            if name not in (NEVER_MELEE_T if self.opts.monster_lists else RANGED_TARGETS):
                 continue
             if name == "gas spore" and d < 3:
                 continue

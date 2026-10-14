@@ -41,6 +41,11 @@ DEFAULTS = {
                                #      the separate desperate floating-eye melee of unblock_step goes
     "msg_windows": False,      # A/B: zap, kick, wear, take_off, dip, wield and the shop door read the messages of
                                #      their own action (msgs_since) instead of the last N messages
+    "monster_lists": False,    # A/B: never-melee / always-avoid / ranged-target / stunned-wait monsters from the attack
+                               #      table (passive-only, explodes, passive stoning / paralysis) instead of the hand
+                               #      lists (ochre jelly, which engulfs, leaves them; acid blob, yellow / red mold join
+                               #      the ranged targets; brown / green mold may be hit when desperate); worth_special
+                               #      by mon_dpt (the focus damage model) instead of the level proxy est_dmg
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

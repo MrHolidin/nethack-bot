@@ -11,7 +11,9 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES, permonst_of
+from nhbot.focus import mon_dpt
+from nhbot.monsters import (ALWAYS_AVOID, ALWAYS_AVOID_T, NEVER_MELEE, NEVER_MELEE_T, PASSIVE_DMG, PM_BY_NAME,
+                            THIEVES, permonst_of)
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
 # (gas spore), the Oracle, a long worm's tail. No monster without one can move (mmove 0 for all that can't).
@@ -292,8 +294,11 @@ class PerceptionMixin:
                    for yy, xx in zip(ys, xs))
 
     def always_avoid(self):
+        blind = int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND
+        if self.opts.monster_lists:
+            return ALWAYS_AVOID_T - {"floating eye"} if blind else ALWAYS_AVOID_T
         s = ALWAYS_AVOID
-        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+        if not blind:
             s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
         return s
 
@@ -301,6 +306,8 @@ class PerceptionMixin:
         """Don't hit what has only a passive attack (it never hurts us otherwise); desperate (stuck) still may."""
         if name in ("cockatrice", "chickatrice") and any(it.wielded for it in self.items()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
+        if self.opts.monster_lists:
+            return name in NEVER_MELEE_T
         return name in NEVER_MELEE or name in PASSIVE_DMG
 
     def may_melee(self, lv, name):
@@ -332,6 +339,8 @@ class PerceptionMixin:
         pm = permonst_of(g)
         if pm is None or name == "invisible":
             return 3.0
+        if self.opts.monster_lists:
+            return mon_dpt(nh.glyph_to_mon(int(g)), self.bl(nh.NLE_BL_AC))
         lvl = pm.mlevel
         ac = self.bl(nh.NLE_BL_AC)
         hit = min(max((10 + ac + lvl - 1) / 20.0, 0.05), 1.0)

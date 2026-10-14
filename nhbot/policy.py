@@ -13,7 +13,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_squares
 from nhbot.mapmem import Level
-from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
+from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PASSIVE_ONLY, PM_BY_NAME
 from nhbot.items import CURSED_RE
 from nhbot.pickup import MISSILE_TYPES, floor_kind
 
@@ -199,7 +199,8 @@ class PolicyMixin:
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
-            if not c.hostiles or all(n in PASSIVE_MOLDS for _, n in c.hostiles):
+            passive = PASSIVE_ONLY if self.opts.monster_lists else PASSIVE_MOLDS
+            if not c.hostiles or all(n in passive for _, n in c.hostiles):
                 self.stun_waits += 1
                 self.press("s")
                 return True
