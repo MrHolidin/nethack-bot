@@ -16,7 +16,7 @@ import glyphs as G
 from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
-from roles import RolesMixin, AMMO
+from roles import RolesMixin, AMMO, ClassTacticsMixin
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -105,7 +105,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -823,7 +823,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin):
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
-        if self.use_roles and self.role_setup():
+        if self.use_roles and (self.role_setup() or self.healer_early_quaff()):
             return
         if self.use_enhance:
             self.enhance_step()
@@ -845,6 +845,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin):
         if len(self.hist) > 40:
             self.hist.popleft()
         if self.use_tactics and self.tactical_step(lv, hostiles):
+            return
+        if self.use_roles and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
             return
         if self.use_abilities and self.ranged_step(lv, hostiles):
             return
@@ -1157,6 +1159,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin):
         self.tactics_init()
         self.abilities_init()
         self.roles_init()
+        self.class_init()
         self.role = self.race = None
         try:
             self.settle()
@@ -1213,6 +1216,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin):
             "pet_waited": self.pet_waited_total,
             "missiles": self.missiles,
             "digs": self.digs,
+            "zaps": self.zaps,
+            "flashes": self.flashes,
+            "early_quaffs": self.early_quaffs,
             "fires": self.fires,
             "ammo_pickups": self.ammo_pickups,
             "pet_last_seen": self.pet_last_seen,

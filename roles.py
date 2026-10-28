@@ -160,3 +160,169 @@ class RolesMixin:
             return False
         t = self.fled.get(name)
         return t is not None and self.turn() - t <= 10
+
+
+# =====================================================================================
+# Class tactics v2 (wiki: Healer, Tourist, Wizard, Expensive camera, Wand of sleep pages)
+# =====================================================================================
+RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bounce off walls
+BEAM_WANDS = ("striking",)                                            # no bounce
+SAFE_RAY_DIST = 7          # ray range is 7..13: a wall >= 7 away can't bounce it back onto us
+
+
+class ClassTacticsMixin:
+    def class_init(self):
+        self.zaps = 0
+        self.flashes = 0
+        self.early_quaffs = 0
+        self.flashed = {}
+        self.empty_wands = set()
+
+    def opt(self, name, default=True):
+        return self.role_opts.get(name, default)
+
+    # ------------------------------------------------------------ danger of one monster
+    def worth_special(self, pos, name):
+        """Is this target worth a charge / energy / a flash?"""
+        g = self.obs["glyphs"][pos]
+        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if hp < maxhp * 0.5:
+            return True
+        return self.est_dmg(g, name) >= 2.0 or self.threat(g) >= 1
+
+    # ------------------------------------------------------------ ray geometry
+    def ray_safe(self, lv, dy, dx):
+        """Distance from us to the first wall/unknown along the line, doors absorb rays."""
+        y, x = self.pos()
+        k_mem = G.KIND[lv.under]
+        for i in range(1, SAFE_RAY_DIST + 1):
+            yy, xx = y + i * dy, x + i * dx
+            if not (0 <= yy < ROWS and 0 <= xx < COLS):
+                return False
+            k = k_mem[yy, xx]
+            if k in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY):
+                return True                      # doors absorb the ray
+            if k in (G.WALL, G.UNKNOWN, G.BOULDER):
+                return False
+        return True
+
+    # ------------------------------------------------------------ wands
+    def attack_wands(self):
+        out = []
+        for letter, ocls, s in self.inventory():
+            if ocls != nh.WAND_CLASS or letter in self.empty_wands:
+                continue
+            m = re.search(r"wand of ([a-z ]+?)(?: \(|$)", s)
+            if not m:
+                continue
+            kind = m.group(1).strip()
+            if re.search(r"\(\d+:0\)", s):
+                continue
+            if kind in RAY_WANDS or kind in BEAM_WANDS:
+                out.append((letter, kind))
+        prio = {"sleep": 0, "striking": 1, "magic missile": 2, "cold": 3, "fire": 4, "lightning": 5}
+        return sorted(out, key=lambda t: prio.get(t[1], 9))
+
+    def zap(self, letter, key):
+        self.press("z", expect_prompt=True)
+        if "zap" not in self.message().lower():
+            self.settle(); return False
+        self.press(letter, expect_prompt=True)
+        m = self.message().lower()
+        if "direction" in m:
+            self.press(key)
+        else:
+            self.settle()
+        msgs = " ".join(t for _, t in list(self.messages)[-3:])
+        if "Nothing happens" in msgs or "You wrest" in msgs:
+            self.empty_wands.add(letter)
+        self.zaps += 1
+        return True
+
+    def wand_step(self, lv, hostiles):
+        if not self.opt("wands"):
+            return False
+        wands = self.attack_wands()
+        if not wands:
+            return False
+        for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=6):
+            if d == 1 and pos not in [p for p, _ in hostiles]:
+                continue
+            if not self.worth_special(pos, name):
+                continue
+            if d > 1 and self.peaceful_far(lv, pos, key, d):
+                continue
+            for letter, kind in wands:
+                if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
+                    continue                     # sleep resistant
+                if kind in RAY_WANDS and not self.ray_safe(lv, -dy, -dx) and not self.ray_far_wall(lv, dy, dx):
+                    continue
+                self.cur_act = "fight"
+                self.last_attack_target = pos
+                return self.zap(letter, key)
+        return False
+
+    def ray_far_wall(self, lv, dy, dx):
+        """Wall in the firing direction is far enough that a bounce cannot come back to us."""
+        y, x = self.pos()
+        k_mem = G.KIND[lv.under]
+        for i in range(1, SAFE_RAY_DIST + 1):
+            yy, xx = y + i * dy, x + i * dx
+            if not (0 <= yy < ROWS and 0 <= xx < COLS):
+                return False
+            k = k_mem[yy, xx]
+            if k in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY):
+                return True
+            if k in (G.WALL, G.UNKNOWN, G.BOULDER):
+                return False
+        return True
+
+    # ------------------------------------------------------------ Healer
+    def healer_early_quaff(self):
+        """Wiki: drink the starting extra healing at full HP for +2 (+5 blessed) max HP each."""
+        if self.role != "Healer" or not self.opt("hea_xh"):
+            return False
+        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) or self.turn() > 300:
+            return False
+        for letter, ocls, s in self.inventory():
+            if ocls == nh.POTION_CLASS and "potion" in s and "extra healing" in s and " cursed" not in s:
+                self.press("q", expect_prompt=True)
+                if "drink" in self.message().lower():
+                    self.press(letter)
+                    self.early_quaffs += 1
+                    return True
+                self.settle()
+                return False
+        return False
+
+    # ------------------------------------------------------------ Tourist camera
+    def camera_step(self, lv, hostiles):
+        if self.role != "Tourist" or not self.opt("camera") or hostiles:
+            return False
+        cam = None
+        for letter, ocls, s in self.inventory():
+            if "expensive camera" in s and not re.search(r"\(0:0\)", s):
+                cam = letter
+        if cam is None:
+            return False
+        for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=2):
+            if d != 2 or not self.worth_special(pos, name):
+                continue
+            g = int(self.obs["glyphs"][pos])
+            if self.turn() - self.flashed.get(g, -999) < 30:
+                continue
+            if self.peaceful_far(lv, pos, key, d):
+                continue
+            self.flashed[g] = self.turn()
+            self.press("a", expect_prompt=True)
+            if "apply" not in self.message().lower():
+                self.settle(); return False
+            self.press(cam, expect_prompt=True)
+            if "direction" in self.message().lower():
+                self.press(key)
+            else:
+                self.settle()
+            self.flashes += 1
+            self.cur_act = "fight"
+            return True
+        return False

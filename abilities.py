@@ -144,7 +144,9 @@ class AbilitiesMixin:
             return False
         y, x = self.pos()
         d = min(max(abs(a - y), abs(b - x)) for a, b in zip(ys, xs))
-        if d <= 1 or d > 7 or self.pet_waits >= 15:
+        far, turns = (12, 30) if (self.role == "Archeologist" and self.use_roles
+                                  and self.role_opts.get("arc_pet", True)) else (7, 15)
+        if d <= 1 or d > far or self.pet_waits >= turns:
             self.pet_waits = 0
             return False
         self.pet_waits += 1
@@ -213,6 +215,11 @@ class AbilitiesMixin:
             elif self.peaceful_far(lv, pos, key, d):
                 continue
             y, x = self.pos()
+            if use_bolt and self.use_roles and self.role_opts.get("bolt_conserve", True) \
+                    and not self.worth_special(pos, name):
+                if not (use_missiles or use_fire):
+                    continue                     # melee weak stuff, keep energy for real threats
+                use_bolt = False
             self.last_attack_target = pos
             self.cur_act = "fight"
             if use_bolt:
