@@ -1,0 +1,7 @@
+== ran
+score     A   967.4  B  1127.4  diff  +160.0  95% CI [-26.7, +344.5]  n=60
+max_depth A     5.0  B     5.5  diff    +0.5  95% CI [-0.2, +1.1]  n=60
+== rog
+score     A   710.4  B   699.5  diff   -10.8  95% CI [-171.7, +162.9]  n=60
+max_depth A     4.2  B     4.2  diff    -0.1  95% CI [-0.6, +0.5]  n=60
+DONE

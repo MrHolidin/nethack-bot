@@ -16,6 +16,7 @@ import glyphs as G
 from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
+from roles import RolesMixin, AMMO
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -104,10 +105,10 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
-                 use_enhance=True, use_pet=True, use_abilities=True,
+                 use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
                  flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", flee_turns=4.0, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
                  descend_policy="explore"):
         from nle.env.tasks import NetHackScore
@@ -125,6 +126,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
         self.use_armor = use_armor
         self.use_food, self.use_tactics = use_food, use_tactics
         self.use_enhance, self.use_pet, self.use_abilities = use_enhance, use_pet, use_abilities
+        self.use_roles = use_roles
+        self.role_opts = role_opts or {}
         self.flee_hp, self.danger_k, self.recover_hp = flee_hp, danger_k, recover_hp
         self.corpse_policy = corpse_policy
         self.flee_turns = flee_turns
@@ -285,6 +288,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
                     lv.blocked[ny, nx] = True
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
+        for mf in re.finditer(r"The ([a-zA-Z' -]+?) turns to flee", m):
+            self.fled[mf.group(1)] = self.turn()
         if "more confident in your" in m:
             self.skill_msgs += 1
             self.want_enhance = True
@@ -720,6 +725,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
+                if self.use_roles and self.knight_skip(name):
+                    continue
                 if self.is_peaceful((ny, nx)):
                     continue
                 out.append(((ny, nx), name))
@@ -816,9 +823,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
+        if self.use_roles and self.role_setup():
+            return
         if self.use_enhance:
             self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
+        if self.use_roles and self.prev_weapon is not None and self.rewield_after_dig(hostiles):
+            return
         if self.use_abilities and self.heal_step(hostiles):
             return
         vis_n = len(self.visible_hostiles(lv))
@@ -869,12 +880,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
 
         # missiles lying where we stand (our own thrown ones, or new ammo for missile roles)
         sh = self.seen_here
-        if sh and sh[0] == self.turn() and sh[1] == (y, x) and (self.throws or self.role in ("Tourist", "Rogue")) \
-                and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?)\b", sh[2]) \
+        if sh and sh[0] == self.turn() and sh[1] == (y, x) and (self.throws or self.role in ("Tourist", "Rogue", "Ranger")) \
+                and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b", sh[2]) \
                 and "for sale" not in sh[2] and not lv.shop[y, x]:
             self.seen_here = None
             n_before = len(self.inventory())
-            self.pickup_matching(THROWABLE)
+            self.pickup_matching(THROWABLE + ("arrow", "crossbow bolt"))
             self.ammo_pickups += 1
             return
 
@@ -1041,6 +1052,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
         # nothing left: map the level if we can, else search for hidden passages
         if self.use_abilities and self.magic_map_step(lv):
             return
+        if self.use_roles and self.dig_down(lv):
+            return
         self.search_mode(lv, k_mem, k_live, passable)
 
     def should_descend(self, lv, frontier, on_level):
@@ -1143,6 +1156,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
         self.equip_init()
         self.tactics_init()
         self.abilities_init()
+        self.roles_init()
         self.role = self.race = None
         try:
             self.settle()
@@ -1198,6 +1212,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
             "missiles": self.missiles,
+            "digs": self.digs,
+            "fires": self.fires,
             "ammo_pickups": self.ammo_pickups,
             "pet_last_seen": self.pet_last_seen,
             "time_by": self.time_by,

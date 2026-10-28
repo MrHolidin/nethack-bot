@@ -1,0 +1,14 @@
+arc score  mean 907  median 718  max 2909
+bar score  mean 2398  median 1664  max 7899
+cav score  mean 1162  median 1019  max 3115
+hea score  mean 590  median 504  max 1724
+kni score  mean 1140  median 896  max 3303
+mon score  mean 2461  median 2048  max 8106
+pri score  mean 1099  median 940  max 3199
+ran score  mean 870  median 736  max 3582
+rog score  mean 776  median 638  max 2259
+sam score  mean 1748  median 1393  max 5980
+tou score  mean 739  median 690  max 2060
+val score  mean 2242  median 1552  max 13763
+wiz score  mean 1064  median 884  max 3578
+DONE

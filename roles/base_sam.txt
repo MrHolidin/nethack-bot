@@ -1,0 +1,8 @@
+games 40  crashes 0  wall 89s
+score  mean 1748  median 1393  max 5980
+depth  mean 6.65  median 6.0  max 13  hist [(1, 1), (2, 2), (4, 3), (5, 4), (6, 13), (7, 6), (8, 3), (9, 3), (10, 1), (11, 2), (13, 2)]
+turns  median 2609.5   xl median 5.0
+truncated: 0
+causes: [('bugbear', 4), ('?', 3), ('dwarf king', 3), ('giant ant', 2), ('giant bat', 2), ('tiger', 2), ('gnome king', 2), ('rothe', 2), ('snake', 2), ('gnome lord', 2), ('unseen', 2), ('large kobold', 1)]
+died in mines: 0 / 40
+by role: {'Samurai': (40, 1393)}

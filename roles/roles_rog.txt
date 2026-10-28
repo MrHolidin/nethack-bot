@@ -1,0 +1,8 @@
+games 40  crashes 0  wall 50s
+score  mean 844  median 686  max 3038
+depth  mean 4.30  median 4.0  max 8  hist [(1, 2), (2, 5), (3, 6), (4, 9), (5, 9), (6, 4), (7, 3), (8, 2)]
+turns  median 2159.0   xl median 4.0
+truncated: 0
+causes: [('dwarf', 3), ('rothe', 3), ('sewer rat', 3), ('?', 3), ('starvation', 3), ('little dog', 2), ('hill orc', 2), ('giant ant', 2), ('vampire bat', 2), ('wand', 2), ('elf zombie', 1), ('werejackal', 1)]
+died in mines: 0 / 40
+by role: {'Rogue': (40, 686)}

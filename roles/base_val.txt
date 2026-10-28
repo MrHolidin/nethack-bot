@@ -1,0 +1,8 @@
+games 40  crashes 0  wall 111s
+score  mean 2242  median 1552  max 13763
+depth  mean 6.55  median 6.5  max 11  hist [(2, 1), (3, 3), (4, 3), (5, 5), (6, 8), (7, 6), (8, 8), (9, 2), (10, 2), (11, 2)]
+turns  median 3829.5   xl median 5.0
+truncated: 0
+causes: [('starvation', 5), ('?', 4), ('unseen', 4), ('magic missile', 2), ('giant ant', 2), ('ape', 2), ('soldier ant', 2), ('hill orc', 1), ('kobold lord', 1), ('panther', 1), ('gnome king', 1), ('small mimic', 1)]
+died in mines: 2 / 40
+by role: {'Valkyrie': (40, 1552)}

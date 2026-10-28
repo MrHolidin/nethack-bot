@@ -1,0 +1,8 @@
+games 40  crashes 0  wall 78s
+score  mean 1040  median 864  max 2528
+depth  mean 5.20  median 5.0  max 10  hist [(2, 3), (3, 7), (4, 3), (5, 9), (6, 8), (7, 6), (8, 3), (10, 1)]
+turns  median 3092.5   xl median 4.0
+truncated: 0
+causes: [('?', 4), ('giant ant', 3), ('kitten', 2), ('killer bee', 2), ('wand', 2), ('rabid rat', 2), ('dwarf king', 1), ('rothe', 1), ('gray unicorn', 1), ('gold golem', 1), ('dingo', 1), ('gnome king', 1)]
+died in mines: 0 / 40
+by role: {'Knight': (40, 864)}

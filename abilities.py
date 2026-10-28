@@ -197,7 +197,10 @@ class AbilitiesMixin:
         """Force bolt (if known) or missiles (missile roles). Returns True if acted."""
         use_bolt = self.can_cast("force bolt") if self.spells is not False else False
         use_missiles = self.role in MISSILE_ROLES and self.throwables()
-        if not (use_bolt or use_missiles):
+        use_fire = self.use_roles and self.ranger_can_fire()
+        if self.use_roles and self.ranger_check_ammo():
+            return True
+        if not (use_bolt or use_missiles or use_fire):
             return False
         for key, d, pos, (dy, dx), name in self.line_targets(lv):
             if name in ("floating eye",) and not use_missiles:
@@ -205,6 +208,8 @@ class AbilitiesMixin:
             if d == 1:
                 if pos not in [p for p, _ in hostiles]:
                     continue                     # adjacent but peaceful/unchecked
+                if self.use_roles and self.role == "Rogue" and not use_bolt:
+                    continue                     # melee adjacent foes, throw only at range
             elif self.peaceful_far(lv, pos, key, d):
                 continue
             y, x = self.pos()
@@ -212,6 +217,9 @@ class AbilitiesMixin:
             self.cur_act = "fight"
             if use_bolt:
                 return self.cast("force bolt", key)
+            if use_fire:
+                self.fire(key)
+                return True
             ray = [(y + i * dy, x + i * dx) for i in range(1, 10)
                    if 0 <= y + i * dy < ROWS and 0 <= x + i * dx < COLS]
             self.missiles += 1

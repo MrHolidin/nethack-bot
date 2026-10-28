@@ -1,0 +1,8 @@
+games 40  crashes 0  wall 63s
+score  mean 907  median 718  max 2909
+depth  mean 4.97  median 5.0  max 9  hist [(1, 3), (3, 6), (4, 6), (5, 11), (6, 6), (7, 3), (8, 3), (9, 2)]
+turns  median 1917.0   xl median 4.0
+truncated: 0
+causes: [('rothe', 5), ('hill orc', 3), ('rope golem', 2), ('wand', 2), ('?', 2), ('giant bat', 2), ('gnome lord', 2), ('starvation', 1), ('jaguar', 1), ('wererat', 1), ('killer bee', 1), ('homunculus', 1)]
+died in mines: 3 / 40
+by role: {'Archeologist': (40, 718)}

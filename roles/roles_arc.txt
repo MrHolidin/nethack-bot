@@ -1,0 +1,8 @@
+games 40  crashes 0  wall 36s
+score  mean 592  median 559  max 1854
+depth  mean 5.38  median 5.0  max 12  hist [(1, 5), (2, 2), (3, 1), (4, 5), (5, 9), (6, 5), (7, 5), (8, 5), (10, 1), (11, 1), (12, 1)]
+turns  median 1124.0   xl median 3.0
+truncated: 0
+causes: [('rothe', 6), ('?', 4), ('werejackal', 4), ('giant ant', 3), ('wand', 2), ('bugbear', 1), ('wraith', 1), ('giant spider', 1), ('hobgoblin', 1), ('imp', 1), ('homunculus', 1), ('werewolf', 1)]
+died in mines: 1 / 40
+by role: {'Archeologist': (40, 559)}

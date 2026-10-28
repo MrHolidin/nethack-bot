@@ -1,0 +1,5 @@
+arc score  mean 592  median 559  max 1854
+ran score  mean 1097  median 1054  max 2249
+kni score  mean 1040  median 864  max 2528
+rog score  mean 844  median 686  max 3038
+DONE
