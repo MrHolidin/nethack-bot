@@ -103,8 +103,8 @@ class Level:
 
 class Bot(EquipMixin, TacticsMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
-                 avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
-                 flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
+                 avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
+                 flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", flee_turns=4.0, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
                  descend_policy="explore"):
         from nle.env.tasks import NetHackScore
         self.env = NetHackScore(character=character,
@@ -122,6 +122,7 @@ class Bot(EquipMixin, TacticsMixin):
         self.use_food, self.use_tactics = use_food, use_tactics
         self.flee_hp, self.danger_k, self.recover_hp = flee_hp, danger_k, recover_hp
         self.corpse_policy = corpse_policy
+        self.flee_turns = flee_turns
         self.rest_frac, self.elb_frac, self.descend_hp = rest_frac, elb_frac, descend_hp
         self.descend_policy = descend_policy
         acts = self.env.unwrapped.actions
@@ -799,8 +800,15 @@ class Bot(EquipMixin, TacticsMixin):
 
         hostiles = self.adjacent_hostiles(lv)
         vis_n = len(self.visible_hostiles(lv))
+        km = G.KIND[lv.under]
+        sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
+        d_st = int(min((max(abs(a - y), abs(b - x)) for a, b in zip(sy, sx)), default=99))
+        st_here = self.stairs_kind_here(lv)
+        adj_info = [(n, bool(PM_BY_NAME[n].mflags2 & 0x01000000) if n in PM_BY_NAME else None,
+                     PM_BY_NAME[n].mmove if n in PM_BY_NAME else None) for _, n in hostiles]
         self.hist.append((t, hp, maxhp, len(hostiles), vis_n, self.can_pray(), self.bl(nh.NLE_BL_DEPTH),
-                          self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_AC)))
+                          self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_AC), d_st,
+                          int(st_here) if st_here is not None else 0, adj_info))
         if len(self.hist) > 40:
             self.hist.popleft()
         if self.use_tactics and self.tactical_step(lv, hostiles):
@@ -1117,6 +1125,8 @@ class Bot(EquipMixin, TacticsMixin):
             "loops": self.loops,
             "start_ac": self.start_ac,
             "flees": self.flees,
+            "escape_log": self.escape_log,
+            "stair_rests": self.stair_rests,
             "stair_runs": self.stair_runs,
             "food_picked": self.food_picked,
             "hist": list(self.hist),
