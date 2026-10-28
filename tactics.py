@@ -128,6 +128,7 @@ class TacticsMixin:
         self.press(key)
 
     def rest_here(self):
+        self.cur_act = "rest"
         self.stair_rests += 1
         self.press("2"); self.press("0"); self.press("s")
 
@@ -192,6 +193,7 @@ class TacticsMixin:
         if not hostiles and not visible and hp < maxhp * self.flee_hp and not self.can_pray() and here is None:
             d, step = self.path_to_stairs(lv, max_cost=25)
             if step is not None:
+                self.cur_act = "stairs"
                 self.stair_runs += 1
                 self.move(step)
                 return True

@@ -15,6 +15,7 @@ import nle.nethack as nh
 import glyphs as G
 from equipment import EquipMixin
 from tactics import TacticsMixin
+from abilities import AbilitiesMixin
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -93,6 +94,8 @@ class Level:
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.desperate = False
+        self.search_turns = 0
+        self.turns_here = 0
         self.progress_count = 0
         self.last_progress = 0
         self.last_reset = 0   # downstairs leading into the Gnomish Mines
@@ -101,9 +104,10 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
+                 use_enhance=True, use_pet=True, use_abilities=True,
                  flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", flee_turns=4.0, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
                  descend_policy="explore"):
         from nle.env.tasks import NetHackScore
@@ -120,6 +124,7 @@ class Bot(EquipMixin, TacticsMixin):
         self.avoid_mines = avoid_mines
         self.use_armor = use_armor
         self.use_food, self.use_tactics = use_food, use_tactics
+        self.use_enhance, self.use_pet, self.use_abilities = use_enhance, use_pet, use_abilities
         self.flee_hp, self.danger_k, self.recover_hp = flee_hp, danger_k, recover_hp
         self.corpse_policy = corpse_policy
         self.flee_turns = flee_turns
@@ -181,7 +186,9 @@ class Bot(EquipMixin, TacticsMixin):
         for _ in range(50):
             tty = self.tty_text()
             msg = self.message()
-            if self.obs["misc"][2] or "--More--" in tty.replace("\n", ""):
+            flat = tty.replace("\n", "")
+            menu = re.search(r"\(end\)|\(\d+ of \d+\)", tty)
+            if "--More--" in flat or (self.obs["misc"][2] and not menu):
                 self.log_msg(msg if msg else self.top_line().replace("--More--", ""))
                 self.raw_step(13)
                 continue
@@ -276,6 +283,13 @@ class Bot(EquipMixin, TacticsMixin):
                 ny, nx = y + dy, x + dx
                 if 0 <= ny < ROWS and 0 <= nx < COLS and G.KIND[lv.under[ny, nx]] == G.DOOR_CLOSED:
                     lv.blocked[ny, nx] = True
+        if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
+            self.seen_here = (self.turn(), self.pos(), m)
+        if "more confident in your" in m:
+            self.skill_msgs += 1
+            self.want_enhance = True
+        if re.search(r"You (kill|destroy) ", m):
+            self.kill_count += 1
         mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
         if mk and self.last_attack_target:
             self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
@@ -404,6 +418,7 @@ class Bot(EquipMixin, TacticsMixin):
                 lv.blocked[ty, tx] = True
 
     def attack(self, target):
+        self.cur_act = "fight"
         y, x = self.pos()
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
         self.last_attack_target = target
@@ -455,6 +470,7 @@ class Bot(EquipMixin, TacticsMixin):
             self.level().locked.discard(self.last_move_target)
 
     def pray(self):
+        self.cur_act = "pray"
         self.last_pray = self.turn()
         self.prayers += 1
         self.press("#", expect_prompt=True)
@@ -595,7 +611,7 @@ class Bot(EquipMixin, TacticsMixin):
     def throwables(self):
         out = []
         for letter, ocls, s in self.inventory():
-            if "weapon in hand" in s or "wielded" in s or " cursed" in s:
+            if "weapon in hand" in s or "(wielded)" in s or " cursed" in s:
                 continue
             if ocls == nh.WEAPON_CLASS and any(t in s for t in THROWABLE):
                 out.append((0, letter, s))
@@ -755,6 +771,8 @@ class Bot(EquipMixin, TacticsMixin):
         hunger = self.bl(nh.NLE_BL_HUNGER)
 
         t = self.turn()
+        if (G.KIND[self.obs["glyphs"]] == G.PET).any():
+            self.pet_last_seen = t
         if t != self.loop_turn:
             self.loop_turn, self.loop_steps = t, self.steps
         elif self.steps - self.loop_steps > 300:      # stuck in a no-time loop
@@ -798,7 +816,11 @@ class Bot(EquipMixin, TacticsMixin):
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
+        if self.use_enhance:
+            self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
+        if self.use_abilities and self.heal_step(hostiles):
+            return
         vis_n = len(self.visible_hostiles(lv))
         km = G.KIND[lv.under]
         sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
@@ -812,6 +834,8 @@ class Bot(EquipMixin, TacticsMixin):
         if len(self.hist) > 40:
             self.hist.popleft()
         if self.use_tactics and self.tactical_step(lv, hostiles):
+            return
+        if self.use_abilities and self.ranged_step(lv, hostiles):
             return
         if hostiles:
             if hp < maxhp * self.elb_frac and (y, x) not in lv.elbereth and self.elbereths < 40:
@@ -827,6 +851,7 @@ class Bot(EquipMixin, TacticsMixin):
             self.attack(target)
             return
         if (y, x) in lv.elbereth and hp * 2 < maxhp:
+            self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return
 
@@ -841,6 +866,17 @@ class Bot(EquipMixin, TacticsMixin):
                 self.last_attack_target = tpos
                 self.throw(th[0][0], key, ray)
                 return
+
+        # missiles lying where we stand (our own thrown ones, or new ammo for missile roles)
+        sh = self.seen_here
+        if sh and sh[0] == self.turn() and sh[1] == (y, x) and (self.throws or self.role in ("Tourist", "Rogue")) \
+                and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?)\b", sh[2]) \
+                and "for sale" not in sh[2] and not lv.shop[y, x]:
+            self.seen_here = None
+            n_before = len(self.inventory())
+            self.pickup_matching(THROWABLE)
+            self.ammo_pickups += 1
+            return
 
         # pick thrown weapons back up
         if self.retrieve:
@@ -881,6 +917,7 @@ class Bot(EquipMixin, TacticsMixin):
 
         # rest if hurt and nothing around
         if hp < maxhp * self.rest_frac and not vis:
+            self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return
 
@@ -938,6 +975,7 @@ class Bot(EquipMixin, TacticsMixin):
         return True
 
     def explore(self, lv):
+        self.cur_act = "explore"
         k_mem, k_live = self.kind_grid(lv)
         passable = self.passable_grid(lv, k_mem, k_live)
         start = self.pos()
@@ -959,6 +997,8 @@ class Bot(EquipMixin, TacticsMixin):
 
         if want_down:
             if downstairs[y, x]:
+                if self.use_pet and self.pet_wait_before_stairs():
+                    self.press("s"); return
                 self.descents += 1
                 self.took_stairs = True
                 self.press(">")
@@ -985,6 +1025,8 @@ class Bot(EquipMixin, TacticsMixin):
 
         if downstairs.any():
             if downstairs[y, x]:
+                if self.use_pet and self.pet_wait_before_stairs():
+                    self.press("s"); return
                 self.descents += 1
                 self.took_stairs = True
                 self.press(">")
@@ -996,7 +1038,9 @@ class Bot(EquipMixin, TacticsMixin):
                     self.move(step)
                     return
 
-        # nothing left: search for hidden passages
+        # nothing left: map the level if we can, else search for hidden passages
+        if self.use_abilities and self.magic_map_step(lv):
+            return
         self.search_mode(lv, k_mem, k_live, passable)
 
     def should_descend(self, lv, frontier, on_level):
@@ -1016,6 +1060,7 @@ class Bot(EquipMixin, TacticsMixin):
         return not frontier.any()
 
     def search_mode(self, lv, k_mem, k_live, passable):
+        self.cur_act = "search"
         start = self.pos()
         dist, prev, _ = self.dijkstra(lv, k_mem, k_live, passable, start, None)
         reach = dist < (1 << 30)
@@ -1066,6 +1111,13 @@ class Bot(EquipMixin, TacticsMixin):
         self.peaceful_seen = 0
         self.throws = 0
         self.lycanthropy = False
+        self.seen_here = None
+        self.ammo_pickups = 0
+        self.time_by = {}
+        self.cur_act = "other"
+        self.skill_msgs = 0
+        self.kill_count = 0
+        self.pet_last_seen = 0
         self.faint_since = None
         self.hist = deque()
         self.no_eat_until = 0
@@ -1090,6 +1142,7 @@ class Bot(EquipMixin, TacticsMixin):
         self.intro = self.message()
         self.equip_init()
         self.tactics_init()
+        self.abilities_init()
         self.role = self.race = None
         try:
             self.settle()
@@ -1104,7 +1157,17 @@ class Bot(EquipMixin, TacticsMixin):
             self.settle()
             self.start_ac = self.bl(nh.NLE_BL_AC)
             while True:
+                t0 = self.turn()
+                self.cur_act = "other"
                 self.tick()
+                dt = self.turn() - t0
+                if dt > 0:
+                    self.time_by[self.cur_act] = self.time_by.get(self.cur_act, 0) + dt
+                    lvc = self.levels.get(self.cur_key)
+                    if lvc is not None:
+                        lvc.turns_here += dt
+                        if self.cur_act == "search":
+                            lvc.search_turns += dt
         except GameOver:
             pass
         return self.summary()
@@ -1124,6 +1187,26 @@ class Bot(EquipMixin, TacticsMixin):
             "throws": self.throws,
             "loops": self.loops,
             "start_ac": self.start_ac,
+            "exp": self.bl(nh.NLE_BL_EXP),
+            "gold": self.bl(nh.NLE_BL_GOLD),
+            "maxhp": self.bl(nh.NLE_BL_HPMAX),
+            "kills": self.kill_count,
+            "skill_msgs": self.skill_msgs,
+            "enhances": self.enhances,
+            "casts": self.casts,
+            "quaffs": self.quaffs,
+            "maps_read": self.maps_read,
+            "pet_waited": self.pet_waited_total,
+            "missiles": self.missiles,
+            "ammo_pickups": self.ammo_pickups,
+            "pet_last_seen": self.pet_last_seen,
+            "time_by": self.time_by,
+            "levels_seen": len(self.levels),
+            "level_stats": [dict(key=list(k), turns=v.turns_here, search=v.search_turns,
+                                 down_known=bool((G.KIND[v.under] == G.DOWNSTAIR).any()),
+                                 mines_branch=bool(v.avoid_down), desperate=v.desperate,
+                                 seen=int(v.seen.sum()))
+                            for k, v in self.levels.items()],
             "flees": self.flees,
             "escape_log": self.escape_log,
             "stair_rests": self.stair_rests,
