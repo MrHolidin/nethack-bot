@@ -100,3 +100,9 @@ def monster_letter(g):
 
 def trap_name(g):
     return nh.symdef.from_idx(nh.glyph_to_cmap(g)).explanation
+
+# '[' piles: armor class is visible to a human (symbol), the exact type is not used
+ARMOR_GLYPH = np.zeros(N, dtype=bool)
+for g in range(N):
+    if nh.glyph_is_normal_object(g) and ord(nh.objclass(nh.glyph_to_obj(g)).oc_class) == nh.ARMOR_CLASS:
+        ARMOR_GLYPH[g] = True

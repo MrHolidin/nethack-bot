@@ -13,6 +13,7 @@ import nle.env.base
 import nle.nethack as nh
 
 import glyphs as G
+from equipment import EquipMixin
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -89,9 +90,9 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot:
+class Bot(EquipMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
-                 avoid_mines=True, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
+                 avoid_mines=True, use_armor=True, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
                  descend_policy="explore"):
         from nle.env.tasks import NetHackScore
         self.env = NetHackScore(character=character,
@@ -105,6 +106,7 @@ class Bot:
         self.max_steps = max_steps
         self.max_turns = max_turns
         self.avoid_mines = avoid_mines
+        self.use_armor = use_armor
         self.rest_frac, self.elb_frac, self.descend_hp = rest_frac, elb_frac, descend_hp
         self.descend_policy = descend_policy
         acts = self.env.unwrapped.actions
@@ -268,6 +270,12 @@ class Bot:
             # shop entrance: never go inside (we get trapped / risk shoplifting)
             self.mark_shop(lv, self.pos())
             self.shops_seen += 1
+        if "You feel feverish" in m:
+            self.lycanthropy = True
+        if "You feel purified" in m:
+            self.lycanthropy = False
+        if "carrying so much" in m:
+            self.no_eat_until = self.turn() + 20
         if "You die" in m or "You starve" in m:
             self.death_msgs = list(self.messages)[-8:]
 
@@ -433,6 +441,20 @@ class Bot:
         for c in "pray":
             self.raw_step(ord(c))
         self.press(13)
+
+    def drop_heavy(self):
+        """Strained or worse (e.g. polymorphed into something small): shed non-essentials."""
+        order = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.TOOL_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS,
+                 nh.SPBOOK_CLASS, nh.POTION_CLASS, nh.WAND_CLASS, nh.SCROLL_CLASS)
+        inv = self.inventory()
+        for cls in order:
+            for letter, ocls, s in inv:
+                if ocls == cls and "being worn" not in s and "weapon in hand" not in s \
+                        and (letter, s) not in self.undroppable:
+                    self.undroppable.add((letter, s))   # try each item once
+                    self.drop_letter(letter)
+                    return True
+        return False
 
     def can_pray(self, hunger_emergency=None):
         if self.god_angry:
@@ -607,7 +629,7 @@ class Bot:
                 continue
             for p in ray:
                 if G.KIND[g[p]] == G.OBJECT and nh.glyph_is_object(int(g[p])) and \
-                        nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class in (nh.WEAPON_CLASS, nh.GEM_CLASS):
+                        ord(nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class) in (nh.WEAPON_CLASS, nh.GEM_CLASS):
                     return p
         return None
 
@@ -726,6 +748,10 @@ class Bot:
             self.pray(); return
         if hunger >= WEAK and self.can_pray(hunger_emergency=hunger >= FAINTING):
             self.pray(); return
+        if self.lycanthropy and self.can_pray():
+            self.pray(); return
+        if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
+            return
 
         hostiles = self.adjacent_hostiles(lv)
         if hostiles:
@@ -770,7 +796,7 @@ class Bot:
                 self.retrieve = [r for r in self.retrieve if goal not in r[1]]
 
         # hunger
-        if hunger >= HUNGRY:
+        if hunger >= HUNGRY and self.turn() >= self.no_eat_until:
             if self.eat_from_inventory():
                 return
 
@@ -785,8 +811,16 @@ class Bot:
                 if self.go_toward(lv, goal):
                     return
 
-        # rest if hurt and nothing around
         vis = self.visible_hostiles(lv)
+        if self.use_armor and not vis:
+            if self.equip_step(lv):
+                return
+            if G.ARMOR_GLYPH[lv.under[y, x]] and (y, x) not in self.inspected.get(lv.key, ()) \
+                    and not lv.shop[y, x]:
+                if self.armor_pickup_here(lv):
+                    return
+
+        # rest if hurt and nothing around
         if hp < maxhp * self.rest_frac and not vis:
             self.press("2"); self.press("0"); self.press("s")
             return
@@ -878,6 +912,8 @@ class Bot:
                     return
 
         targets = frontier | gold
+        if self.use_armor:
+            targets = targets | (self.armor_targets(lv, G) & passable)
         if targets.any():
             dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
             if reached is not None and reached != start:
@@ -970,6 +1006,9 @@ class Bot:
         self.pray_failed = 0
         self.peaceful_seen = 0
         self.throws = 0
+        self.lycanthropy = False
+        self.no_eat_until = 0
+        self.undroppable = set()
         self.shops_seen = 0
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
         self.desperations = 0
@@ -988,6 +1027,7 @@ class Bot:
         self.max_depth = 1
         self.death_msgs = []
         self.intro = self.message()
+        self.equip_init()
         self.role = self.race = None
         try:
             self.settle()
@@ -1000,6 +1040,7 @@ class Bot:
                 self.role, self.race = words[-1], words[-2]
             self.raw_step(27)
             self.settle()
+            self.start_ac = self.bl(nh.NLE_BL_AC)
             while True:
                 self.tick()
         except GameOver:
@@ -1020,6 +1061,10 @@ class Bot:
             "corpses": self.corpses_eaten,
             "throws": self.throws,
             "loops": self.loops,
+            "start_ac": self.start_ac,
+            "ac": self.bl(nh.NLE_BL_AC),
+            "worn": [e[2] for e in self.equip_events if e[1] == "wear"],
+            "equip_fail": sum(1 for e in self.equip_events if e[1] == "fail"),
             "shops": self.shops_seen,
             "desperate": self.desperations,
             "resets": self.resets,
