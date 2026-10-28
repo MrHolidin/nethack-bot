@@ -106,3 +106,9 @@ ARMOR_GLYPH = np.zeros(N, dtype=bool)
 for g in range(N):
     if nh.glyph_is_normal_object(g) and ord(nh.objclass(nh.glyph_to_obj(g)).oc_class) == nh.ARMOR_CLASS:
         ARMOR_GLYPH[g] = True
+
+# '%' food items (not corpses: those are body glyphs)
+FOOD_GLYPH = np.zeros(N, dtype=bool)
+for g in range(N):
+    if nh.glyph_is_normal_object(g) and ord(nh.objclass(nh.glyph_to_obj(g)).oc_class) == nh.FOOD_CLASS:
+        FOOD_GLYPH[g] = True

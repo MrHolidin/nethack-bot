@@ -78,6 +78,15 @@ for n in ("mummy wrapping", "orcish cloak", "coarse mantelet", "dwarvish cloak",
 for n in ("Hawaiian shirt", "T-shirt"):
     UNSAFE[n] = (SHIRT, 0)
 
+# safe permanent food (no eggs: could be cockatrice; no tins: slow; no unknown corpses)
+SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration", "fortune cookie",
+             "apple", "orange", "pear", "melon", "banana", "carrot", "slime mold", "pancake", "cream pie",
+             "candy bar", "lump of royal jelly", "kelp frond", "eucalyptus leaf", "sprig of wolfsbane",
+             "clove of garlic", "meatball", "meat stick", "huge chunk of meat", "meat ring",
+             "lichen corpse", "lizard corpse")
+MEAT = ("meatball", "meat stick", "huge chunk of meat", "meat ring", "lichen corpse" and "", "lizard corpse")
+MAX_FOOD = 6
+
 HEAVY = {"bronze plate mail", "plate mail", "crystal plate mail", "splint mail", "banded mail"}
 
 # unknown enchantment of a floor item: ~79% uncursed (+0 mostly), ~12% cursed (often -1..-3)
@@ -129,6 +138,7 @@ class EquipMixin:
         self.equip_events = []        # (turn, action, name)
         self.inspected = {}           # level key -> set of positions looked at
         self.start_ac = None
+        self.food_picked = 0
 
     # ---------------------------------------------------------- inventory view
     def armor_inventory(self):
@@ -278,6 +288,18 @@ class EquipMixin:
         self.settle()
         return names
 
+    def food_count(self):
+        return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
+
+    def food_wanted(self, name):
+        if not self.use_food or self.food_count() >= MAX_FOOD:
+            return False
+        if any(b in name for b in ("egg", "tin", "partly eaten")):
+            return False
+        if self.role == "Monk" and any(m and m in name for m in MEAT):
+            return False
+        return any(f in name for f in SAFE_FOOD)
+
     def armor_pickup_here(self, lv):
         key = lv.key
         insp = self.inspected.setdefault(key, set())
@@ -286,9 +308,13 @@ class EquipMixin:
         worn = self.worn_by_slot()
         want = []
         for n in names:
-            a = parse_armor(n)
+            a = parse_armor(n) if self.use_armor else None
             if a and self.improves(a, worn):
                 want.append(a["name"])
+            elif self.food_wanted(n):
+                fm = next(f for f in SAFE_FOOD if f in n)
+                want.append(fm)
+                self.food_picked += 1
         if not want:
             return False
         cap_before = self.bl(nh.NLE_BL_CAP)
@@ -302,8 +328,10 @@ class EquipMixin:
         return True
 
     def armor_targets(self, lv, glyphs_mod):
-        """Mask of remembered '[' piles not yet inspected."""
-        mask = glyphs_mod.ARMOR_GLYPH[lv.under]
+        """Mask of remembered '[' (and '%' food when low on food) piles not yet inspected."""
+        mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.use_armor else np.zeros(lv.under.shape, bool)
+        if self.use_food and self.food_count() < MAX_FOOD:
+            mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False
         return mask

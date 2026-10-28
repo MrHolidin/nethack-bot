@@ -14,6 +14,7 @@ import nle.nethack as nh
 
 import glyphs as G
 from equipment import EquipMixin
+from tactics import TacticsMixin
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -28,7 +29,7 @@ SATIATED, NOT_HUNGRY, HUNGRY, WEAK, FAINTING = 0, 1, 2, 3, 4
 
 NEVER_MELEE = {"floating eye", "gas spore", "cockatrice", "chickatrice",
                "blue jelly", "spotted jelly", "ochre jelly", "brown mold", "green mold"}
-ALWAYS_AVOID = {"gas spore", "cockatrice", "chickatrice"}   # even when desperate
+ALWAYS_AVOID = {"gas spore", "cockatrice", "chickatrice", "brown mold", "green mold"}   # even when desperate
 RANGED_TARGETS = {"floating eye", "gas spore", "blue jelly", "spotted jelly",
                   "ochre jelly", "brown mold", "green mold", "cockatrice", "chickatrice"}
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
@@ -64,6 +65,16 @@ MINOTAUR_MLET = nh.permonst(next(i for i in range(nh.NUMMONS)
                                  if nh.permonst(i).mname == "minotaur")).mlet
 
 
+# monflag.h (NetHack 3.6)
+M1_ACID, M1_POIS = 0x08000000, 0x10000000
+M2_UNDEAD, M2_WERE, M2_SHAPESHIFTER = 0x2, 0x4, 0x4000
+RACE_FLAG = {"human": 0x8, "elf": 0x10, "elven": 0x10, "dwarf": 0x20, "dwarven": 0x20,
+             "gnome": 0x40, "gnomish": 0x40, "orc": 0x80, "orcish": 0x80}
+NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
+             "kitten", "housecat", "large cat", "Death", "Pestilence", "Famine"}
+PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
+
+
 class GameOver(Exception):
     pass
 
@@ -90,9 +101,10 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin):
+class Bot(EquipMixin, TacticsMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
-                 avoid_mines=True, use_armor=True, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
+                 avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
+                 flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
                  descend_policy="explore"):
         from nle.env.tasks import NetHackScore
         self.env = NetHackScore(character=character,
@@ -107,6 +119,9 @@ class Bot(EquipMixin):
         self.max_turns = max_turns
         self.avoid_mines = avoid_mines
         self.use_armor = use_armor
+        self.use_food, self.use_tactics = use_food, use_tactics
+        self.flee_hp, self.danger_k, self.recover_hp = flee_hp, danger_k, recover_hp
+        self.corpse_policy = corpse_policy
         self.rest_frac, self.elb_frac, self.descend_hp = rest_frac, elb_frac, descend_hp
         self.descend_policy = descend_policy
         acts = self.env.unwrapped.actions
@@ -156,6 +171,8 @@ class Bot(EquipMixin):
     def press(self, key, expect_prompt=False):
         """Send one key, then clear --More-- and unexpected menus/prompts."""
         code = ord(key) if isinstance(key, str) else key
+        if key in ("<", ">"):
+            self.last_stair_dir = key
         self.raw_step(code)
         self.settle(expect_prompt)
 
@@ -249,6 +266,8 @@ class Bot(EquipMixin):
                 "There is a boulder in your way",
                 "You are carrying too much to get through",
                 "You don't have enough room to maneuver")):
+            lv.blocked[self.last_move_target] = True
+        if "no shape for kicking" in m and lv and self.last_move_target:
             lv.blocked[self.last_move_target] = True
         if "Closed for inventory" in m and lv:
             y, x = self.pos()
@@ -463,9 +482,9 @@ class Bot(EquipMixin):
         if self.last_pray is None:
             return t > 300 or (hunger_emergency and t > 100)
         gap = t - self.last_pray
-        if hunger_emergency:          # fainting: starving is certain death
+        if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
-        return gap > 1000 if hunger_emergency is None else gap > 700
+        return gap > 1000
 
     def engrave_elbereth(self):
         lv = self.level()
@@ -510,10 +529,26 @@ class Bot(EquipMixin):
         return False
 
     def corpse_ok(self, name):
-        if name not in SAFE_CORPSES:
+        """Fresh corpse of our own kill: decide from the species' flags."""
+        if self.corpse_policy == "whitelist":
+            if name not in SAFE_CORPSES:
+                return False
+            kin = RACE_KIN.get((self.race or "").lower(), ())
+            return not any(k.lower() in name.lower() for k in kin)
+        pm = PM_BY_NAME.get(name)
+        if pm is None or name in NEVER_EAT:
             return False
-        kin = RACE_KIN.get((self.race or "").lower(), ())
-        return not any(k.lower() in name.lower() for k in kin)
+        f1, f2 = pm.mflags1, pm.mflags2
+        if f2 & (M2_UNDEAD | M2_WERE | M2_SHAPESHIFTER):
+            return False
+        if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
+            return False                      # cannibalism
+        hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
+        if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
+            return hunger >= WEAK and hp > 20
+        if self.role == "Monk":
+            return hunger >= HUNGRY           # vegetarian conduct: meat only when needed
+        return True
 
     def eat_corpse_here(self):
         self.press("e", expect_prompt=True)
@@ -703,7 +738,10 @@ class Bot(EquipMixin):
         arrived_by_stairs = False
         if lv.key != self.prev_key:
             arrived_by_stairs = self.took_stairs
+            self.note_stair_arrival(lv, True)
             self.prev_key = lv.key
+        else:
+            self.last_stair_dir = None
         self.took_stairs = False
         if self.avoid_mines and lv.key[0] == 2 and lv.key not in self.mines_bounced \
                 and arrived_by_stairs:
@@ -746,7 +784,13 @@ class Bot(EquipMixin):
         low = hp <= 5 or hp * 7 <= maxhp
         if low and self.can_pray():
             self.pray(); return
-        if hunger >= WEAK and self.can_pray(hunger_emergency=hunger >= FAINTING):
+        if hunger >= FAINTING:
+            if self.faint_since is None:
+                self.faint_since = t
+        else:
+            self.faint_since = None
+        if hunger >= WEAK and self.can_pray(hunger_emergency=(
+                self.faint_since is not None and t - self.faint_since > 200)):
             self.pray(); return
         if self.lycanthropy and self.can_pray():
             self.pray(); return
@@ -754,6 +798,13 @@ class Bot(EquipMixin):
             return
 
         hostiles = self.adjacent_hostiles(lv)
+        vis_n = len(self.visible_hostiles(lv))
+        self.hist.append((t, hp, maxhp, len(hostiles), vis_n, self.can_pray(), self.bl(nh.NLE_BL_DEPTH),
+                          self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_AC)))
+        if len(self.hist) > 40:
+            self.hist.popleft()
+        if self.use_tactics and self.tactical_step(lv, hostiles):
+            return
         if hostiles:
             if hp < maxhp * self.elb_frac and (y, x) not in lv.elbereth and self.elbereths < 40:
                 if all(self.respects_elbereth(n, p) for p, n in hostiles):
@@ -812,10 +863,10 @@ class Bot(EquipMixin):
                     return
 
         vis = self.visible_hostiles(lv)
-        if self.use_armor and not vis:
-            if self.equip_step(lv):
+        if (self.use_armor or self.use_food) and not vis:
+            if self.use_armor and self.equip_step(lv):
                 return
-            if G.ARMOR_GLYPH[lv.under[y, x]] and (y, x) not in self.inspected.get(lv.key, ()) \
+            if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]) and (y, x) not in self.inspected.get(lv.key, ()) \
                     and not lv.shop[y, x]:
                 if self.armor_pickup_here(lv):
                     return
@@ -912,7 +963,7 @@ class Bot(EquipMixin):
                     return
 
         targets = frontier | gold
-        if self.use_armor:
+        if self.use_armor or self.use_food:
             targets = targets | (self.armor_targets(lv, G) & passable)
         if targets.any():
             dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
@@ -1007,6 +1058,8 @@ class Bot(EquipMixin):
         self.peaceful_seen = 0
         self.throws = 0
         self.lycanthropy = False
+        self.faint_since = None
+        self.hist = deque()
         self.no_eat_until = 0
         self.undroppable = set()
         self.shops_seen = 0
@@ -1028,6 +1081,7 @@ class Bot(EquipMixin):
         self.death_msgs = []
         self.intro = self.message()
         self.equip_init()
+        self.tactics_init()
         self.role = self.race = None
         try:
             self.settle()
@@ -1062,6 +1116,11 @@ class Bot(EquipMixin):
             "throws": self.throws,
             "loops": self.loops,
             "start_ac": self.start_ac,
+            "flees": self.flees,
+            "stair_runs": self.stair_runs,
+            "food_picked": self.food_picked,
+            "hist": list(self.hist),
+            "last_pray": self.last_pray,
             "ac": self.bl(nh.NLE_BL_AC),
             "worn": [e[2] for e in self.equip_events if e[1] == "wear"],
             "equip_fail": sum(1 for e in self.equip_events if e[1] == "fail"),
