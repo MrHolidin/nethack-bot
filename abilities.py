@@ -35,6 +35,7 @@ class AbilitiesMixin:
         self.maps_read = 0
         self.pet_waits = 0
         self.pet_waited_total = 0
+        self.pet_seen_turn, self.pet_seen_key = -999, None
         self.missiles = 0
         self.far_peaceful = {}         # (level, glyph, pos) -> (peaceful, turn)
 
@@ -140,6 +141,12 @@ class AbilitiesMixin:
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.PET)
         if len(ys) == 0:
+            # pet not in view: if it was with us on this level recently, give it time to catch up
+            recent = self.pet_seen_key == self.cur_key and self.turn() - self.pet_seen_turn <= 50
+            if recent and self.role_opts.get("pet_recent", False) and self.pet_waits < 30:
+                self.pet_waits += 1
+                self.pet_waited_total += 1
+                return True
             self.pet_waits = 0
             return False
         y, x = self.pos()

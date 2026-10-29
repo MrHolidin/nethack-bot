@@ -1,0 +1,13 @@
+== arc
+score     A   840.5  B   802.6  diff   -37.9  95% CI [-194.9, +121.8]  n=60
+max_depth A     5.2  B     4.9  diff    -0.3  95% CI [-0.8, +0.3]  n=60
+   pet>T1000 5 -> 8
+== hea
+score     A   720.5  B   696.4  diff   -24.1  95% CI [-189.4, +165.9]  n=60
+max_depth A     4.5  B     4.1  diff    -0.4  95% CI [-0.8, +0.1]  n=60
+   pet>T1000 22 -> 36
+== tou
+score     A   693.8  B   737.8  diff   +44.0  95% CI [-25.5, +116.6]  n=60
+max_depth A     4.4  B     4.6  diff    +0.1  95% CI [-0.2, +0.5]  n=60
+   pet>T1000 21 -> 34
+DONE

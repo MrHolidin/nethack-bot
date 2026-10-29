@@ -17,6 +17,7 @@ from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin
+from shop import ShopMixin
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -105,7 +106,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -226,6 +227,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.raw_step(ord("n"))
         elif "eat it" in m or "eat one" in m:
             self.raw_step(ord("n"))
+        elif "itemized billing" in m:
+            self.raw_step(ord("n"))
+        elif "sell it?" in m:
+            self.raw_step(ord("y"))
         elif m.rstrip().endswith("pay? [yn] (n)") or "pay?" in m:
             self.raw_step(ord("y"))
         elif "possessions identified" in m:
@@ -309,6 +314,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             # shop entrance: never go inside (we get trapped / risk shoplifting)
             self.mark_shop(lv, self.pos())
             self.shops_seen += 1
+            self.shop_greeted(lv, m)
+        if "Please pay before leaving" in m or "you owe" in m.lower() and "zorkmid" in m:
+            self.need_pay = True
         if "You feel feverish" in m:
             self.lycanthropy = True
         if "You feel purified" in m:
@@ -330,7 +338,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
-        if not lv.shop[self.pos()]:
+        if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
         # stationary dangerous monsters block
         for (y, x) in self.avoid_cells:
@@ -780,6 +788,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         t = self.turn()
         if (G.KIND[self.obs["glyphs"]] == G.PET).any():
             self.pet_last_seen = t
+            self.pet_seen_turn, self.pet_seen_key = t, lv.key
         if t != self.loop_turn:
             self.loop_turn, self.loop_steps = t, self.steps
         elif self.steps - self.loop_steps > 300:      # stuck in a no-time loop
@@ -921,6 +930,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
         vis = self.visible_hostiles(lv)
         if (self.use_armor or self.use_food) and not vis:
+            if self.need_pay:
+                self.need_pay = False
+                self.pay()
+                return
+            if self.use_armor and self.shop_step(lv):
+                return
             if self.use_armor and self.equip_step(lv):
                 return
             if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]) and (y, x) not in self.inspected.get(lv.key, ()) \
@@ -1160,6 +1175,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.abilities_init()
         self.roles_init()
         self.class_init()
+        self.shop_init()
+        self.shops_done = set()
+        self.need_pay = False
         self.role = self.race = None
         try:
             self.settle()
@@ -1217,6 +1235,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "missiles": self.missiles,
             "digs": self.digs,
             "zaps": self.zaps,
+            "purchases": self.purchases,
+            "shop_visits": self.shop_visits,
             "flashes": self.flashes,
             "early_quaffs": self.early_quaffs,
             "fires": self.fires,
