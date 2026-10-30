@@ -562,6 +562,9 @@ class ElberethMixin:
         self.elb_misspelled = 0
         self.elb_turns = 0
         self.elb_exits = collections.Counter()
+        self.no_engrave = set()
+        self.elb_block_until = 0
+        self.elb_fail = 0
 
     def read_engraving(self):
         n0 = len(self.messages)
@@ -581,6 +584,8 @@ class ElberethMixin:
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if (lv.key, self.pos()) in self.no_engrave or self.turn() < self.elb_block_until:
+            return False
         if self.can_pray() or G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF):
@@ -633,14 +638,27 @@ class ElberethMixin:
         return self.elb_write(lv)
 
     def elb_write(self, lv):
+        """Engrave and verify by reading. Any failure to reach the text prompt (fountain/altar/stairs,
+        polymorphed into a handless form, levitating, ...) backs off instead of retrying every tick."""
+        here = (lv.key, self.pos())
         for attempt in range(3):
-            self.engrave_elbereth()
+            ok = self.engrave_elbereth()
             self.elb_engraves += 1
+            if not ok:
+                recent = " ".join(m for _, m in list(self.messages)[-4:])
+                if "even hold" in recent or "can't reach" in recent:
+                    self.elb_block_until = self.turn() + 100      # condition of the hero, not the square
+                else:
+                    self.no_engrave.add(here)
+                self.elb_fail += 1
+                self.elb_state = None
+                return False
             if self.read_engraving() == "Elbereth":
                 self.elb_state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
                                   "last_read": self.turn(), "hp_hist": [self.bl(nh.NLE_BL_HP)]}
                 self.cur_act = "rest"
                 return True
             self.elb_misspelled += 1
+        self.elb_block_until = self.turn() + 3                    # 3 misspellings in a row: pause briefly
         self.elb_state = None
         return True

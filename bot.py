@@ -540,7 +540,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.press("E", expect_prompt=True)
         if "write with" not in self.message().lower():
             self.settle()
-            return
+            return False
         self.press("-", expect_prompt=True)
         for _ in range(5):
             m = self.message().lower()
@@ -557,8 +557,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.press(13)
             lv.elbereth.add(self.pos())
             self.elbereths += 1
-        else:
-            self.settle()
+            return True
+        self.settle()
+        return False
 
     def eat_from_inventory(self):
         for letter, ocls, s in self.inventory():
@@ -1292,6 +1293,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
+            "elb_fail": getattr(self, "elb_fail", 0),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "kill_loot_checks": self.kill_loot_checks,
