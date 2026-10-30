@@ -879,7 +879,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.nymph_step(lv, hostiles):
             return
-        if self.choke_step(lv, hostiles):
+        if self.vopt("choke", False) and (self.choke_continue(lv, hostiles) or self.choke_step(lv, hostiles)):
             return
         if not hostiles and (self.risky_aftercare() or self.weapon_check()):
             return

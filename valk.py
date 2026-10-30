@@ -422,6 +422,9 @@ class ValkMixin2:
         self.kill_loot_checks = 0
         self.choke_moves = 0
         self.choke_waits = 0
+        self.choke_cooldown = 0
+        self.choke_target = None
+        self.choke_until = 0
 
     # ------------------------------------------------------------------ kill loot
     def note_kill(self, name, pos):
@@ -474,49 +477,63 @@ class ValkMixin2:
         return n
 
     def choke_step(self, lv, hostiles):
+        """Being swarmed in the open: step to a nearby square with <= 2 attack slots, if we get
+        there before the group. One move per group (no shuttling), never away from a single
+        adjacent foe (that only gives it free hits)."""
         if not self.vopt("choke", False):
             return False
         y, x = self.pos()
+        t = self.turn()
         foes = [(p, n) for p, n in self.visible_hostiles(lv)
-                if max(abs(p[0] - y), abs(p[1] - x)) <= 7 and n not in ("floating eye", "gas spore")]
-        if len(foes) < 2:
-            self.choke_waits = 0
+                if max(abs(p[0] - y), abs(p[1] - x)) <= 6 and n not in ("floating eye", "gas spore")]
+        if len(foes) < 2 or len(hostiles) == 1 or t < self.choke_cooldown:
             return False
         k_mem, k_live = self.kind_grid(lv)
         p = self.passable_grid(lv, k_mem, k_live)
-        p_free = p.copy()
-        here = self.attack_slots(lv, k_mem, p_free, (y, x))
+        here = self.attack_slots(lv, k_mem, p, (y, x))
         if here <= 2:
-            # already in a good spot: hold it and let them come one at a time
-            if not hostiles and self.choke_waits < 6:
-                self.choke_waits += 1
-                self.cur_act = "fight"
-                self.press("s")
-                return True
             return False
-        if len(hostiles) >= 2 or len(hostiles) == 0 or self.vopt("choke_engaged", True):
-            dist, prev, _ = self.dijkstra(lv, k_mem, k_live, p, (y, x), None, max_cost=10)
-            best = None
-            ys, xs = np.nonzero(dist <= 8)
-            for cy, cx in zip(ys, xs):
-                c = (int(cy), int(cx))
-                if c == (y, x) or not p[c]:
-                    continue
-                slots = self.attack_slots(lv, k_mem, p_free, c)
-                if slots > 2:
-                    continue
-                d_me = int(dist[c])
-                d_foe = min(max(abs(fp[0] - c[0]), abs(fp[1] - c[1])) for fp, _ in foes)
-                if d_me >= d_foe:
-                    continue                       # they get there first
-                score = (slots, d_me)
-                if best is None or score < best[0]:
-                    best = (score, c)
-            if best is not None:
-                step = self.first_step(prev, (y, x), best[1])
-                if step is not None and G.KIND[self.obs["glyphs"][step]] not in (G.MONSTER, G.PET):
-                    self.choke_moves += 1
-                    self.cur_act = "fight"
-                    self.move(step)
-                    return True
+        dist, prev, _ = self.dijkstra(lv, k_mem, k_live, p, (y, x), None, max_cost=8)
+        best = None
+        ys, xs = np.nonzero(dist <= 6)
+        for cy, cx in zip(ys, xs):
+            c = (int(cy), int(cx))
+            if c == (y, x):
+                continue
+            slots = self.attack_slots(lv, k_mem, p, c)
+            if slots > 2 or slots >= here - 1:
+                continue
+            d_me = int(dist[c])
+            d_foe = min(max(abs(fp[0] - c[0]), abs(fp[1] - c[1])) for fp, _ in foes)
+            if d_me >= d_foe:
+                continue
+            score = (slots, d_me)
+            if best is None or score < best[0]:
+                best = (score, c)
+        if best is None:
+            return False
+        self.choke_target = best[1]
+        self.choke_until = t + 2 * int(dist[best[1]]) + 2
+        self.choke_cooldown = t + 30
+        step = self.first_step(prev, (y, x), best[1])
+        if step is None or G.KIND[self.obs["glyphs"][step]] in (G.MONSTER, G.PET):
+            return False
+        self.choke_moves += 1
+        self.cur_act = "fight"
+        self.move(step)
+        return True
+
+    def choke_continue(self, lv, hostiles):
+        """Keep walking to the chosen chokepoint (unless something is already adjacent)."""
+        tgt = getattr(self, "choke_target", None)
+        if tgt is None:
+            return False
+        if self.turn() > self.choke_until or self.pos() == tgt or len(hostiles) == 1:
+            self.choke_target = None
+            return False
+        if self.go_toward(lv, tgt):
+            self.choke_moves += 1
+            self.cur_act = "fight"
+            return True
+        self.choke_target = None
         return False
