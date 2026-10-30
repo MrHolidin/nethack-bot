@@ -44,7 +44,47 @@ for _g in range(nh.MAX_GLYPH):
         CMAP_OF[_g] = nh.glyph_to_cmap(_g)
 
 
-def search_candidates(under, k_mem, reach):
+def deep_unknown(k_mem, min_dist=2, min_area=6):
+    """Unknown squares at least min_dist (Chebyshev) from anything known, in blobs of at least min_area:
+    space where a not-yet-seen room can still be. Rock between known rooms stays UNKNOWN forever but is
+    thin, so it is not 'deep'."""
+    known = k_mem != G.UNKNOWN
+    near = known.copy()
+    rows, cols = k_mem.shape
+    for _ in range(min_dist - 1 + 1):
+        grown = near.copy()
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if dy or dx:
+                    grown[max(0, dy):rows + min(0, dy), max(0, dx):cols + min(0, dx)] |= \
+                        near[max(0, -dy):rows + min(0, -dy), max(0, -dx):cols + min(0, -dx)]
+        near = grown
+    deep = ~near
+    deep[0, :] = deep[-1, :] = False
+    # drop small blobs
+    out = np.zeros_like(deep)
+    seen = np.zeros_like(deep)
+    for y, x in zip(*np.nonzero(deep)):
+        if seen[y, x]:
+            continue
+        comp = [(y, x)]
+        seen[y, x] = True
+        i = 0
+        while i < len(comp):
+            cy, cx = comp[i]
+            i += 1
+            for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ny, nx = cy + dy, cx + dx
+                if 0 <= ny < rows and 0 <= nx < cols and deep[ny, nx] and not seen[ny, nx]:
+                    seen[ny, nx] = True
+                    comp.append((ny, nx))
+        if len(comp) >= min_area:
+            for cy, cx in comp:
+                out[cy, cx] = True
+    return out
+
+
+def search_candidates(under, k_mem, reach, deep_mode=False):
     """weight map over standing squares."""
     rows, cols = k_mem.shape
     cm = CMAP_OF[under]
@@ -52,7 +92,7 @@ def search_candidates(under, k_mem, reach):
     room = np.isin(cm, list(ROOM_CMAP)) | (np.isin(k_mem, [G.OBJECT, G.GOLD, G.CORPSE, G.TRAP]) & ~corridor)
     walk = np.isin(k_mem, [G.FLOOR, G.DOOR_OPEN, G.DOORWAY, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP,
                            G.UPSTAIR, G.DOWNSTAIR, G.DOOR_CLOSED, G.BOULDER])
-    unknown = k_mem == G.UNKNOWN
+    unknown = deep_unknown(k_mem) if deep_mode else (k_mem == G.UNKNOWN)
     w = np.zeros(k_mem.shape)
     # (a) dead-end corridor tips
     nb = np.zeros(k_mem.shape, dtype=int)
@@ -63,7 +103,23 @@ def search_candidates(under, k_mem, reach):
                 s[max(0, dy):rows + min(0, dy), max(0, dx):cols + min(0, dx)] = \
                     walk[max(0, -dy):rows + min(0, -dy), max(0, -dx):cols + min(0, -dx)]
                 nb += s
-    w[corridor & reach & (nb <= 1)] = W_DEAD_END
+    tips = corridor & reach & (nb <= 1)
+    if not deep_mode:
+        w[tips] = W_DEAD_END
+    else:
+        # a tip is worth searching if it points into space where a room can still be
+        for y, x in zip(*np.nonzero(tips)):
+            dirs = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if (dy or dx)
+                    and 0 <= y + dy < rows and 0 <= x + dx < cols and walk[y + dy, x + dx]]
+            if len(dirs) == 1:
+                dy, dx = -dirs[0][0], -dirs[0][1]          # continue away from where we came from
+                ray = [(y + k * dy + a * (dx != 0), x + k * dx + a * (dy != 0))
+                       for k in range(1, 12) for a in (-2, -1, 0, 1, 2)]
+                ray = [(a, b) for a, b in ray if 0 <= a < rows and 0 <= b < cols]
+                frac = np.mean([unknown[a, b] for a, b in ray]) if ray else 0.0
+            else:
+                frac = 0.5
+            w[y, x] = W_DEAD_END * (0.2 + 0.8 * frac)
     # (b) room squares next to a wall: weight = share of unseen squares in the strip beyond the wall
     ys, xs = np.nonzero(room & reach)
     for y, x in zip(ys, xs):
@@ -87,7 +143,7 @@ def search_candidates(under, k_mem, reach):
 
 class SearchV2Mixin:
     def pick_search_spot(self, lv, k_mem, reach, dist):
-        w = search_candidates(lv.under, k_mem, reach)
+        w = search_candidates(lv.under, k_mem, reach, deep_mode=bool(self.role_opts.get("search_deep")))
         if not (w > 0).any():
             return None
         covered = _shift_sum(lv.searched.astype(int))           # searches made at or next to the square

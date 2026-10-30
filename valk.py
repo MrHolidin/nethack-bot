@@ -626,7 +626,12 @@ class ElberethMixin:
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
-        if self.can_pray() or G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
+        if self.can_pray() and not self.vopt("elb_any_pray", False):
+            return False
+        # prayer and Elbereth answer different questions: prayer fixes HP only below the game's 'trouble'
+        # line (and resets a long timeout); Elbereth stops melee now at any HP. elb_any_pray: decide
+        # Elbereth on danger alone; prayer keeps its own trigger at critical HP.
+        if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF):
             return False
