@@ -17,7 +17,7 @@ from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
-from valk import ValkMixin
+from valk import ValkMixin, ValkMixin2
 from shop import ShopMixin
 
 ROWS, COLS = 21, 79
@@ -107,7 +107,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -307,6 +307,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
                 self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
+            if hasattr(self, "kill_loot"):
+                self.note_kill(mk.group(2), self.last_attack_target)
         if "You feel that" in m and "displeased" in m:
             self.pray_failed += 1
         if self.last_pray is not None and self.turn() - self.last_pray <= 5 and any(
@@ -877,6 +879,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.nymph_step(lv, hostiles):
             return
+        if self.choke_step(lv, hostiles):
+            return
         if not hostiles and (self.risky_aftercare() or self.weapon_check()):
             return
         if self.use_roles and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
@@ -962,7 +966,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.excal_step(lv):
                 return
-            if self.loot_step(lv) or self.altar_step(lv) or self.dagger_step(lv):
+            if self.loot_step(lv) or self.kill_loot_step(lv) or self.altar_step(lv) or self.dagger_step(lv):
                 return
             if self.use_armor and self.equip_step(lv):
                 return
@@ -1206,6 +1210,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.class_init()
         self.excal_init()
         self.valk_init()
+        self.valk2_init()
         self.shop_init()
         self.shops_done = set()
         self.need_pay = False
@@ -1267,6 +1272,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "digs": self.digs,
             "zaps": self.zaps,
             "thefts": self.thefts,
+            "kill_loot_checks": self.kill_loot_checks,
+            "choke_moves": self.choke_moves,
+            "choke_waits": self.choke_waits,
             "deadly_prayers": self.deadly_prayers,
             "nymph_escapes": self.nymph_escapes,
             "daggers_picked": self.daggers_picked,

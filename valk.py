@@ -403,3 +403,120 @@ class ValkMixin:
                         self.drop_letter(a["letter"])
                         return True
         return False
+
+
+# =====================================================================================
+# kill_loot: a dead monster's inventory lies UNDER its corpse, so the '[' never shows.
+#            Look at the square of every humanoid we kill and take armor/daggers/food.
+# choke:     with 2+ hostiles in view, fight from a square few of them can reach at once
+#            (corridor, doorway); go there if we arrive before they do.
+# =====================================================================================
+M1_HUMANOID = 0x20000
+CORRIDOR_GLYPHS = (nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22)
+PM_BY_NAME_V = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
+
+
+class ValkMixin2:
+    def valk2_init(self):
+        self.kill_loot = []           # (level key, pos, turn)
+        self.kill_loot_checks = 0
+        self.choke_moves = 0
+        self.choke_waits = 0
+
+    # ------------------------------------------------------------------ kill loot
+    def note_kill(self, name, pos):
+        if not self.vopt("kill_loot", False) or pos is None:
+            return
+        pm = PM_BY_NAME_V.get(name)
+        if pm is not None and pm.mflags1 & M1_HUMANOID:
+            self.kill_loot.append((self.cur_key, pos, self.turn()))
+
+    def kill_loot_step(self, lv):
+        if not self.kill_loot:
+            return False
+        t = self.turn()
+        self.kill_loot = [k for k in self.kill_loot if t - k[2] < 300]
+        y, x = self.pos()
+        cand = [k for k in self.kill_loot if k[0] == lv.key]
+        if not cand:
+            return False
+        goal = min(cand, key=lambda k: max(abs(k[1][0] - y), abs(k[1][1] - x)))
+        if goal[1] == (y, x):
+            self.kill_loot.remove(goal)
+            self.kill_loot_checks += 1
+            self.inspected.get(lv.key, set()).discard((y, x))
+            if self.armor_pickup_here(lv):
+                return True
+            if self.vopt("daggers", False) and self.dagger_count() < 8:
+                self.pickup_matching(("dagger",))
+            return True
+        if max(abs(goal[1][0] - y), abs(goal[1][1] - x)) > 15 or not self.go_toward(lv, goal[1]):
+            self.kill_loot.remove(goal)
+            return False
+        return True
+
+    # ------------------------------------------------------------------ chokepoints
+    def attack_slots(self, lv, k_mem, p, c):
+        """How many squares around c a monster could attack from."""
+        cy, cx = c
+        door_here = k_mem[cy, cx] in (G.DOOR_OPEN, G.DOOR_CLOSED)
+        n = 0
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if not (dy or dx):
+                    continue
+                ny, nx = cy + dy, cx + dx
+                if not (0 <= ny < ROWS and 0 <= nx < COLS) or not p[ny, nx]:
+                    continue
+                if dy and dx and (door_here or k_mem[ny, nx] in (G.DOOR_OPEN, G.DOOR_CLOSED)):
+                    continue
+                n += 1
+        return n
+
+    def choke_step(self, lv, hostiles):
+        if not self.vopt("choke", False):
+            return False
+        y, x = self.pos()
+        foes = [(p, n) for p, n in self.visible_hostiles(lv)
+                if max(abs(p[0] - y), abs(p[1] - x)) <= 7 and n not in ("floating eye", "gas spore")]
+        if len(foes) < 2:
+            self.choke_waits = 0
+            return False
+        k_mem, k_live = self.kind_grid(lv)
+        p = self.passable_grid(lv, k_mem, k_live)
+        p_free = p.copy()
+        here = self.attack_slots(lv, k_mem, p_free, (y, x))
+        if here <= 2:
+            # already in a good spot: hold it and let them come one at a time
+            if not hostiles and self.choke_waits < 6:
+                self.choke_waits += 1
+                self.cur_act = "fight"
+                self.press("s")
+                return True
+            return False
+        if len(hostiles) >= 2 or len(hostiles) == 0 or self.vopt("choke_engaged", True):
+            dist, prev, _ = self.dijkstra(lv, k_mem, k_live, p, (y, x), None, max_cost=10)
+            best = None
+            ys, xs = np.nonzero(dist <= 8)
+            for cy, cx in zip(ys, xs):
+                c = (int(cy), int(cx))
+                if c == (y, x) or not p[c]:
+                    continue
+                slots = self.attack_slots(lv, k_mem, p_free, c)
+                if slots > 2:
+                    continue
+                d_me = int(dist[c])
+                d_foe = min(max(abs(fp[0] - c[0]), abs(fp[1] - c[1])) for fp, _ in foes)
+                if d_me >= d_foe:
+                    continue                       # they get there first
+                score = (slots, d_me)
+                if best is None or score < best[0]:
+                    best = (score, c)
+            if best is not None:
+                step = self.first_step(prev, (y, x), best[1])
+                if step is not None and G.KIND[self.obs["glyphs"][step]] not in (G.MONSTER, G.PET):
+                    self.choke_moves += 1
+                    self.cur_act = "fight"
+                    self.move(step)
+                    return True
+        return False
