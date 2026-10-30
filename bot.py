@@ -112,7 +112,7 @@ class Level:
 
 class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
-                 avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
+                 avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
                  flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", flee_turns=4.0, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
                  descend_policy="explore"):
