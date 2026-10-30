@@ -37,6 +37,8 @@ class ShopMixin:
             return
         stype = mm.group(1)
         lv.shop_type = stype
+        if self.shopping is None and hasattr(self, "scroll_shop_greeted"):
+            self.scroll_shop_greeted(lv, stype)
         if stype in BUY_TYPES and self.can_shop() and lv.key not in self.shops_done:
             self.shopping = {"key": lv.key, "until": self.turn() + 200}
             self.shop_visits += 1
@@ -72,6 +74,8 @@ class ShopMixin:
             self.shops_done.add(self.shopping["key"])
             self.shopping = None
             return False
+        if self.shopping.get("kind") == "scroll":
+            return self.scroll_shop_step(lv)
         targets = self.shop_targets(lv)
         y, x = self.pos()
         if not targets.any() or self.bl(nh.NLE_BL_GOLD) < 20:

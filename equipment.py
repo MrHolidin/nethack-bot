@@ -316,6 +316,9 @@ class EquipMixin:
         insp = self.inspected.setdefault(key, set())
         insp.add(self.pos())
         names = self.look_here()
+        if self.role_opts.get("scroll_id"):
+            # never take merchandise (a lone item is picked up without a menu, so filter here)
+            names = [n for n in names if "for sale" not in n]
         worn = self.worn_by_slot()
         want = []
         for n in names:

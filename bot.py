@@ -18,6 +18,7 @@ from tactics import TacticsMixin
 from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
+from scrolls import ScrollMixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 
@@ -111,7 +112,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -328,6 +329,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                                  "Then die, mortal", "Thou durst", "You feel that Mitra is angry",
                                  "is displeased.") if p != "is displeased."):
             self.god_angry = True
+        if self.role_opts.get("scroll_id") and "for sale" in m:
+            self.note_scroll_prices(m)
         if self.role_opts.get("vault_guard"):
             if "drop that gold" in m or "drop that money" in m:
                 self.vault_drop = True
@@ -477,6 +480,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.last_move_target = None
         self.press("F")
         self.press(key)
+
+    def shopkeeper_in_view(self):
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        return any(G.monster_name(int(g[a, c])) == "shopkeeper" for a, c in zip(ys, xs))
 
     def vault_step(self, lv, hostiles):
         """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
@@ -1055,7 +1063,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
 
         # fresh corpse nearby
-        if hunger >= NOT_HUNGRY and self.kills:
+        if hunger >= NOT_HUNGRY and self.kills and not (self.role_opts.get("scroll_id") and (
+                self.shopkeeper_in_view() or lv.shop[y, x])):     # shop corpses are merchandise
             goal = self.corpse_goal(lv)
             if goal is not None:
                 if goal == (y, x):
@@ -1077,6 +1086,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.loot_step(lv) or self.kill_loot_step(lv) or self.altar_step(lv) or self.dagger_step(lv):
                 return
+            if self.role_opts.get("scroll_id") and self.scroll_step(lv):
+                return
             if self.use_armor and self.equip_step(lv):
                 return
             if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]) and (y, x) not in self.inspected.get(lv.key, ()) \
@@ -1091,7 +1102,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         # gold under us
-        if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried:
+        if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried \
+                and not (self.role_opts.get("scroll_id") and (lv.shop[y, x] or self.shopkeeper_in_view())):
             lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
             self.pickup_matching(("gold piece",))
             lv.under[y, x] = G.STONE_GLYPH + 19
@@ -1182,7 +1194,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     self.move(step)
                     return
 
+        if self.role_opts.get("scroll_id"):
+            gold = gold & ~lv.shop                     # shop gold belongs to the shopkeeper
         targets = frontier | gold
+        if self.role_opts.get("scroll_id"):
+            targets = targets | (self.scroll_targets(lv) & passable)
         if self.use_armor or self.use_food:
             targets = targets | (self.armor_targets(lv, G) & passable)
         if targets.any():
@@ -1335,6 +1351,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.valk2_init()
         self.elb2_init()
         self.shop_init()
+        self.scroll_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -1399,6 +1416,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": getattr(self, "elb_fail", 0),
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
+            "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
             "blind_waits": self.blind_waits, "shop_kicks_avoided": self.shop_kicks_avoided,
             "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
