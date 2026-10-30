@@ -53,9 +53,29 @@ jobs:
     needs: run
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with: {path: parts, pattern: "res-*", merge-multiple: true}
-      - run: cat parts/*.jsonl > "${{ inputs.tag }}.jsonl" && wc -l "${{ inputs.tag }}.jsonl"
-      - uses: actions/upload-artifact@v4
-        with: {name: "${{ inputs.tag }}", path: "${{ inputs.tag }}.jsonl"}
+      - name: push results to the results branch
+        run: |
+          set -e
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" repo
+          cd repo
+          if git ls-remote --exit-code origin results >/dev/null; then
+            git fetch --depth 1 origin results && git checkout -B results FETCH_HEAD
+          else
+            git checkout --orphan results && git rm -rf -q .
+          fi
+          mkdir -p results
+          cat ../parts/*.jsonl > "results/${{ inputs.tag }}.jsonl"
+          wc -l "results/${{ inputs.tag }}.jsonl"
+          git add results
+          git commit -q -m "results: ${{ inputs.tag }} (run ${{ github.run_id }})"
+          for i in 1 2 3 4 5; do
+            git push origin HEAD:results && break
+            git fetch --depth 1 origin results && git rebase FETCH_HEAD
+          done
