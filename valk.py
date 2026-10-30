@@ -641,7 +641,7 @@ class ElberethMixin:
         return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
-        if not self.vopt("elb2", False):
+        if not self.vopt("elb2", True):
             return False
         st = self.elb_state
         y, x = self.pos()
