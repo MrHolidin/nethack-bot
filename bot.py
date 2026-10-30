@@ -344,7 +344,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
         on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
-        if self.role_opts.get("shop_fix2"):
+        if self.role_opts.get("shop_fix2", True):
             # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
             # instead: we are inside only if we just fell / were teleported onto this level
             recent = " ".join(mm for _, mm in list(self.messages)[-6:])
@@ -497,7 +497,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         vis = self.visible_hostiles(lv)
         if self.role_opts.get("scroll_id"):
             vis = [v for v in vis if v[1] != "shopkeeper"]     # a peaceful shopkeeper is not a threat
-        if self.role_opts.get("vis_mobile"):
+        if self.role_opts.get("vis_mobile", True):
             # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
             # stepping in and out of its line of sight flips this gate and two goals take turns
             y, x = self.pos()
@@ -1233,7 +1233,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         targets = frontier | gold
         items_ok = True
         item_mask = passable
-        if self.role_opts.get("item_consistent"):
+        if self.role_opts.get("item_consistent", True):
             # an item square is only a goal if the step that inspects it (and so removes the goal) will run:
             # that step needs no hostile in view and skips shop squares
             items_ok = not self.view_threats(lv)
@@ -1302,7 +1302,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 wallish[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         score = np.where(reach & passable, cnt * 10.0 - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
         # dead-end corridors are prime spots
-        goal = getattr(lv, "search_goal", None) if self.role_opts.get("search_goal") else None
+        goal = getattr(lv, "search_goal", None) if self.role_opts.get("search_goal", True) else None
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
