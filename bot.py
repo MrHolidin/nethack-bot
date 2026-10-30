@@ -344,6 +344,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
         on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
+        if self.role_opts.get("shop_fix2"):
+            # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
+            # instead: we are inside only if we just fell / were teleported onto this level
+            recent = " ".join(mm for _, mm in list(self.messages)[-6:])
+            on_door = not any(k in recent for k in ("trap door", "fall through", "hole", "teleport",
+                                                     "wrenching", "You materialize"))
         if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and (on_door or not self.role_opts.get("shop_fix", True)):
             # shop entrance: never go inside (we get trapped / risk shoplifting).
             # shop_fix: only when we are at the door -- after falling in through a trap door we are
