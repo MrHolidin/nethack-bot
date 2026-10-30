@@ -469,6 +469,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         for c in seen:
             lv.shop[c] = True
 
+    def mines_blocked(self):
+        """avoid_mines: True/False, or "until_excalibur": lawful long-sword users first look for
+        Excalibur in the main dungeon (the Mines have no usable fountains)."""
+        if self.avoid_mines == "until_excalibur":
+            return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
+                and self.long_sword() is not None and self.turn() < 8000
+        return bool(self.avoid_mines)
+
     def law_nearby(self):
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
@@ -781,7 +789,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         else:
             self.last_stair_dir = None
         self.took_stairs = False
-        if self.avoid_mines and lv.key[0] == 2 and lv.key not in self.mines_bounced \
+        if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines_bounced \
                 and arrived_by_stairs:
             self.mines_bounced.add(lv.key)
             self.pending_mines_mark = True
@@ -1038,7 +1046,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         gold = (k_mem == G.GOLD) & passable
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
-        if lv.avoid_down and on_level < 3000:
+        if lv.avoid_down and on_level < 3000 and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
