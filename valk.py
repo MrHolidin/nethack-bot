@@ -56,6 +56,8 @@ class ValkMixin:
         self.daggers_picked = 0
         self.nymph_waits = 0
         self.nymph_elbs = 0
+        self.nymph_hide = None
+        self.nymph_escapes = 0
 
     def vopt(self, k, d=None):
         return self.role_opts.get(k, d)
@@ -145,9 +147,25 @@ class ValkMixin:
         if adj:
             self.attack(adj[0][0])
             return True
+        # 0) hiding on another level after slipping away from a nymph
+        hide = self.nymph_hide
+        if hide is not None:
+            here = self.stairs_kind_here(lv)
+            if lv.key == hide["from"] or here is None:
+                self.nymph_hide = None
+            elif not hostiles:
+                if self.turn() < hide["until"]:
+                    self.cur_act = "rest"
+                    self.press("2"); self.press("0"); self.press("s")
+                    return True
+                self.nymph_hide = None
+                self.press(hide["back"])
+                return True
         th = self.thieves_visible(lv)
         if not th:
             return False
+        if self.vopt("nymph_avoid", False) and not self.stolen_pending and self.nymph_escape(lv, th):
+            return True
         # 2) thief in a clear line at range: throw / fire / bolt
         for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=7):
             if name not in THIEVES or d < 2:
@@ -193,6 +211,41 @@ class ValkMixin:
         if not close:
             self.nymph_waits = 0
         return False
+
+    def nymph_escape(self, lv, th):
+        """Nothing to gain from a nymph: leave by the stairs if we get there first."""
+        y, x = self.pos()
+        nyms = [t for t in th if t[1] in NYMPHS]
+        if not nyms:
+            return False
+        d_n = min(max(abs(p[0] - y), abs(p[1] - x)) for p, _ in nyms)
+        if d_n < 3:
+            return False
+        here = self.stairs_kind_here(lv)
+        if here is not None and self.can_use_stairs(lv, here):
+            key = ">" if here == G.DOWNSTAIR else "<"
+            self.nymph_escapes += 1
+            if key == "<":
+                self.nymph_hide = {"from": lv.key, "back": ">", "until": self.turn() + 50}
+            else:
+                self.descents += 1
+                self.took_stairs = True
+            self.press(key)
+            return True
+        k_mem, k_live = self.kind_grid(lv)
+        passable = self.passable_grid(lv, k_mem, k_live)
+        stairs = self.stairs_mask(lv, k_mem)
+        if not stairs.any():
+            return False
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, (y, x), stairs, max_cost=30)
+        if reached is None or dist[reached] >= d_n - 1:
+            return False
+        step = self.first_step(prev, (y, x), reached)
+        if step is None:
+            return False
+        self.cur_act = "stairs"
+        self.move(step)
+        return True
 
     def align_step(self, lv, th):
         """A neighbouring free square from which some thief is in a straight clear line, 2..6 away."""

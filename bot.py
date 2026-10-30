@@ -1249,6 +1249,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "digs": self.digs,
             "zaps": self.zaps,
             "thefts": self.thefts,
+            "nymph_escapes": self.nymph_escapes,
             "daggers_picked": self.daggers_picked,
             "nymph_kills": self.nymph_kills,
             "loot_pickups": self.loot_pickups,
