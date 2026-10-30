@@ -444,6 +444,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def attack(self, target):
         self.cur_act = "fight"
         y, x = self.pos()
+        if (target[0] - y, target[1] - x) not in DELTA2KEY:   # we were moved this tick (e.g. teleported)
+            self.press("s")
+            return
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
         self.last_attack_target = target
         self.last_move_target = None
@@ -1296,6 +1299,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_fail": getattr(self, "elb_fail", 0),
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
+            "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "kill_loot_checks": self.kill_loot_checks,

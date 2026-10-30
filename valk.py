@@ -16,6 +16,7 @@ import numpy as np
 import nle.nethack as nh
 
 import glyphs as G
+import elbereth as ELB
 from equipment import parse_armor, HELM, GLOVES, BOOTS
 
 ROWS, COLS = 21, 79
@@ -590,6 +591,7 @@ class ElberethMixin:
         self.elb_turns = 0
         self.elb_exits = collections.Counter()
         self.elb_fail_at = None
+        self.elb_block_reasons = collections.Counter()
         self.elb_fail_msgs = []
         self.elb_fail = 0
         self.elb_rewrites = 0
@@ -610,6 +612,13 @@ class ElberethMixin:
             return False
         return pm.mlet not in (B_HUMAN_MLET, B_ANGEL_MLET)
 
+    def elb_blocked(self, lv):
+        """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
+        bl = ELB.blockers(self.obs["glyphs"], self.pos(), lv.peaceful, lv.key[0])
+        if bl:
+            self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
+        return bool(bl)
+
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
@@ -621,10 +630,12 @@ class ElberethMixin:
         y, x = self.pos()
         near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]
         threats = hostiles + [t for t in near if t not in hostiles]
-        if not threats or not all(self.respects(p, n) for p, n in threats):
+        if not threats:
             return False
         swarm = sum(1 for _, n in threats if n in SWARMERS)
-        return hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2
+        if not (hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2):
+            return False
+        return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
         if not self.vopt("elb2", False):
@@ -644,6 +655,10 @@ class ElberethMixin:
                 if hostiles and not bad:
                     st["last_read"] = self.turn()
                     if self.read_engraving() != "Elbereth":
+                        if self.elb_blocked(lv):
+                            self.elb_exits["blocked"] += 1
+                            self.elb_state = None
+                            return False
                         self.elb_rewrites += 1
                         st["hp_hist"] = [hp]
                         return self.elb_write(lv)
@@ -664,6 +679,10 @@ class ElberethMixin:
                 if self.turn() - st["last_read"] >= 4:
                     st["last_read"] = self.turn()
                     if self.read_engraving() != "Elbereth":
+                        if self.elb_blocked(lv):
+                            self.elb_exits["blocked"] += 1
+                            self.elb_state = None
+                            return False
                         return self.elb_write(lv)
                 self.elb_turns += 1
                 self.cur_act = "rest"
