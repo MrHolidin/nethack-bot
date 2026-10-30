@@ -108,6 +108,7 @@ class Level:
     def __init__(self, key):
         self.key = key
         self.under = np.full((ROWS, COLS), G.STONE_GLYPH, dtype=np.int32)
+        self.door = np.zeros((ROWS, COLS), dtype=bool)   # an intact door seen here (objects may cover it later)
         self.seen = np.zeros((ROWS, COLS), dtype=bool)
         self.visited = np.zeros((ROWS, COLS), dtype=np.int32)
         self.near = np.zeros((ROWS, COLS), dtype=bool)
@@ -304,6 +305,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
         lv.under[known] = g[known]
+        kk = G.KIND[g]
+        lv.door[known & ((kk == G.DOOR_OPEN) | (kk == G.DOOR_CLOSED))] = True
+        lv.door[known & np.isin(kk, [G.FLOOR, G.WALL, G.DOORWAY])] = False   # terrain seen: not an intact door
         lv.seen |= known & (g != G.STONE_GLYPH)
         y, x = self.pos()
         lv.visited[y, x] += 1
@@ -328,6 +332,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 "You are carrying too much to get through",
                 "You don't have enough room to maneuver")):
             lv.blocked[self.last_move_target] = True
+        if lv is not None and self.lvl_opt("door_mem", lv) and "diagonally" in m and self.last_move_target:
+            if "out of" in m:
+                lv.door[self.pos()] = True
+            else:
+                lv.door[self.last_move_target] = True
+            lv.fail[self.last_move_target] = 0
         if "no shape for kicking" in m and lv and self.last_move_target:
             lv.blocked[self.last_move_target] = True
         if "Closed for inventory" in m and lv:
@@ -424,6 +434,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         dist[sy, sx] = 0
         pq = [(0, sy, sx)]
         door_like = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED)
+        if self.lvl_opt("door_mem", lv):
+            door_like = door_like | lv.door    # a corpse lying in a doorway hides the door glyph
         monster_here = (k_live == G.MONSTER) | (k_live == G.INVIS)
         while pq:
             d, y, x = heapq.heappop(pq)
@@ -1117,6 +1129,26 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.ammo_pickups += 1
             return
 
+        # commit_goal: keep walking to the goal chosen earlier (by whichever step chose it) until reached.
+        # Re-deciding every tick lets two steps with opposite goals take turns when a gate flips with our
+        # position (a monster visible from one square but not the next).
+        if self.lvl_opt("commit_goal", lv) and self.nav is not None:
+            nav = self.nav
+            if nav["key"] != lv.key or self.pos() == nav["goal"] or self.turn() - nav["t"] > 150:
+                self.nav = None
+            else:
+                k_mem, k_live = self.kind_grid(lv)
+                p = self.passable_grid(lv, k_mem, k_live)
+                mask = np.zeros((ROWS, COLS), dtype=bool)
+                mask[nav["goal"]] = True
+                dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, self.pos(), mask)
+                step = self.first_step(prev, self.pos(), reached) if reached is not None else None
+                if step is not None:
+                    self.nav_moves += 1
+                    self.move(step)
+                    return
+                self.nav = None
+
         # pick thrown weapons back up
         if self.retrieve:
             goal = self.retrieve_goal(lv)
@@ -1225,8 +1257,18 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         step = self.first_step(prev, start, reached)
         if step is None:
             return False
+        self.set_nav(lv, reached)
         self.move(step)
         return True
+
+    def lvl_opt(self, name, lv):
+        """An option, optionally limited to one level (benchmarks: identical play up to that level)."""
+        only = self.role_opts.get("search_only_key")
+        return bool(self.role_opts.get(name)) and (only is None or tuple(only) == tuple(lv.key))
+
+    def set_nav(self, lv, goal):
+        if self.nav is None or self.nav["goal"] != goal:
+            self.nav = {"goal": goal, "key": lv.key, "t": self.turn()}
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -1285,6 +1327,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if reached is not None and reached != start:
                 step = self.first_step(prev, start, reached)
                 if step:
+                    self.set_nav(lv, reached)
                     self.move(step)
                     return
             if reached == start:
@@ -1345,8 +1388,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
             best = None
-            if self.role_opts.get("search_v2"):
-                best = self.pick_search_spot(lv, k_mem, reach & passable, dist)
+            algo = self.role_opts.get("search_algo") or ("v2" if self.role_opts.get("search_v2") else None)
+            only = self.role_opts.get("search_only_key")
+            if algo and (only is None or tuple(only) == tuple(lv.key)):
+                best = self.pick_search_spot(lv, k_mem, reach & passable, dist, algo)
             if best is None:
                 best = np.unravel_index(np.argmax(score), score.shape)
                 if score[best] <= -1e8:
@@ -1394,6 +1439,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.lycanthropy = False
         self.deadly_prayers = 0
         self.stun_waits = 0
+        self.nav = None
+        self.nav_moves = 0
         self.tin_eating = False
         self.tins_eaten = 0
         self.tins_refused = 0
@@ -1511,7 +1558,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
             "tins_eaten": self.tins_eaten, "tins_refused": self.tins_refused,
-            "blind_waits": self.blind_waits, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
+            "blind_waits": self.blind_waits, "nav_moves": self.nav_moves, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
             "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),

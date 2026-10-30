@@ -112,5 +112,7 @@ class ShopMixin:
         step = self.first_step(prev, start, reached)
         if step is None:
             return False
+        if hasattr(self, "set_nav"):
+            self.set_nav(lv, reached)
         self.move(step)
         return True

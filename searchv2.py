@@ -142,8 +142,10 @@ def search_candidates(under, k_mem, reach, deep_mode=False):
 
 
 class SearchV2Mixin:
-    def pick_search_spot(self, lv, k_mem, reach, dist):
-        w = search_candidates(lv.under, k_mem, reach, deep_mode=bool(self.role_opts.get("search_deep")))
+    def pick_search_spot(self, lv, k_mem, reach, dist, algo="v2"):
+        if algo not in ("v2", "deep"):
+            return self.pick_search_spot_alt(lv, k_mem, reach, dist, algo)
+        w = search_candidates(lv.under, k_mem, reach, deep_mode=bool(self.role_opts.get("search_deep")) or algo == "deep")
         if not (w > 0).any():
             return None
         covered = _shift_sum(lv.searched.astype(int))           # searches made at or next to the square
@@ -154,3 +156,19 @@ class SearchV2Mixin:
             return None
         self.sv2_picks += 1
         return int(best[0]), int(best[1])
+
+    def pick_search_spot_alt(self, lv, k_mem, reach, dist, algo):
+        """v3: structured candidates (deep), but once their remaining probability is small, hand over to the
+        exhaustive coverage rule (return None -> the old wall-count heuristic)."""
+        if algo == "v3":
+            w = search_candidates(lv.under, k_mem, reach, deep_mode=True)
+            covered = _shift_sum(lv.searched.astype(int))
+            post = w * np.power(Q_MISS, covered)
+            post[~reach] = 0
+            if post.max() < self.role_opts.get("sv3_min", 0.15):
+                return None
+            score = post / (np.minimum(dist, 500) + 10.0)
+            best = np.unravel_index(np.argmax(score), score.shape)
+            self.sv2_picks += 1
+            return int(best[0]), int(best[1])
+        return None
