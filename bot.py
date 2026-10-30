@@ -491,6 +491,20 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.press("F")
         self.press(key)
 
+    def view_threats(self, lv):
+        """Visible hostiles that should stop housekeeping (pickups, equipment, shopping). The SAME list
+        gates those steps and the explore goals they consume."""
+        vis = self.visible_hostiles(lv)
+        if self.role_opts.get("scroll_id"):
+            vis = [v for v in vis if v[1] != "shopkeeper"]     # a peaceful shopkeeper is not a threat
+        if self.role_opts.get("vis_mobile"):
+            # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
+            # stepping in and out of its line of sight flips this gate and two goals take turns
+            y, x = self.pos()
+            vis = [(p, n) for p, n in vis if max(abs(p[0] - y), abs(p[1] - x)) <= 1
+                   or n not in PM_BY_NAME or PM_BY_NAME[n].mmove > 0]
+        return vis
+
     def shopkeeper_in_view(self):
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
@@ -1094,9 +1108,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 if self.go_toward(lv, goal):
                     return
 
-        vis = self.visible_hostiles(lv)
-        if self.role_opts.get("scroll_id"):
-            vis = [v for v in vis if v[1] != "shopkeeper"]   # a peaceful shopkeeper is not a threat
+        vis = self.view_threats(lv)
         if (self.use_armor or self.use_food) and not vis:
             if self.need_pay:
                 self.need_pay = False
@@ -1219,10 +1231,17 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.role_opts.get("scroll_id"):
             gold = gold & ~lv.shop                     # shop gold belongs to the shopkeeper
         targets = frontier | gold
-        if self.role_opts.get("scroll_id"):
-            targets = targets | (self.scroll_targets(lv) & passable)
-        if self.use_armor or self.use_food:
-            targets = targets | (self.armor_targets(lv, G) & passable)
+        items_ok = True
+        item_mask = passable
+        if self.role_opts.get("item_consistent"):
+            # an item square is only a goal if the step that inspects it (and so removes the goal) will run:
+            # that step needs no hostile in view and skips shop squares
+            items_ok = not self.view_threats(lv)
+            item_mask = passable & ~lv.shop
+        if items_ok and self.role_opts.get("scroll_id"):
+            targets = targets | (self.scroll_targets(lv) & item_mask)
+        if items_ok and (self.use_armor or self.use_food):
+            targets = targets | (self.armor_targets(lv, G) & item_mask)
         if targets.any():
             dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
             if reached is not None and reached != start:
@@ -1283,12 +1302,18 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 wallish[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         score = np.where(reach & passable, cnt * 10.0 - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
         # dead-end corridors are prime spots
-        best = np.unravel_index(np.argmax(score), score.shape)
-        if score[best] <= -1e8:
-            self.press("s")
-            return
-        best = (int(best[0]), int(best[1]))
+        goal = getattr(lv, "search_goal", None) if self.role_opts.get("search_goal") else None
+        if goal is not None and reach[goal] and passable[goal]:
+            best = goal                       # committed: the distance term must not re-pick it every step
+        else:
+            best = np.unravel_index(np.argmax(score), score.shape)
+            if score[best] <= -1e8:
+                self.press("s")
+                return
+            best = (int(best[0]), int(best[1]))
+            lv.search_goal = best
         if best == start:
+            lv.search_goal = None             # searched here: choose afresh next time
             lv.searched[start] += 10
             self.press("1"); self.press("0"); self.press("s")
             return
