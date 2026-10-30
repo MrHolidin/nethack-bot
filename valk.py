@@ -74,6 +74,16 @@ class ValkMixin:
             if self.stolen_pending:
                 self.loot_sq = self.last_attack_target
                 self.loot_key = self.cur_key
+        if "It stole" in m or "It steals" in m or "She charms you" in m:
+            if self.turn() != getattr(self, "_theft_turn", None):
+                self._theft_turn = self.turn()
+                self.thefts += 1
+            self.stolen_pending = True
+        if self.vopt("nymph", False) and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
+            self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
+        if "return to human form" in m and getattr(self, "were_drop", None):
+            self.loot_key, self.loot_sq = self.were_drop
+            self.were_drop = None
         if "You float" in m or "float into the air" in m or "start to float" in m:
             self.just_levitated = True
         if self.vopt("armor_mode", "safe") == "aggressive" and re.search(r"You (trip|flounder|slip)", m):
