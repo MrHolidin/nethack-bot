@@ -45,6 +45,7 @@ jobs:
           python eval.py -n ${{ matrix.n }} --start ${{ matrix.start }} --char "${{ matrix.char }}" \
             --kw "$KW" -j $J --out "res_${SAFE}_${{ matrix.start }}.jsonl"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: res-${{ strategy.job-index }}
           path: res_*.jsonl

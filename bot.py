@@ -330,7 +330,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if "carrying so much" in m:
             self.no_eat_until = self.turn() + 20
         if "You die" in m or "You starve" in m:
-            self.death_msgs = list(self.messages)[-8:]
+            self.death_msgs = [mm for _, mm in list(self.messages)[-8:]]
 
     # ------------------------------------------------------------ helpers
     def kind_grid(self, lv):
