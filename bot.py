@@ -591,7 +591,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def always_avoid(self):
         s = ALWAYS_AVOID
-        if self.role_opts.get("eye_avoid", True) and not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+        if self.role_opts.get("eye_avoid") and not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
         return s
 
@@ -748,7 +748,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
-        if self.role_opts.get("no_bats", True) and name in ("bat", "giant bat", "vampire bat"):
+        if self.role_opts.get("no_bats") and name in ("bat", "giant bat", "vampire bat"):
             return False                      # eat.c: bat corpses stun for 30 (giant bat 60) turns
         f1, f2 = pm.mflags1, pm.mflags2
         if f2 & (M2_UNDEAD | M2_WERE | M2_SHAPESHIFTER):
@@ -1051,7 +1051,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
         if self.role_opts.get("vault_guard") and self.vault_step(lv, hostiles):
             return
-        if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
+        if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait") and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
             self.press("s")
