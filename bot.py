@@ -212,6 +212,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
+                if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard"):
+                    for c in "Agent":                       # our real name (lawful: lying costs alignment)
+                        self.raw_step(ord(c))
+                    self.raw_step(13)
+                    continue
                 self.raw_step(27)
                 continue
             if re.search(r"\(end\)|\(\d+ of \d+\)", tty):
@@ -323,8 +328,19 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                                  "Then die, mortal", "Thou durst", "You feel that Mitra is angry",
                                  "is displeased.") if p != "is displeased."):
             self.god_angry = True
-        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m):
-            # shop entrance: never go inside (we get trapped / risk shoplifting)
+        if self.role_opts.get("vault_guard"):
+            if "drop that gold" in m or "drop that money" in m:
+                self.vault_drop = True
+            if "follow me" in m:
+                self.vault_follow_until = self.turn() + 300
+                self.guard_trail = []
+        if self.role_opts.get("shop_fix") and lv is not None and "Closed for inventory" in m:
+            lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
+        on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
+        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and (on_door or not self.role_opts.get("shop_fix")):
+            # shop entrance: never go inside (we get trapped / risk shoplifting).
+            # shop_fix: only when we are at the door -- after falling in through a trap door we are
+            # inside, and marking from here walls us in
             self.mark_shop(lv, self.pos())
             self.shops_seen += 1
             self.shop_greeted(lv, m)
@@ -429,6 +445,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         before = (y, x, self.turn())
         lv = self.level()
         if target in lv.locked:
+            if self.role_opts.get("shop_fix") and any(max(abs(cy - ty), abs(cx - tx)) <= 1
+                                                       for cy, cx in getattr(lv, "cfi", ())):
+                lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
+                self.shop_kicks_avoided += 1
+                return
             if lv.key[0] == 2 or self.law_nearby():
                 lv.blocked[ty, tx] = True     # never kick doors in the Mines (Minetown watch)
                 return
@@ -456,6 +477,52 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.last_move_target = None
         self.press("F")
         self.press(key)
+
+    def vault_step(self, lv, hostiles):
+        """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
+        if self.vault_drop:
+            self.vault_drop = False
+            self.vault_drops += 1
+            self.press("d", expect_prompt=True)
+            if "drop" in self.message().lower():
+                self.press("$")
+            else:
+                self.settle()
+            return True
+        if self.turn() > self.vault_follow_until:
+            return False
+        if any(n != "guard" for _, n in hostiles):
+            return False                      # something else is attacking: fight first
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        guards = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "guard"]
+        y, x = self.pos()
+        if not guards:
+            if self.guard_trail and self.turn() - self.guard_trail[-1][1] > 20:
+                self.vault_follow_until = -1
+                return False
+        else:
+            gp = min(guards, key=lambda p: max(abs(p[0] - y), abs(p[1] - x)))
+            if not self.guard_trail or self.guard_trail[-1][0] != gp:
+                self.guard_trail.append((gp, self.turn()))
+        # step onto the newest square the guard has left that is next to us
+        gnow = self.guard_trail[-1][0] if self.guard_trail else None
+        for p, _ in reversed(self.guard_trail[:-1]):
+            d = (p[0] - y, p[1] - x)
+            if p != gnow and d in DELTA2KEY:
+                self.vault_moves += 1
+                self.cur_act = "vault"
+                self.press(DELTA2KEY[d])
+                return True
+        self.cur_act = "vault"
+        self.press("s")
+        return True
+
+    def always_avoid(self):
+        s = ALWAYS_AVOID
+        if self.role_opts.get("eye_avoid") and not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+            s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
+        return s
 
     def mark_shop(self, lv, door):
         g = lv.under.copy()
@@ -599,6 +666,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
+        if self.role_opts.get("no_bats") and name in ("bat", "giant bat", "vampire bat"):
+            return False                      # eat.c: bat corpses stun for 30 (giant bat 60) turns
         f1, f2 = pm.mflags1, pm.mflags2
         if f2 & (M2_UNDEAD | M2_WERE | M2_SHAPESHIFTER):
             return False
@@ -749,7 +818,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(g[yy, xx])
-                    if name in NEVER_MELEE and not (lv.desperate and name not in ALWAYS_AVOID) \
+                    if name in NEVER_MELEE and not (lv.desperate and name not in self.always_avoid()) \
                             and not self.spore_ok(name):
                         self.avoid_cells.append((yy, xx))
         for dy, dx in NEIGH:
@@ -760,7 +829,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             k = G.KIND[gg]
             if k == G.MONSTER and gg not in lv.peaceful:
                 name = G.monster_name(gg)
-                if name in NEVER_MELEE and not (lv.desperate and name not in ALWAYS_AVOID
+                if name in NEVER_MELEE and not (lv.desperate and name not in self.always_avoid()
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
@@ -888,6 +957,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.stun_waits += 1
                 self.press("s")
                 return
+        if self.role_opts.get("vault_guard") and self.vault_step(lv, hostiles):
+            return
+        if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait") and not hostiles \
+                and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
+            self.blind_waits += 1             # wandering blind walks into things we can't see
+            self.press("s")
+            return
         if self.use_roles and self.prev_weapon is not None and self.rewield_after_dig(hostiles):
             return
         if self.use_abilities and self.heal_step(hostiles):
@@ -1213,6 +1289,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.lycanthropy = False
         self.deadly_prayers = 0
         self.stun_waits = 0
+        self.blind_waits = 0
+        self.shop_kicks_avoided = 0
+        self.vault_drop = False
+        self.vault_follow_until = -1
+        self.guard_trail = []
+        self.vault_moves = 0
+        self.vault_drops = 0
         self.seen_here = None
         self.ammo_pickups = 0
         self.time_by = {}
@@ -1316,6 +1399,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": getattr(self, "elb_fail", 0),
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
+            "blind_waits": self.blind_waits, "shop_kicks_avoided": self.shop_kicks_avoided,
+            "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
