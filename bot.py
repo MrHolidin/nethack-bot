@@ -228,6 +228,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def answer_yn(self, msg):
         m = msg.lower()
+        if getattr(self, "sell_probe", None) and "sell" in m:
+            self.on_sell_offer(msg + " " + self.top_line())
+            self.raw_step(ord("n"))
+            return
         if "really attack" in m:
             self.mark_peaceful_target()
             self.raw_step(27)
@@ -778,16 +782,26 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.throws += 1
         self.retrieve.append((self.cur_key, ray, self.turn() + 60))
 
-    def pickup_matching(self, words):
+    def pickup_matching(self, words, no_sale=False, own=False):
+        if self.role_opts.get("scroll_id") and not own:
+            lv = self.level()
+            if lv.shop[self.pos()] or self.shopkeeper_in_view():
+                return                        # in a shop: anything here may be merchandise
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
         if "Pick up what?" not in tty:
             self.settle()
             return
         chosen = 0
-        for line in tty.split("\n"):
+        lines = tty.split("\n")
+        if own or self.role_opts.get("menu_col"):
+            # the menu is drawn over the map from the header's column: cut each line there
+            hi = next(i for i, l in enumerate(lines) if "Pick up what?" in l)
+            col = lines[hi].index("Pick up what?")
+            lines = [l[col:] for l in lines[hi + 1:]]
+        for line in lines:
             m = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
-            if m and any(w in m.group(2) for w in words):
+            if m and any(w in m.group(2) for w in words) and not (no_sale and "for sale" in m.group(2)):
                 self.raw_step(ord(m.group(1)))
                 chosen += 1
         self.raw_step(13 if chosen else 27)
@@ -1075,6 +1089,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     return
 
         vis = self.visible_hostiles(lv)
+        if self.role_opts.get("scroll_id"):
+            vis = [v for v in vis if v[1] != "shopkeeper"]   # a peaceful shopkeeper is not a threat
         if (self.use_armor or self.use_food) and not vis:
             if self.need_pay:
                 self.need_pay = False

@@ -62,10 +62,29 @@ def possible_bases(price, cha, sucker=False):
     return out
 
 
+def possible_bases_offer(offer, qty, low_divisor):
+    """Bases consistent with a shopkeeper's buy offer (shk.c set_cost): total = qty*base / 2 (or /3 for a
+    dunce/tourist), times 3/4 for unidentified items at shopkeepers with m_id % 4 == 0 (fixed per shk)."""
+    out = set()
+    div0 = 3 if low_divisor else 2
+    for b in SCROLL_BASES:
+        for m, d in ((1, div0), (3, div0 * 4)):
+            t = qty * b * m
+            t = max((t * 10 // d + 5) // 10, 1)
+            if t == offer:
+                out.add(b)
+    return out
+
+
+OFFER_RE = re.compile(r"offers (only )?(\d+) gold pieces? for your .*?scrolls? labeled ([A-Z0-9 ]+?)\.\s+Sell")
+
+
 class ScrollMixin:
     def scroll_init(self):
         self.scroll_bases = {}        # appearance -> set of possible base prices
-        self.scroll_stats = {"shops_entered": 0, "priced": 0, "picked": 0, "read": 0, "read_names": [],
+        self.sell_probe = None        # dict(app, qty) while a drop-to-hear-the-offer is in flight
+        self.probed = set()           # (shop level key, appearance)
+        self.scroll_stats = {"probes": 0, "probe_info": 0, "shops_entered": 0, "priced": 0, "picked": 0, "read": 0, "read_names": [],
                              "good_appearances": 0, "seen_floor": 0}
 
     # ------------------------------------------------------------ knowledge
@@ -114,9 +133,71 @@ class ScrollMixin:
             mask[p] = False
         return mask
 
+    def on_sell_offer(self, msg):
+        """Called from answer_yn on 'Sell it?' while probing: learn from the offer, always decline."""
+        m = OFFER_RE.search(msg)
+        p = self.sell_probe
+        if not m or not p or m.group(1):          # 'offers only N': shopkeeper short of cash, no info
+            return
+        cand = possible_bases_offer(int(m.group(2)), p["qty"], self.sucker())
+        if cand:
+            old = self.scroll_bases.get(p["app"])
+            new = cand if old is None else (old & cand or old)
+            if new <= GOOD_BASES and not (old is not None and old <= GOOD_BASES):
+                self.scroll_stats["good_appearances"] += 1
+            self.scroll_bases[p["app"]] = new
+            self.scroll_stats["probe_info"] += 1
+
+    def unknown_scrolls(self, lv):
+        out = []
+        for letter, c, s in self.inventory():
+            if c != nh.SCROLL_CLASS:
+                continue
+            m = APPEAR_RE.search(s)
+            if not m:
+                continue
+            app = m.group(1).strip()
+            if app in self.scroll_bases and len(self.scroll_bases[app]) == 1 or (lv.key, app) in self.probed:
+                continue
+            q = re.match(r"(\d+) ", s)
+            out.append((letter, app, int(q.group(1)) if q else 1))
+        return out
+
+    def probe_scroll(self, lv, letter, app, qty):
+        """Drop it on the shop floor, hear the offer, decline, take it back."""
+        self.probed.add((lv.key, app))
+        self.scroll_stats["probes"] += 1
+        self.sell_probe = {"app": app, "qty": qty}
+        self.press("d", expect_prompt=True)
+        if "drop" not in self.message().lower():
+            self.settle()
+        else:
+            self.press(letter)
+        self.sell_probe = None
+        self.pickup_matching(("labeled " + app,), no_sale=True, own=True)
+
     def scroll_shop_step(self, lv):
-        targets = self.scroll_shop_targets(lv)
         y, x = self.pos()
+        unknown = self.unknown_scrolls(lv)
+        # the square just inside the door is the shopkeeper's post and is not for sale: offers come only
+        # for items dropped deeper inside
+        near_door = any(G.KIND[lv.under[y + dy, x + dx]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
+                        for dy in (-1, 0, 1) for dx in (-1, 0, 1)
+                        if 0 <= y + dy < lv.under.shape[0] and 0 <= x + dx < lv.under.shape[1])
+        inside = bool(lv.shop[y, x]) and not near_door
+        if unknown and inside:
+            self.probe_scroll(lv, *unknown[0])
+            return True
+        targets = self.scroll_shop_targets(lv)
+        if unknown and not targets.any():
+            k = G.KIND[lv.under]
+            door = np.isin(k, [G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY])
+            near = door.copy()
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    near |= np.roll(np.roll(door, dy, 0), dx, 1)
+            targets = lv.shop & ~near
+            targets[y, x] = False
         if not targets.any():
             self.shops_done.add(lv.key)
             self.shopping = None
