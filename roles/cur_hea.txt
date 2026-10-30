@@ -1,0 +1,8 @@
+games 60  crashes 0  wall 80s
+score  mean 779  median 626  max 2332
+depth  mean 4.77  median 5.0  max 8  hist [(1, 2), (2, 3), (3, 7), (4, 10), (5, 21), (6, 9), (7, 6), (8, 2)]
+turns  median 2376.5   xl median 4.0
+truncated: 0
+causes: [('starvation', 7), ('rothe', 5), ('wererat', 4), ('?', 4), ('iguana', 4), ('giant ant', 3), ('hill orc', 3), ('sewer rat', 2), ('giant bat', 2), ('soldier ant', 2), ('werejackal', 2), ('imp', 1)]
+died in mines: 1 / 60
+by role: {'Healer': (60, 626)}

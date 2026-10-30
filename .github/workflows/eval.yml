@@ -1,0 +1,61 @@
+name: eval
+on:
+  workflow_dispatch:
+    inputs:
+      tag:   {description: "run name", required: true, default: "run"}
+      chars: {description: "space-separated character codes (val, mon, @ = random, val-hum-law-fem ...)", required: true, default: "@"}
+      n:     {description: "games per shard", required: true, default: "40"}
+      shards: {description: "shards per character (seed ranges)", required: true, default: "4"}
+      start: {description: "first seed", required: true, default: "10000"}
+      kw:    {description: "Bot kwargs as JSON", required: true, default: "{}"}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          chars = "${{ inputs.chars }}".split()
+          n, shards, start = int("${{ inputs.n }}"), int("${{ inputs.shards }}"), int("${{ inputs.start }}")
+          inc = [{"char": c, "start": start + i * n, "n": n} for c in chars for i in range(shards)]
+          print("matrix=" + json.dumps({"include": inc}))
+          PY
+
+  run:
+    needs: plan
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11", cache: pip}
+      - run: pip install nle==1.3.0
+      - name: play
+        env:
+          KW: ${{ inputs.kw }}
+        run: |
+          J=$(nproc)
+          SAFE=$(echo "${{ matrix.char }}" | tr -c 'A-Za-z0-9\n' '_')
+          python eval.py -n ${{ matrix.n }} --start ${{ matrix.start }} --char "${{ matrix.char }}" \
+            --kw "$KW" -j $J --out "res_${SAFE}_${{ matrix.start }}.jsonl" | head -12
+      - uses: actions/upload-artifact@v4
+        with:
+          name: res-${{ strategy.job-index }}
+          path: res_*.jsonl
+
+  merge:
+    needs: run
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: {path: parts, pattern: "res-*", merge-multiple: true}
+      - run: cat parts/*.jsonl > "${{ inputs.tag }}.jsonl" && wc -l "${{ inputs.tag }}.jsonl"
+      - uses: actions/upload-artifact@v4
+        with: {name: "${{ inputs.tag }}", path: "${{ inputs.tag }}.jsonl"}

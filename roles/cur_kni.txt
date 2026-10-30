@@ -1,0 +1,8 @@
+games 60  crashes 0  wall 96s
+score  mean 1274  median 855  max 8119
+depth  mean 5.45  median 5.0  max 11  hist [(1, 3), (2, 2), (3, 8), (4, 5), (5, 15), (6, 6), (7, 11), (8, 6), (9, 1), (10, 2), (11, 1)]
+turns  median 2965.0   xl median 4.0
+truncated: 0
+causes: [('wand', 4), ('unseen', 4), ('starvation', 3), ('rothe', 3), ('jaguar', 3), ('giant ant', 3), ('wolf', 3), ('giant bat', 3), ('pony', 3), ('killer bee', 2), ('dwarf', 2), ('wererat', 2)]
+died in mines: 4 / 60
+by role: {'Knight': (60, 855)}

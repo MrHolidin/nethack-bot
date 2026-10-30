@@ -1,0 +1,8 @@
+games 60  crashes 0  wall 103s
+score  mean 2462  median 1518  max 17156
+depth  mean 6.90  median 7.0  max 15  hist [(1, 1), (2, 1), (3, 4), (4, 5), (5, 10), (6, 5), (7, 13), (8, 9), (9, 3), (10, 1), (11, 3), (12, 2), (13, 1), (14, 1), (15, 1)]
+turns  median 3505.5   xl median 5.0
+truncated: 0
+causes: [('starvation', 6), ('?', 5), ('unseen', 4), ('fire ant', 3), ('guard', 2), ('jaguar', 2), ('rothe', 2), ('ape', 2), ('hill orc', 2), ('cockatrice', 2), ('dingo', 2), ('owlbear', 2)]
+died in mines: 3 / 60
+by role: {'Valkyrie': (60, 1518)}

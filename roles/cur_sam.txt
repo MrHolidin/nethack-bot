@@ -1,0 +1,8 @@
+games 60  crashes 0  wall 182s
+score  mean 1520  median 1146  max 10460
+depth  mean 5.63  median 6.0  max 12  hist [(1, 1), (2, 7), (3, 6), (4, 4), (5, 11), (6, 8), (7, 10), (8, 7), (9, 3), (10, 1), (11, 1), (12, 1)]
+turns  median 2827.0   xl median 5.0
+truncated: 0
+causes: [('?', 8), ('starvation', 7), ('wand', 4), ('unseen', 4), ('killer bee', 3), ('giant ant', 3), ('bolt of cold', 2), ('gnome king', 2), ('hill orc', 2), ('giant bat', 2), ('magic missile', 2), ('jaguar', 1)]
+died in mines: 3 / 60
+by role: {'Samurai': (60, 1146)}

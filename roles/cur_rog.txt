@@ -1,0 +1,8 @@
+games 60  crashes 0  wall 71s
+score  mean 863  median 729  max 2432
+depth  mean 4.77  median 5.0  max 9  hist [(1, 2), (2, 5), (3, 4), (4, 12), (5, 20), (6, 8), (7, 7), (8, 1), (9, 1)]
+turns  median 2319.0   xl median 4.0
+truncated: 0
+causes: [('starvation', 6), ('dwarf', 5), ('giant ant', 4), ('wererat', 4), ('rothe', 4), ('pony', 4), ('?', 3), ('werejackal', 2), ('homunculus', 2), ('jackal', 2), ('gnome lord', 2), ('dwarf king', 2)]
+died in mines: 2 / 60
+by role: {'Rogue': (60, 729)}

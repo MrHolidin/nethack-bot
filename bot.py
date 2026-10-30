@@ -16,7 +16,7 @@ import glyphs as G
 from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
-from roles import RolesMixin, AMMO, ClassTacticsMixin
+from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from shop import ShopMixin
 
 ROWS, COLS = 21, 79
@@ -106,7 +106,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -936,6 +936,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.use_armor and self.shop_step(lv):
                 return
+            if self.excal_step(lv):
+                return
             if self.use_armor and self.equip_step(lv):
                 return
             if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]) and (y, x) not in self.inspected.get(lv.key, ()) \
@@ -1175,6 +1177,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.abilities_init()
         self.roles_init()
         self.class_init()
+        self.excal_init()
         self.shop_init()
         self.shops_done = set()
         self.need_pay = False
@@ -1235,6 +1238,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "missiles": self.missiles,
             "digs": self.digs,
             "zaps": self.zaps,
+            "excalibur": self.excal_turn,
+            "dips": self.dips,
+            "excal_trips": self.excal_trips,
+            "dip_events": self.dip_events,
+            "fountain_levels": len(self.fountain_levels),
+            "align": int(self.last_bl[nh.NLE_BL_ALIGN]),
             "purchases": self.purchases,
             "shop_visits": self.shop_visits,
             "flashes": self.flashes,
