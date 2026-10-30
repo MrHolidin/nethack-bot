@@ -9,6 +9,7 @@ armor_mode:  "safe"        - only known-mundane armor (previous behaviour)
              "aggressive"  - also random-appearance helm/gloves/boots into an empty slot, untested;
                              undo levitation (take off, else pray) and drop fumbling items.
 """
+import collections
 import re
 
 import numpy as np
@@ -537,3 +538,109 @@ class ValkMixin2:
             return True
         self.choke_target = None
         return False
+
+
+# =====================================================================================
+# elb2: Elbereth as measured in NLE 3.6.6 wizard mode
+#   - while you stand on a correctly spelled Elbereth, monsters that respect it never melee you
+#   - it survives waiting; your first melee attack (and usually a throw) erases it
+#   - ~1 in 5 finger engravings is misspelled and does nothing -> always read it back
+# =====================================================================================
+ELB_IGNORE_NAMES = {"minotaur", "shopkeeper", "guard", "watchman", "watch captain", "aligned priest",
+                    "high priest", "Oracle"}
+SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
+
+
+B_HUMAN_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "human")
+B_ANGEL_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "Angel")
+
+
+class ElberethMixin:
+    def elb2_init(self):
+        self.elb_state = None        # dict(pos, key, since, last_read, hp_hist)
+        self.elb_engraves = 0
+        self.elb_misspelled = 0
+        self.elb_turns = 0
+        self.elb_exits = collections.Counter()
+
+    def read_engraving(self):
+        n0 = len(self.messages)
+        self.raw_step(ord(":"))
+        self.settle()
+        txt = " ".join(m for _, m in list(self.messages)[-6:])
+        m = re.search(r'You read: "([^"]*)"', txt)
+        return m.group(1) if m else ""
+
+    def respects(self, pos, name):
+        if name == "invisible" or name in ELB_IGNORE_NAMES:
+            return False
+        pm = PM_BY_NAME_V.get(name)
+        if pm is None:
+            return False
+        return pm.mlet not in (B_HUMAN_MLET, B_ANGEL_MLET)
+
+    def elb_wanted(self, lv, hostiles):
+        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if self.can_pray() or G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
+            return False
+        if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF):
+            return False
+        y, x = self.pos()
+        near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]
+        threats = hostiles + [t for t in near if t not in hostiles]
+        if not threats or not all(self.respects(p, n) for p, n in threats):
+            return False
+        swarm = sum(1 for _, n in threats if n in SWARMERS)
+        return hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2
+
+    def elb_step(self, lv, hostiles):
+        if not self.vopt("elb2", False):
+            return False
+        st = self.elb_state
+        y, x = self.pos()
+        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if st is not None:
+            if st["pos"] != (y, x) or st["key"] != lv.key:
+                self.elb_exits["moved"] += 1
+                self.elb_state = None
+            else:
+                bad = [n for p, n in hostiles if not self.respects(p, n)]
+                st["hp_hist"].append(hp)
+                losing = len(st["hp_hist"]) > 4 and st["hp_hist"][-1] < st["hp_hist"][-5] - 2
+                if bad or losing:
+                    self.elb_exits["ignored" if bad else "ranged"] += 1
+                    self.elb_state = None
+                    return False                       # fight / let tactics handle it
+                visible = self.visible_hostiles(lv)
+                if hp >= maxhp * self.vopt("elb_exit", 0.85) or (not visible and hp >= maxhp * 0.6):
+                    self.elb_exits["healed"] += 1
+                    self.elb_state = None
+                    return False
+                if self.turn() - st["since"] > self.vopt("elb_max", 400):
+                    self.elb_exits["timeout"] += 1
+                    self.elb_state = None
+                    return False
+                if self.turn() - st["last_read"] >= 4:
+                    st["last_read"] = self.turn()
+                    if self.read_engraving() != "Elbereth":
+                        return self.elb_write(lv)
+                self.elb_turns += 1
+                self.cur_act = "rest"
+                self.press("s")
+                return True
+        if not self.elb_wanted(lv, hostiles):
+            return False
+        return self.elb_write(lv)
+
+    def elb_write(self, lv):
+        for attempt in range(3):
+            self.engrave_elbereth()
+            self.elb_engraves += 1
+            if self.read_engraving() == "Elbereth":
+                self.elb_state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
+                                  "last_read": self.turn(), "hp_hist": [self.bl(nh.NLE_BL_HP)]}
+                self.cur_act = "rest"
+                return True
+            self.elb_misspelled += 1
+        self.elb_state = None
+        return True

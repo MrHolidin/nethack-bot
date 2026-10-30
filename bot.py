@@ -17,7 +17,7 @@ from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
-from valk import ValkMixin, ValkMixin2
+from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 
 ROWS, COLS = 21, 79
@@ -33,6 +33,8 @@ SATIATED, NOT_HUNGRY, HUNGRY, WEAK, FAINTING = 0, 1, 2, 3, 4
 
 NEVER_MELEE = {"floating eye", "gas spore", "cockatrice", "chickatrice",
                "blue jelly", "spotted jelly", "ochre jelly", "brown mold", "green mold"}
+PASSIVE_MOLDS = {"yellow mold", "green mold", "brown mold", "red mold", "lichen" and "", "violet fungus" and ""}
+PASSIVE_MOLDS.discard("")
 ALWAYS_AVOID = {"gas spore", "cockatrice", "chickatrice", "brown mold", "green mold"}   # even when desperate
 RANGED_TARGETS = {"floating eye", "gas spore", "blue jelly", "spotted jelly",
                   "ochre jelly", "brown mold", "green mold", "cockatrice", "chickatrice"}
@@ -94,6 +96,7 @@ class Level:
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
         self.locked = set()
+        self.gold_tried = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.desperate = False
@@ -107,7 +110,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -859,6 +862,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.use_enhance:
             self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
+        cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF) and self.role_opts.get("stun_wait", True):
+            # moves and attacks go in random directions while stunned/confused
+            only_passive = all(n in PASSIVE_MOLDS for _, n in hostiles)
+            if not hostiles or only_passive:
+                self.stun_waits += 1
+                self.press("s")
+                return
         if self.use_roles and self.prev_weapon is not None and self.rewield_after_dig(hostiles):
             return
         if self.use_abilities and self.heal_step(hostiles):
@@ -876,6 +887,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if len(self.hist) > 40:
             self.hist.popleft()
         if self.use_tactics and self.tactical_step(lv, hostiles):
+            return
+        if self.elb_step(lv, hostiles):
             return
         if self.nymph_step(lv, hostiles):
             return
@@ -982,9 +995,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         # gold under us
-        if G.KIND[lv.under[y, x]] == G.GOLD:
-            self.press(",")
-            lv.under[y, x] = G.STONE_GLYPH + 19   # assume floor now
+        if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried:
+            lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
+            self.pickup_matching(("gold piece",))
+            lv.under[y, x] = G.STONE_GLYPH + 19
             return
 
         self.explore(lv)
@@ -1048,6 +1062,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
         gold = (k_mem == G.GOLD) & passable
+        for p in lv.gold_tried:
+            gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
         if lv.avoid_down and on_level < 3000 and self.mines_blocked():
@@ -1174,6 +1190,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.throws = 0
         self.lycanthropy = False
         self.deadly_prayers = 0
+        self.stun_waits = 0
         self.seen_here = None
         self.ammo_pickups = 0
         self.time_by = {}
@@ -1211,6 +1228,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.excal_init()
         self.valk_init()
         self.valk2_init()
+        self.elb2_init()
         self.shop_init()
         self.shops_done = set()
         self.need_pay = False
@@ -1272,10 +1290,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "digs": self.digs,
             "zaps": self.zaps,
             "thefts": self.thefts,
+            "elb_engraves": self.elb_engraves,
+            "elb_misspelled": self.elb_misspelled,
+            "elb_turns": self.elb_turns,
+            "elb_exits": dict(self.elb_exits),
             "kill_loot_checks": self.kill_loot_checks,
             "choke_moves": self.choke_moves,
             "choke_waits": self.choke_waits,
             "deadly_prayers": self.deadly_prayers,
+            "stun_waits": self.stun_waits,
             "nymph_escapes": self.nymph_escapes,
             "daggers_picked": self.daggers_picked,
             "nymph_kills": self.nymph_kills,
