@@ -52,6 +52,10 @@ class ValkMixin:
         self.lev_fixes = 0
         self.fumble_drops = 0
         self.tested_bad = set()
+        self.inspected_daggers = {}
+        self.daggers_picked = 0
+        self.nymph_waits = 0
+        self.nymph_elbs = 0
 
     def vopt(self, k, d=None):
         return self.role_opts.get(k, d)
@@ -74,6 +78,45 @@ class ValkMixin:
             self.just_levitated = True
         if self.vopt("armor_mode", "safe") == "aggressive" and re.search(r"You (trip|flounder|slip)", m):
             self.fumbling_seen = True
+
+    def dagger_count(self):
+        n = 0
+        for _, c, s in self.inventory():
+            if c == nh.WEAPON_CLASS and re.search(r"\bdaggers?\b", s) and "weapon in hand" not in s:
+                m = re.match(r"^(\d+) ", s)
+                n += int(m.group(1)) if m else 1
+        return n
+
+    def dagger_targets(self, lv):
+        """Remembered dagger piles to collect (Valkyries can throw daggers)."""
+        if not self.vopt("daggers", False) or self.dagger_count() >= 8:
+            return None
+        mask = G.DAGGER_GLYPH[lv.under].copy()
+        for p in self.inspected_daggers.get(lv.key, ()):
+            mask[p] = False
+        mask &= ~lv.shop
+        return mask if mask.any() else None
+
+    def dagger_step(self, lv):
+        mask = self.dagger_targets(lv)
+        if mask is None:
+            return False
+        y, x = self.pos()
+        if mask[y, x]:
+            self.inspected_daggers.setdefault(lv.key, set()).add((y, x))
+            self.pickup_matching(("dagger",))
+            self.daggers_picked += 1
+            return True
+        k_mem, k_live = self.kind_grid(lv)
+        p = self.passable_grid(lv, k_mem, k_live)
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), mask, max_cost=40)
+        if reached is None:
+            return False
+        step = self.first_step(prev, (y, x), reached)
+        if step is None:
+            return False
+        self.move(step)
+        return True
 
     def thieves_visible(self, lv):
         g = self.obs["glyphs"]
@@ -113,13 +156,61 @@ class ValkMixin:
                        if 0 <= y + i * dy < ROWS and 0 <= x + i * dx < COLS]
                 self.throw(tw[0][0], key, ray)
                 return True
-        # 3) we were robbed: hunt the thief down
-        if self.stolen_pending:
-            goal = min(th, key=lambda t: max(abs(t[0][0] - y), abs(t[0][1] - x)))[0]
-            if self.go_toward(lv, goal):
+        have_shot = bool(self.throwables()) or self.can_cast("force bolt") or (self.use_roles and self.ranger_can_fire())
+        # 2b) we could shoot but it isn't in line: step to a square that lines us up, at distance >= 2
+        if have_shot and self.vopt("nymph_align", True):
+            step = self.align_step(lv, th)
+            if step is not None:
                 self.cur_act = "fight"
+                self.move(step)
                 return True
+        # 2c) no way to shoot: stand on Elbereth (nymphs respect it and won't steal in melee)
+        if not have_shot and self.vopt("nymph_elb", True) and (y, x) not in lv.elbereth:
+            close = [t for t in th if max(abs(t[0][0] - y), abs(t[0][1] - x)) <= 4]
+            if close and G.KIND[lv.under[y, x]] not in (G.UPSTAIR, G.DOWNSTAIR) and self.nymph_elbs < 30:
+                self.nymph_elbs += 1
+                self.cur_act = "fight"
+                self.engrave_elbereth()
+                return True
+        # 3) no shot: never step next to a thief (that hands it the first move). Hold still and
+        #    let it come; nymphs come back to steal more, so waiting is also how we get our items back.
+        close = [t for t in th if 2 <= max(abs(t[0][0] - y), abs(t[0][1] - x)) <= self.vopt("nymph_hold", 4)]
+        if close and self.nymph_waits < self.vopt("nymph_wait_max", 8):
+            self.nymph_waits += 1
+            self.cur_act = "fight"
+            self.press("s")
+            return True
+        if not close:
+            self.nymph_waits = 0
         return False
+
+    def align_step(self, lv, th):
+        """A neighbouring free square from which some thief is in a straight clear line, 2..6 away."""
+        y, x = self.pos()
+        k_mem, k_live = self.kind_grid(lv)
+        p = self.passable_grid(lv, k_mem, k_live)
+        g = self.obs["glyphs"]
+        best = None
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                if not (dy or dx):
+                    continue
+                ny, nx = y + dy, x + dx
+                if not (0 <= ny < ROWS and 0 <= nx < COLS) or not p[ny, nx] or G.KIND[g[ny, nx]] in (G.MONSTER, G.PET):
+                    continue
+                if dy and dx and (k_mem[y, x] in (G.DOOR_OPEN, G.DOOR_CLOSED) or k_mem[ny, nx] in (G.DOOR_OPEN, G.DOOR_CLOSED)):
+                    continue
+                for (ty, tx), _ in th:
+                    ry, rx = ty - ny, tx - nx
+                    d = max(abs(ry), abs(rx))
+                    if d < 2 or d > 6 or not (ry == 0 or rx == 0 or abs(ry) == abs(rx)):
+                        continue
+                    sy, sx = (ry > 0) - (ry < 0), (rx > 0) - (rx < 0)
+                    if all(G.PASSABLE[k_mem[ny + i * sy, nx + i * sx]] and G.KIND[g[ny + i * sy, nx + i * sx]] not in (G.MONSTER, G.PET, G.BOULDER)
+                           for i in range(1, d)):
+                        if best is None or d < best[0]:
+                            best = (d, (ny, nx))
+        return best[1] if best else None
 
     def pickup_all(self):
         self.press(",", expect_prompt=True)

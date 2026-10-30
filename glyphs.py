@@ -112,3 +112,12 @@ FOOD_GLYPH = np.zeros(N, dtype=bool)
 for g in range(N):
     if nh.glyph_is_normal_object(g) and ord(nh.objclass(nh.glyph_to_obj(g)).oc_class) == nh.FOOD_CLASS:
         FOOD_GLYPH[g] = True
+
+# daggers on the floor: daggers have fixed appearances ("dagger", "crude dagger", "runed dagger"),
+# so the glyph tells a human-visible fact
+DAGGER_GLYPH = np.zeros(N, dtype=bool)
+for g in range(N):
+    if nh.glyph_is_normal_object(g):
+        _n = nh.OBJ_NAME(nh.objclass(nh.glyph_to_obj(g))) or ""
+        if _n in ("dagger", "orcish dagger", "elven dagger", "silver dagger", "athame"):
+            DAGGER_GLYPH[g] = True

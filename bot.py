@@ -945,7 +945,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.excal_step(lv):
                 return
-            if self.loot_step(lv) or self.altar_step(lv):
+            if self.loot_step(lv) or self.altar_step(lv) or self.dagger_step(lv):
                 return
             if self.use_armor and self.equip_step(lv):
                 return
@@ -1249,6 +1249,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "digs": self.digs,
             "zaps": self.zaps,
             "thefts": self.thefts,
+            "daggers_picked": self.daggers_picked,
             "nymph_kills": self.nymph_kills,
             "loot_pickups": self.loot_pickups,
             "rewields": self.rewields,
