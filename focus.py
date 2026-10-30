@@ -112,6 +112,8 @@ class FocusMixin:
             m = re.search(r"([+-]\d+) ", s)
             ench = int(m.group(1)) if m else 0
             name = next((w for w in sorted(WEAPON_DICE, key=len, reverse=True) if w in s), None)
+            if name is None and "Excalibur" in s:
+                name = "long sword"              # the inventory line names the artifact, not its base type
             if name:
                 sd, ld, hitbon = WEAPON_DICE[name]
                 dmg = ((ld if large else sd) + 1) / 2.0
