@@ -837,7 +837,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.pray(); return
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
-        if cond & deadly and self.can_pray(hunger_emergency=True):
+        if cond & deadly and not self.god_angry and self.turn() - (self.last_pray or -9999) > 2:
+            # certain death otherwise: pray even if the timeout may not have expired
             self.deadly_prayers += 1
             self.pray(); return
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
