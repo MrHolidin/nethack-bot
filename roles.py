@@ -377,6 +377,8 @@ class ExcaliburMixin:
             return self.excal_go_up(lv)
         if lv.shop.any() and fmask[lv.shop].any():
             fmask &= ~lv.shop
+        if lv.key[0] == 2:
+            fmask[:] = False          # Minetown: a fountain drying up angers the watch
         y, x = self.pos()
         if fmask[y, x]:
             return self.dip(lv)
