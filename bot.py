@@ -19,6 +19,7 @@ from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
 from scrolls import ScrollMixin
+from searchv2 import SearchV2Mixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 
@@ -112,7 +113,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, SearchV2Mixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -1306,11 +1307,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
-            best = np.unravel_index(np.argmax(score), score.shape)
-            if score[best] <= -1e8:
-                self.press("s")
-                return
-            best = (int(best[0]), int(best[1]))
+            best = None
+            if self.role_opts.get("search_v2"):
+                best = self.pick_search_spot(lv, k_mem, reach & passable, dist)
+            if best is None:
+                best = np.unravel_index(np.argmax(score), score.shape)
+                if score[best] <= -1e8:
+                    self.press("s")
+                    return
+                best = (int(best[0]), int(best[1]))
             lv.search_goal = best
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time
@@ -1352,6 +1357,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.lycanthropy = False
         self.deadly_prayers = 0
         self.stun_waits = 0
+        self.sv2_picks = 0
         self.blind_waits = 0
         self.shop_kicks_avoided = 0
         self.vault_drop = False
@@ -1464,7 +1470,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_fail": getattr(self, "elb_fail", 0),
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
-            "blind_waits": self.blind_waits, "shop_kicks_avoided": self.shop_kicks_avoided,
+            "blind_waits": self.blind_waits, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
             "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
