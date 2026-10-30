@@ -565,6 +565,7 @@ class ElberethMixin:
         self.no_engrave = set()
         self.elb_block_until = 0
         self.elb_fail = 0
+        self.elb_rewrites = 0
 
     def read_engraving(self):
         n0 = len(self.messages)
@@ -611,6 +612,14 @@ class ElberethMixin:
             else:
                 bad = [n for p, n in hostiles if not self.respects(p, n)]
                 st["hp_hist"].append(hp)
+                # 3.6: every time a monster is scared the engraving may erode -> check it each turn a foe
+                # is adjacent (reading is free); a hit through a smudged engraving means rewrite, not leave
+                if hostiles and not bad:
+                    st["last_read"] = self.turn()
+                    if self.read_engraving() != "Elbereth":
+                        self.elb_rewrites += 1
+                        st["hp_hist"] = [hp]
+                        return self.elb_write(lv)
                 losing = len(st["hp_hist"]) > 4 and st["hp_hist"][-1] < st["hp_hist"][-5] - 2
                 if bad or losing:
                     self.elb_exits["ignored" if bad else "ranged"] += 1
