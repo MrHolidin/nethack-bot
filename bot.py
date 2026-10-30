@@ -1294,6 +1294,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": getattr(self, "elb_fail", 0),
+            "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),

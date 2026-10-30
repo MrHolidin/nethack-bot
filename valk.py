@@ -554,16 +554,43 @@ SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
 B_HUMAN_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "human")
 B_ANGEL_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "Angel")
 
+NO_ENGRAVE_CMAP = {23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34, 39, 40, 41}   # stairs/ladders, altar, grave,
+#                    throne, sink, fountain, water, lava, air, cloud: the game refuses to engrave there
+VALK_RANKS = {"stripling", "skirmisher", "fighter", "man-at-arms", "woman-at-arms", "warrior",
+              "swashbuckler", "hero", "heroine", "champion", "lord", "lady"}
+
 
 class ElberethMixin:
+    def poly_form(self):
+        """Name of the form we are polymorphed into (the status line shows it instead of the rank), else None."""
+        line = bytes(self.obs["tty_chars"][22]).decode("latin1")
+        m = re.match(r"\S+ the (.+?)\s{2,}St:", line)
+        if not m or m.group(1).lower() in VALK_RANKS:
+            return None
+        return m.group(1).lower()
+
+    def can_engrave_here(self, lv):
+        """What a player knows before trying: the square, and whether they have hands."""
+        g = int(lv.under[self.pos()])
+        if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in NO_ENGRAVE_CMAP:
+            return False
+        form = self.poly_form()
+        if form is not None:
+            pm = PM_BY_NAME_V.get(form)
+            if form.startswith("were"):          # lycanthrope: the status line names it, the body is the animal
+                pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
+                          if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
+            if pm is None or pm.mflags1 & 0x2000 or pm.msize == 0:     # M1_NOHANDS / very small
+                return False
+        return True
     def elb2_init(self):
         self.elb_state = None        # dict(pos, key, since, last_read, hp_hist)
         self.elb_engraves = 0
         self.elb_misspelled = 0
         self.elb_turns = 0
         self.elb_exits = collections.Counter()
-        self.no_engrave = set()
-        self.elb_block_until = 0
+        self.elb_fail_at = None
+        self.elb_fail_msgs = []
         self.elb_fail = 0
         self.elb_rewrites = 0
 
@@ -585,7 +612,7 @@ class ElberethMixin:
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if (lv.key, self.pos()) in self.no_engrave or self.turn() < self.elb_block_until:
+        if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
         if self.can_pray() or G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
@@ -654,12 +681,10 @@ class ElberethMixin:
             ok = self.engrave_elbereth()
             self.elb_engraves += 1
             if not ok:
-                recent = " ".join(m for _, m in list(self.messages)[-4:])
-                if "even hold" in recent or "can't reach" in recent:
-                    self.elb_block_until = self.turn() + 100      # condition of the hero, not the square
-                else:
-                    self.no_engrave.add(here)
+                # precondition missed a case: log it (to find it), and don't retry on this square this turn
                 self.elb_fail += 1
+                self.elb_fail_msgs.append(" ".join(m for _, m in list(self.messages)[-2:])[:80])
+                self.elb_fail_at = (lv.key, self.pos(), self.turn())
                 self.elb_state = None
                 return False
             if self.read_engraving() == "Elbereth":
@@ -668,6 +693,5 @@ class ElberethMixin:
                 self.cur_act = "rest"
                 return True
             self.elb_misspelled += 1
-        self.elb_block_until = self.turn() + 3                    # 3 misspellings in a row: pause briefly
         self.elb_state = None
         return True
