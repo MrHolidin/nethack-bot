@@ -121,3 +121,9 @@ for g in range(N):
         _n = nh.OBJ_NAME(nh.objclass(nh.glyph_to_obj(g))) or ""
         if _n in ("dagger", "orcish dagger", "elven dagger", "silver dagger", "athame"):
             DAGGER_GLYPH[g] = True
+
+# corpses that never rot (eat.c nonrotting_corpse): lichen, lizard (+acid blob, not wanted)
+SAFE_CORPSE_GLYPH = np.zeros(N, dtype=bool)
+for g in range(N):
+    if nh.glyph_is_body(g) and 0 <= g - nh.GLYPH_BODY_OFF < nh.NUMMONS and nh.permonst(g - nh.GLYPH_BODY_OFF).mname in ("lichen", "lizard"):
+        SAFE_CORPSE_GLYPH[g] = True

@@ -305,8 +305,15 @@ class EquipMixin:
     def food_wanted(self, name):
         if not self.use_food or self.food_count() >= MAX_FOOD:
             return False
-        if any(b in name for b in ("egg", "tin", "partly eaten")):
+        ro = getattr(self, "role_opts", {})
+        if ro.get("carry_lichen") and ("lichen corpse" in name or "lizard corpse" in name):
+            return True                  # never rot: a safe reserve (lizard also stops stoning)
+        if ro.get("tins") and re.search(r"\btins?\b", name) and "for sale" not in name:
+            return sum(1 for _, c, s in self.inventory() if c == nh.FOOD_CLASS and re.search(r"\btins?\b", s)) < 4
+        if "egg" in name or re.search(r"\btins?\b", name):
             return False
+        if "partly eaten" in name and not ro.get("food_partly"):
+            return False                 # food_partly: a partly eaten ration is still a safe ration
         if self.role == "Monk" and any(m and m in name for m in MEAT):
             return False
         return any(f in name for f in SAFE_FOOD)
@@ -329,7 +336,11 @@ class EquipMixin:
                     self.role_opts.get("armor_mode", "safe") == "tested" and self.risky_candidate(a, worn):
                 want.append(a["name"])
             elif self.food_wanted(n):
-                fm = next(f for f in SAFE_FOOD if f in n)
+                fm = next((f for f in SAFE_FOOD + ("lichen corpse", "lizard corpse") if f in n), None)
+                if fm is None and re.search(r"\btins?\b", n):
+                    fm = "tin"
+                if fm is None:
+                    continue
                 want.append(fm)
                 self.food_picked += 1
         if not want:
@@ -349,6 +360,8 @@ class EquipMixin:
         mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.use_armor else np.zeros(lv.under.shape, bool)
         if self.use_food and self.food_count() < MAX_FOOD:
             mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
+            if getattr(self, "role_opts", {}).get("carry_lichen"):
+                mask = mask | glyphs_mod.SAFE_CORPSE_GLYPH[lv.under]
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False
         return mask

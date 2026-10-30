@@ -79,6 +79,22 @@ M1_ACID, M1_POIS = 0x08000000, 0x10000000
 M2_UNDEAD, M2_WERE, M2_SHAPESHIFTER = 0x2, 0x4, 0x4000
 RACE_FLAG = {"human": 0x8, "elf": 0x10, "elven": 0x10, "dwarf": 0x20, "dwarven": 0x20,
              "gnome": 0x40, "gnomish": 0x40, "orc": 0x80, "orcish": 0x80}
+def singular(w):
+    w = w.strip()
+    if w.endswith("ves"):
+        return w[:-3] + "f"                    # dwarves, elves, wolves
+    if w.endswith("ies"):
+        return w[:-3] + "y"
+    if w.endswith("es") and w[:-2].endswith(("ch", "sh", "x", "s")):
+        return w[:-2]
+    if w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+BAD_TIN = {"cockatrice", "chickatrice", "medusa", "green slime", "little dog", "dog", "large dog", "kitten",
+           "housecat", "large cat", "chameleon", "doppelganger", "sandestin", "bat", "giant bat", "vampire bat",
+           "violet fungus", "violet fungi", "human", "elf", "dwarf", "gnome", "werejackal", "wererat", "werewolf"}
 NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
              "kitten", "housecat", "large cat", "Death", "Pestilence", "Famine"}
 PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
@@ -242,6 +258,16 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.raw_step(ord("n"))
         elif "continue eating" in m:
             self.raw_step(ord("n"))
+        elif getattr(self, "tin_eating", False) and "eat it?" in m and "here" not in m:
+            # "It smells like X. Eat it?" -- refuse what corpses would refuse, plus effect-carrying meats
+            what = (m + " " + " ".join(mm for _, mm in list(self.messages)[-3:])).lower()
+            sm = re.search(r"smells like (?:an? )?([a-z' -]+?)\.", what)
+            name = singular(sm.group(1)) if sm else ""      # the game says "It smells like doppelgangers."
+            bad = bool(sm) and (name in BAD_TIN or name.startswith("were")
+                                or name == (self.race or "").lower().replace("dwarven", "dwarf").replace("elven", "elf"))
+            self.tins_refused += bool(bad)
+            self.tins_eaten += not bad
+            self.raw_step(ord("n" if bad else "y"))
         elif "eat it" in m or "eat one" in m:
             self.raw_step(ord("n"))
         elif "itemized billing" in m:
@@ -672,9 +698,20 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.settle()
         return False
 
+    def edible_now(self, s):
+        if re.search(r"\btins?\b", s):
+            return bool(self.role_opts.get("tins"))
+        if "corpse" in s:
+            return bool(self.role_opts.get("carry_lichen")) and ("lichen corpse" in s or "lizard corpse" in s)
+        return "egg" not in s
+
     def eat_from_inventory(self):
-        for letter, ocls, s in self.inventory():
-            if ocls == nh.FOOD_CLASS and "corpse" not in s and "tin" not in s and "egg" not in s:
+        inv = [(l, c, s) for l, c, s in self.inventory() if c == nh.FOOD_CLASS and self.edible_now(s)]
+        # plain food first, then lichen, tins (slow to open), lizard last (it cures stoning)
+        rank = lambda s: 3 if "lizard" in s else 2 if re.search(r"\btins?\b", s) else 1 if "lichen" in s else 0
+        for letter, ocls, s in sorted(inv, key=lambda t: rank(t[2])):
+            if True:
+                self.tin_eating = bool(re.search(r"\btins?\b", s))
                 self.press("e", expect_prompt=True)
                 for _ in range(3):
                     m = self.message().lower()
@@ -1357,6 +1394,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.lycanthropy = False
         self.deadly_prayers = 0
         self.stun_waits = 0
+        self.tin_eating = False
+        self.tins_eaten = 0
+        self.tins_refused = 0
         self.sv2_picks = 0
         self.blind_waits = 0
         self.shop_kicks_avoided = 0
@@ -1470,6 +1510,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_fail": getattr(self, "elb_fail", 0),
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
+            "tins_eaten": self.tins_eaten, "tins_refused": self.tins_refused,
             "blind_waits": self.blind_waits, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
             "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
