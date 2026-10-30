@@ -36,9 +36,15 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.13", cache: pip, cache-dependency-path: requirements.txt}
       - run: pip install -r requirements.txt
+      - run: sudo apt-get install -y -q faketime
       - name: play
         env:
           KW: ${{ inputs.kw }}
+          # NetHack reads the clock: night (local hour < 6 or > 21) and the moon phase / Friday 13th change
+          # the game. Pin date and time so runs started at different hours stay comparable.
+          TZ: UTC
+          FAKETIME: "@2026-10-14 12:00:00"
+          LD_PRELOAD: /usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
         run: |
           J=$(nproc)
           SAFE=$(echo "${{ matrix.char }}" | tr -c 'A-Za-z0-9\n' '_')
