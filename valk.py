@@ -597,12 +597,15 @@ class ElberethMixin:
         self.elb_rewrites = 0
 
     def read_engraving(self):
-        n0 = len(self.messages)
+        """Text of the engraving under us, from the answer to THIS ':' only (older 'You read' lines in the
+        log belong to earlier reads and must not be used); last match if the answer has several lines."""
+        seq0 = self.msg_seq
         self.raw_step(ord(":"))
         self.settle()
-        txt = " ".join(m for _, m in list(self.messages)[-6:])
-        m = re.search(r'You read: "([^"]*)"', txt)
-        return m.group(1) if m else ""
+        n_new = min(self.msg_seq - seq0, len(self.messages))
+        txt = " ".join(m for _, m in list(self.messages)[len(self.messages) - n_new:]) if n_new else ""
+        found = re.findall(r'You read: "([^"]*)"', txt)
+        return found[-1] if found else ""
 
     def respects(self, pos, name):
         if name == "invisible" or name in ELB_IGNORE_NAMES:

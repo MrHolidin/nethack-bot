@@ -173,6 +173,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self._last_logged, self._last_logged_step = m, self.steps
         if m:
             self.messages.append((self.turn(), m))
+            self.msg_seq += 1
             if self.verbose:
                 self.all_msgs.append((self.turn(), m))
             if len(self.messages) > 60:
@@ -528,6 +529,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         return False
 
     def can_pray(self, hunger_emergency=None, weak=False):
+        # Weak/Fainting is major trouble (timeout <= 200 suffices); 500 turns after a prayer is ~88% safe.
+        # A/B (1000 games): +273 [-1, +553], deaths while fainted 108 -> 76
         if self.god_angry:
             return False
         t = self.turn()
@@ -536,8 +539,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         gap = t - self.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
-        if weak and "hunger_gap" in self.role_opts:   # Weak/Fainting is major trouble (timeout <= 200 suffices)
-            return gap > self.role_opts["hunger_gap"]
+        if weak:
+            return gap > self.role_opts.get("hunger_gap", 500)
         return gap > 1000
 
     def engrave_elbereth(self):
@@ -1190,6 +1193,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.truncated = False
         self.levels = {}
         self.messages = deque()
+        self.msg_seq = 0          # total messages logged so far (the deque keeps only the last 60)
         self.all_msgs = []
         self._last_logged, self._last_logged_step = None, -1
         self.cur_key = None
