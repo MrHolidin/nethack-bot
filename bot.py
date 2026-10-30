@@ -280,7 +280,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def on_message(self, m):
         lv = self.levels.get(self.cur_key) if self.cur_key else None
-        if self.role_opts.get("focus"):
+        if self.role_opts.get("focus", True):
             self.focus_note(m)
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
@@ -929,7 +929,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             # attack the weakest-looking (lowest level) target
             target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
-            if self.role_opts.get("focus") and len(hostiles) > 1:
+            if self.role_opts.get("focus", True) and len(hostiles) > 1:
                 target = self.focus_target(hostiles, target)
             self.attack(target)
             return
