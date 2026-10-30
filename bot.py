@@ -17,6 +17,7 @@ from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
+from focus import FocusMixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 
@@ -110,7 +111,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -279,6 +280,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def on_message(self, m):
         lv = self.levels.get(self.cur_key) if self.cur_key else None
+        if self.role_opts.get("focus"):
+            self.focus_note(m)
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
         if lv and self.last_move_target and any(s in m for s in (
@@ -926,6 +929,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             # attack the weakest-looking (lowest level) target
             target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
+            if self.role_opts.get("focus") and len(hostiles) > 1:
+                target = self.focus_target(hostiles, target)
             self.attack(target)
             return
         if (y, x) in lv.elbereth and hp * 2 < maxhp:
@@ -1194,6 +1199,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.levels = {}
         self.messages = deque()
         self.msg_seq = 0          # total messages logged so far (the deque keeps only the last 60)
+        self.focus_init()
         self.all_msgs = []
         self._last_logged, self._last_logged_step = None, -1
         self.cur_key = None
@@ -1309,6 +1315,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": getattr(self, "elb_fail", 0),
+            "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
