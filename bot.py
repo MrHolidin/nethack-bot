@@ -527,7 +527,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     return True
         return False
 
-    def can_pray(self, hunger_emergency=None):
+    def can_pray(self, hunger_emergency=None, weak=False):
         if self.god_angry:
             return False
         t = self.turn()
@@ -536,6 +536,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         gap = t - self.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
+        if weak and "hunger_gap" in self.role_opts:   # Weak/Fainting is major trouble (timeout <= 200 suffices)
+            return gap > self.role_opts["hunger_gap"]
         return gap > 1000
 
     def engrave_elbereth(self):
@@ -839,7 +841,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         # emergencies
-        low = hp <= 5 or hp * 7 <= maxhp
+        if self.role_opts.get("pray_hp") == "game":
+            # pray.c critically_low_hp(): maxhp capped at 15*XL, divisor 5 (XL1-5), 6 (XL6-13), 7 (XL14+)
+            xl = self.bl(nh.NLE_BL_XP)
+            div = 5 if xl <= 5 else 6 if xl <= 13 else 7
+            low = hp <= 5 or hp * div <= min(maxhp, 15 * xl)
+        else:
+            low = hp <= 5 or hp * 7 <= maxhp
         if low and self.can_pray():
             self.pray(); return
         if hunger >= FAINTING:
@@ -848,7 +856,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         else:
             self.faint_since = None
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
-                self.faint_since is not None and t - self.faint_since > 200)):
+                self.faint_since is not None and t - self.faint_since > 200), weak=True):
             self.pray(); return
         if self.lycanthropy and self.can_pray():
             self.pray(); return
@@ -1306,6 +1314,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "choke_moves": self.choke_moves,
             "choke_waits": self.choke_waits,
             "deadly_prayers": self.deadly_prayers,
+            "pray_failed": self.pray_failed,
             "stun_waits": self.stun_waits,
             "nymph_escapes": self.nymph_escapes,
             "daggers_picked": self.daggers_picked,
