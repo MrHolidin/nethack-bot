@@ -120,7 +120,8 @@ def parse_armor(s):
         slot, ac = SUIT, 3
     else:
         return None
-    return {"slot": slot, "ac": ac, "ench": ench, "worn": worn, "cursed": cursed, "name": t, "safe": safe}
+    return {"slot": slot, "ac": ac, "ench": ench, "worn": worn, "cursed": cursed, "name": t, "safe": safe,
+            "text": s}
 
 
 def value(a):
@@ -176,6 +177,10 @@ class EquipMixin:
         return any("(weapon in hands)" in s for _, _, s in self.inventory())
 
     def improves(self, a, worn):
+        if a["slot"] is not None and not a.get("safe"):
+            if a["name"] in getattr(self, "tested_bad", ()) or (a["name"], a.get("letter")) in self.wear_failed:
+                return False
+            return hasattr(self, "risky_allowed") and self.risky_allowed(a, a.get("text", ""), worn)
         if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
             return False
         if (a["name"], a.get("letter")) in self.wear_failed:
@@ -199,11 +204,17 @@ class EquipMixin:
             self.wear(best, worn)
             return True
         # 2) drop carried armor we will never wear (weight)
-        junk = [a for a in inv if not a["worn"]]
+        junk = [a for a in inv if not a["worn"] and not self.awaiting_test(a)]
         if junk:
             self.drop_letter(junk[0]["letter"])
             return True
         return False
+
+    def awaiting_test(self, a):
+        if getattr(self, "role_opts", {}).get("armor_mode", "safe") != "tested":
+            return False
+        from valk import RISKY, known_uncursed
+        return a["name"] in RISKY and not a["cursed"] and not known_uncursed(a.get("text", ""))
 
     # ---------------------------------------------------------- actions
     def wear(self, a, worn):
@@ -310,6 +321,9 @@ class EquipMixin:
         for n in names:
             a = parse_armor(n) if self.use_armor else None
             if a and self.improves(a, worn):
+                want.append(a["name"])
+            elif a and hasattr(self, "risky_candidate") and \
+                    self.role_opts.get("armor_mode", "safe") == "tested" and self.risky_candidate(a, worn):
                 want.append(a["name"])
             elif self.food_wanted(n):
                 fm = next(f for f in SAFE_FOOD if f in n)

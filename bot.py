@@ -17,6 +17,7 @@ from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
+from valk import ValkMixin
 from shop import ShopMixin
 
 ROWS, COLS = 21, 79
@@ -106,7 +107,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -317,6 +318,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.shop_greeted(lv, m)
         if "Please pay before leaving" in m or "you owe" in m.lower() and "zorkmid" in m:
             self.need_pay = True
+        if hasattr(self, "thefts"):
+            self.on_valk_message(m)
         if "You feel feverish" in m:
             self.lycanthropy = True
         if "You feel purified" in m:
@@ -855,6 +858,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.hist.popleft()
         if self.use_tactics and self.tactical_step(lv, hostiles):
             return
+        if self.nymph_step(lv, hostiles):
+            return
+        if not hostiles and (self.risky_aftercare() or self.weapon_check()):
+            return
         if self.use_roles and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
             return
         if self.use_abilities and self.ranged_step(lv, hostiles):
@@ -937,6 +944,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if self.use_armor and self.shop_step(lv):
                 return
             if self.excal_step(lv):
+                return
+            if self.loot_step(lv) or self.altar_step(lv):
                 return
             if self.use_armor and self.equip_step(lv):
                 return
@@ -1178,6 +1187,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.roles_init()
         self.class_init()
         self.excal_init()
+        self.valk_init()
         self.shop_init()
         self.shops_done = set()
         self.need_pay = False
@@ -1238,6 +1248,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "missiles": self.missiles,
             "digs": self.digs,
             "zaps": self.zaps,
+            "thefts": self.thefts,
+            "nymph_kills": self.nymph_kills,
+            "loot_pickups": self.loot_pickups,
+            "rewields": self.rewields,
+            "altar_tests": self.altar_tests,
+            "lev_fixes": self.lev_fixes,
+            "fumble_drops": self.fumble_drops,
             "excalibur": self.excal_turn,
             "dips": self.dips,
             "excal_trips": self.excal_trips,
