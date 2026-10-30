@@ -303,7 +303,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.kill_count += 1
         mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
         if mk and self.last_attack_target:
-            self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
+            lvk = self.levels.get(self.cur_key)
+            old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
+            if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
+                self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
         if "You feel that" in m and "displeased" in m:
             self.pray_failed += 1
         if self.last_pray is not None and self.turn() - self.last_pray <= 5 and any(
@@ -832,6 +835,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.pray(); return
         if self.lycanthropy and self.can_pray():
             self.pray(); return
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
+        if cond & deadly and self.can_pray(hunger_emergency=True):
+            self.deadly_prayers += 1
+            self.pray(); return
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
@@ -1152,6 +1160,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.peaceful_seen = 0
         self.throws = 0
         self.lycanthropy = False
+        self.deadly_prayers = 0
         self.seen_here = None
         self.ammo_pickups = 0
         self.time_by = {}
@@ -1249,6 +1258,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "digs": self.digs,
             "zaps": self.zaps,
             "thefts": self.thefts,
+            "deadly_prayers": self.deadly_prayers,
             "nymph_escapes": self.nymph_escapes,
             "daggers_picked": self.daggers_picked,
             "nymph_kills": self.nymph_kills,
