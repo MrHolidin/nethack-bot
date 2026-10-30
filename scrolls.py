@@ -229,7 +229,9 @@ class ScrollMixin:
         if not names:
             return False
         self.scroll_stats["seen_floor"] += 1
-        self.pickup_matching(("scroll",))
+        if self.shopkeeper_in_view():
+            return False
+        self.pickup_matching(("scroll",), no_sale=True, own=True)   # own: menu parsed by column
         self.scroll_stats["picked"] += 1
         return True
 

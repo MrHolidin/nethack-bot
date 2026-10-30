@@ -341,10 +341,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if "follow me" in m:
                 self.vault_follow_until = self.turn() + 300
                 self.guard_trail = []
-        if self.role_opts.get("shop_fix") and lv is not None and "Closed for inventory" in m:
+        if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
         on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
-        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and (on_door or not self.role_opts.get("shop_fix")):
+        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and (on_door or not self.role_opts.get("shop_fix", True)):
             # shop entrance: never go inside (we get trapped / risk shoplifting).
             # shop_fix: only when we are at the door -- after falling in through a trap door we are
             # inside, and marking from here walls us in
@@ -452,7 +452,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         before = (y, x, self.turn())
         lv = self.level()
         if target in lv.locked:
-            if self.role_opts.get("shop_fix") and any(max(abs(cy - ty), abs(cx - tx)) <= 1
+            if self.role_opts.get("shop_fix", True) and any(max(abs(cy - ty), abs(cx - tx)) <= 1
                                                        for cy, cx in getattr(lv, "cfi", ())):
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
@@ -532,7 +532,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def always_avoid(self):
         s = ALWAYS_AVOID
-        if self.role_opts.get("eye_avoid") and not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+        if self.role_opts.get("eye_avoid", True) and not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
         return s
 
@@ -678,7 +678,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
-        if self.role_opts.get("no_bats") and name in ("bat", "giant bat", "vampire bat"):
+        if self.role_opts.get("no_bats", True) and name in ("bat", "giant bat", "vampire bat"):
             return False                      # eat.c: bat corpses stun for 30 (giant bat 60) turns
         f1, f2 = pm.mflags1, pm.mflags2
         if f2 & (M2_UNDEAD | M2_WERE | M2_SHAPESHIFTER):
@@ -981,7 +981,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
         if self.role_opts.get("vault_guard") and self.vault_step(lv, hostiles):
             return
-        if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait") and not hostiles \
+        if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
             self.press("s")
