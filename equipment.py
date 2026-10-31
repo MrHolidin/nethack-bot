@@ -256,6 +256,9 @@ class EquipMixin:
         return True
 
     def drop_letter(self, letter):
+        s = next((s for l, _, s in self.inventory() if l == letter), "")
+        m = re.match(r"^(\d+) ", s)
+        self.last_drop_qty = int(m.group(1)) if m else 1
         if self.carry_on():                     # carry: never come back for what we dropped
             self.dropped_at.add((self.level().key, self.pos()))
             self.inspected.setdefault(self.level().key, set()).add(self.pos())
@@ -291,6 +294,8 @@ class EquipMixin:
                 continue
             break
         self.settle()
+        if hasattr(self, "price_note_text"):
+            self.price_note_text(" | ".join(names))
         return names
 
     def food_count(self):

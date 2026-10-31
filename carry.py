@@ -57,12 +57,12 @@ for _g in range(nh.MAX_GLYPH):
         CARRY_GLYPH[_g] = True
 
 # identified name -> (weight, cost), from objects.c
-OBJ_INFO = {}
+OBJ_INFO = {}                     # (class, name): names repeat across classes ("levitation")
 for _i in range(nh.NUM_OBJECTS):
     _oc = nh.objclass(_i)
     _n = nh.OBJ_NAME(_oc)
     if _n:
-        OBJ_INFO.setdefault(_n, (_oc.oc_weight, _oc.oc_cost))
+        OBJ_INFO.setdefault((ord(_oc.oc_class), _n), (_oc.oc_weight, _oc.oc_cost))
 APPEAR_WEIGHT = {}
 for _i in range(nh.NUM_OBJECTS):
     _oc = nh.objclass(_i)
@@ -112,15 +112,15 @@ def describe(ocls, s):
         name = nm
     else:
         name = t
-    if name is not None and name not in OBJ_INFO:
+    if name is not None and (ocls, name) not in OBJ_INFO:
         words = name.split(" ")
         for i in range(len(words)):
             cand = " ".join(words[:i] + [singular(words[i])] + words[i + 1:])
-            if cand in OBJ_INFO:
+            if (ocls, cand) in OBJ_INFO:
                 name = cand
                 break
-    if name in OBJ_INFO:
-        wt, cost = OBJ_INFO[name]
+    if (ocls, name) in OBJ_INFO:
+        wt, cost = OBJ_INFO[(ocls, name)]
     else:
         wt = CLASS_WEIGHT.get(ocls) or APPEAR_WEIGHT.get(singular(t), APPEAR_WEIGHT.get(t, 10))
         cost = None
@@ -161,6 +161,9 @@ class CarryMixin:
     # ------------------------------------------------------------ never Burdened
     def drop_units(self, letter, n=None):
         """Drop n of a stack (all if None); remember the square."""
+        s = next((s for l, _, s in self.inventory() if l == letter), "")
+        m = re.match(r"^(\d+) ", s)
+        self.last_drop_qty = n or (int(m.group(1)) if m else 1)
         self.dropped_at.add((self.level().key, self.pos()))
         self.inspected.setdefault(self.level().key, set()).add(self.pos())
         self.press("d", expect_prompt=True)

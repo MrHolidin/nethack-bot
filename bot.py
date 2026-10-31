@@ -23,6 +23,7 @@ from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 from armorid import ArmorIdMixin, RANDOM_APPEARANCE
 from carry import CarryMixin, CARRY_GLYPH
+from pricemem import PriceMemoryMixin
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -121,7 +122,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -232,6 +233,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def answer_yn(self, msg):
         m = msg.lower()
+        if "offers" in m and "sell" in m:
+            self.price_note_offer(msg + " " + self.top_line())       # every offer is a price reading
         if self.selling and ("sell it" in m or "sell them" in m):
             self.raw_step(ord("y"))
             return
@@ -352,8 +355,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                                  "Then die, mortal", "Thou durst", "You feel that Mitra is angry",
                                  "is displeased.") if p != "is displeased."):
             self.god_angry = True
-        if self.role_opts.get("scroll_id") and "for sale" in m:
-            self.note_scroll_prices(m)
+        if "for sale" in m:
+            self.price_note_text(m)
         if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
         on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
@@ -1396,6 +1399,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.scroll_init()
         self.armor_id_init()
         self.carry_init()
+        self.price_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -1459,7 +1463,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": getattr(self, "elb_fail", 0),
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
-            "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
+            "scrolls": dict(self.scroll_stats), "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
             "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 
@@ -1467,7 +1471,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
             "carry": dict(self.carry_stats),
-            "armor_id": dict(self.armor_id_stats, appearances=self.armor_id_report(),
+            "armor_id": dict(self.armor_id_stats,
                              random_worn=[e for e in self.equip_events if e[1] == "wear" and e[2] in RANDOM_APPEARANCE]),
             "elb_only_c": getattr(self, "elb_only_c", 0),
             "rthreat_events": dict(getattr(self, "rthreat_events", {})),

@@ -21,6 +21,7 @@ import glyphs as G
 SCROLL_BASES = (20, 50, 60, 80, 100, 200, 300)
 GOOD_BASES = {60, 80}
 GOOD_NAMES = ("scroll of enchant armor", "scroll of enchant weapon", "scroll of remove curse")
+GOOD_TYPES = {"enchant armor", "enchant weapon", "remove curse"}
 SCROLL_SHOPS = ("general store", "second-hand bookstore")
 MAX_CARRY = 12
 
@@ -81,7 +82,6 @@ OFFER_RE = re.compile(r"offers (only )?(\d+) gold pieces? for your .*?scrolls? l
 
 class ScrollMixin:
     def scroll_init(self):
-        self.scroll_bases = {}        # appearance -> set of possible base prices
         self.sell_probe = None        # dict(app, qty) while a drop-to-hear-the-offer is in flight
         self.probed = set()           # (shop level key, appearance)
         self.scroll_stats = {"probes": 0, "probe_info": 0, "shops_entered": 0, "priced": 0, "picked": 0, "read": 0, "read_names": [],
@@ -98,25 +98,14 @@ class ScrollMixin:
         return shirt and not over
 
     def note_scroll_prices(self, text):
-        for m in PRICE_RE.finditer(text):
-            app, price = m.group(1).strip(), int(m.group(2))
-            cand = possible_bases(price, self.bl(nh.NLE_BL_CHA), self.sucker())
-            if not cand:
-                continue
-            old = self.scroll_bases.get(app)
-            new = cand if old is None else (old & cand or old)
-            if old is None:
-                self.scroll_stats["priced"] += 1
-            if new <= GOOD_BASES and not (old is not None and old <= GOOD_BASES):
-                self.scroll_stats["good_appearances"] += 1
-            self.scroll_bases[app] = new
+        self.price_note_text(text)                 # pricemem: every price tag is recorded there
 
     def scroll_is_good(self, s):
+        """Identified as one of GOOD_NAMES, or every type its shop prices allow is one of them."""
         if any(n in s for n in GOOD_NAMES):
             return True
-        m = APPEAR_RE.search(s)
-        return bool(m) and self.scroll_bases.get(m.group(1).strip(), set()) <= GOOD_BASES \
-            and m.group(1).strip() in self.scroll_bases
+        post = self.price_of_text(s) if "labeled" in s else None
+        return bool(post) and set(post) <= GOOD_TYPES
 
     # ------------------------------------------------------------ shop visit
     def scroll_shop_greeted(self, lv, stype):
@@ -134,19 +123,8 @@ class ScrollMixin:
         return mask
 
     def on_sell_offer(self, msg):
-        """Called from answer_yn on 'Sell it?' while probing: learn from the offer, always decline."""
-        m = OFFER_RE.search(msg)
-        p = self.sell_probe
-        if not m or not p or m.group(1):          # 'offers only N': shopkeeper short of cash, no info
-            return
-        cand = possible_bases_offer(int(m.group(2)), p["qty"], self.sucker())
-        if cand:
-            old = self.scroll_bases.get(p["app"])
-            new = cand if old is None else (old & cand or old)
-            if new <= GOOD_BASES and not (old is not None and old <= GOOD_BASES):
-                self.scroll_stats["good_appearances"] += 1
-            self.scroll_bases[p["app"]] = new
-            self.scroll_stats["probe_info"] += 1
+        """Called from answer_yn on 'Sell it?' while probing (pricemem has recorded the offer): decline."""
+        self.scroll_stats["probe_info"] += 1
 
     def unknown_scrolls(self, lv):
         out = []
@@ -157,7 +135,8 @@ class ScrollMixin:
             if not m:
                 continue
             app = m.group(1).strip()
-            if app in self.scroll_bases and len(self.scroll_bases[app]) == 1 or (lv.key, app) in self.probed:
+            post = self.price_posterior((nh.SCROLL_CLASS, app))
+            if post and len(post) == 1 or (lv.key, app) in self.probed:
                 continue
             q = re.match(r"(\d+) ", s)
             out.append((letter, app, int(q.group(1)) if q else 1))
@@ -168,6 +147,7 @@ class ScrollMixin:
         self.probed.add((lv.key, app))
         self.scroll_stats["probes"] += 1
         self.sell_probe = {"app": app, "qty": qty}
+        self.last_drop_qty = qty
         self.press("d", expect_prompt=True)
         if "drop" not in self.message().lower():
             self.settle()
