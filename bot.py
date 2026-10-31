@@ -1125,7 +1125,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if self.use_armor and self.equip_step(lv):
                 return
             if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                    or (self.carry_on() and CARRY_GLYPH[lv.under[y, x]])) and (y, x) not in self.inspected.get(lv.key, ()) \
+                    or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ()) \
                     and not lv.shop[y, x]:
                 if self.armor_pickup_here(lv):
                     return

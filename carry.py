@@ -1,6 +1,8 @@
 """Carry valuables, never be Burdened, sell what we don't use (flag carry).
 
 Pick up: wands, rings, amulets, scrolls, potions (light and worth gold; gold on hand is score 1:1).
+carry_more: also tools (not a pick-axe -- shopkeepers keep diggers out -- nor chests, boxes, traps) and armor
+we won't wear (kept for selling instead of dropped at once).
 
 Never Burdened (Burdened costs a quarter of our speed). When the status shows any encumbrance, drop one
 unit per turn, in this order:
@@ -52,9 +54,24 @@ SHOP_BUYS = {
 }
 
 CARRY_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
+MORE_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
 for _g in range(nh.MAX_GLYPH):
-    if nh.glyph_is_normal_object(_g) and ord(nh.objclass(nh.glyph_to_obj(_g)).oc_class) in CARRY_CLASSES:
-        CARRY_GLYPH[_g] = True
+    if nh.glyph_is_normal_object(_g):
+        _c = ord(nh.objclass(nh.glyph_to_obj(_g)).oc_class)
+        CARRY_GLYPH[_g] = _c in CARRY_CLASSES
+        MORE_GLYPH[_g] = _c in (nh.TOOL_CLASS, nh.ARMOR_CLASS)
+MORE_CLASSES = (nh.TOOL_CLASS, nh.ARMOR_CLASS)
+NO_TOOLS = {"pick-axe", "chest", "large box", "ice box", "beartrap", "land mine"}
+KEEP_TOOLS = ("unicorn horn",)
+TOOL_WORDS = set()                # tool names and looks ("oil lamp", "lamp", "bag", "wax candle")
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    if ord(_oc.oc_class) == nh.TOOL_CLASS:
+        for _w in (nh.OBJ_NAME(_oc), nh.OBJ_DESCR(_oc)):
+            if _w:
+                TOOL_WORDS.add(_w)
+TOOL_LOOKS = {nh.OBJ_DESCR(nh.objclass(_i)) for _i in range(nh.NUM_OBJECTS)
+              if ord(nh.objclass(_i).oc_class) == nh.TOOL_CLASS and nh.OBJ_DESCR(nh.objclass(_i))}
 
 # identified name -> (weight, cost), from objects.c
 OBJ_INFO = {}                     # (class, name): names repeat across classes ("levitation")
@@ -112,6 +129,8 @@ def describe(ocls, s):
         name = nm
     else:
         name = t
+        if ocls == nh.TOOL_CLASS and singular(t) in TOOL_LOOKS and (ocls, singular(t)) not in OBJ_INFO:
+            unid = True                      # "bag", "lamp", "flute": several types share the look
     if name is not None and (ocls, name) not in OBJ_INFO:
         words = name.split(" ")
         for i in range(len(words)):
@@ -138,11 +157,25 @@ class CarryMixin:
     def carry_on(self):
         return bool(self.role_opts.get("carry", True))
 
+    def carry_more_on(self):
+        return self.carry_on() and bool(self.role_opts.get("carry_more", False))
+
+    def carry_classes(self):
+        return CARRY_CLASSES + (MORE_CLASSES if self.carry_more_on() else ())
+
     # ------------------------------------------------------------ pick up
+    def carry_glyph(self, g):
+        """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
+        makes the step that inspects it (and so removes the goal) run."""
+        if not self.carry_on():
+            return False
+        return bool(CARRY_GLYPH[g] or (self.carry_more_on() and MORE_GLYPH[g]))
+
     def carry_targets(self, lv):
         if not self.carry_on():
             return None
-        mask = CARRY_GLYPH[lv.under] & ~lv.shop
+        glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_more_on() else CARRY_GLYPH
+        mask = glyphs[lv.under] & ~lv.shop
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False
         for k, p in self.dropped_at:
@@ -156,6 +189,16 @@ class CarryMixin:
             return None
         if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
             return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
+        if self.carry_more_on():
+            a = parse_armor(n)
+            if a is not None:
+                return a["name"]
+            core = re.sub(r"\s*\(.*?\)", "", n)
+            core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
+            core = re.sub(r"\b(uncursed|cursed|blessed|lit|partly used|rusty|greased)\s+", "", core).strip()
+            one = " ".join(singular(w) for w in core.split(" "))
+            if (core in TOOL_WORDS or one in TOOL_WORDS) and core not in NO_TOOLS and one not in NO_TOOLS:
+                return core
         return None
 
     # ------------------------------------------------------------ never Burdened
@@ -217,12 +260,14 @@ class CarryMixin:
             return True
         if c == nh.SCROLL_CLASS and self.role_opts.get("scroll_id") and self.scroll_is_good(s):
             return True
+        if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
+            return True
         return False
 
     def sellables(self, lv, stype):
         buys = SHOP_BUYS.get(stype, set())
         return [(l, c, s) for l, c, s in self.inventory()
-                if c in CARRY_CLASSES and (buys is ALL or c in buys) and not self.needed(c, s)
+                if c in self.carry_classes() and (buys is ALL or c in buys) and not self.needed(c, s)
                 and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s]
 
     def carry_shop_greeted(self, lv, stype):

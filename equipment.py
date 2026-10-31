@@ -201,7 +201,7 @@ class EquipMixin:
             self.wear(best, worn)
             return True
         # 2) drop carried armor we will never wear (weight)
-        junk = [a for a in inv if not a["worn"]]
+        junk = [] if (hasattr(self, "carry_more_on") and self.carry_more_on()) else [a for a in inv if not a["worn"]]
         if junk:
             self.drop_letter(junk[0]["letter"])
             return True
