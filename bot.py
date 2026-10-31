@@ -1298,7 +1298,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
-        if want_down and self.role_opts.get("items_first", False) \
+        if want_down and self.role_opts.get("items_first", True) \
                 and on_level <= self.role_opts.get("descend_after", 2000):
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
