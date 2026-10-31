@@ -117,6 +117,39 @@ class AbilitiesMixin:
         if self.can_cast("healing", max_fail=20):
             self.cur_act = "heal"
             return self.cast("healing", ".")
+        if self.role_opts.get("quaff_unknown", False) and (hp <= 5 or hp * 7 <= maxhp):
+            return self.quaff_unknown_step()
+        return False
+
+    def quaff_unknown_step(self):
+        """Nearly dead, no prayer, no known healing: drink the unidentified potion most likely to heal
+        (prices narrow it down: healing / extra healing sit in the 100 zm group)."""
+        import pricemem
+        best = None
+        for letter, ocls, s in self.inventory():
+            if ocls != nh.POTION_CLASS or " of " in s or "clear" in s:
+                continue
+            key = pricemem.appearance(s)
+            if key is None:
+                continue
+            post = self.price_posterior(key)
+            if post is None:
+                post = {n: pricemem.POTION_PROB.get(n, 0) for n in pricemem.POOLS[nh.POTION_CLASS]}
+                z = sum(post.values()) or 1
+                post = {n: p / z for n, p in post.items()}
+            p = sum(post.get(n, 0) for n in ("healing", "extra healing", "full healing"))
+            if best is None or p > best[0]:
+                best = (p, letter)
+        if best is None or best[0] < 0.08:
+            return False
+        self.cur_act = "heal"
+        self.press("q", expect_prompt=True)
+        if "drink" in self.message().lower():
+            self.press(best[1])
+            self.quaffs += 1
+            self.unknown_quaffs = getattr(self, "unknown_quaffs", 0) + 1
+            return True
+        self.settle()
         return False
 
     def magic_map_step(self, lv):

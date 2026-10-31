@@ -55,6 +55,7 @@ def _pool(cls):
 
 
 POOLS = {cls: [OBJ[i][0] for i in _pool(cls)] for cls in SHUFFLED_CLASSES}
+POTION_PROB = {OBJ[i][0]: nh.objclass(i).oc_prob for i in _pool(nh.POTION_CLASS)}
 _AR = nh.ARMOR_CLASS
 for _a, _b in ARMOR_GROUPS:
     _grp = [OBJ[i][0] for i in range(_INDEX[(_AR, _a)], _INDEX[(_AR, _b)] + 1)]
