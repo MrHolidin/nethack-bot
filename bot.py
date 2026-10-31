@@ -897,6 +897,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if name in ("cockatrice", "chickatrice") and self.role_opts.get("cocka_melee", True) \
                 and any("weapon in hand" in s for _, _, s in self.inventory()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
+        if name in ("brown mold", "blue jelly") and self.role == "Valkyrie" and self.role_opts.get("cold_melee", False):
+            return False       # their passive is cold only, and Valkyries are born cold resistant
         return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
 
     def spore_ok(self, name):
