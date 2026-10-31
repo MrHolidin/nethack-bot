@@ -21,6 +21,7 @@ from focus import FocusMixin
 from scrolls import ScrollMixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
+from wandid import WandIdMixin
 from armorid import ArmorIdMixin, RANDOM_APPEARANCE
 from carry import CarryMixin, CARRY_GLYPH
 from pricemem import PriceMemoryMixin
@@ -122,7 +123,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin, PriceMemoryMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin, PriceMemoryMixin, WandIdMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -1021,6 +1022,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.use_abilities and self.heal_step(hostiles):
             return
+        if hostiles and low and not self.can_pray() and self.dig_down(lv, "escape"):
+            return
         vis_n = len(self.visible_hostiles(lv))
         km = G.KIND[lv.under]
         sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
@@ -1126,6 +1129,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if self.use_armor and self.shop_step(lv):
                 return
             if self.excal_step(lv):
+                return
+            if self.wand_id_step(lv):
                 return
             if self.loot_step(lv) or self.kill_loot_step(lv):
                 return
@@ -1280,6 +1285,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     self.move(step)
                     return
 
+        # stuck for good on this level: a wand of digging makes the way down
+        if lv.desperate and self.dig_down(lv, "stuck"):
+            return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
         if self.role_opts.get("unblock", False) and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
             return
@@ -1634,6 +1642,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "shops": self.shops_seen,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
+            "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
             "truncated": self.truncated,

@@ -146,6 +146,7 @@ class ClassTacticsMixin:
                 continue
             if kind in RAY_WANDS or kind in BEAM_WANDS:
                 out.append((letter, kind))
+        out += self.extra_attack_wands()
         prio = {"sleep": 0, "striking": 1, "magic missile": 2, "cold": 3, "fire": 4, "lightning": 5}
         return sorted(out, key=lambda t: prio.get(t[1], 9))
 
