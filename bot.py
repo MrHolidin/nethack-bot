@@ -293,7 +293,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.prev_pos, self._cur_pos = getattr(self, "_cur_pos", None), (y, x)
         lv.visited[y, x] += 1
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
-        if self.role_opts.get("shop_side") and not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
+        if self.role_opts.get("shop_side", True) and not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
                 and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
                 and int(lv.under[y, x]) not in (nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22):
             # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
@@ -550,7 +550,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         came = getattr(self, "_cur_pos", None)          # map memory is not updated yet for the door square
         if came == door:
             came = getattr(self, "prev_pos", None)
-        if self.role_opts.get("shop_side") and came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
+        if self.role_opts.get("shop_side", True) and came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
             # the greeting comes as we step onto the door from outside: the square we came from is outside.
             # Flooding both sides marked a room beyond the door as shop and left us stuck on the door.
             outside = self._flood(inside_ok, [came]) if inside_ok[came] else {came}

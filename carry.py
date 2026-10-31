@@ -136,7 +136,7 @@ class CarryMixin:
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
 
     def carry_on(self):
-        return bool(self.role_opts.get("carry", False))
+        return bool(self.role_opts.get("carry", True))
 
     # ------------------------------------------------------------ pick up
     def carry_targets(self, lv):

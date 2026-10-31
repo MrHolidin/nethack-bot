@@ -27,7 +27,7 @@ class ShopMixin:
     def shop_visits_on(self):
         """An option that walks into shops is on: shop safety rules apply (merchandise, shop gold,
         a peaceful shopkeeper is not a threat)."""
-        return bool(self.role_opts.get("scroll_id") or self.role_opts.get("armor_pid") or self.role_opts.get("carry"))
+        return bool(self.role_opts.get("scroll_id") or self.role_opts.get("armor_pid") or self.carry_on())
 
     def shop_active(self, lv):
         s = self.shopping
