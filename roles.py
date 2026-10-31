@@ -291,7 +291,7 @@ class ExcaliburMixin:
         if self.bl(nh.NLE_BL_XP) < self.role_opts.get("excal_xl", 5):
             return False
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp < maxhp * 0.7:
+        if hp < maxhp * self.role_opts.get("excal_hp", 0.7):
             return False
         return self.long_sword() is not None
 
