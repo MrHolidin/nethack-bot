@@ -1520,23 +1520,29 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         return False
 
     def ward_step(self, lv, hostiles):
-        """ward: a lycanthrope in its animal (infecting) form or an incubus/succubus within 2 squares -> stand on
-        Elbereth (write it if the square has none) and wait there while it stays close. Both respect it. Fight
-        normally if something that ignores Elbereth is next to us; give up after 150 turns."""
+        """ward: a lycanthrope (either form: the @ form can turn into the infecting animal at any moment) or an
+        incubus/succubus within ward_r squares (default 5) -> stand on Elbereth (write it if the square has none)
+        and wait there while it is in view, plus ward_linger turns (default 5) after it was last seen. Same rule
+        for every such monster: fight normally if something that ignores Elbereth (e.g. a were in @ form) is
+        next to us; give up after 150 turns."""
         g = self.obs["glyphs"]
         y, x = self.pos()
-        danger = []
+        r = self.role_opts.get("ward_r", 5)
+        t = self.turn()
+        danger = False
         for p, n in self.visible_hostiles(lv):
-            if max(abs(p[0] - y), abs(p[1] - x)) > 2:
+            if max(abs(p[0] - y), abs(p[1] - x)) > r:
                 continue
             m = nh.glyph_to_mon(int(g[p]))
             if not (0 <= m < nh.NUMMONS):
                 continue
-            pm = nh.permonst(m)
-            if n in ("incubus", "succubus") or (n.startswith("were") and pm.mlet != HUMAN_MLET):
-                danger.append((p, n))
-        t = self.turn()
-        if not danger:
+            if n in ("incubus", "succubus") or n.startswith("were"):
+                danger = True
+                break
+        on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
+        if danger:
+            self.ward_seen = t
+        elif not (on_elb and t - getattr(self, "ward_seen", -99) <= self.role_opts.get("ward_linger", 5)):
             self.ward_since = None
             return False
         if getattr(self, "ward_since", None) is None:
@@ -1545,7 +1551,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return False
         if any(not self.respects_elbereth(n, p) for p, n in hostiles):
             return False
-        on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
         if not on_elb:
             if not self.can_engrave_here(lv):
                 return False
