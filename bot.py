@@ -224,7 +224,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
-                if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard"):
+                if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard", True):
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
                     self.raw_step(13)
@@ -363,7 +363,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
-        if self.role_opts.get("vault_guard"):
+        if self.role_opts.get("vault_guard", True):
             if "drop that gold" in m or "drop that money" in m:
                 self.vault_drop = True
             if "follow me" in m:
@@ -1068,7 +1068,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.stun_waits += 1
                 self.press("s")
                 return
-        if self.role_opts.get("vault_guard") and self.vault_step(lv, hostiles):
+        if self.role_opts.get("vault_guard", True) and self.vault_step(lv, hostiles):
             return
         if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
