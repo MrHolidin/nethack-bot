@@ -224,6 +224,7 @@ class ClassTacticsMixin:
         return sorted(out, key=lambda t: prio.get(t[1], 9))
 
     def zap(self, letter, key):
+        self.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
         self.press("z", expect_prompt=True)
         if "zap" not in self.message().lower():
             self.settle(); return False

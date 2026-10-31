@@ -326,6 +326,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.poison_res = True
         if self.role_opts.get("focus", True):
             self.focus_note(m)
+        self.rthreat_note(m)
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
         if lv and self.last_move_target and any(s in m for s in (
@@ -1106,7 +1107,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 target = self.focus_target(hostiles, target)
             self.attack(target)
             return
-        if (y, x) in lv.elbereth and hp * 2 < maxhp:
+        if (y, x) in lv.elbereth and hp * 2 < maxhp and not self.rthreat_active():
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return
@@ -1572,6 +1573,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_only_c": getattr(self, "elb_only_c", 0),
             "elb_suspect_marks": getattr(self, "elb_suspect_marks", 0),
             "elb_shot_msgs": getattr(self, "elb_shot_msgs", []),
+            "rthreat_events": dict(getattr(self, "rthreat_events", {})),
+            "rthreat_msgs": getattr(self, "rthreat_msgs", []),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "kill_loot_checks": self.kill_loot_checks,

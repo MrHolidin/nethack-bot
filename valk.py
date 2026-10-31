@@ -551,6 +551,13 @@ ELB_IGNORE_NAMES = {"minotaur", "shopkeeper", "guard", "watchman", "watch captai
                     "high priest", "Oracle"}
 SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
 
+# Somebody attacked us from a distance (mthrowu.c monshoot / thitu, zap.c buzz, muse.c), seen or not.
+RTHREAT_RE = re.compile(r"(?:throws|shoots) |zaps (?:a|an|the) |You are (?:almost )?hit by |You are hit!|misses you\.|"
+                        r"whizzes by you|hits you!|crashes on your head|You hear a nearby zap")
+# ...but arrow/dart/rock traps print the same 'You are hit by' lines
+RTRAP_RE = re.compile(r"trap|shoots out at you|falls on your head|from the ceiling")
+RTHREAT_TTL = 100
+
 
 B_HUMAN_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "human")
 B_ANGEL_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "Angel")
@@ -599,6 +606,9 @@ class ElberethMixin:
         self.elb_suspect_marks = 0
         self.elb_only_c = 0
         self.elb_shot_msgs = []
+        self.rthreat = None          # (level key, turn of the last evidence of a ranged attacker)
+        self.rthreat_events = collections.Counter()
+        self.rthreat_msgs = []
 
     def read_engraving(self):
         """Text of the engraving under us, from the answer to THIS ':' only (older 'You read' lines in the
@@ -619,6 +629,34 @@ class ElberethMixin:
             return False
         return pm.mlet not in (B_HUMAN_MLET, B_ANGEL_MLET)
 
+    # ------------------------------------------------------------ ranged threat (rthreat)
+    def rthreat_note(self, m):
+        """Called for every message: a missile, ray or wand aimed at us (or a zap heard nearby)."""
+        if not self.vopt("rthreat", False) or not RTHREAT_RE.search(m):
+            return
+        t = self.turn()
+        if getattr(self, "own_zap_turn", None) == t:          # our own ray bouncing back
+            return
+        recent = " ".join(mm for tt, mm in list(self.messages)[-4:] if tt == t)
+        if RTRAP_RE.search(recent):
+            return
+        self.rthreat_set("msg", m)
+
+    def rthreat_set(self, why, m=""):
+        if not hasattr(self, "rthreat_events"):
+            return
+        self.rthreat = (self.cur_key, self.turn())
+        self.rthreat_events[why] += 1
+        if len(self.rthreat_msgs) < 30:
+            self.rthreat_msgs.append(f"T{self.turn()} {why}: {m[:120]}")
+
+    def rthreat_active(self):
+        """A ranged attacker (possibly unseen) is around: Elbereth does not help, don't write or rest on it.
+        Clears after RTHREAT_TTL turns without new evidence, and on another level."""
+        r = getattr(self, "rthreat", None)
+        return bool(self.vopt("rthreat", False) and r and r[0] == self.cur_key
+                    and self.turn() - r[1] <= RTHREAT_TTL)
+
     def elb_blocked(self, lv):
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write.
         elb_opt: monsters that merely might carry missiles/wands (class C) count as respecting it until we
@@ -628,7 +666,7 @@ class ElberethMixin:
         if full and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         bl = full
-        if full and self.vopt("elb_opt", False):
+        if full and (self.vopt("elb_opt", False) or self.vopt("rthreat", False)):
             bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0],
                               optimistic=True, suspects=self.elb_suspects.get(lv.key, ()))
         if bl:
@@ -657,6 +695,8 @@ class ElberethMixin:
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
         if self.can_pray() and not self.vopt("elb_any_pray", False):
+            return False
+        if self.rthreat_active():
             return False
         # prayer and Elbereth answer different questions: prayer fixes HP only below the game's 'trouble'
         # line (and resets a long timeout); Elbereth stops melee now at any HP. elb_any_pray: decide
@@ -691,6 +731,14 @@ class ElberethMixin:
                 st["hp_hist"].append(hp)
                 # elb_opt: hurt while the engraving is intact -> someone in view hits from range; suspect
                 # every class-C monster in view. (A broken engraving explains a melee hit: rewrite below.)
+                if hurt and not bad and self.vopt("rthreat", False) and not self.rthreat_active() \
+                        and self.read_engraving() == "Elbereth":
+                    st["last_read"] = self.turn()
+                    self.rthreat_set("hurt on Elbereth", f"{st['hp_hist'][-2]}->{hp}")
+                if self.rthreat_active():
+                    self.elb_exits["rthreat"] += 1
+                    self.elb_state = None
+                    return False
                 if hurt and not bad and self.vopt("elb_opt", False) and self.read_engraving() == "Elbereth":
                     st["last_read"] = self.turn()
                     if self.elb_mark_suspects(lv):
