@@ -1367,7 +1367,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
-            if d == 1 and name == "floating eye" and lv.desperate:
+            since = lv.__dict__.setdefault("unblock_since", self.turn())
+            wait = self.role_opts.get("unblock_wait", None)
+            if d == 1 and name == "floating eye" and (lv.desperate or (wait is not None and self.turn() - since > wait)):
                 self.unblock_melee += 1
                 self.attack(blocker)
                 return True
