@@ -1115,6 +1115,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.hist.popleft()
         if self.use_tactics and self.tactical_step(lv, hostiles):
             return
+        if self.role_opts.get("ward", False) and self.ward_step(lv, hostiles):
+            return
         if self.elb_step(lv, hostiles):
             return
         if self.nymph_step(lv, hostiles):
@@ -1517,6 +1519,45 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                         return True
         return False
 
+    def ward_step(self, lv, hostiles):
+        """ward: a lycanthrope in its animal (infecting) form or an incubus/succubus within 2 squares -> stand on
+        Elbereth (write it if the square has none) and wait there while it stays close. Both respect it. Fight
+        normally if something that ignores Elbereth is next to us; give up after 150 turns."""
+        g = self.obs["glyphs"]
+        y, x = self.pos()
+        danger = []
+        for p, n in self.visible_hostiles(lv):
+            if max(abs(p[0] - y), abs(p[1] - x)) > 2:
+                continue
+            m = nh.glyph_to_mon(int(g[p]))
+            if not (0 <= m < nh.NUMMONS):
+                continue
+            pm = nh.permonst(m)
+            if n in ("incubus", "succubus") or (n.startswith("were") and pm.mlet != HUMAN_MLET):
+                danger.append((p, n))
+        t = self.turn()
+        if not danger:
+            self.ward_since = None
+            return False
+        if getattr(self, "ward_since", None) is None:
+            self.ward_since = t
+        if t - self.ward_since > 150:
+            return False
+        if any(not self.respects_elbereth(n, p) for p, n in hostiles):
+            return False
+        on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
+        if not on_elb:
+            if not self.can_engrave_here(lv):
+                return False
+            self.ward_writes += 1
+            self.cur_act = "ward"
+            self.engrave_elbereth()
+            return True
+        self.ward_waits += 1
+        self.cur_act = "ward"
+        self.press("s")
+        return True
+
     def near_hostile_mask(self, lv, r=1):
         """Squares within r steps of a visible hostile: an item there is reached only by stepping into its reach."""
         m = np.zeros((ROWS, COLS), dtype=bool)
@@ -1782,6 +1823,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.hunt = None
         self.shot_event = None
         self.hunts = self.hunt_steps = 0
+        self.ward_since = None
+        self.ward_writes = self.ward_waits = 0
         self.resets = 0
         self.god_angry = False
         self.pending_mines_mark = False
@@ -1932,6 +1975,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "wishes": getattr(self, "wishes_made", 0),
             "items_first": self.items_first_holds,
             "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
+            "ward": [self.ward_writes, self.ward_waits],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
