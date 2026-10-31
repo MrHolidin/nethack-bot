@@ -1543,6 +1543,32 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return False                       # next to it: the fight step takes over
         k_mem, k_live = self.kind_grid(lv)
         passable = self.passable_grid(lv, k_mem, k_live)
+        if self.role_opts.get("hunt_offline", False):
+            # among the steps that get as close as any, prefer one off the target's lines (it fires only when
+            # lined up); distances from the target over the same grid
+            ty, tx = h["pos"]
+            p2 = passable.copy()
+            p2[ty, tx] = True
+            dmap, _, _ = self.dijkstra(lv, k_mem, k_live, p2, (ty, tx), None, max_cost=80)
+            INF = 1 << 29
+            if dmap[y, x] < INF:
+                cands = []
+                for dy, dx in NEIGH:
+                    ny, nx = y + dy, x + dx
+                    if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx] and dmap[ny, nx] < dmap[y, x] \
+                            and G.KIND[self.obs["glyphs"][ny, nx]] not in (G.MONSTER, G.PET) \
+                            and not ((k_mem[y, x] in (G.DOOR_OPEN, G.DOOR_CLOSED) or k_mem[ny, nx] in (G.DOOR_OPEN, G.DOOR_CLOSED)) and dy and dx):
+                        cands.append((int(dmap[ny, nx]), (ny, nx)))
+                if cands:
+                    best = min(c[0] for c in cands)
+                    pool = [p for d, p in cands if d == best]
+                    lined = lambda p: p[0] == ty or p[1] == tx or abs(p[0] - ty) == abs(p[1] - tx)
+                    off = [p for p in pool if not lined(p)]
+                    self.cur_act = "hunt"
+                    self.hunt_steps += 1
+                    self.hunt_offline_steps = getattr(self, "hunt_offline_steps", 0) + bool(off and any(lined(p) for p in pool))
+                    self.move((off or pool)[0])
+                    return True
         adj = np.zeros((ROWS, COLS), dtype=bool)
         for dy, dx in NEIGH:
             ny, nx = h["pos"][0] + dy, h["pos"][1] + dx
@@ -1874,7 +1900,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "vault": [self.vault_drops, self.vault_moves],
             "wishes": getattr(self, "wishes_made", 0),
             "items_first": self.items_first_holds,
-            "hunt": [self.hunts, self.hunt_steps],
+            "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
