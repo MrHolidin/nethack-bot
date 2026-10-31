@@ -882,11 +882,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         chosen = 0
         lines = tty.split("\n")
-        if own:
-            # the menu is drawn over the map from the header's column: cut each line there
-            hi = next(i for i, l in enumerate(lines) if "Pick up what?" in l)
-            col = lines[hi].index("Pick up what?")
-            lines = [l[col:] for l in lines[hi + 1:]]
+        if own or self.role_opts.get("menu_fix", False):
+            lines = self.menu_lines(tty, "Pick up what?")
         for line in lines:
             m = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
             if m and any(w in m.group(2) for w in words) and not (no_sale and "for sale" in m.group(2)):
@@ -894,6 +891,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 chosen += 1
         self.raw_step(13 if chosen else 27)
         self.settle()
+
+    @staticmethod
+    def menu_lines(tty, header):
+        """Lines of a menu: a short menu is drawn over the map from the header's column (tty overlay), so
+        each line is cut there; a full-screen menu has the header at column 0 and is unchanged."""
+        lines = tty.split("\n")
+        hi = next(i for i, l in enumerate(lines) if header in l)
+        col = lines[hi].index(header)
+        return [l[col:] for l in lines[hi + 1:]]
 
     def retrieve_goal(self, lv):
         t = self.turn()
