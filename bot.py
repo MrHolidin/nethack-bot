@@ -954,7 +954,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def never_melee(self, name):
         """passive_nomelee: one rule from monster data instead of the hand list -- don't hit what has only a
         passive attack (it never hurts us otherwise); desperate (stuck) still may."""
-        return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", False) and name in PASSIVE_DMG)
+        return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
