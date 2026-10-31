@@ -369,6 +369,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
+        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
+            self.last_shot_turn = self.turn()
         if self.role_opts.get("hunt_shooter", False) and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
                 and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
@@ -1222,6 +1224,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     and not lv.shop[y, x]:
                 if self.armor_pickup_here(lv):
                     return
+        elif (self.use_armor or self.use_food) and self.role_opts.get("pickup_calm", False) and self.items_gate(lv):
+            # monsters in view but none in reach and nobody shooting: still collect what lies here
+            if self.loot_step(lv) or self.kill_loot_step(lv):
+                return
+            if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
+                    or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ()) \
+                    and not lv.shop[y, x]:
+                if self.armor_pickup_here(lv):
+                    return
 
         # rest if hurt and nothing around
         if hp < maxhp * self.rest_frac and not vis:
@@ -1324,7 +1335,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
             stuff = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
-            ok = not self.view_threats(lv) if self.role_opts.get("item_consistent", True) else True
+            ok = self.items_gate(lv) if self.role_opts.get("item_consistent", True) else True
             im = passable & ~lv.shop if self.role_opts.get("item_consistent", True) else passable
             if ok and (self.use_armor or self.use_food):
                 stuff |= self.armor_targets(lv, G) & im
@@ -1363,7 +1374,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.role_opts.get("item_consistent", True):
             # an item square is only a goal if the step that inspects it (and so removes the goal) will run:
             # that step needs no hostile in view and skips shop squares
-            items_ok = not self.view_threats(lv)
+            items_ok = self.items_gate(lv)
             item_mask = passable & ~lv.shop
         if items_ok and self.role_opts.get("scroll_id"):
             targets = targets | (self.scroll_targets(lv) & item_mask)
@@ -1500,6 +1511,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                         self.move(step)
                         return True
         return False
+
+    def items_gate(self, lv):
+        """May item goals be pursued / piles inspected now? Default: no hostile in view. pickup_calm: not in
+        combat -- nothing in melee range and not shot at in the last 5 turns. Goals and the inspecting step
+        use this same test."""
+        if self.role_opts.get("pickup_calm", False):
+            return not self.adjacent_hostiles(lv) and self.turn() - getattr(self, "last_shot_turn", -99) > 5
+        return not self.view_threats(lv)
 
     def hunt_step(self, lv):
         """hunt_shooter: something hit us from range and nothing is next to us -> close in on the likeliest
