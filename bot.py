@@ -224,6 +224,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
+                if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard"):
+                    for c in "Agent":                       # our real name (lawful: lying costs alignment)
+                        self.raw_step(ord(c))
+                    self.raw_step(13)
+                    continue
                 self.raw_step(27)
                 continue
             if re.search(r"\(end\)|\(\d+ of \d+\)", tty):
@@ -358,6 +363,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
+        if self.role_opts.get("vault_guard"):
+            if "drop that gold" in m or "drop that money" in m:
+                self.vault_drop = True
+            if "follow me" in m:
+                self.vault_follow_until = self.turn() + 300
+                self.guard_trail = []
         if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
         on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
@@ -531,6 +542,46 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
         return any(G.monster_name(int(g[a, c])) == "shopkeeper" for a, c in zip(ys, xs))
+
+    def vault_step(self, lv, hostiles):
+        """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
+        if self.vault_drop:
+            self.vault_drop = False
+            self.vault_drops += 1
+            self.press("d", expect_prompt=True)
+            if "drop" in self.message().lower():
+                self.press("$")
+            else:
+                self.settle()
+            return True
+        if self.turn() > self.vault_follow_until:
+            return False
+        if any(n != "guard" for _, n in hostiles):
+            return False                      # something else is attacking: fight first
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        guards = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "guard"]
+        y, x = self.pos()
+        if not guards:
+            if self.guard_trail and self.turn() - self.guard_trail[-1][1] > 20:
+                self.vault_follow_until = -1
+                return False
+        else:
+            gp = min(guards, key=lambda p: max(abs(p[0] - y), abs(p[1] - x)))
+            if not self.guard_trail or self.guard_trail[-1][0] != gp:
+                self.guard_trail.append((gp, self.turn()))
+        # step onto the newest square the guard has left that is next to us
+        gnow = self.guard_trail[-1][0] if self.guard_trail else None
+        for p, _ in reversed(self.guard_trail[:-1]):
+            d = (p[0] - y, p[1] - x)
+            if p != gnow and d in DELTA2KEY:
+                self.vault_moves += 1
+                self.cur_act = "vault"
+                self.press(DELTA2KEY[d])
+                return True
+        self.cur_act = "vault"
+        self.press("s")
+        return True
 
     def always_avoid(self):
         s = ALWAYS_AVOID
@@ -1017,6 +1068,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.stun_waits += 1
                 self.press("s")
                 return
+        if self.role_opts.get("vault_guard") and self.vault_step(lv, hostiles):
+            return
         if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
@@ -1500,6 +1553,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.shops_seen = 0
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
         self.desperations = 0
+        self.vault_drop = False
+        self.vault_follow_until = -1
+        self.guard_trail = []
+        self.vault_moves = 0
+        self.vault_drops = 0
         self.unblocks = self.unblock_throws = self.unblock_melee = 0
         self.resets = 0
         self.god_angry = False
@@ -1647,6 +1705,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "unknown_quaffs": getattr(self, "unknown_quaffs", 0),
+            "vault": [self.vault_drops, self.vault_moves],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
