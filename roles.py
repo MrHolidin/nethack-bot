@@ -312,7 +312,7 @@ class ExcaliburMixin:
         k_mem, k_live = self.kind_grid(lv)
         p = self.passable_grid(lv, k_mem, k_live)
         p |= fmask
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), fmask, max_cost=200)
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), fmask, max_cost=self.role_opts.get("excal_cost", 200))
         if reached is None:
             self.excal_skip.add(lv.key)            # can't reach it: don't keep coming back
             return False
@@ -325,7 +325,7 @@ class ExcaliburMixin:
 
     def excal_go_up(self, lv):
         """No fountain here, but one is remembered a few levels up: walk back up to it."""
-        if not self.role_opts.get("excal_travel", True) or lv.key[0] != 0 or self.excal_trips >= 12:
+        if not self.role_opts.get("excal_travel", True) or lv.key[0] != 0 or self.excal_trips >= self.role_opts.get("excal_trips", 12):
             return False
         dl = lv.key[1]
         targets = [k for k, l in self.levels.items()
@@ -344,7 +344,7 @@ class ExcaliburMixin:
             self.press("<")
             return True
         p = self.passable_grid(lv, k_mem, k_live)
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), up, max_cost=150)
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), up, max_cost=self.role_opts.get("excal_cost_up", 150))
         if reached is None:
             return False
         step = self.first_step(prev, (y, x), reached)
