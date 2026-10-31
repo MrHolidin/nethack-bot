@@ -1077,7 +1077,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.use_abilities and self.heal_step(hostiles):
             return
-        if hostiles and low and not self.can_pray() and self.dig_down(lv, "escape"):
+        if hostiles and low and not self.can_pray() and self.role_opts.get("dig_escape", True) and self.dig_down(lv, "escape"):
             return
         vis_n = len(self.visible_hostiles(lv))
         km = G.KIND[lv.under]
