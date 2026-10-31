@@ -1524,7 +1524,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         incubus/succubus within ward_r squares (default 5) -> stand on Elbereth (write it if the square has none)
         and wait there while it is in view, plus ward_linger turns (default 5) after it was last seen. Same rule
         for every such monster: fight normally if something that ignores Elbereth (e.g. a were in @ form) is
-        next to us; give up after 150 turns."""
+        next to us; give up after 150 turns. Version 1 = ward_r=2, ward_linger=0, ward_human=False (animal form
+        only)."""
         g = self.obs["glyphs"]
         y, x = self.pos()
         r = self.role_opts.get("ward_r", 5)
@@ -1536,7 +1537,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             m = nh.glyph_to_mon(int(g[p]))
             if not (0 <= m < nh.NUMMONS):
                 continue
-            if n in ("incubus", "succubus") or n.startswith("were"):
+            if n in ("incubus", "succubus") or (n.startswith("were") and (self.role_opts.get("ward_human", True)
+                                                                        or nh.permonst(m).mlet != HUMAN_MLET)):
                 danger = True
                 break
         on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
