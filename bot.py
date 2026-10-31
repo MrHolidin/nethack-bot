@@ -286,8 +286,18 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         lv.under[known] = g[known]
         lv.seen |= known & (g != G.STONE_GLYPH)
         y, x = self.pos()
+        if getattr(self, "_cur_pos", None) != (y, x):
+            self.prev_pos, self._cur_pos = getattr(self, "_cur_pos", None), (y, x)
         lv.visited[y, x] += 1
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
+        if self.role_opts.get("shop_side") and not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
+                and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
+                and int(lv.under[y, x]) not in (nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22):
+            # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
+            # or an item hid are missing. Standing on such a hole (an item goal there, or the end of a shop
+            # visit) locked us in, since shop squares are impassable from outside. Next to the shop and
+            # neither door nor corridor means inside it.
+            lv.shop[y, x] = True
         self.max_depth = max(self.max_depth, self.bl(nh.NLE_BL_DEPTH))
         pc = int(lv.seen.sum()) + int((lv.visited > 0).sum())
         if pc > lv.progress_count:
@@ -534,6 +544,16 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         seen = set()
         q = deque()
         y, x = door
+        came = getattr(self, "_cur_pos", None)          # map memory is not updated yet for the door square
+        if came == door:
+            came = getattr(self, "prev_pos", None)
+        if self.role_opts.get("shop_side") and came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
+            # the greeting comes as we step onto the door from outside: the square we came from is outside.
+            # Flooding both sides marked a room beyond the door as shop and left us stuck on the door.
+            outside = self._flood(inside_ok, [came]) if inside_ok[came] else {came}
+            inside_ok = inside_ok.copy()
+            for c in outside:
+                inside_ok[c] = False
         for dy, dx in NEIGH:
             ny, nx = y + dy, x + dx
             if 0 <= ny < ROWS and 0 <= nx < COLS and inside_ok[ny, nx]:
@@ -547,6 +567,17 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     seen.add((ny, nx)); q.append((ny, nx))
         for c in seen:
             lv.shop[c] = True
+
+    def _flood(self, ok, seeds, cap=300):
+        seen = set(seeds)
+        q = deque(seeds)
+        while q and len(seen) < cap:
+            cy, cx = q.popleft()
+            for dy, dx in NEIGH:
+                ny, nx = cy + dy, cx + dx
+                if 0 <= ny < ROWS and 0 <= nx < COLS and (ny, nx) not in seen and ok[ny, nx]:
+                    seen.add((ny, nx)); q.append((ny, nx))
+        return seen
 
     def mines_blocked(self):
         """avoid_mines: True/False, or "until_excalibur": lawful long-sword users first look for
