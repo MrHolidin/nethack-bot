@@ -1221,7 +1221,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if lv.avoid_down and on_level < self.role_opts.get("mines_after", 3000) and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
-        want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
+        want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
 
         if want_down:
             if downstairs[y, x]:
@@ -1265,7 +1265,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if reached == start:
                 lv.visited[start] += 1
 
-        if downstairs.any():
+        if downstairs.any() and not self.excal_holds(lv):
             if downstairs[y, x]:
                 if self.use_pet and self.pet_wait_before_stairs():
                     self.press("s"); return

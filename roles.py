@@ -294,6 +294,27 @@ class ExcaliburMixin:
             return False
         return self.long_sword() is not None
 
+    def excal_holds(self, lv):
+        """excal_hold: while the Excalibur errand is on (a usable fountain here, or one to walk back up to),
+        exploration must not take the stairs down: a monster in view pauses the errand, and the explore
+        fallback used to descend straight away, bouncing between the levels until the trips ran out."""
+        if not self.role_opts.get("excal_hold", False) or lv.key[0] != 0 or not self.excal_eligible():
+            return False
+        hc = self.__dict__.setdefault("excal_hold_count", {})
+        if hc.get(lv.key, 0) > 500:
+            return False                           # held long enough here: let the level go
+        hc[lv.key] = hc.get(lv.key, 0) + 1
+        fm = lv.under == FOUNTAIN_GLYPH
+        if lv.shop.any():
+            fm = fm & ~lv.shop
+        if fm.any() and lv.key not in self.excal_skip:
+            return True
+        if not self.role_opts.get("excal_travel", True) or self.excal_trips >= self.role_opts.get("excal_trips", 12):
+            return False
+        dl = lv.key[1]
+        return any(k[0] == 0 and dl - self.role_opts.get("excal_up", 4) <= k[1] < dl and k not in self.excal_skip
+                   and (l.under == FOUNTAIN_GLYPH).any() for k, l in self.levels.items())
+
     def excal_step(self, lv):
         fmask = lv.under == FOUNTAIN_GLYPH
         if fmask.any():
@@ -339,6 +360,10 @@ class ExcaliburMixin:
             return False
         y, x = self.pos()
         if up[y, x]:
+            cool = self.role_opts.get("excal_cool", 0)
+            if cool and self.turn() - getattr(self, "excal_last_up", -10**9) < cool:
+                return False                       # just bounced back down (a threat at the top?): later
+            self.excal_last_up = self.turn()
             self.cur_act = "excal"
             self.excal_trips += 1
             self.press("<")
