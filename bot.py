@@ -21,6 +21,7 @@ from focus import FocusMixin
 from scrolls import ScrollMixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
+from armorid import ArmorIdMixin, RANDOM_APPEARANCE
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -119,7 +120,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -493,7 +494,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         """Visible hostiles that should stop housekeeping (pickups, equipment, shopping). The SAME list
         gates those steps and the explore goals they consume."""
         vis = self.visible_hostiles(lv)
-        if self.role_opts.get("scroll_id"):
+        if self.shop_visits_on():
             vis = [v for v in vis if v[1] != "shopkeeper"]     # a peaceful shopkeeper is not a threat
         if self.role_opts.get("vis_mobile", True):
             # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
@@ -772,7 +773,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.retrieve.append((self.cur_key, ray, self.turn() + 60))
 
     def pickup_matching(self, words, no_sale=False, own=False):
-        if self.role_opts.get("scroll_id") and not own:
+        if self.shop_visits_on() and not own:
             lv = self.level()
             if lv.shop[self.pos()] or self.shopkeeper_in_view():
                 return                        # in a shop: anything here may be merchandise
@@ -1056,7 +1057,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
 
         # fresh corpse nearby
-        if hunger >= NOT_HUNGRY and self.kills and not (self.role_opts.get("scroll_id") and (
+        if hunger >= NOT_HUNGRY and self.kills and not (self.shop_visits_on() and (
                 self.shopkeeper_in_view() or lv.shop[y, x])):     # shop corpses are merchandise
             goal = self.corpse_goal(lv)
             if goal is not None:
@@ -1096,7 +1097,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
         # gold under us
         if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried \
-                and not (self.role_opts.get("scroll_id") and (lv.shop[y, x] or self.shopkeeper_in_view())):
+                and not (self.shop_visits_on() and (lv.shop[y, x] or self.shopkeeper_in_view())):
             lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
             self.pickup_matching(("gold piece",))
             lv.under[y, x] = G.STONE_GLYPH + 19
@@ -1187,7 +1188,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     self.move(step)
                     return
 
-        if self.role_opts.get("scroll_id"):
+        if self.shop_visits_on():
             gold = gold & ~lv.shop                     # shop gold belongs to the shopkeeper
         targets = frontier | gold
         items_ok = True
@@ -1352,6 +1353,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.elb2_init()
         self.shop_init()
         self.scroll_init()
+        self.armor_id_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -1422,6 +1424,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
+            "armor_id": dict(self.armor_id_stats, appearances=self.armor_id_report(),
+                             random_worn=[e for e in self.equip_events if e[1] == "wear" and e[2] in RANDOM_APPEARANCE]),
             "elb_only_c": getattr(self, "elb_only_c", 0),
             "rthreat_events": dict(getattr(self, "rthreat_events", {})),
             "rthreat_msgs": getattr(self, "rthreat_msgs", []),

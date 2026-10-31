@@ -177,7 +177,8 @@ class EquipMixin:
         return any("(weapon in hands)" in s for _, _, s in self.inventory())
 
     def improves(self, a, worn):
-        if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
+        safe = a.get("safe") or (hasattr(self, "price_safe") and self.price_safe(a["name"]))
+        if a["slot"] is None or not safe or not self.slot_allowed(a["slot"]):
             return False
         if (a["name"], a.get("letter")) in self.wear_failed:
             return False
@@ -309,7 +310,7 @@ class EquipMixin:
         insp = self.inspected.setdefault(key, set())
         insp.add(self.pos())
         names = self.look_here()
-        if self.role_opts.get("scroll_id"):
+        if self.shop_visits_on():
             # never take merchandise (a lone item is picked up without a menu, so filter here)
             names = [n for n in names if "for sale" not in n]
         worn = self.worn_by_slot()

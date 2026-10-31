@@ -51,12 +51,12 @@ def sell_price(base, mult, div):
     return max(t, 1)
 
 
-def possible_bases(price, cha, sucker=False):
+def possible_bases(price, cha, sucker=False, bases=SCROLL_BASES):
     m, d = cha_factor(cha)
     if sucker:
         m, d = m * 4, d * 3
     out = set()
-    for b in SCROLL_BASES:
+    for b in bases:
         if sell_price(b, m, d) == price or sell_price(b, m * 4, d * 3) == price:
             out.add(b)
     return out
