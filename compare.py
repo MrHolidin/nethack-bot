@@ -10,10 +10,14 @@ from eval import death_cause
 ALIGN = {1: "lawful", 0: "neutral", -1: "chaotic"}
 
 
+LEVEL = 0.80            # two-sided interval used for decisions (user: 80%)
+
+
 def boot(d, n=4000):
     random.seed(0)
     b = sorted(st.mean(random.choices(d, k=len(d))) for _ in range(n))
-    return b[int(n * 0.025)], b[int(n * 0.975)]
+    a = (1 - LEVEL) / 2
+    return b[int(n * a)], b[int(n * (1 - a))]
 
 
 def line(name, a, b, seeds, key):
@@ -22,7 +26,7 @@ def line(name, a, b, seeds, key):
     d = [b[s][key] - a[s][key] for s in seeds]
     lo, hi = boot(d)
     print(f"  {name:8s} {key:9s} A {st.mean(a[s][key] for s in seeds):8.1f}  B {st.mean(b[s][key] for s in seeds):8.1f}  "
-          f"diff {st.mean(d):+8.1f}  95% CI [{lo:+.1f}, {hi:+.1f}]  n={len(seeds)}")
+          f"diff {st.mean(d):+8.1f}  {int(LEVEL*100)}% CI [{lo:+.1f}, {hi:+.1f}]  n={len(seeds)}")
 
 
 if __name__ == "__main__":
