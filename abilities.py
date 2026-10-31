@@ -140,8 +140,12 @@ class AbilitiesMixin:
             p = sum(post.get(n, 0) for n in ("healing", "extra healing", "full healing"))
             if best is None or p > best[0]:
                 best = (p, letter)
-        if best is None or best[0] < 0.08:
+        if best is None or best[0] < self.role_opts.get("quaff_min_p", 0.08):
             return False
+        cool = self.role_opts.get("quaff_cool", 0)
+        if cool and self.turn() - getattr(self, "last_unknown_quaff", -10**9) < cool:
+            return False
+        self.last_unknown_quaff = self.turn()
         self.cur_act = "heal"
         self.press("q", expect_prompt=True)
         if "drink" in self.message().lower():
