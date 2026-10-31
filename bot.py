@@ -1337,6 +1337,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             stuff = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
             ok = self.items_gate(lv) if self.role_opts.get("item_consistent", True) else True
             im = passable & ~lv.shop if self.role_opts.get("item_consistent", True) else passable
+            if self.role_opts.get("calm_target", False):
+                im = im & ~self.near_hostile_mask(lv)
             if ok and (self.use_armor or self.use_food):
                 stuff |= self.armor_targets(lv, G) & im
                 ct = self.carry_targets(lv)
@@ -1376,6 +1378,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             # that step needs no hostile in view and skips shop squares
             items_ok = self.items_gate(lv)
             item_mask = passable & ~lv.shop
+            if self.role_opts.get("calm_target", False):
+                # pickup_calm judges where we stand; an item next to a hostile would take us into its reach
+                item_mask = item_mask & ~self.near_hostile_mask(lv)
         if items_ok and self.role_opts.get("scroll_id"):
             targets = targets | (self.scroll_targets(lv) & item_mask)
         if items_ok and (self.use_armor or self.use_food):
@@ -1511,6 +1516,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                         self.move(step)
                         return True
         return False
+
+    def near_hostile_mask(self, lv, r=1):
+        """Squares within r steps of a visible hostile: an item there is reached only by stepping into its reach."""
+        m = np.zeros((ROWS, COLS), dtype=bool)
+        for (yy, xx), _ in self.visible_hostiles(lv):
+            m[max(0, yy - r):yy + r + 1, max(0, xx - r):xx + r + 1] = True
+        return m
 
     def items_gate(self, lv):
         """May item goals be pursued / piles inspected now? Default: no hostile in view. pickup_calm: not in
