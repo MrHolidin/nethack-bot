@@ -187,6 +187,9 @@ class EquipMixin:
             return value(a) > 0.5
         if cur.get("cursed") or a["slot"] in self.cursed_slots:
             return False
+        if a["slot"] == BOOTS and hasattr(self, "magic_boots") and self.magic_boots(a["name"]) \
+                and not self.magic_boots(cur["name"]) and value(a) + 0.5 >= value(cur):
+            return True        # speed / water walking / jumping at no AC cost beats plain boots
         return value(a) > value(cur) + 0.5
 
     # ---------------------------------------------------------- main hook

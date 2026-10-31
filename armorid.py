@@ -20,6 +20,7 @@ RANDOM_APPEARANCE = {
     "buckled boots": BOOTS, "riding boots": BOOTS, "snow boots": BOOTS,
 }
 HARMFUL = {"fumble boots", "levitation boots", "helm of opposite alignment", "gauntlets of fumbling"}
+MAGIC_BOOTS = {"speed boots", "water walking boots", "jumping boots"}      # base 50: same AC 1, plus a power
 ARMOR_SHOPS = ("used armor dealership", "general store")
 WEAR_MAX_P_BAD = 0.01
 
@@ -36,6 +37,13 @@ class ArmorIdMixin:
             return False
         post = self.price_posterior((nh.ARMOR_CLASS, name))
         return post is not None and sum(p for t, p in post.items() if t in HARMFUL) < WEAR_MAX_P_BAD
+
+    def magic_boots(self, name):
+        """Random-appearance boots that prices put in the speed / water walking / jumping group."""
+        if name not in RANDOM_APPEARANCE or not self.price_safe(name):
+            return False
+        post = self.price_posterior((nh.ARMOR_CLASS, name)) or {}
+        return sum(p for t, p in post.items() if t in MAGIC_BOOTS) >= 1 - WEAR_MAX_P_BAD
 
     def armor_shop_greeted(self, lv, stype):
         if not self.role_opts.get("armor_pid", False) or stype not in ARMOR_SHOPS or lv.key in self.shops_done:
