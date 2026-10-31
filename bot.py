@@ -369,6 +369,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
+        if "Invisible customers are not welcome" in m and lv is not None:
+            lv.shk_wait = 99                    # he won't let us in while we're invisible: stop waiting at the door
         if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
             self.dip_threat_until = self.turn() + 150
         if self.role_opts.get("vault_guard", True):
@@ -1289,6 +1291,19 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
+        dt = self.door_target_mask(lv, k_mem, passable)
+        if dt is not None:
+            frontier = frontier | dt
+        if self.role_opts.get("door_targets") == "shop" and not getattr(lv, "shop_type", None) \
+                and start in getattr(lv, "shk_doors", ()) and k_mem[start] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
+                and lv.__dict__.get("shk_wait", 0) < 15:
+            g = self.obs["glyphs"]
+            if any(0 <= y + dy < ROWS and 0 <= x + dx < COLS and G.KIND[g[y + dy, x + dx]] == G.MONSTER
+                   and G.monster_name(int(g[y + dy, x + dx])) == "shopkeeper" for dy, dx in NEIGH):
+                lv.shk_wait = lv.__dict__.get("shk_wait", 0) + 1
+                self.cur_act = "shopdoor"
+                self.press("s")               # in the doorway, in line with him: he steps aside (shk.c shk_move)
+                return
         gold = (k_mem == G.GOLD) & passable
         for p in lv.gold_tried:
             gold[p] = False
@@ -1479,6 +1494,49 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                         self.move(step)
                         return True
         return False
+
+    def door_target_mask(self, lv, k_mem, passable):
+        """door_targets: doors we have not stood on count as unexplored ground (a lit room seen whole from
+        outside leaves its door off the frontier, so a shop could be walked past).
+          "all"  -- every door/doorway;  "shop" -- doors next to a shopkeeper seen on this level, until greeted.
+        Each door is a goal for at most door_ttl turns from when it first became one: a door we can't get onto
+        (a monster in it, a misread) expires instead of holding exploration forever."""
+        mode = self.role_opts.get("door_targets")
+        if not mode:
+            return None
+        t = self.turn()
+        doors = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | (k_mem == G.DOORWAY)
+        if mode == "shop":
+            if getattr(lv, "shop_type", None):
+                return None                          # greeted: we have been in
+            sd = lv.__dict__.setdefault("shk_doors", set())
+            g = self.obs["glyphs"]
+            ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+            for a, c in zip(ys, xs):
+                if G.monster_name(int(g[a, c])) != "shopkeeper":
+                    continue
+                for dy, dx in NEIGH:
+                    ny, nx = int(a) + dy, int(c) + dx
+                    if 0 <= ny < ROWS and 0 <= nx < COLS and doors[ny, nx]:
+                        # the door and the shopkeeper's post just inside it: standing in the doorway is not
+                        # entering (no greeting); he steps aside when we wait there in line with him
+                        sd.add((ny, nx))
+                        sd.add((int(a), int(c)))
+            cand = np.zeros_like(doors)
+            for p in sd:
+                cand[p] = True
+        else:
+            cand = doors.copy()
+        cand &= (lv.visited == 0) & passable
+        if not cand.any():
+            return None
+        since = lv.__dict__.setdefault("door_since", {})
+        ttl = self.role_opts.get("door_ttl", 300)
+        for p in zip(*np.nonzero(cand)):
+            p = (int(p[0]), int(p[1]))
+            if t - since.setdefault(p, t) > ttl:
+                cand[p] = False
+        return cand
 
     def should_descend(self, lv, frontier, on_level):
         if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.descend_hp:
