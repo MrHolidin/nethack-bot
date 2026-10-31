@@ -1224,7 +1224,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     and not lv.shop[y, x]:
                 if self.armor_pickup_here(lv):
                     return
-        elif (self.use_armor or self.use_food) and self.role_opts.get("pickup_calm", False) and self.items_gate(lv):
+        elif (self.use_armor or self.use_food) and self.role_opts.get("pickup_calm", True) and self.items_gate(lv):
             # monsters in view but none in reach and nobody shooting: still collect what lies here
             if self.loot_step(lv) or self.kill_loot_step(lv):
                 return
@@ -1516,7 +1516,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         """May item goals be pursued / piles inspected now? Default: no hostile in view. pickup_calm: not in
         combat -- nothing in melee range and not shot at in the last 5 turns. Goals and the inspecting step
         use this same test."""
-        if self.role_opts.get("pickup_calm", False):
+        if self.role_opts.get("pickup_calm", True):
             return not self.adjacent_hostiles(lv) and self.turn() - getattr(self, "last_shot_turn", -99) > 5
         return not self.view_threats(lv)
 
