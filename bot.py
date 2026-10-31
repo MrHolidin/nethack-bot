@@ -100,6 +100,10 @@ NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog",
 PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 from monattacks import ATTACKS as _ATK
 PASSIVE_ONLY = {nh.permonst(i).mname for i in range(nh.NUMMONS) if all(a[0] == "NONE" for a in _ATK[i])}
+# hurt us only when we hit them (a passive attack and no active one): molds, jellies, acid blob, floating eye.
+# A shrieker has no attack at all: hitting it is free.
+PASSIVE_DMG = {nh.permonst(i).mname for i in range(nh.NUMMONS)
+               if _ATK[i] and all(a[0] == "NONE" for a in _ATK[i])}
 
 
 class GameOver(Exception):
@@ -548,7 +552,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             y, x = self.pos()
             vis = [(p, n) for p, n in vis if max(abs(p[0] - y), abs(p[1] - x)) <= 1
                    or n not in PM_BY_NAME or PM_BY_NAME[n].mmove > 0]
-        if self.role_opts.get("vis_passive", False):
+        if self.role_opts.get("vis_passive", True):
             # no active attack at all (molds, jellies, floating eye, shrieker): harmless unless we hit it, and
             # we never do. Counting it only when adjacent made the gate flip on the square next to it (an item
             # beside a brown mold was a goal from 2 squares away and forbidden on arrival).
@@ -923,7 +927,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(g[yy, xx])
-                    if name in NEVER_MELEE and not (lv.desperate and name not in self.always_avoid()) \
+                    if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
                             and not self.spore_ok(name):
                         self.avoid_cells.append((yy, xx))
         for dy, dx in NEIGH:
@@ -934,7 +938,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             k = G.KIND[gg]
             if k == G.MONSTER and gg not in lv.peaceful:
                 name = G.monster_name(gg)
-                if name in NEVER_MELEE and not (lv.desperate and name not in self.always_avoid()
+                if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
@@ -946,6 +950,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             elif k == G.INVIS and (ny, nx):
                 out.append(((ny, nx), "invisible"))
         return out
+
+    def never_melee(self, name):
+        """passive_nomelee: one rule from monster data instead of the hand list -- don't hit what has only a
+        passive attack (it never hurts us otherwise); desperate (stuck) still may."""
+        return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", False) and name in PASSIVE_DMG)
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
