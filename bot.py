@@ -19,7 +19,6 @@ from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
 from scrolls import ScrollMixin
-from searchv2 import SearchV2Mixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 
@@ -79,22 +78,7 @@ M1_ACID, M1_POIS = 0x08000000, 0x10000000
 M2_UNDEAD, M2_WERE, M2_SHAPESHIFTER = 0x2, 0x4, 0x4000
 RACE_FLAG = {"human": 0x8, "elf": 0x10, "elven": 0x10, "dwarf": 0x20, "dwarven": 0x20,
              "gnome": 0x40, "gnomish": 0x40, "orc": 0x80, "orcish": 0x80}
-def singular(w):
-    w = w.strip()
-    if w.endswith("ves"):
-        return w[:-3] + "f"                    # dwarves, elves, wolves
-    if w.endswith("ies"):
-        return w[:-3] + "y"
-    if w.endswith("es") and w[:-2].endswith(("ch", "sh", "x", "s")):
-        return w[:-2]
-    if w.endswith("s") and not w.endswith("ss"):
-        return w[:-1]
-    return w
 
-
-BAD_TIN = {"cockatrice", "chickatrice", "medusa", "green slime", "little dog", "dog", "large dog", "kitten",
-           "housecat", "large cat", "chameleon", "doppelganger", "sandestin", "bat", "giant bat", "vampire bat",
-           "violet fungus", "violet fungi", "human", "elf", "dwarf", "gnome", "werejackal", "wererat", "werewolf"}
 NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
              "kitten", "housecat", "large cat", "Death", "Pestilence", "Famine"}
 PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
@@ -114,7 +98,6 @@ class Level:
     def __init__(self, key):
         self.key = key
         self.under = np.full((ROWS, COLS), G.STONE_GLYPH, dtype=np.int32)
-        self.door = np.zeros((ROWS, COLS), dtype=bool)   # an intact door seen here (objects may cover it later)
         self.seen = np.zeros((ROWS, COLS), dtype=bool)
         self.visited = np.zeros((ROWS, COLS), dtype=np.int32)
         self.near = np.zeros((ROWS, COLS), dtype=bool)
@@ -136,7 +119,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, SearchV2Mixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -237,11 +220,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
-                if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard"):
-                    for c in "Agent":                       # our real name (lawful: lying costs alignment)
-                        self.raw_step(ord(c))
-                    self.raw_step(13)
-                    continue
                 self.raw_step(27)
                 continue
             if re.search(r"\(end\)|\(\d+ of \d+\)", tty):
@@ -265,16 +243,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.raw_step(ord("n"))
         elif "continue eating" in m:
             self.raw_step(ord("n"))
-        elif getattr(self, "tin_eating", False) and "eat it?" in m and "here" not in m:
-            # "It smells like X. Eat it?" -- refuse what corpses would refuse, plus effect-carrying meats
-            what = (m + " " + " ".join(mm for _, mm in list(self.messages)[-3:])).lower()
-            sm = re.search(r"smells like (?:an? )?([a-z' -]+?)\.", what)
-            name = singular(sm.group(1)) if sm else ""      # the game says "It smells like doppelgangers."
-            bad = bool(sm) and (name in BAD_TIN or name.startswith("were")
-                                or name == (self.race or "").lower().replace("dwarven", "dwarf").replace("elven", "elf"))
-            self.tins_refused += bool(bad)
-            self.tins_eaten += not bad
-            self.raw_step(ord("n" if bad else "y"))
         elif "eat it" in m or "eat one" in m:
             self.raw_step(ord("n"))
         elif "itemized billing" in m:
@@ -311,9 +279,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
         lv.under[known] = g[known]
-        kk = G.KIND[g]
-        lv.door[known & ((kk == G.DOOR_OPEN) | (kk == G.DOOR_CLOSED))] = True
-        lv.door[known & np.isin(kk, [G.FLOOR, G.WALL, G.DOORWAY])] = False   # terrain seen: not an intact door
         lv.seen |= known & (g != G.STONE_GLYPH)
         y, x = self.pos()
         lv.visited[y, x] += 1
@@ -342,12 +307,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 "You are carrying too much to get through",
                 "You don't have enough room to maneuver")):
             lv.blocked[self.last_move_target] = True
-        if lv is not None and self.lvl_opt("door_mem", lv) and "diagonally" in m and self.last_move_target:
-            if "out of" in m:
-                lv.door[self.pos()] = True
-            else:
-                lv.door[self.last_move_target] = True
-            lv.fail[self.last_move_target] = 0
         if "no shape for kicking" in m and lv and self.last_move_target:
             lv.blocked[self.last_move_target] = True
         if "Closed for inventory" in m and lv:
@@ -358,8 +317,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     lv.blocked[ny, nx] = True
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
-        for mf in re.finditer(r"The ([a-zA-Z' -]+?) turns to flee", m):
-            self.fled[mf.group(1)] = self.turn()
         if "more confident in your" in m:
             self.skill_msgs += 1
             self.want_enhance = True
@@ -382,12 +339,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if self.role_opts.get("scroll_id") and "for sale" in m:
             self.note_scroll_prices(m)
-        if self.role_opts.get("vault_guard"):
-            if "drop that gold" in m or "drop that money" in m:
-                self.vault_drop = True
-            if "follow me" in m:
-                self.vault_follow_until = self.turn() + 300
-                self.guard_trail = []
         if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
         on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
@@ -444,8 +395,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         dist[sy, sx] = 0
         pq = [(0, sy, sx)]
         door_like = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED)
-        if self.lvl_opt("door_mem", lv):
-            door_like = door_like | lv.door    # a corpse lying in a doorway hides the door glyph
         monster_here = (k_live == G.MONSTER) | (k_live == G.INVIS)
         while pq:
             d, y, x = heapq.heappop(pq)
@@ -563,46 +512,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
         return any(G.monster_name(int(g[a, c])) == "shopkeeper" for a, c in zip(ys, xs))
-
-    def vault_step(self, lv, hostiles):
-        """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
-        if self.vault_drop:
-            self.vault_drop = False
-            self.vault_drops += 1
-            self.press("d", expect_prompt=True)
-            if "drop" in self.message().lower():
-                self.press("$")
-            else:
-                self.settle()
-            return True
-        if self.turn() > self.vault_follow_until:
-            return False
-        if any(n != "guard" for _, n in hostiles):
-            return False                      # something else is attacking: fight first
-        g = self.obs["glyphs"]
-        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-        guards = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "guard"]
-        y, x = self.pos()
-        if not guards:
-            if self.guard_trail and self.turn() - self.guard_trail[-1][1] > 20:
-                self.vault_follow_until = -1
-                return False
-        else:
-            gp = min(guards, key=lambda p: max(abs(p[0] - y), abs(p[1] - x)))
-            if not self.guard_trail or self.guard_trail[-1][0] != gp:
-                self.guard_trail.append((gp, self.turn()))
-        # step onto the newest square the guard has left that is next to us
-        gnow = self.guard_trail[-1][0] if self.guard_trail else None
-        for p, _ in reversed(self.guard_trail[:-1]):
-            d = (p[0] - y, p[1] - x)
-            if p != gnow and d in DELTA2KEY:
-                self.vault_moves += 1
-                self.cur_act = "vault"
-                self.press(DELTA2KEY[d])
-                return True
-        self.cur_act = "vault"
-        self.press("s")
-        return True
 
     def always_avoid(self):
         s = ALWAYS_AVOID
@@ -726,31 +635,24 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         return False
 
     def edible_now(self, s):
-        if re.search(r"\btins?\b", s):
-            return bool(self.role_opts.get("tins"))
-        if "corpse" in s:
-            return bool(self.role_opts.get("carry_lichen")) and ("lichen corpse" in s or "lizard corpse" in s)
-        return "egg" not in s
+        return not re.search(r"\btins?\b", s) and "corpse" not in s and "egg" not in s
 
     def eat_from_inventory(self):
-        inv = [(l, c, s) for l, c, s in self.inventory() if c == nh.FOOD_CLASS and self.edible_now(s)]
-        # plain food first, then lichen, tins (slow to open), lizard last (it cures stoning)
-        rank = lambda s: 3 if "lizard" in s else 2 if re.search(r"\btins?\b", s) else 1 if "lichen" in s else 0
-        for letter, ocls, s in sorted(inv, key=lambda t: rank(t[2])):
-            if True:
-                self.tin_eating = bool(re.search(r"\btins?\b", s))
-                self.press("e", expect_prompt=True)
-                for _ in range(3):
-                    m = self.message().lower()
-                    if self.obs["misc"][0] and "eat" in m and "here" in m:
-                        self.press("n", expect_prompt=True)
-                        continue
-                    break
-                if "what do you want to eat" in self.message().lower():
-                    self.press(letter)
-                else:
-                    self.settle()
-                return True
+        for letter, ocls, s in self.inventory():
+            if ocls != nh.FOOD_CLASS or not self.edible_now(s):
+                continue
+            self.press("e", expect_prompt=True)
+            for _ in range(3):
+                m = self.message().lower()
+                if self.obs["misc"][0] and "eat" in m and "here" in m:
+                    self.press("n", expect_prompt=True)
+                    continue
+                break
+            if "what do you want to eat" in self.message().lower():
+                self.press(letter)
+            else:
+                self.settle()
+            return True
         return False
 
     def corpse_ok(self, name):
@@ -881,7 +783,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         chosen = 0
         lines = tty.split("\n")
-        if own or self.role_opts.get("menu_col"):
+        if own:
             # the menu is drawn over the map from the header's column: cut each line there
             hi = next(i for i, l in enumerate(lines) if "Pick up what?" in l)
             col = lines[hi].index("Pick up what?")
@@ -942,8 +844,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
-                if self.use_roles and self.knight_skip(name):
-                    continue
                 if self.is_peaceful((ny, nx)):
                     continue
                 out.append(((ny, nx), name))
@@ -1002,7 +902,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         t = self.turn()
         if (G.KIND[self.obs["glyphs"]] == G.PET).any():
             self.pet_last_seen = t
-            self.pet_seen_turn, self.pet_seen_key = t, lv.key
         if t != self.loop_turn:
             self.loop_turn, self.loop_steps = t, self.steps
         elif self.steps - self.loop_steps > 300:      # stuck in a no-time loop
@@ -1030,13 +929,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         # emergencies
-        if self.role_opts.get("pray_hp") == "game":
-            # pray.c critically_low_hp(): maxhp capped at 15*XL, divisor 5 (XL1-5), 6 (XL6-13), 7 (XL14+)
-            xl = self.bl(nh.NLE_BL_XP)
-            div = 5 if xl <= 5 else 6 if xl <= 13 else 7
-            low = hp <= 5 or hp * div <= min(maxhp, 15 * xl)
-        else:
-            low = hp <= 5 or hp * 7 <= maxhp
+        low = hp <= 5 or hp * 7 <= maxhp
         if low and self.can_pray():
             self.pray(); return
         if hunger >= FAINTING:
@@ -1071,14 +964,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.stun_waits += 1
                 self.press("s")
                 return
-        if self.role_opts.get("vault_guard") and self.vault_step(lv, hostiles):
-            return
         if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
             self.press("s")
-            return
-        if self.use_roles and self.prev_weapon is not None and self.rewield_after_dig(hostiles):
             return
         if self.use_abilities and self.heal_step(hostiles):
             return
@@ -1100,9 +989,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.nymph_step(lv, hostiles):
             return
-        if self.vopt("choke", False) and (self.choke_continue(lv, hostiles) or self.choke_step(lv, hostiles)):
-            return
-        if not hostiles and (self.risky_aftercare() or self.weapon_check()):
+        if not hostiles and self.weapon_check():
             return
         if self.use_roles and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
             return
@@ -1151,26 +1038,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.ammo_pickups += 1
             return
 
-        # commit_goal: keep walking to the goal chosen earlier (by whichever step chose it) until reached.
-        # Re-deciding every tick lets two steps with opposite goals take turns when a gate flips with our
-        # position (a monster visible from one square but not the next).
-        if self.lvl_opt("commit_goal", lv) and self.nav is not None:
-            nav = self.nav
-            if nav["key"] != lv.key or self.pos() == nav["goal"] or self.turn() - nav["t"] > 150:
-                self.nav = None
-            else:
-                k_mem, k_live = self.kind_grid(lv)
-                p = self.passable_grid(lv, k_mem, k_live)
-                mask = np.zeros((ROWS, COLS), dtype=bool)
-                mask[nav["goal"]] = True
-                dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, self.pos(), mask)
-                step = self.first_step(prev, self.pos(), reached) if reached is not None else None
-                if step is not None:
-                    self.nav_moves += 1
-                    self.move(step)
-                    return
-                self.nav = None
-
         # pick thrown weapons back up
         if self.retrieve:
             goal = self.retrieve_goal(lv)
@@ -1210,7 +1077,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.excal_step(lv):
                 return
-            if self.loot_step(lv) or self.kill_loot_step(lv) or self.altar_step(lv) or self.dagger_step(lv):
+            if self.loot_step(lv) or self.kill_loot_step(lv):
                 return
             if self.role_opts.get("scroll_id") and self.scroll_step(lv):
                 return
@@ -1279,18 +1146,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         step = self.first_step(prev, start, reached)
         if step is None:
             return False
-        self.set_nav(lv, reached)
         self.move(step)
         return True
-
-    def lvl_opt(self, name, lv):
-        """An option, optionally limited to one level (benchmarks: identical play up to that level)."""
-        only = self.role_opts.get("search_only_key")
-        return bool(self.role_opts.get(name)) and (only is None or tuple(only) == tuple(lv.key))
-
-    def set_nav(self, lv, goal):
-        if self.nav is None or self.nav["goal"] != goal:
-            self.nav = {"goal": goal, "key": lv.key, "t": self.turn()}
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -1349,7 +1206,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if reached is not None and reached != start:
                 step = self.first_step(prev, start, reached)
                 if step:
-                    self.set_nav(lv, reached)
                     self.move(step)
                     return
             if reached == start:
@@ -1372,8 +1228,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
         # nothing left: map the level if we can, else search for hidden passages
         if self.use_abilities and self.magic_map_step(lv):
-            return
-        if self.use_roles and self.dig_down(lv):
             return
         self.search_mode(lv, k_mem, k_live, passable)
 
@@ -1409,17 +1263,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
-            best = None
-            algo = self.role_opts.get("search_algo") or ("v2" if self.role_opts.get("search_v2") else None)
-            only = self.role_opts.get("search_only_key")
-            if algo and (only is None or tuple(only) == tuple(lv.key)):
-                best = self.pick_search_spot(lv, k_mem, reach & passable, dist, algo)
-            if best is None:
-                best = np.unravel_index(np.argmax(score), score.shape)
-                if score[best] <= -1e8:
-                    self.press("s")
-                    return
-                best = (int(best[0]), int(best[1]))
+            best = np.unravel_index(np.argmax(score), score.shape)
+            if score[best] <= -1e8:
+                self.press("s")
+                return
+            best = (int(best[0]), int(best[1]))
             lv.search_goal = best
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time
@@ -1462,19 +1310,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.deadly_prayers = 0
         self.stun_waits = 0
         self.poison_res = False
-        self.nav = None
-        self.nav_moves = 0
-        self.tin_eating = False
-        self.tins_eaten = 0
-        self.tins_refused = 0
-        self.sv2_picks = 0
         self.blind_waits = 0
         self.shop_kicks_avoided = 0
-        self.vault_drop = False
-        self.vault_follow_until = -1
-        self.guard_trail = []
-        self.vault_moves = 0
-        self.vault_drops = 0
         self.seen_here = None
         self.ammo_pickups = 0
         self.time_by = {}
@@ -1572,7 +1409,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
             "missiles": self.missiles,
-            "digs": self.digs,
             "zaps": self.zaps,
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
@@ -1580,41 +1416,30 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_fail": getattr(self, "elb_fail", 0),
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
-            "tins_eaten": self.tins_eaten, "tins_refused": self.tins_refused,
-            "blind_waits": self.blind_waits, "poison_res": self.poison_res, "nav_moves": self.nav_moves, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
-            "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
+
+            "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
+
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
             "elb_only_c": getattr(self, "elb_only_c", 0),
-            "elb_suspect_marks": getattr(self, "elb_suspect_marks", 0),
-            "elb_shot_msgs": getattr(self, "elb_shot_msgs", []),
             "rthreat_events": dict(getattr(self, "rthreat_events", {})),
             "rthreat_msgs": getattr(self, "rthreat_msgs", []),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "kill_loot_checks": self.kill_loot_checks,
-            "choke_moves": self.choke_moves,
-            "choke_waits": self.choke_waits,
             "deadly_prayers": self.deadly_prayers,
             "pray_failed": self.pray_failed,
             "stun_waits": self.stun_waits,
-            "nymph_escapes": self.nymph_escapes,
-            "daggers_picked": self.daggers_picked,
             "nymph_kills": self.nymph_kills,
             "loot_pickups": self.loot_pickups,
             "rewields": self.rewields,
-            "altar_tests": self.altar_tests,
-            "lev_fixes": self.lev_fixes,
-            "fumble_drops": self.fumble_drops,
             "excalibur": self.excal_turn,
             "dips": self.dips,
             "excal_trips": self.excal_trips,
             "dip_events": self.dip_events,
             "fountain_levels": len(self.fountain_levels),
             "align": int(self.last_bl[nh.NLE_BL_ALIGN]),
-            "purchases": self.purchases,
-            "shop_visits": self.shop_visits,
             "flashes": self.flashes,
             "early_quaffs": self.early_quaffs,
             "fires": self.fires,

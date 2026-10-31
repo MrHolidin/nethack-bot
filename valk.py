@@ -3,11 +3,6 @@
 nymph:       nymphs (and monkeys) steal and teleport. Shoot them from range, melee them first,
              and after a theft hunt them and loot the square they die on; re-wield the stolen
              main weapon.
-armor_mode:  "safe"        - only known-mundane armor (previous behaviour)
-             "tested"      - also random-appearance helm/gloves/boots into an EMPTY slot, but only
-                             once the item is known not cursed (altar test, or B/U/C shown)
-             "aggressive"  - also random-appearance helm/gloves/boots into an empty slot, untested;
-                             undo levitation (take off, else pray) and drop fumbling items.
 """
 import collections
 import re
@@ -17,28 +12,10 @@ import nle.nethack as nh
 
 import glyphs as G
 import elbereth as ELB
-from equipment import parse_armor, HELM, GLOVES, BOOTS
 
 ROWS, COLS = 21, 79
 THIEVES = ("water nymph", "wood nymph", "mountain nymph", "monkey")
 NYMPHS = ("water nymph", "wood nymph", "mountain nymph")
-ALTAR_GLYPH = nh.GLYPH_CMAP_OFF + 27
-
-# random appearances that may hide a bad item (never conical hat = dunce cap / cornuthaum)
-RISKY = {
-    "plumed helmet": HELM, "etched helmet": HELM, "crested helmet": HELM, "visored helmet": HELM,
-    "old gloves": GLOVES, "padded gloves": GLOVES, "riding gloves": GLOVES, "fencing gloves": GLOVES,
-    "combat boots": BOOTS, "jungle boots": BOOTS, "hiking boots": BOOTS, "mud boots": BOOTS,
-    "buckled boots": BOOTS, "riding boots": BOOTS, "snow boots": BOOTS,
-}
-NEVER = ("helm of opposite alignment", "gauntlets of fumbling", "fumble boots", "levitation boots",
-         "dunce cap", "conical hat")
-
-
-def known_uncursed(s):
-    return bool(re.search(r"\b(uncursed|blessed)\b", s))
-
-
 class ValkMixin:
     def valk_init(self):
         self.thefts = 0
@@ -49,17 +26,8 @@ class ValkMixin:
         self.loot_pickups = 0
         self.main_weapon = None
         self.rewields = 0
-        self.altar_tests = 0
-        self.risky_worn = []
-        self.lev_fixes = 0
-        self.fumble_drops = 0
-        self.tested_bad = set()
-        self.inspected_daggers = {}
-        self.daggers_picked = 0
         self.nymph_waits = 0
         self.nymph_elbs = 0
-        self.nymph_hide = None
-        self.nymph_escapes = 0
 
     def vopt(self, k, d=None):
         return self.role_opts.get(k, d)
@@ -88,49 +56,6 @@ class ValkMixin:
         if "return to human form" in m and getattr(self, "were_drop", None):
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
-        if "You float" in m or "float into the air" in m or "start to float" in m:
-            self.just_levitated = True
-        if self.vopt("armor_mode", "safe") == "aggressive" and re.search(r"You (trip|flounder|slip)", m):
-            self.fumbling_seen = True
-
-    def dagger_count(self):
-        n = 0
-        for _, c, s in self.inventory():
-            if c == nh.WEAPON_CLASS and re.search(r"\bdaggers?\b", s) and "weapon in hand" not in s:
-                m = re.match(r"^(\d+) ", s)
-                n += int(m.group(1)) if m else 1
-        return n
-
-    def dagger_targets(self, lv):
-        """Remembered dagger piles to collect (Valkyries can throw daggers)."""
-        if not self.vopt("daggers", False) or self.dagger_count() >= 8:
-            return None
-        mask = G.DAGGER_GLYPH[lv.under].copy()
-        for p in self.inspected_daggers.get(lv.key, ()):
-            mask[p] = False
-        mask &= ~lv.shop
-        return mask if mask.any() else None
-
-    def dagger_step(self, lv):
-        mask = self.dagger_targets(lv)
-        if mask is None:
-            return False
-        y, x = self.pos()
-        if mask[y, x]:
-            self.inspected_daggers.setdefault(lv.key, set()).add((y, x))
-            self.pickup_matching(("dagger",))
-            self.daggers_picked += 1
-            return True
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), mask, max_cost=40)
-        if reached is None:
-            return False
-        step = self.first_step(prev, (y, x), reached)
-        if step is None:
-            return False
-        self.move(step)
-        return True
 
     def thieves_visible(self, lv):
         g = self.obs["glyphs"]
@@ -149,25 +74,9 @@ class ValkMixin:
         if adj:
             self.attack(adj[0][0])
             return True
-        # 0) hiding on another level after slipping away from a nymph
-        hide = self.nymph_hide
-        if hide is not None:
-            here = self.stairs_kind_here(lv)
-            if lv.key == hide["from"] or here is None:
-                self.nymph_hide = None
-            elif not hostiles:
-                if self.turn() < hide["until"]:
-                    self.cur_act = "rest"
-                    self.press("2"); self.press("0"); self.press("s")
-                    return True
-                self.nymph_hide = None
-                self.press(hide["back"])
-                return True
         th = self.thieves_visible(lv)
         if not th:
             return False
-        if self.vopt("nymph_avoid", False) and not self.stolen_pending and self.nymph_escape(lv, th):
-            return True
         # 2) thief in a clear line at range: throw / fire / bolt
         for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=7):
             if name not in THIEVES or d < 2:
@@ -213,41 +122,6 @@ class ValkMixin:
         if not close:
             self.nymph_waits = 0
         return False
-
-    def nymph_escape(self, lv, th):
-        """Nothing to gain from a nymph: leave by the stairs if we get there first."""
-        y, x = self.pos()
-        nyms = [t for t in th if t[1] in NYMPHS]
-        if not nyms:
-            return False
-        d_n = min(max(abs(p[0] - y), abs(p[1] - x)) for p, _ in nyms)
-        if d_n < 3:
-            return False
-        here = self.stairs_kind_here(lv)
-        if here is not None and self.can_use_stairs(lv, here):
-            key = ">" if here == G.DOWNSTAIR else "<"
-            self.nymph_escapes += 1
-            if key == "<":
-                self.nymph_hide = {"from": lv.key, "back": ">", "until": self.turn() + 50}
-            else:
-                self.descents += 1
-                self.took_stairs = True
-            self.press(key)
-            return True
-        k_mem, k_live = self.kind_grid(lv)
-        passable = self.passable_grid(lv, k_mem, k_live)
-        stairs = self.stairs_mask(lv, k_mem)
-        if not stairs.any():
-            return False
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, (y, x), stairs, max_cost=30)
-        if reached is None or dist[reached] >= d_n - 1:
-            return False
-        step = self.first_step(prev, (y, x), reached)
-        if step is None:
-            return False
-        self.cur_act = "stairs"
-        self.move(step)
-        return True
 
     def align_step(self, lv, th):
         """A neighbouring free square from which some thief is in a straight clear line, 2..6 away."""
@@ -328,93 +202,11 @@ class ValkMixin:
             return True
         return False
 
-    # ================================================================== risky armor
-    def risky_allowed(self, a, s_text, worn):
-        """Called for armor the base module calls unsafe. a = parse_armor(...)."""
-        mode = self.vopt("armor_mode", "safe")
-        if mode == "safe" or a is None:
-            return False
-        if a["name"] in NEVER or a["name"] not in RISKY:
-            return False
-        slot = RISKY[a["name"]]
-        if slot in worn or not self.slot_allowed(slot):
-            return False
-        if mode == "aggressive":
-            return not a["cursed"]
-        # tested: B/U/C must be known and not cursed
-        return known_uncursed(s_text) and not a["cursed"]
-
-    def risky_candidate(self, a, worn):
-        """Worth picking up (tested mode: to test later; aggressive: to wear)."""
-        mode = self.vopt("armor_mode", "safe")
-        if mode == "safe" or a is None or a["name"] not in RISKY or a["name"] in NEVER or a["cursed"]:
-            return False
-        slot = RISKY[a["name"]]
-        if slot in worn or not self.slot_allowed(slot):
-            return False
-        held = [x for x in self.armor_inventory() if not x["worn"] and x["name"] in RISKY and RISKY[x["name"]] == slot]
-        return not held
-
-    def altar_step(self, lv):
-        """tested mode: drop untested risky armor on a known altar to learn B/U/C."""
-        if self.vopt("armor_mode", "safe") != "tested":
-            return False
-        untested = [(l, s) for l, c, s in self.inventory() if c == nh.ARMOR_CLASS and "being worn" not in s
-                    and (parse_armor(s) or {}).get("name") in RISKY and not re.search(r"\b(uncursed|blessed|cursed)\b", s)]
-        if not untested:
-            return False
-        amask = lv.under == ALTAR_GLYPH
-        if not amask.any():
-            return False
-        y, x = self.pos()
-        if amask[y, x]:
-            for l, s in untested:
-                self.drop_letter(l)
-            self.altar_tests += 1
-            self.pickup_all()
-            return True
-        return self.go_toward_mask(lv, amask) if hasattr(self, "go_toward_mask") else False
-
-    def risky_aftercare(self):
-        """aggressive mode: undo levitation and fumbling caused by a risky item."""
-        if self.vopt("armor_mode", "safe") == "safe":
-            return False
-        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
-        lev = bool(cond & nh.BL_MASK_LEV)
-        inv = self.armor_inventory()
-        worn_risky = [a for a in inv if a["worn"] and a["name"] in RISKY]
-        if lev:
-            boots = [a for a in worn_risky if RISKY[a["name"]] == BOOTS]
-            for a in boots:
-                if a["name"] not in self.tested_bad and self.take_off(a):
-                    self.tested_bad.add(a["name"])
-                    self.lev_fixes += 1
-                    self.drop_letter(a["letter"])
-                    return True
-            if self.can_pray():
-                self.lev_fixes += 1
-                self.pray()
-                return True
-        if getattr(self, "fumbling_seen", False):
-            self.fumbling_seen = False
-            for a in worn_risky:
-                if RISKY[a["name"]] in (GLOVES, BOOTS) and a["name"] not in self.tested_bad:
-                    if self.take_off(a):
-                        self.tested_bad.add(a["name"])
-                        self.fumble_drops += 1
-                        self.drop_letter(a["letter"])
-                        return True
-        return False
-
-
 # =====================================================================================
 # kill_loot: a dead monster's inventory lies UNDER its corpse, so the '[' never shows.
-#            Look at the square of every humanoid we kill and take armor/daggers/food.
-# choke:     with 2+ hostiles in view, fight from a square few of them can reach at once
-#            (corridor, doorway); go there if we arrive before they do.
+#            Look at the square of every humanoid we kill and take armor/food.
 # =====================================================================================
 M1_HUMANOID = 0x20000
-CORRIDOR_GLYPHS = (nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22)
 PM_BY_NAME_V = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 
 
@@ -422,11 +214,6 @@ class ValkMixin2:
     def valk2_init(self):
         self.kill_loot = []           # (level key, pos, turn)
         self.kill_loot_checks = 0
-        self.choke_moves = 0
-        self.choke_waits = 0
-        self.choke_cooldown = 0
-        self.choke_target = None
-        self.choke_until = 0
 
     # ------------------------------------------------------------------ kill loot
     def note_kill(self, name, pos):
@@ -450,96 +237,12 @@ class ValkMixin2:
             self.kill_loot.remove(goal)
             self.kill_loot_checks += 1
             self.inspected.get(lv.key, set()).discard((y, x))
-            if self.armor_pickup_here(lv):
-                return True
-            if self.vopt("daggers", False) and self.dagger_count() < 8:
-                self.pickup_matching(("dagger",))
+            self.armor_pickup_here(lv)
             return True
         if max(abs(goal[1][0] - y), abs(goal[1][1] - x)) > 15 or not self.go_toward(lv, goal[1]):
             self.kill_loot.remove(goal)
             return False
         return True
-
-    # ------------------------------------------------------------------ chokepoints
-    def attack_slots(self, lv, k_mem, p, c):
-        """How many squares around c a monster could attack from."""
-        cy, cx = c
-        door_here = k_mem[cy, cx] in (G.DOOR_OPEN, G.DOOR_CLOSED)
-        n = 0
-        for dy in (-1, 0, 1):
-            for dx in (-1, 0, 1):
-                if not (dy or dx):
-                    continue
-                ny, nx = cy + dy, cx + dx
-                if not (0 <= ny < ROWS and 0 <= nx < COLS) or not p[ny, nx]:
-                    continue
-                if dy and dx and (door_here or k_mem[ny, nx] in (G.DOOR_OPEN, G.DOOR_CLOSED)):
-                    continue
-                n += 1
-        return n
-
-    def choke_step(self, lv, hostiles):
-        """Being swarmed in the open: step to a nearby square with <= 2 attack slots, if we get
-        there before the group. One move per group (no shuttling), never away from a single
-        adjacent foe (that only gives it free hits)."""
-        if not self.vopt("choke", False):
-            return False
-        y, x = self.pos()
-        t = self.turn()
-        foes = [(p, n) for p, n in self.visible_hostiles(lv)
-                if max(abs(p[0] - y), abs(p[1] - x)) <= 6 and n not in ("floating eye", "gas spore")]
-        if len(foes) < 2 or len(hostiles) == 1 or t < self.choke_cooldown:
-            return False
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
-        here = self.attack_slots(lv, k_mem, p, (y, x))
-        if here <= 2:
-            return False
-        dist, prev, _ = self.dijkstra(lv, k_mem, k_live, p, (y, x), None, max_cost=8)
-        best = None
-        ys, xs = np.nonzero(dist <= 6)
-        for cy, cx in zip(ys, xs):
-            c = (int(cy), int(cx))
-            if c == (y, x):
-                continue
-            slots = self.attack_slots(lv, k_mem, p, c)
-            if slots > 2 or slots >= here - 1:
-                continue
-            d_me = int(dist[c])
-            d_foe = min(max(abs(fp[0] - c[0]), abs(fp[1] - c[1])) for fp, _ in foes)
-            if d_me >= d_foe:
-                continue
-            score = (slots, d_me)
-            if best is None or score < best[0]:
-                best = (score, c)
-        if best is None:
-            return False
-        self.choke_target = best[1]
-        self.choke_until = t + 2 * int(dist[best[1]]) + 2
-        self.choke_cooldown = t + 30
-        step = self.first_step(prev, (y, x), best[1])
-        if step is None or G.KIND[self.obs["glyphs"][step]] in (G.MONSTER, G.PET):
-            return False
-        self.choke_moves += 1
-        self.cur_act = "fight"
-        self.move(step)
-        return True
-
-    def choke_continue(self, lv, hostiles):
-        """Keep walking to the chosen chokepoint (unless something is already adjacent)."""
-        tgt = getattr(self, "choke_target", None)
-        if tgt is None:
-            return False
-        if self.turn() > self.choke_until or self.pos() == tgt or len(hostiles) == 1:
-            self.choke_target = None
-            return False
-        if self.go_toward(lv, tgt):
-            self.choke_moves += 1
-            self.cur_act = "fight"
-            return True
-        self.choke_target = None
-        return False
-
 
 # =====================================================================================
 # elb2: Elbereth as measured in NLE 3.6.6 wizard mode
@@ -602,10 +305,7 @@ class ElberethMixin:
         self.elb_fail_msgs = []
         self.elb_fail = 0
         self.elb_rewrites = 0
-        self.elb_suspects = {}       # level key -> set of monster indices seen around when we were hurt
-        self.elb_suspect_marks = 0
         self.elb_only_c = 0
-        self.elb_shot_msgs = []
         self.rthreat = None          # (level key, turn of the last evidence of a ranged attacker)
         self.rthreat_events = collections.Counter()
         self.rthreat_msgs = []
@@ -659,48 +359,25 @@ class ElberethMixin:
 
     def elb_blocked(self, lv):
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write.
-        elb_opt: monsters that merely might carry missiles/wands (class C) count as respecting it until we
-        take damage on an intact Elbereth with them in view (elb_mark_suspects)."""
+        rthreat: monsters that merely might carry missiles/wands (class C) count as respecting it; a ranged
+        attack seen or felt switches Elbereth off for a while instead (rthreat_active)."""
         glyphs, me = self.obs["glyphs"], self.pos()
         full = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0])
         if full and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         bl = full
-        if full and (self.vopt("elb_opt", False) or self.vopt("rthreat", False)):
-            bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0],
-                              optimistic=True, suspects=self.elb_suspects.get(lv.key, ()))
+        if full and self.vopt("rthreat", False):
+            bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True)
         if bl:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
         return bool(bl)
-
-    def elb_mark_suspects(self, lv):
-        """We lost HP on an intact Elbereth: every visible class-C monster may have shot or zapped us.
-        No monster ids in the observation, so the TYPE is suspected for the rest of this level."""
-        g = self.obs["glyphs"]
-        sus = self.elb_suspects.setdefault(lv.key, set())
-        new = 0
-        for (y, x), _ in self.visible_hostiles(lv):
-            gg = int(g[y, x])
-            if nh.glyph_is_monster(gg):
-                idx = nh.glyph_to_mon(gg)
-                if idx in ELB.MAYBE_ARMED:
-                    new += idx not in sus
-                    sus.add(idx)
-        self.elb_suspect_marks += new
-        return any(nh.glyph_is_monster(int(g[p])) and nh.glyph_to_mon(int(g[p])) in sus
-                   for p, _ in self.visible_hostiles(lv))
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
-        if self.can_pray() and not self.vopt("elb_any_pray", False):
+        if self.can_pray() or self.rthreat_active():
             return False
-        if self.rthreat_active():
-            return False
-        # prayer and Elbereth answer different questions: prayer fixes HP only below the game's 'trouble'
-        # line (and resets a long timeout); Elbereth stops melee now at any HP. elb_any_pray: decide
-        # Elbereth on danger alone; prayer keeps its own trigger at critical HP.
         if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF):
@@ -729,8 +406,8 @@ class ElberethMixin:
                 bad = [n for p, n in hostiles if not self.respects(p, n)]
                 hurt = hp < st["hp_hist"][-1]
                 st["hp_hist"].append(hp)
-                # elb_opt: hurt while the engraving is intact -> someone in view hits from range; suspect
-                # every class-C monster in view. (A broken engraving explains a melee hit: rewrite below.)
+                # rthreat: hurt while the engraving is intact and nothing that ignores it is adjacent -> hit
+                # from range. (A broken engraving explains a melee hit: rewrite below.)
                 if hurt and not bad and self.vopt("rthreat", False) and not self.rthreat_active() \
                         and self.read_engraving() == "Elbereth":
                     st["last_read"] = self.turn()
@@ -739,17 +416,8 @@ class ElberethMixin:
                     self.elb_exits["rthreat"] += 1
                     self.elb_state = None
                     return False
-                if hurt and not bad and self.vopt("elb_opt", False) and self.read_engraving() == "Elbereth":
-                    st["last_read"] = self.turn()
-                    if self.elb_mark_suspects(lv):
-                        if len(self.elb_shot_msgs) < 30:
-                            self.elb_shot_msgs.append(f"T{self.turn()} {hp}/{st['hp_hist'][-2]} " + " | ".join(
-                                m for _, m in list(self.messages)[-4:])[:200])
-                        self.elb_exits["shot"] += 1
-                        self.elb_state = None
-                        return False
-                # 3.6: every time a monster is scared the engraving may erode -> check it each turn a foe
-                # is adjacent (reading is free); a hit through a smudged engraving means rewrite, not leave
+                # a dust engraving wears off on its own (allmain.c: 1/(40+3*Dex) per turn); with a foe
+                # adjacent check it every turn (reading is free); a hit through a smudged one means rewrite
                 if hostiles and not bad:
                     st["last_read"] = self.turn()
                     if self.read_engraving() != "Elbereth":
@@ -766,9 +434,7 @@ class ElberethMixin:
                     self.elb_state = None
                     return False                       # fight / let tactics handle it
                 visible = self.visible_hostiles(lv)
-                # elb_rest_full: an intact Elbereth is the safest place to heal; leaving at 60% with nothing in
-                # view puts us back to exploring below the general rest line's reach (it only fires < 50%)
-                early = not visible and hp >= maxhp * 0.6 and not self.vopt("elb_rest_full", False)
+                early = not visible and hp >= maxhp * 0.6
                 if hp >= maxhp * self.vopt("elb_exit", 0.85) or early:
                     self.elb_exits["healed"] += 1
                     self.elb_state = None

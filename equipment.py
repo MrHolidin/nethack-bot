@@ -177,10 +177,6 @@ class EquipMixin:
         return any("(weapon in hands)" in s for _, _, s in self.inventory())
 
     def improves(self, a, worn):
-        if a["slot"] is not None and not a.get("safe"):
-            if a["name"] in getattr(self, "tested_bad", ()) or (a["name"], a.get("letter")) in self.wear_failed:
-                return False
-            return hasattr(self, "risky_allowed") and self.risky_allowed(a, a.get("text", ""), worn)
         if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
             return False
         if (a["name"], a.get("letter")) in self.wear_failed:
@@ -204,17 +200,11 @@ class EquipMixin:
             self.wear(best, worn)
             return True
         # 2) drop carried armor we will never wear (weight)
-        junk = [a for a in inv if not a["worn"] and not self.awaiting_test(a)]
+        junk = [a for a in inv if not a["worn"]]
         if junk:
             self.drop_letter(junk[0]["letter"])
             return True
         return False
-
-    def awaiting_test(self, a):
-        if getattr(self, "role_opts", {}).get("armor_mode", "safe") != "tested":
-            return False
-        from valk import RISKY, known_uncursed
-        return a["name"] in RISKY and not a["cursed"] and not known_uncursed(a.get("text", ""))
 
     # ---------------------------------------------------------- actions
     def wear(self, a, worn):
@@ -306,10 +296,6 @@ class EquipMixin:
         if not self.use_food or self.food_count() >= MAX_FOOD:
             return False
         ro = getattr(self, "role_opts", {})
-        if ro.get("carry_lichen") and ("lichen corpse" in name or "lizard corpse" in name):
-            return True                  # never rot: a safe reserve (lizard also stops stoning)
-        if ro.get("tins") and re.search(r"\btins?\b", name) and "for sale" not in name:
-            return sum(1 for _, c, s in self.inventory() if c == nh.FOOD_CLASS and re.search(r"\btins?\b", s)) < 4
         if "egg" in name or re.search(r"\btins?\b", name):
             return False
         if "partly eaten" in name and not ro.get("food_partly"):
@@ -332,13 +318,8 @@ class EquipMixin:
             a = parse_armor(n) if self.use_armor else None
             if a and self.improves(a, worn):
                 want.append(a["name"])
-            elif a and hasattr(self, "risky_candidate") and \
-                    self.role_opts.get("armor_mode", "safe") == "tested" and self.risky_candidate(a, worn):
-                want.append(a["name"])
             elif self.food_wanted(n):
-                fm = next((f for f in SAFE_FOOD + ("lichen corpse", "lizard corpse") if f in n), None)
-                if fm is None and re.search(r"\btins?\b", n):
-                    fm = "tin"
+                fm = next((f for f in SAFE_FOOD if f in n), None)
                 if fm is None:
                     continue
                 want.append(fm)
@@ -360,8 +341,6 @@ class EquipMixin:
         mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.use_armor else np.zeros(lv.under.shape, bool)
         if self.use_food and self.food_count() < MAX_FOOD:
             mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
-            if getattr(self, "role_opts", {}).get("carry_lichen"):
-                mask = mask | glyphs_mod.SAFE_CORPSE_GLYPH[lv.under]
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False
         return mask
