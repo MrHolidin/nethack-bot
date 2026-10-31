@@ -1040,7 +1040,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         else:
             self.faint_since = None
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
-                self.faint_since is not None and t - self.faint_since > 200), weak=True):
+                self.faint_since is not None and t - self.faint_since > self.role_opts.get("faint_wait", 200)), weak=True):
             self.pray(); return
         if self.lycanthropy and self.can_pray():
             self.pray(); return
