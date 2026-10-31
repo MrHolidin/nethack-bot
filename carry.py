@@ -61,6 +61,21 @@ for _g in range(nh.MAX_GLYPH):
         CARRY_GLYPH[_g] = _c in CARRY_CLASSES
         MORE_GLYPH[_g] = _c in (nh.TOOL_CLASS, nh.ARMOR_CLASS)
 MORE_CLASSES = (nh.TOOL_CLASS, nh.ARMOR_CLASS)
+WEAPON_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
+for _g in range(nh.MAX_GLYPH):
+    if nh.glyph_is_normal_object(_g):
+        WEAPON_GLYPH[_g] = ord(nh.objclass(nh.glyph_to_obj(_g)).oc_class) == nh.WEAPON_CLASS
+# weapon appearances are fixed (not shuffled): "samurai sword" is always a katana, "broad pick" a dwarvish mattock
+WEAPON_NAME_OF = {}
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    if ord(_oc.oc_class) == nh.WEAPON_CLASS and nh.OBJ_NAME(_oc):
+        WEAPON_NAME_OF.setdefault(nh.OBJ_NAME(_oc), nh.OBJ_NAME(_oc))
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    if ord(_oc.oc_class) == nh.WEAPON_CLASS and nh.OBJ_DESCR(_oc):
+        WEAPON_NAME_OF.setdefault(nh.OBJ_DESCR(_oc), nh.OBJ_NAME(_oc))
+KEEP_WEAPONS = ("dagger", "knife", "dart", "shuriken", "javelin", "spear")   # bot.THROWABLE: thrown, kept
 NO_TOOLS = {"pick-axe", "chest", "large box", "ice box", "beartrap", "land mine"}
 KEEP_TOOLS = ("unicorn horn",)
 TOOL_WORDS = set()                # tool names and looks ("oil lamp", "lamp", "bag", "wax candle")
@@ -129,6 +144,8 @@ def describe(ocls, s):
         name = nm
     else:
         name = t
+        if ocls == nh.WEAPON_CLASS:
+            name = WEAPON_NAME_OF.get(t, WEAPON_NAME_OF.get(" ".join(singular(w) for w in t.split(" ")), t))
         if ocls == nh.TOOL_CLASS and singular(t) in TOOL_LOOKS and (ocls, singular(t)) not in OBJ_INFO:
             unid = True                      # "bag", "lamp", "flute": several types share the look
     if name is not None and (ocls, name) not in OBJ_INFO:
@@ -160,8 +177,14 @@ class CarryMixin:
     def carry_more_on(self):
         return self.carry_on() and bool(self.role_opts.get("carry_more", False))
 
+    def carry_weapons_on(self):
+        """weapons: weapons join the carry pipeline (pick up, never-Burdened drop order, sell what we
+        don't keep); valk.weapon_check wields the best one."""
+        return self.carry_on() and bool(self.role_opts.get("weapons", False))
+
     def carry_classes(self):
-        return CARRY_CLASSES + (MORE_CLASSES if self.carry_more_on() else ())
+        return CARRY_CLASSES + (MORE_CLASSES if self.carry_more_on() else ()) + \
+            ((nh.WEAPON_CLASS,) if self.carry_weapons_on() else ())
 
     # ------------------------------------------------------------ pick up
     def carry_glyph(self, g):
@@ -169,12 +192,15 @@ class CarryMixin:
         makes the step that inspects it (and so removes the goal) run."""
         if not self.carry_on():
             return False
-        return bool(CARRY_GLYPH[g] or (self.carry_more_on() and MORE_GLYPH[g]))
+        return bool(CARRY_GLYPH[g] or (self.carry_more_on() and MORE_GLYPH[g])
+                    or (self.carry_weapons_on() and WEAPON_GLYPH[g]))
 
     def carry_targets(self, lv):
         if not self.carry_on():
             return None
         glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_more_on() else CARRY_GLYPH
+        if self.carry_weapons_on():
+            glyphs = glyphs | WEAPON_GLYPH
         mask = glyphs[lv.under] & ~lv.shop
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False
@@ -189,6 +215,16 @@ class CarryMixin:
             return None
         if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
             return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
+        if self.carry_weapons_on() and "corpse" not in n:
+            core = re.sub(r"\s*\(.*?\)", "", n)
+            core = re.sub(r"\s+(called|named)\s+.*$", "", core)
+            core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
+            core = re.sub(r"\b(uncursed|cursed|blessed|rustproof|fireproof|corrodeproof|rotted|very|thoroughly|"
+                          r"rusty|rusted|corroded|burnt|burned|greased|poisoned)\s+", "", core)
+            core = re.sub(r"^[+-]\d+\s+", "", core).strip()
+            one = " ".join(singular(w) for w in core.split(" "))
+            if (core in WEAPON_NAME_OF or one in WEAPON_NAME_OF) and " cursed" not in " " + n:
+                return core
         if self.carry_more_on():
             a = parse_armor(n)
             if a is not None:
@@ -263,13 +299,19 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
             return True
+        if c == nh.WEAPON_CLASS:
+            d = describe(c, s)["key"][1]
+            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
+                return True                  # wield candidates (valk.weapon_rank) and missiles we throw
         return False
 
     def sellables(self, lv, stype):
         buys = SHOP_BUYS.get(stype, set())
         return [(l, c, s) for l, c, s in self.inventory()
                 if c in self.carry_classes() and (buys is ALL or c in buys) and not self.needed(c, s)
-                and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s]
+                and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s
+                and "weapon in hand" not in s and "(wielded" not in s and "alternate weapon" not in s
+                and "in quiver" not in s]
 
     def keep_after_offer(self):
         """pid_wear: the offer just recorded may show the random-appearance armor we are selling is safe;

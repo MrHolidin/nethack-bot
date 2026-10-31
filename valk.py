@@ -192,6 +192,8 @@ class ValkMixin:
                 base = re.sub(r"\b(uncursed|cursed|blessed|rustproof|[+-]\d+)\s+", "", base).strip()
                 self.main_weapon = base
             return False
+        if self.vopt("weapons", False):
+            return self.weapon_upgrade(inv)
         if wielded or not self.vopt("nymph", False):
             return False
         weapons = [(l, s) for l, c, s in inv if c == nh.WEAPON_CLASS and not re.search(r"\b(arrows?|bolts?|ya|darts?)\b", s)]
@@ -202,6 +204,44 @@ class ValkMixin:
             self.rewields += 1
             return True
         return False
+
+    def weapon_rank(self, s):
+        """weapons: Excalibur > the two long-sword-skill blades > anything else. Lawful: katana < long sword
+        (a long sword can still become Excalibur); others: long sword < katana. Ties: known enchantment."""
+        m = re.search(r"(?:^|\s)([+-]\d+) ", s)
+        ench = int(m.group(1)) if m else 0
+        lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
+        if "Excalibur" in s:
+            return (3, ench)
+        if re.search(r"\blong swords?\b", s):
+            return (2 if lawful else 1, ench)
+        if re.search(r"\bkatanas?\b", s) or (re.search(r"\bsamurai swords?\b", s) and "long samurai" not in s):
+            return (1 if lawful else 2, ench)
+        return (0, ench)
+
+    def weapon_upgrade(self, inv):
+        """Wield the best-ranked weapon we carry if it beats the wielded one (or nothing is wielded).
+        Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
+        cur = next((s for _, c, s in inv if "weapon in hand" in s or "weapons in hands" in s), None)
+        if cur is not None and " cursed" in " " + cur:
+            return False
+        tried = getattr(self, "_wield_tried", set())
+        cands = [(self.weapon_rank(s), l, s) for l, c, s in inv
+                 if c == nh.WEAPON_CLASS and "weapon in hand" not in s and " cursed" not in " " + s
+                 and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", s)
+                 and (l, s) not in tried]
+        if not cands:
+            return False
+        rank, l, s = max(cands, key=lambda x: x[0])
+        if cur is not None and rank <= self.weapon_rank(cur):
+            return False
+        if cur is not None and rank[0] == 0:
+            return False                     # only the long-sword-skill blades replace a wielded weapon
+        self._wield_tried = tried | {(l, s)}
+        self.cur_act = "wield"
+        self.wield(l)
+        self.rewields += 1
+        return True
 
 # =====================================================================================
 # kill_loot: a dead monster's inventory lies UNDER its corpse, so the '[' never shows.
