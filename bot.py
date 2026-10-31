@@ -224,6 +224,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
+                if "for what do you wish" in (msg + self.top_line()).lower() and self.role_opts.get("wish", False):
+                    for c in "blessed +2 gray dragon scale mail":
+                        self.raw_step(ord(c))
+                    self.raw_step(13)
+                    self.wishes_made = getattr(self, "wishes_made", 0) + 1
+                    continue
                 if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard", True):
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
@@ -363,6 +369,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
+        if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
+            self.dip_threat_until = self.turn() + 150
         if self.role_opts.get("vault_guard", True):
             if "drop that gold" in m or "drop that money" in m:
                 self.vault_drop = True
@@ -1709,6 +1717,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "unknown_quaffs": getattr(self, "unknown_quaffs", 0),
             "vault": [self.vault_drops, self.vault_moves],
+            "wishes": getattr(self, "wishes_made", 0),
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,

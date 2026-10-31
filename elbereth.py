@@ -64,7 +64,7 @@ MAYBE_ARMED = frozenset(i for i, r in enumerate(_REASON)
                         if r and r.startswith(("weapon user", "has hands and a mind")))
 
 
-def blockers(glyphs, me, peaceful, dnum, optimistic=False):
+def blockers(glyphs, me, peaceful, dnum, optimistic=False, skip_names=()):
     """[(name, reason)] for every visible non-peaceful monster that makes Elbereth useless, plus unseen
     attackers ('I' markers) within 2 squares.  Empty list = Elbereth is worth writing.
     optimistic: class-C monsters (MAYBE_ARMED) don't block."""
@@ -86,7 +86,7 @@ def blockers(glyphs, me, peaceful, dnum, optimistic=False):
                 r = _REASON[idx]
                 if r and optimistic and idx in MAYBE_ARMED:
                     continue
-                if r:
+                if r and G.monster_name(g) not in skip_names:
                     out.append((G.monster_name(g), r))
     return out
 

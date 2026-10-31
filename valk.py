@@ -362,12 +362,13 @@ class ElberethMixin:
         rthreat: monsters that merely might carry missiles/wands (class C) count as respecting it; a ranged
         attack seen or felt switches Elbereth off for a while instead (rthreat_active)."""
         glyphs, me = self.obs["glyphs"], self.pos()
-        full = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0])
-        if full and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True):
+        skip = ("Oracle", "shopkeeper", "aligned priest") if self.vopt("elb_peace", False) else ()
+        full = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], skip_names=skip)
+        if full and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True, skip_names=skip):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         bl = full
         if full and self.vopt("rthreat", False):
-            bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True)
+            bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True, skip_names=skip)
         if bl:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
         return bool(bl)
@@ -376,7 +377,8 @@ class ElberethMixin:
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
-        if self.can_pray() or self.rthreat_active():
+        dip_on = self.vopt("dip_elb", False) and self.turn() < getattr(self, "dip_threat_until", -1)
+        if (self.can_pray() and not dip_on) or self.rthreat_active():
             return False
         if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
@@ -388,7 +390,9 @@ class ElberethMixin:
         if not threats:
             return False
         swarm = sum(1 for _, n in threats if n in SWARMERS)
-        if not (hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2):
+        dip = self.vopt("dip_elb", False) and self.turn() < getattr(self, "dip_threat_until", -1) \
+            and any(n in ("water demon", "water moccasin") for _, n in threats)
+        if not (hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2 or dip):
             return False
         return not self.elb_blocked(lv)
 
@@ -455,9 +459,29 @@ class ElberethMixin:
                 self.cur_act = "rest"
                 self.press("s")
                 return True
+        if self.vopt("dip_elb", False) and self.turn() < getattr(self, "dip_threat_until", -1) \
+                and not self.can_engrave_here(lv) and self.dip_step_off(lv):
+            return True
         if not self.elb_wanted(lv, hostiles):
             return False
         return self.elb_write(lv)
+
+    def dip_step_off(self, lv):
+        """A dip let out a water demon / moccasins and we stand on the fountain, where nothing can be
+        engraved: step to a free neighbouring square that can hold an Elbereth."""
+        import glyphs as G2
+        y, x = self.pos()
+        g = self.obs["glyphs"]
+        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)):
+            ny, nx = y + dy, x + dx
+            if not (0 <= ny < g.shape[0] and 0 <= nx < g.shape[1]):
+                continue
+            k = G2.KIND[int(g[ny, nx])]
+            if k in (G2.FLOOR, G2.CORPSE, G2.OBJECT) and G2.KIND[int(lv.under[ny, nx])] in (G2.FLOOR, G2.CORPSE, G2.OBJECT):
+                self.cur_act = "dipflee"
+                self.move((ny, nx))
+                return True
+        return False
 
     def elb_write(self, lv):
         """Engrave and verify by reading. Any failure to reach the text prompt (fountain/altar/stairs,
