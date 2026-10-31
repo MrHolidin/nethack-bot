@@ -893,6 +893,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def never_melee(self, name):
         """passive_nomelee: one rule from monster data instead of the hand list -- don't hit what has only a
         passive attack (it never hurts us otherwise); desperate (stuck) still may."""
+        if name in ("cockatrice", "chickatrice") and self.role_opts.get("cocka_melee", False) \
+                and any("weapon in hand" in s for _, _, s in self.inventory()):
+            return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
         return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
 
     def spore_ok(self, name):
@@ -960,9 +963,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             lv.desperate = True
             self.desperations += 1
 
-        # engulfed: hit anything
-        if G.KIND[self.obs["glyphs"][y, x]] == G.EFFECT and self.obs["glyphs"][y, x] >= nh.GLYPH_SWALLOW_OFF \
-                and self.obs["glyphs"][y, x] < nh.GLYPH_WARNING_OFF:
+        # engulfed: hit anything. The engulfer is drawn on the 8 squares AROUND us (display.c swallowed());
+        # our own square shows us, so the old test on it never fired (engulf_fix)
+        gg = self.obs["glyphs"]
+        if self.role_opts.get("engulf_fix", False):
+            ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
+            engulfed = int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5
+        else:
+            engulfed = G.KIND[gg[y, x]] == G.EFFECT and nh.GLYPH_SWALLOW_OFF <= gg[y, x] < nh.GLYPH_WARNING_OFF
+        if engulfed:
             self.last_attack_target = None
             self.press("F"); self.press("h")
             return
@@ -1284,7 +1293,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         xl = self.bl(nh.NLE_BL_XP)
         depth = self.bl(nh.NLE_BL_DEPTH)
         if self.descend_policy == "explore":
-            return not frontier.any() or on_level > 2000
+            return not frontier.any() or on_level > self.role_opts.get("descend_after", 2000)
         if self.descend_policy == "careful":
             # explore fully; only go deeper when experienced enough
             if depth >= xl + 3 and on_level < 4000:
