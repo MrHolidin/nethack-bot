@@ -676,7 +676,10 @@ class ElberethMixin:
                     self.elb_state = None
                     return False                       # fight / let tactics handle it
                 visible = self.visible_hostiles(lv)
-                if hp >= maxhp * self.vopt("elb_exit", 0.85) or (not visible and hp >= maxhp * 0.6):
+                # elb_rest_full: an intact Elbereth is the safest place to heal; leaving at 60% with nothing in
+                # view puts us back to exploring below the general rest line's reach (it only fires < 50%)
+                early = not visible and hp >= maxhp * 0.6 and not self.vopt("elb_rest_full", False)
+                if hp >= maxhp * self.vopt("elb_exit", 0.85) or early:
                     self.elb_exits["healed"] += 1
                     self.elb_state = None
                     return False
