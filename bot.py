@@ -1344,7 +1344,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if lv.desperate and self.dig_down(lv, "stuck"):
             return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
-        if self.role_opts.get("unblock", False) and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
+        if self.role_opts.get("unblock", True) and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
             return
         # nothing left: map the level if we can, else search for hidden passages
         if self.use_abilities and self.magic_map_step(lv):
