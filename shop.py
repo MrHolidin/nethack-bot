@@ -18,6 +18,8 @@ class ShopMixin:
         stype = mm.group(1)
         lv.shop_type = stype
         if self.shopping is None:
+            self.carry_shop_greeted(lv, stype)
+        if self.shopping is None:
             self.scroll_shop_greeted(lv, stype)
         if self.shopping is None:
             self.armor_shop_greeted(lv, stype)
@@ -25,7 +27,7 @@ class ShopMixin:
     def shop_visits_on(self):
         """An option that walks into shops is on: shop safety rules apply (merchandise, shop gold,
         a peaceful shopkeeper is not a threat)."""
-        return bool(self.role_opts.get("scroll_id") or self.role_opts.get("armor_pid"))
+        return bool(self.role_opts.get("scroll_id") or self.role_opts.get("armor_pid") or self.role_opts.get("carry"))
 
     def shop_active(self, lv):
         s = self.shopping
@@ -52,6 +54,8 @@ class ShopMixin:
             self.shops_done.add(self.shopping["key"])
             self.shopping = None
             return False
+        if self.shopping.get("kind") == "sell":
+            return self.carry_sell_step(lv)
         if self.shopping.get("kind") == "armor":
             return self.armor_shop_step(lv)
         return self.scroll_shop_step(lv)

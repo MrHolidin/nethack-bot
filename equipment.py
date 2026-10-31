@@ -256,6 +256,9 @@ class EquipMixin:
         return True
 
     def drop_letter(self, letter):
+        if self.carry_on():                     # carry: never come back for what we dropped
+            self.dropped_at.add((self.level().key, self.pos()))
+            self.inspected.setdefault(self.level().key, set()).add(self.pos())
         self.press("d", expect_prompt=True)
         if "drop" in self.message().lower():
             self.press(letter)
@@ -319,6 +322,9 @@ class EquipMixin:
             a = parse_armor(n) if self.use_armor else None
             if a and self.improves(a, worn):
                 want.append(a["name"])
+            elif self.carry_wanted(n):
+                want.append(self.carry_wanted(n))
+                self.carry_stats["picked"] += 1
             elif self.food_wanted(n):
                 fm = next((f for f in SAFE_FOOD if f in n), None)
                 if fm is None:
@@ -329,7 +335,7 @@ class EquipMixin:
             return False
         cap_before = self.bl(nh.NLE_BL_CAP)
         self.pickup_matching(want)
-        if self.bl(nh.NLE_BL_CAP) > cap_before:   # became (more) burdened: not worth the speed loss
+        if self.bl(nh.NLE_BL_CAP) > cap_before and not self.carry_on():   # (carry: its own drop order)
             for a in self.armor_inventory():
                 if not a["worn"]:
                     self.drop_letter(a["letter"])

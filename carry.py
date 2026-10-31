@@ -1,0 +1,266 @@
+"""Carry valuables, never be Burdened, sell what we don't use (flag carry).
+
+Pick up: wands, rings, amulets, scrolls, potions (light and worth gold; gold on hand is score 1:1).
+
+Never Burdened (Burdened costs a quarter of our speed). When the status shows any encumbrance, drop one
+unit per turn, in this order:
+  1. duplicated unidentified items (same appearance in two slots, or a stack), heaviest first
+  2. other unidentified items, heaviest first
+  3. anything not worn / wielded, lowest price per weight first
+  4. worn / wielded
+A square we dropped something on is remembered: no going back to pick it up.
+
+Sell: in a shop that buys the class (general store: everything), drop each item we have no use for deep
+inside the shop and accept the offer; take back what the shopkeeper won't buy. Kept: identified attack
+wands (wand_step), healing potions (heal_step), scrolls known to be good (scroll_id).
+
+Identity comes from the item text only: an unidentified potion/scroll/ring/wand/amulet/spellbook is named
+by its appearance ("bubbly potion", "scroll labeled FOO"); identified ones by "... of X".
+"""
+import re
+
+import numpy as np
+import nle.nethack as nh
+
+import glyphs as G
+from equipment import parse_armor
+
+CARRY_CLASSES = (nh.WAND_CLASS, nh.RING_CLASS, nh.AMULET_CLASS, nh.SCROLL_CLASS, nh.POTION_CLASS)
+RANDOM_CLASSES = CARRY_CLASSES + (nh.SPBOOK_CLASS,)
+CLASS_WEIGHT = {nh.WAND_CLASS: 7, nh.RING_CLASS: 3, nh.AMULET_CLASS: 20, nh.SCROLL_CLASS: 5,
+                nh.POTION_CLASS: 20, nh.SPBOOK_CLASS: 50}
+RANDOM_ARMOR = {"plumed helmet", "etched helmet", "crested helmet", "visored helmet", "old gloves",
+                "padded gloves", "riding gloves", "fencing gloves", "combat boots", "jungle boots",
+                "hiking boots", "mud boots", "buckled boots", "riding boots", "snow boots", "tattered cape",
+                "opera cloak", "ornamental cope", "piece of cloth"}
+ATTACK_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning", "striking")
+HEAL_POTIONS = ("full healing", "extra healing", "healing")
+
+ALL = None
+SHOP_BUYS = {
+    "general store": ALL,
+    "used armor dealership": {nh.ARMOR_CLASS, nh.WEAPON_CLASS},
+    "second-hand bookstore": {nh.SCROLL_CLASS, nh.SPBOOK_CLASS},
+    "liquor emporium": {nh.POTION_CLASS},
+    "antique weapons outlet": {nh.WEAPON_CLASS, nh.ARMOR_CLASS},
+    "delicatessen": {nh.FOOD_CLASS},
+    "jewelers": {nh.RING_CLASS, nh.GEM_CLASS, nh.AMULET_CLASS},
+    "quality apparel and accessories": {nh.WAND_CLASS, nh.ARMOR_CLASS},
+    "hardware store": {nh.TOOL_CLASS},
+    "rare books": {nh.SPBOOK_CLASS, nh.SCROLL_CLASS},
+    "lighting store": {nh.TOOL_CLASS},
+}
+
+CARRY_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
+for _g in range(nh.MAX_GLYPH):
+    if nh.glyph_is_normal_object(_g) and ord(nh.objclass(nh.glyph_to_obj(_g)).oc_class) in CARRY_CLASSES:
+        CARRY_GLYPH[_g] = True
+
+# identified name -> (weight, cost), from objects.c
+OBJ_INFO = {}
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    _n = nh.OBJ_NAME(_oc)
+    if _n:
+        OBJ_INFO.setdefault(_n, (_oc.oc_weight, _oc.oc_cost))
+APPEAR_WEIGHT = {}
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    _d = nh.OBJ_DESCR(_oc)
+    if _d:
+        APPEAR_WEIGHT[_d] = max(APPEAR_WEIGHT.get(_d, 0), _oc.oc_weight)
+
+ID_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s? of ([a-zA-Z' -]+?)(?: \(|$| called| named)")
+SOLD_RE = re.compile(r"You sold .*? for (\d+) gold pieces?")
+
+
+def singular(w):
+    if w.endswith("ves"):
+        return w[:-3] + "f"
+    if w.endswith("ies"):
+        return w[:-3] + "y"
+    if w.endswith(("ches", "shes", "xes", "sses")):
+        return w[:-2]
+    if w.endswith("s") and not w.endswith("ss"):
+        return w[:-1]
+    return w
+
+
+def describe(ocls, s):
+    """Inventory/floor text -> dict(qty, unit weight, unit cost (None if unknown), unidentified, key)."""
+    t = re.sub(r"\s*\(.*?\)", "", s).strip()
+    t = re.sub(r"\s+(called|named)\s+.*$", "", t)
+    m = re.match(r"^(\d+)\s+", t)
+    qty = int(m.group(1)) if m else 1
+    t = re.sub(r"^(a|an|the|\d+)\s+", "", t)
+    t = re.sub(r"\b(uncursed|cursed|blessed|rustproof|fireproof|corrodeproof|rotted|very|thoroughly|rusty|"
+               r"rusted|corroded|burnt|burned|partly eaten|greased|poisoned|diluted)\s+", "", t)
+    t = re.sub(r"^[+-]\d+\s+", "", t)
+    t = re.sub(r"^(pair|set)s? of ", "", t).strip()
+    unid, name = False, None
+    if ocls in RANDOM_CLASSES:
+        mm = ID_RE.search(s)
+        if mm:
+            kind, what = mm.group(1), mm.group(2).strip()
+            name = ("amulet of " + what) if kind == "amulet" else what
+        else:
+            unid = True
+    elif ocls == nh.ARMOR_CLASS:
+        a = parse_armor(s)
+        nm = a["name"] if a else t
+        unid = nm in RANDOM_ARMOR
+        name = nm
+    else:
+        name = t
+    if name is not None and name not in OBJ_INFO:
+        words = name.split(" ")
+        for i in range(len(words)):
+            cand = " ".join(words[:i] + [singular(words[i])] + words[i + 1:])
+            if cand in OBJ_INFO:
+                name = cand
+                break
+    if name in OBJ_INFO:
+        wt, cost = OBJ_INFO[name]
+    else:
+        wt = CLASS_WEIGHT.get(ocls) or APPEAR_WEIGHT.get(singular(t), APPEAR_WEIGHT.get(t, 10))
+        cost = None
+    app = " ".join(singular(w) if w.islower() else w for w in t.split(" "))
+    return {"qty": qty, "wt": max(wt, 1), "cost": cost, "unid": unid, "key": (ocls, app if unid else name)}
+
+
+class CarryMixin:
+    def carry_init(self):
+        self.dropped_at = set()      # (level key, pos): never collect there again
+        self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
+        self.selling = False
+        self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
+
+    def carry_on(self):
+        return bool(self.role_opts.get("carry", False))
+
+    # ------------------------------------------------------------ pick up
+    def carry_targets(self, lv):
+        if not self.carry_on():
+            return None
+        mask = CARRY_GLYPH[lv.under] & ~lv.shop
+        for p in self.inspected.get(lv.key, ()):
+            mask[p] = False
+        for k, p in self.dropped_at:
+            if k == lv.key:
+                mask[p] = False
+        return mask
+
+    def carry_wanted(self, n):
+        """A floor item (look_here text) to take: one of the carried classes, not merchandise."""
+        if not self.carry_on() or "for sale" in n:
+            return None
+        if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
+            return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
+        return None
+
+    # ------------------------------------------------------------ never Burdened
+    def drop_units(self, letter, n=None):
+        """Drop n of a stack (all if None); remember the square."""
+        self.dropped_at.add((self.level().key, self.pos()))
+        self.inspected.setdefault(self.level().key, set()).add(self.pos())
+        self.press("d", expect_prompt=True)
+        if "drop" not in self.message().lower():
+            self.settle()
+            return
+        if n:
+            for c in str(n):
+                self.raw_step(ord(c))
+        self.press(letter)
+
+    def carry_drop_step(self):
+        """Encumbered: drop one unit following the four tiers. True if it used the turn."""
+        if not self.carry_on() or self.bl(nh.NLE_BL_CAP) < 1:
+            return False
+        inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
+        equipped = lambda s: "being worn" in s or "weapon in hand" in s or "(in use)" in s or "(on " in s
+        free = [x for x in inv if not equipped(x[2])]
+        keys = {}
+        for l, c, s, d in free:
+            if d["unid"]:
+                keys[d["key"]] = keys.get(d["key"], 0) + d["qty"]
+        tier1 = [x for x in free if x[3]["unid"] and keys[x[3]["key"]] > 1]
+        tier2 = [x for x in free if x[3]["unid"]]
+        tier3 = [x for x in free if not x[3]["unid"]]
+        for tier, items, key in ((1, tier1, lambda x: -x[3]["wt"]), (2, tier2, lambda x: -x[3]["wt"]),
+                                 (3, tier3, lambda x: (x[3]["cost"] or 0) / x[3]["wt"])):
+            if items:
+                l, c, s, d = min(items, key=key)
+                self.drop_units(l, 1 if d["qty"] > 1 else None)
+                self.carry_stats["dropped"][tier] += 1
+                return True
+        worn = [x for x in inv if equipped(x[2])]
+        if worn:
+            l, c, s, d = min(worn, key=lambda x: (x[3]["cost"] or 0) / x[3]["wt"])
+            if c == nh.ARMOR_CLASS and "being worn" in s:
+                a = parse_armor(s) or {"slot": None}
+                a["letter"] = l
+                if not self.take_off(a):
+                    return False
+            self.drop_units(l)
+            self.carry_stats["dropped"][4] += 1
+            return True
+        return False
+
+    # ------------------------------------------------------------ sell
+    def needed(self, c, s):
+        if c == nh.WAND_CLASS and re.search(r"wand of (%s)\b" % "|".join(ATTACK_WANDS), s):
+            return True
+        if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
+            return True
+        if c == nh.SCROLL_CLASS and self.role_opts.get("scroll_id") and self.scroll_is_good(s):
+            return True
+        return False
+
+    def sellables(self, lv, stype):
+        buys = SHOP_BUYS.get(stype, set())
+        return [(l, c, s) for l, c, s in self.inventory()
+                if c in CARRY_CLASSES and (buys is ALL or c in buys) and not self.needed(c, s)
+                and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s]
+
+    def carry_shop_greeted(self, lv, stype):
+        if not self.carry_on() or lv.key in self.shops_done or not self.sellables(lv, stype):
+            return
+        self.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
+
+    def carry_sell_step(self, lv):
+        stype = self.shopping.get("stype")
+        items = self.sellables(lv, stype)
+        if not items:
+            self.shops_done.add(lv.key)
+            self.shopping = None
+            return False
+        y, x = self.pos()
+        k = G.KIND[lv.under]
+        door = np.isin(k, [G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY])
+        near = door.copy()
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                near |= np.roll(np.roll(door, dy, 0), dx, 1)
+        if lv.shop[y, x] and not near[y, x]:
+            l, c, s = items[0]
+            gold0 = self.bl(nh.NLE_BL_GOLD)
+            self.selling = True
+            self.drop_units(l)
+            self.selling = False
+            got = self.bl(nh.NLE_BL_GOLD) - gold0
+            if got > 0:
+                self.carry_stats["sold"] += 1
+                self.carry_stats["gold"] += got
+            else:                                    # not bought: it is still ours, take it back
+                self.sell_tried.add((lv.key, s))
+                self.carry_stats["kept_back"] += 1
+                self.pickup_matching((re.sub(r"^(a|an|the|\d+)\s+", "", re.sub(r"\s*\(.*?\)", "", s)).strip(),),
+                                     own=True)
+            return True
+        targets = lv.shop & ~near
+        targets[y, x] = False
+        if not targets.any():
+            self.shops_done.add(lv.key)
+            self.shopping = None
+            return False
+        return self.go_toward_mask(lv, targets)

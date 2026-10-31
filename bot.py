@@ -22,6 +22,7 @@ from scrolls import ScrollMixin
 from valk import ValkMixin, ValkMixin2, ElberethMixin
 from shop import ShopMixin
 from armorid import ArmorIdMixin, RANDOM_APPEARANCE
+from carry import CarryMixin, CARRY_GLYPH
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -120,7 +121,7 @@ class Level:
         self.elbereth = set()     # positions where we engraved
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=True, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -231,6 +232,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def answer_yn(self, msg):
         m = msg.lower()
+        if self.selling and ("sell it" in m or "sell them" in m):
+            self.raw_step(ord("y"))
+            return
         if getattr(self, "sell_probe", None) and "sell" in m:
             self.on_sell_offer(msg + " " + self.top_line())
             self.raw_step(ord("n"))
@@ -949,6 +953,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             # certain death otherwise: pray even if the timeout may not have expired
             self.deadly_prayers += 1
             self.pray(); return
+        if self.carry_drop_step():
+            return
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
@@ -1084,7 +1090,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.use_armor and self.equip_step(lv):
                 return
-            if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]) and (y, x) not in self.inspected.get(lv.key, ()) \
+            if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
+                    or (self.carry_on() and CARRY_GLYPH[lv.under[y, x]])) and (y, x) not in self.inspected.get(lv.key, ()) \
                     and not lv.shop[y, x]:
                 if self.armor_pickup_here(lv):
                     return
@@ -1202,6 +1209,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             targets = targets | (self.scroll_targets(lv) & item_mask)
         if items_ok and (self.use_armor or self.use_food):
             targets = targets | (self.armor_targets(lv, G) & item_mask)
+            ct = self.carry_targets(lv)
+            if ct is not None:
+                targets = targets | (ct & item_mask)
         if targets.any():
             dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
             if reached is not None and reached != start:
@@ -1354,6 +1364,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.shop_init()
         self.scroll_init()
         self.armor_id_init()
+        self.carry_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -1424,6 +1435,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
+            "carry": dict(self.carry_stats),
             "armor_id": dict(self.armor_id_stats, appearances=self.armor_id_report(),
                              random_worn=[e for e in self.equip_events if e[1] == "wear" and e[2] in RANDOM_APPEARANCE]),
             "elb_only_c": getattr(self, "elb_only_c", 0),
