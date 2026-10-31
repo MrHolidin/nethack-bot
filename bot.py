@@ -1405,7 +1405,21 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         for dy, dx in NEIGH:
             cnt[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] += \
                 wallish[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
-        score = np.where(reach & passable, cnt * 10.0 - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
+        wall_term = cnt * 10.0
+        if self.role_opts.get("search_blank", False):
+            # weight by how much of the map around is still blank: hidden passages lead to undiscovered
+            # rooms, which need room; the 8-neighbour count alone rates every corridor square alike
+            blank = (k_mem == G.UNKNOWN) & ~lv.near
+            blank[:, 0] = False
+            ry, rx = 4, 9
+            cs = np.zeros((ROWS + 1, COLS + 1), dtype=np.int32)
+            cs[1:, 1:] = np.cumsum(np.cumsum(blank, axis=0), axis=1)
+            yy, xx = np.mgrid[0:ROWS, 0:COLS]
+            y0, y1 = np.clip(yy - ry, 0, ROWS), np.clip(yy + ry + 1, 0, ROWS)
+            x0, x1 = np.clip(xx - rx, 0, COLS), np.clip(xx + rx + 1, 0, COLS)
+            mass = cs[y1, x1] - cs[y0, x1] - cs[y1, x0] + cs[y0, x0]
+            wall_term = wall_term * (0.4 + 1.6 * mass / ((2 * ry + 1) * (2 * rx + 1)))
+        score = np.where(reach & passable, wall_term - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
         # dead-end corridors are prime spots
         goal = getattr(lv, "search_goal", None) if self.role_opts.get("search_goal", True) else None
         if goal is not None and reach[goal] and passable[goal]:
