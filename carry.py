@@ -310,7 +310,8 @@ class CarryMixin:
         return [(l, c, s) for l, c, s in self.inventory()
                 if c in self.carry_classes() and (buys is ALL or c in buys) and not self.needed(c, s)
                 and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s
-                and "weapon in hand" not in s and "(wielded" not in s and "alternate weapon" not in s
+                and "(weapon in " not in s and "(weapons in " not in s and "(wielded" not in s
+                and "alternate weapon" not in s
                 and "in quiver" not in s]
 
     def keep_after_offer(self):

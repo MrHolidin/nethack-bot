@@ -53,6 +53,10 @@ class ValkMixin:
             self.stolen_pending = True
         if self.vopt("nymph", True) and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
             self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
+        if re.search(r"You turn into an? ", m):
+            self.polyd = True                                 # weapons: no wielding in a borrowed body
+        if re.search(r"You return to \w+ form|You feel like a new ", m):
+            self.polyd = False
         if "return to human form" in m and getattr(self, "were_drop", None):
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
@@ -222,12 +226,14 @@ class ValkMixin:
     def weapon_upgrade(self, inv):
         """Wield the best-ranked weapon we carry if it beats the wielded one (or nothing is wielded).
         Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
-        cur = next((s for _, c, s in inv if "weapon in hand" in s or "weapons in hands" in s), None)
+        if getattr(self, "polyd", False):
+            return False                     # animal forms can't hold weapons ("Don't be ridiculous!")
+        cur = next((s for _, c, s in inv if WIELDED_RE.search(s)), None)
         if cur is not None and " cursed" in " " + cur:
             return False
         tried = getattr(self, "_wield_tried", set())
         cands = [(self.weapon_rank(s), l, s) for l, c, s in inv
-                 if c == nh.WEAPON_CLASS and "weapon in hand" not in s and " cursed" not in " " + s
+                 if c == nh.WEAPON_CLASS and not WIELDED_RE.search(s) and " cursed" not in " " + s
                  and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", s)
                  and (l, s) not in tried]
         if not cands:
@@ -237,9 +243,14 @@ class ValkMixin:
             return False
         if cur is not None and rank[0] == 0:
             return False                     # only the long-sword-skill blades replace a wielded weapon
-        self._wield_tried = tried | {(l, s)}
         self.cur_act = "wield"
+        t0 = self.turn()
         self.wield(l)
+        recent = " ".join([t for tt, t in list(self.messages)[-4:] if tt >= t0] + [self.message()])
+        if "Don't be ridiculous" in recent:
+            self.polyd = True                # a form we failed to notice; retry after "You return to ... form"
+            return True
+        self._wield_tried = tried | {(l, s)}
         self.rewields += 1
         return True
 
@@ -248,6 +259,7 @@ class ValkMixin:
 #            Look at the square of every humanoid we kill and take armor/food.
 # =====================================================================================
 M1_HUMANOID = 0x20000
+WIELDED_RE = re.compile(r"\((?:weapons? in \w+|wielded)")
 PM_BY_NAME_V = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 
 
