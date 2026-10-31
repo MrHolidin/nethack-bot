@@ -98,6 +98,8 @@ BAD_TIN = {"cockatrice", "chickatrice", "medusa", "green slime", "little dog", "
 NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
              "kitten", "housecat", "large cat", "Death", "Pestilence", "Famine"}
 PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
+from monattacks import ATTACKS as _ATK
+PASSIVE_ONLY = {nh.permonst(i).mname for i in range(nh.NUMMONS) if all(a[0] == "NONE" for a in _ATK[i])}
 
 
 class GameOver(Exception):
@@ -546,6 +548,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             y, x = self.pos()
             vis = [(p, n) for p, n in vis if max(abs(p[0] - y), abs(p[1] - x)) <= 1
                    or n not in PM_BY_NAME or PM_BY_NAME[n].mmove > 0]
+        if self.role_opts.get("vis_passive", False):
+            # no active attack at all (molds, jellies, floating eye, shrieker): harmless unless we hit it, and
+            # we never do. Counting it only when adjacent made the gate flip on the square next to it (an item
+            # beside a brown mold was a goal from 2 squares away and forbidden on arrival).
+            vis = [(p, n) for p, n in vis if n not in PASSIVE_ONLY]
         return vis
 
     def shopkeeper_in_view(self):
