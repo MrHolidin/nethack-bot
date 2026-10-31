@@ -1452,6 +1452,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         xl = self.bl(nh.NLE_BL_XP)
         depth = self.bl(nh.NLE_BL_DEPTH)
         if self.descend_policy == "explore":
+            dd = self.role_opts.get("dive_depth", None)
+            if dd is not None and depth >= dd and self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX) * 0.6:
+                return True                    # deep: 50 points a level, 1000 past DL20, and richer kills below
             return not frontier.any() or on_level > self.role_opts.get("descend_after", 2000)
         if self.descend_policy == "careful":
             # explore fully; only go deeper when experienced enough
