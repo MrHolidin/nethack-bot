@@ -29,8 +29,10 @@ class ArmorIdMixin:
         self.armor_id_stats = {"shops": 0, "piles": 0}
 
     def price_safe(self, name):
-        """Random-appearance armor shown (by shop prices) to be harmless with high probability."""
-        if not self.role_opts.get("armor_pid", False) or name not in RANDOM_APPEARANCE:
+        """Random-appearance armor shown (by shop prices) to be harmless with high probability.
+        armor_pid gathers prices in armor shops; pid_wear uses whatever prices we have (any shop, any sale)."""
+        if not (self.role_opts.get("armor_pid", False) or self.role_opts.get("pid_wear", False)) \
+                or name not in RANDOM_APPEARANCE:
             return False
         post = self.price_posterior((nh.ARMOR_CLASS, name))
         return post is not None and sum(p for t, p in post.items() if t in HARMFUL) < WEAR_MAX_P_BAD

@@ -270,6 +270,15 @@ class CarryMixin:
                 if c in self.carry_classes() and (buys is ALL or c in buys) and not self.needed(c, s)
                 and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s]
 
+    def keep_after_offer(self):
+        """pid_wear: the offer just recorded may show the random-appearance armor we are selling is safe;
+        if it would also be an upgrade, don't sell it (equip_step wears it once we take it back)."""
+        c, s = getattr(self, "selling_item", (None, ""))
+        if c != nh.ARMOR_CLASS or not self.role_opts.get("pid_wear", False):
+            return False
+        a = parse_armor(s)
+        return bool(a) and self.price_safe(a["name"]) and self.improves(dict(a, safe=True), self.worn_by_slot())
+
     def carry_shop_greeted(self, lv, stype):
         if not self.carry_on() or lv.key in self.shops_done or not self.sellables(lv, stype):
             return
@@ -292,6 +301,7 @@ class CarryMixin:
         if lv.shop[y, x] and not near[y, x]:
             l, c, s = items[0]
             gold0 = self.bl(nh.NLE_BL_GOLD)
+            self.selling_item = (c, s)
             self.selling = True
             self.drop_units(l)
             self.selling = False

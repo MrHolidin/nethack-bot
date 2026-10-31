@@ -236,7 +236,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if "offers" in m and "sell" in m:
             self.price_note_offer(msg + " " + self.top_line())       # every offer is a price reading
         if self.selling and ("sell it" in m or "sell them" in m):
-            self.raw_step(ord("y"))
+            self.raw_step(ord("n" if self.keep_after_offer() else "y"))
             return
         if getattr(self, "sell_probe", None) and "sell" in m:
             self.on_sell_offer(msg + " " + self.top_line())
