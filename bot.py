@@ -321,6 +321,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def on_message(self, m):
         lv = self.levels.get(self.cur_key) if self.cur_key else None
+        # eat.c givit(POISON_RES): "You feel healthy."; eating poison while resistant: "You seem unaffected"
+        if "You feel healthy" in m or "You seem unaffected by the poison" in m:
+            self.poison_res = True
         if self.role_opts.get("focus", True):
             self.focus_note(m)
         if "This door is locked" in m and self.last_move_target and lv:
@@ -756,6 +759,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
             return False                      # cannibalism
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
+        if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res:
+            return True                       # poison resistant: a poisonous corpse is ordinary food
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > 20
         if self.role == "Monk":
@@ -1439,6 +1444,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.lycanthropy = False
         self.deadly_prayers = 0
         self.stun_waits = 0
+        self.poison_res = False
         self.nav = None
         self.nav_moves = 0
         self.tin_eating = False
@@ -1558,7 +1564,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "scrolls": dict(self.scroll_stats), "scroll_bases": {k: sorted(v) for k, v in self.scroll_bases.items()},
             "tins_eaten": self.tins_eaten, "tins_refused": self.tins_refused,
-            "blind_waits": self.blind_waits, "nav_moves": self.nav_moves, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
+            "blind_waits": self.blind_waits, "poison_res": self.poison_res, "nav_moves": self.nav_moves, "sv2_picks": self.sv2_picks, "shop_kicks_avoided": self.shop_kicks_avoided,
             "vault_drops": self.vault_drops, "vault_moves": self.vault_moves,
             "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
