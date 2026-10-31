@@ -893,7 +893,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def never_melee(self, name):
         """passive_nomelee: one rule from monster data instead of the hand list -- don't hit what has only a
         passive attack (it never hurts us otherwise); desperate (stuck) still may."""
-        if name in ("cockatrice", "chickatrice") and self.role_opts.get("cocka_melee", False) \
+        if name in ("cockatrice", "chickatrice") and self.role_opts.get("cocka_melee", True) \
                 and any("weapon in hand" in s for _, _, s in self.inventory()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
         return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
@@ -966,7 +966,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         # engulfed: hit anything. The engulfer is drawn on the 8 squares AROUND us (display.c swallowed());
         # our own square shows us, so the old test on it never fired (engulf_fix)
         gg = self.obs["glyphs"]
-        if self.role_opts.get("engulf_fix", False):
+        if self.role_opts.get("engulf_fix", True):
             ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
             engulfed = int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5
         else:
@@ -1280,10 +1280,104 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     self.move(step)
                     return
 
+        # nothing left: a monster we won't melee may be all that separates us from the rest of the level
+        if self.role_opts.get("unblock", False) and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
+            return
         # nothing left: map the level if we can, else search for hidden passages
         if self.use_abilities and self.magic_map_step(lv):
             return
         self.search_mode(lv, k_mem, k_live, passable)
+
+    def expendables(self):
+        """Inventory items worth less than a way through: missiles first, then gems/rocks, spare weapons,
+        unworn armor, ordinary tools."""
+        out = [(0, l, s) for l, s in self.throwables()]
+        for letter, ocls, s in self.inventory():
+            if any(w in s for w in ("weapon in hand", "(wielded", "being worn", "(in use", " cursed", "alternate weapon")):
+                continue
+            if ocls == nh.GEM_CLASS:
+                out.append((1, letter, s))
+            elif ocls == nh.WEAPON_CLASS:
+                out.append((2, letter, s))
+            elif ocls == nh.ARMOR_CLASS:
+                out.append((3, letter, s))
+            elif ocls == nh.TOOL_CLASS and not any(w in s for w in ("pick-axe", "mattock", "unicorn horn", "key", "lock pick", "bag", "sack")):
+                out.append((4, letter, s))
+        out.sort()
+        seen, res = set(), []
+        for _, l, s in out:
+            if l not in seen:
+                seen.add(l); res.append((l, s))
+        return res
+
+    def unblock_step(self, lv, k_mem, k_live, passable, goal):
+        """Explore/descend goals are reachable only through squares held by monsters we refuse to melee
+        (a floating eye in a doorway, a mold in a corridor): throw whatever is expendable at the blocker;
+        stuck long with nothing to throw, hit a floating eye anyway (paralysis beats starving)."""
+        if not self.avoid_cells:
+            return False
+        p2 = passable.copy()
+        for c in self.avoid_cells:
+            p2[c] = bool(G.PASSABLE[k_mem[c]]) or k_mem[c] == G.DOORWAY
+        start = self.pos()
+        blocker = None
+        if goal.any():
+            dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p2, start, goal)
+            if reached is not None:
+                path, c = [], reached
+                while c != start:
+                    path.append(c)
+                    c = prev[c]
+                blocker = next((c for c in reversed(path) if c in self.avoid_cells), None)
+        if blocker is None:
+            # no goal left, but we are shut in a pocket: most of the known level lies past the blocker
+            d1, _, _ = self.dijkstra(lv, k_mem, k_live, passable, start, None)
+            d2, _, _ = self.dijkstra(lv, k_mem, k_live, p2, start, None)
+            r1, r2 = d1 < (1 << 29), d2 < (1 << 29)
+            if r1.sum() * 2 >= r2.sum():
+                return False
+            near = [c for c in self.avoid_cells if r2[c] and any(
+                0 <= c[0] + a < ROWS and 0 <= c[1] + b < COLS and r1[c[0] + a, c[1] + b] for a, b in NEIGH)]
+            if not near:
+                return False
+            blocker = min(near, key=lambda c: d2[c])
+        name = G.monster_name(int(self.obs["glyphs"][blocker]))
+        self.unblocks += 1
+        y, x = start
+        dy, dx = blocker[0] - y, blocker[1] - x
+        d = max(abs(dy), abs(dx))
+        if d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) and not (name == "gas spore" and d < 3):
+            sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
+            clear = all(G.PASSABLE[k_mem[y + i * sy, x + i * sx]] and
+                        G.KIND[self.obs["glyphs"][y + i * sy, x + i * sx]] not in (G.MONSTER, G.PET, G.BOULDER)
+                        for i in range(1, d))
+            ex = self.expendables() if clear else []
+            if ex:
+                ray = [(y + i * sy, x + i * sx) for i in range(1, 10) if 0 <= y + i * sy < ROWS and 0 <= x + i * sx < COLS]
+                self.cur_act = "unblock"
+                self.last_attack_target = blocker
+                self.unblock_throws += 1
+                self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
+                return True
+            if d == 1 and name == "floating eye" and lv.desperate:
+                self.unblock_melee += 1
+                self.attack(blocker)
+                return True
+        # get next to it (any adjacent square is in line)
+        if d > 1:
+            adj = np.zeros((ROWS, COLS), dtype=bool)
+            for ny, nx in ((blocker[0] + a, blocker[1] + b) for a, b in NEIGH):
+                if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx]:
+                    adj[ny, nx] = True
+            if adj.any():
+                dist, prev, r2 = self.dijkstra(lv, k_mem, k_live, passable, start, adj)
+                if r2 is not None and r2 != start:
+                    step = self.first_step(prev, start, r2)
+                    if step:
+                        self.cur_act = "unblock"
+                        self.move(step)
+                        return True
+        return False
 
     def should_descend(self, lv, frontier, on_level):
         if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.descend_hp:
@@ -1380,6 +1474,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.shops_seen = 0
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
         self.desperations = 0
+        self.unblocks = self.unblock_throws = self.unblock_melee = 0
         self.resets = 0
         self.god_angry = False
         self.pending_mines_mark = False
@@ -1524,6 +1619,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "equip_fail": sum(1 for e in self.equip_events if e[1] == "fail"),
             "shops": self.shops_seen,
             "desperate": self.desperations,
+            "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "resets": self.resets,
             "god_angry": self.god_angry,
             "truncated": self.truncated,
