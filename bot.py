@@ -882,7 +882,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         chosen = 0
         lines = tty.split("\n")
-        if own or self.role_opts.get("menu_fix", False):
+        if own or self.role_opts.get("menu_fix", True):
             lines = self.menu_lines(tty, "Pick up what?")
         for line in lines:
             m = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
@@ -1202,6 +1202,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if self.wand_id_step(lv):
                 return
             if self.loot_step(lv) or self.kill_loot_step(lv):
+                return
+            if self.role_opts.get("read_good") and not self.role_opts.get("scroll_id") and self.read_good_scroll():
                 return
             if self.role_opts.get("scroll_id") and self.scroll_step(lv):
                 return

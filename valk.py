@@ -158,7 +158,7 @@ class ValkMixin:
             self.settle()
             return
         n = 0
-        lines = self.menu_lines(tty, "Pick up what?") if self.vopt("menu_fix", False) else tty.split("\n")
+        lines = self.menu_lines(tty, "Pick up what?") if self.vopt("menu_fix", True) else tty.split("\n")
         for line in lines:
             mm = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
             if mm and "corpse" not in mm.group(2) and "boulder" not in mm.group(2):

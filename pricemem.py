@@ -139,6 +139,8 @@ def appearance(text):
     m = re.match(r"^scrolls? labeled (.+)$", t)
     if m:
         return nh.SCROLL_CLASS, m.group(1)
+    if re.match(r"^unlabeled scrolls?$", t):
+        return None                                                  # blank paper: fixed look, not shuffled
     for cls, noun in NOUN.items():
         m = re.match(r"^(.+?) %ss?$" % noun, t)
         if m:
