@@ -1218,7 +1218,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
-        if lv.avoid_down and on_level < 3000 and self.mines_blocked():
+        if lv.avoid_down and on_level < self.role_opts.get("mines_after", 3000) and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
