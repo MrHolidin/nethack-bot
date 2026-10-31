@@ -705,7 +705,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return gap > 300
         if weak:
             return gap > self.role_opts.get("hunger_gap", 500)
-        return gap > 1000
+        return gap > self.role_opts.get("pray_gap", 1000)
 
     def engrave_elbereth(self):
         lv = self.level()
