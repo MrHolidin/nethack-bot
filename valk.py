@@ -595,6 +595,10 @@ class ElberethMixin:
         self.elb_fail_msgs = []
         self.elb_fail = 0
         self.elb_rewrites = 0
+        self.elb_suspects = {}       # level key -> set of monster indices seen around when we were hurt
+        self.elb_suspect_marks = 0
+        self.elb_only_c = 0
+        self.elb_shot_msgs = []
 
     def read_engraving(self):
         """Text of the engraving under us, from the answer to THIS ':' only (older 'You read' lines in the
@@ -616,11 +620,37 @@ class ElberethMixin:
         return pm.mlet not in (B_HUMAN_MLET, B_ANGEL_MLET)
 
     def elb_blocked(self, lv):
-        """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
-        bl = ELB.blockers(self.obs["glyphs"], self.pos(), lv.peaceful, lv.key[0])
+        """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write.
+        elb_opt: monsters that merely might carry missiles/wands (class C) count as respecting it until we
+        take damage on an intact Elbereth with them in view (elb_mark_suspects)."""
+        glyphs, me = self.obs["glyphs"], self.pos()
+        full = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0])
+        if full and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True):
+            self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
+        bl = full
+        if full and self.vopt("elb_opt", False):
+            bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0],
+                              optimistic=True, suspects=self.elb_suspects.get(lv.key, ()))
         if bl:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
         return bool(bl)
+
+    def elb_mark_suspects(self, lv):
+        """We lost HP on an intact Elbereth: every visible class-C monster may have shot or zapped us.
+        No monster ids in the observation, so the TYPE is suspected for the rest of this level."""
+        g = self.obs["glyphs"]
+        sus = self.elb_suspects.setdefault(lv.key, set())
+        new = 0
+        for (y, x), _ in self.visible_hostiles(lv):
+            gg = int(g[y, x])
+            if nh.glyph_is_monster(gg):
+                idx = nh.glyph_to_mon(gg)
+                if idx in ELB.MAYBE_ARMED:
+                    new += idx not in sus
+                    sus.add(idx)
+        self.elb_suspect_marks += new
+        return any(nh.glyph_is_monster(int(g[p])) and nh.glyph_to_mon(int(g[p])) in sus
+                   for p, _ in self.visible_hostiles(lv))
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
@@ -657,7 +687,19 @@ class ElberethMixin:
                 self.elb_state = None
             else:
                 bad = [n for p, n in hostiles if not self.respects(p, n)]
+                hurt = hp < st["hp_hist"][-1]
                 st["hp_hist"].append(hp)
+                # elb_opt: hurt while the engraving is intact -> someone in view hits from range; suspect
+                # every class-C monster in view. (A broken engraving explains a melee hit: rewrite below.)
+                if hurt and not bad and self.vopt("elb_opt", False) and self.read_engraving() == "Elbereth":
+                    st["last_read"] = self.turn()
+                    if self.elb_mark_suspects(lv):
+                        if len(self.elb_shot_msgs) < 30:
+                            self.elb_shot_msgs.append(f"T{self.turn()} {hp}/{st['hp_hist'][-2]} " + " | ".join(
+                                m for _, m in list(self.messages)[-4:])[:200])
+                        self.elb_exits["shot"] += 1
+                        self.elb_state = None
+                        return False
                 # 3.6: every time a monster is scared the engraving may erode -> check it each turn a foe
                 # is adjacent (reading is free); a hit through a smudged engraving means rewrite, not leave
                 if hostiles and not bad:
