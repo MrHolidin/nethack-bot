@@ -258,7 +258,7 @@ class CarryMixin:
             return True
         if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
             return True
-        if c == nh.SCROLL_CLASS and (self.role_opts.get("scroll_id") or self.role_opts.get("read_good")) \
+        if c == nh.SCROLL_CLASS and (self.role_opts.get("scroll_id") or self.role_opts.get("read_good", True)) \
                 and self.scroll_is_good(s):
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
@@ -275,7 +275,7 @@ class CarryMixin:
         """pid_wear: the offer just recorded may show the random-appearance armor we are selling is safe;
         if it would also be an upgrade, don't sell it (equip_step wears it once we take it back)."""
         c, s = getattr(self, "selling_item", (None, ""))
-        if c == nh.SCROLL_CLASS and self.role_opts.get("read_good", False) and self.scroll_is_good(s):
+        if c == nh.SCROLL_CLASS and self.role_opts.get("read_good", True) and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
         if c != nh.ARMOR_CLASS or not self.role_opts.get("pid_wear", False):

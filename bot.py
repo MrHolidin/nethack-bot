@@ -1203,7 +1203,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.loot_step(lv) or self.kill_loot_step(lv):
                 return
-            if self.role_opts.get("read_good") and not self.role_opts.get("scroll_id") and self.read_good_scroll():
+            if self.role_opts.get("read_good", True) and not self.role_opts.get("scroll_id") and self.read_good_scroll():
                 return
             if self.role_opts.get("scroll_id") and self.scroll_step(lv):
                 return
