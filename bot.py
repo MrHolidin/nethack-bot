@@ -759,7 +759,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
             return False                      # cannibalism
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
-        if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res:
+        if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res and self.role_opts.get("pois_eat", True):
             return True                       # poison resistant: a poisonous corpse is ordinary food
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > 20
