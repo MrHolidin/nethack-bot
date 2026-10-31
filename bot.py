@@ -371,7 +371,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.price_note_text(m)
         if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
             self.last_shot_turn = self.turn()
-        if self.role_opts.get("hunt_shooter", False) and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
+        if self.role_opts.get("hunt_shooter", True) and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
                 and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
@@ -1140,7 +1140,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 target = self.focus_target(hostiles, target)
             self.attack(target)
             return
-        if self.role_opts.get("hunt_shooter", False) and self.hunt_step(lv):
+        if self.role_opts.get("hunt_shooter", True) and self.hunt_step(lv):
             return
         if (y, x) in lv.elbereth and hp * 2 < maxhp and not self.rthreat_active():
             self.cur_act = "rest"
@@ -1562,7 +1562,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return False                       # next to it: the fight step takes over
         k_mem, k_live = self.kind_grid(lv)
         passable = self.passable_grid(lv, k_mem, k_live)
-        if self.role_opts.get("hunt_offline", False):
+        if self.role_opts.get("hunt_offline", True):
             # among the steps that get as close as any, prefer one off the target's lines (it fires only when
             # lined up); distances from the target over the same grid
             ty, tx = h["pos"]
