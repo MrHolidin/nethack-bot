@@ -51,7 +51,7 @@ class ValkMixin:
                 self._theft_turn = self.turn()
                 self.thefts += 1
             self.stolen_pending = True
-        if self.vopt("nymph", False) and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
+        if self.vopt("nymph", True) and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
             self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
         if "return to human form" in m and getattr(self, "were_drop", None):
             self.loot_key, self.loot_sq = self.were_drop
@@ -66,7 +66,7 @@ class ValkMixin:
         return out
 
     def nymph_step(self, lv, hostiles):
-        if not self.vopt("nymph", False):
+        if not self.vopt("nymph", True):
             return False
         y, x = self.pos()
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
@@ -194,7 +194,7 @@ class ValkMixin:
             return False
         if self.vopt("weapons", False):
             return self.weapon_upgrade(inv)
-        if wielded or not self.vopt("nymph", False):
+        if wielded or not self.vopt("nymph", True):
             return False
         weapons = [(l, s) for l, c, s in inv if c == nh.WEAPON_CLASS and not re.search(r"\b(arrows?|bolts?|ya|darts?)\b", s)]
         pick = next(((l, s) for l, s in weapons if self.main_weapon in s), None) or (weapons[0] if weapons else None)
