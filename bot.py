@@ -19,7 +19,7 @@ from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
 from scrolls import ScrollMixin
-from valk import ValkMixin, ValkMixin2, ElberethMixin
+from valk import ValkMixin, ValkMixin2, ElberethMixin, RTHREAT_RE, RTRAP_RE
 from shop import ShopMixin
 from wandid import WandIdMixin
 from armorid import ArmorIdMixin, RANDOM_APPEARANCE
@@ -369,6 +369,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
+        if self.role_opts.get("hunt_shooter", False) and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
+                and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
+            mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
+            self.shot_event = (self.turn(), mm.group(1) if mm else None)
         if "Invisible customers are not welcome" in m and lv is not None:
             lv.shk_wait = 99                    # he won't let us in while we're invisible: stop waiting at the door
         if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
@@ -1134,6 +1138,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 target = self.focus_target(hostiles, target)
             self.attack(target)
             return
+        if self.role_opts.get("hunt_shooter", False) and self.hunt_step(lv):
+            return
         if (y, x) in lv.elbereth and hp * 2 < maxhp and not self.rthreat_active():
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
@@ -1495,6 +1501,65 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                         return True
         return False
 
+    def hunt_step(self, lv):
+        """hunt_shooter: something hit us from range and nothing is next to us -> close in on the likeliest
+        shooter: a visible hostile of the named kind, else one standing on a line with us within 8 squares
+        (monsters only fire when lined up, BOLT_LIM). Pursue it for at most 25 turns, while HP >= 40%."""
+        t = self.turn()
+        y, x = self.pos()
+        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if hp < maxhp * 0.4:
+            self.hunt = None
+            return False
+        ev = getattr(self, "shot_event", None)
+        dist = lambda p: max(abs(p[0] - y), abs(p[1] - x))
+        if ev and t - ev[0] <= 2:
+            self.shot_event = None
+            vis = self.visible_hostiles(lv)
+            lined = [(p, n) for p, n in vis if dist(p) <= 8 and (p[0] == y or p[1] == x or abs(p[0] - y) == abs(p[1] - x))]
+            cands = lined
+            if ev[1]:
+                cands = [c for c in lined if c[1] == ev[1]] or [c for c in vis if c[1] == ev[1]] or lined
+            if cands:
+                p, n = min(cands, key=lambda c: dist(c[0]))
+                self.hunt = {"key": lv.key, "pos": p, "name": n, "until": t + 25, "lost": 0}
+                self.hunts += 1
+        h = getattr(self, "hunt", None)
+        if not h:
+            return False
+        if h["key"] != lv.key or t > h["until"]:
+            self.hunt = None
+            return False
+        same = [p for p, n in self.visible_hostiles(lv) if n == h["name"]]
+        if same:
+            h["pos"] = min(same, key=lambda p: max(abs(p[0] - h["pos"][0]), abs(p[1] - h["pos"][1])))
+            h["lost"] = 0
+        else:
+            h["lost"] += 1
+            if h["lost"] > 5:
+                self.hunt = None
+                return False
+        if dist(h["pos"]) <= 1:
+            return False                       # next to it: the fight step takes over
+        k_mem, k_live = self.kind_grid(lv)
+        passable = self.passable_grid(lv, k_mem, k_live)
+        adj = np.zeros((ROWS, COLS), dtype=bool)
+        for dy, dx in NEIGH:
+            ny, nx = h["pos"][0] + dy, h["pos"][1] + dx
+            if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx]:
+                adj[ny, nx] = True
+        if adj.any():
+            _, prev, got = self.dijkstra(lv, k_mem, k_live, passable, (y, x), adj, max_cost=60)
+            if got is not None and got != (y, x):
+                step = self.first_step(prev, (y, x), got)
+                if step:
+                    self.cur_act = "hunt"
+                    self.hunt_steps += 1
+                    self.move(step)
+                    return True
+        self.hunt = None
+        return False
+
     def door_target_mask(self, lv, k_mem, passable):
         """door_targets: doors we have not stood on count as unexplored ground (a lit room seen whole from
         outside leaves its door off the frontier, so a shop could be walked past).
@@ -1657,6 +1722,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.vault_drops = 0
         self.unblocks = self.unblock_throws = self.unblock_melee = 0
         self.items_first_holds = 0
+        self.hunt = None
+        self.shot_event = None
+        self.hunts = self.hunt_steps = 0
         self.resets = 0
         self.god_angry = False
         self.pending_mines_mark = False
@@ -1806,6 +1874,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "vault": [self.vault_drops, self.vault_moves],
             "wishes": getattr(self, "wishes_made", 0),
             "items_first": self.items_first_holds,
+            "hunt": [self.hunts, self.hunt_steps],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
