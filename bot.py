@@ -1296,6 +1296,26 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
+        if want_down and self.role_opts.get("items_first", False) \
+                and on_level <= self.role_opts.get("descend_after", 2000):
+            # explored, but something worth having still lies here: the same goals the target step below
+            # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
+            stuff = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
+            ok = not self.view_threats(lv) if self.role_opts.get("item_consistent", True) else True
+            im = passable & ~lv.shop if self.role_opts.get("item_consistent", True) else passable
+            if ok and (self.use_armor or self.use_food):
+                stuff |= self.armor_targets(lv, G) & im
+                ct = self.carry_targets(lv)
+                if ct is not None:
+                    stuff |= ct & im
+            if ok and self.role_opts.get("scroll_id"):
+                stuff |= self.scroll_targets(lv) & im
+            stuff[y, x] = False
+            if stuff.any():
+                _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff)
+                if got is not None and got != start:
+                    want_down = False
+                    self.items_first_holds += 1
 
         if want_down:
             if downstairs[y, x]:
@@ -1576,6 +1596,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.vault_moves = 0
         self.vault_drops = 0
         self.unblocks = self.unblock_throws = self.unblock_melee = 0
+        self.items_first_holds = 0
         self.resets = 0
         self.god_angry = False
         self.pending_mines_mark = False
@@ -1724,6 +1745,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "unknown_quaffs": getattr(self, "unknown_quaffs", 0),
             "vault": [self.vault_drops, self.vault_moves],
             "wishes": getattr(self, "wishes_made", 0),
+            "items_first": self.items_first_holds,
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
