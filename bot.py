@@ -1604,7 +1604,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if reached == start:
                 lv.visited[start] += 1
 
-        if downstairs.any() and not self.excal_holds(lv):
+        if downstairs.any() and not self.excal_holds(lv) and not self.descent_gated(lv, on_level):
             if downstairs[y, x]:
                 if self.use_pet and self.pet_wait_before_stairs():
                     self.press("s"); return
@@ -1917,8 +1917,27 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 cand[p] = False
         return cand
 
+    def descent_gated(self, lv, on_level):
+        """Two experimental holds on going down (both off by default; the descend_after timer releases them):
+        xl_gate=k  -- not below depth XL + k (stay, keep exploring / searching, fight what comes, gain levels);
+        seen_gate=n -- fewer than n squares seen here: the rest is probably behind a hidden door or corridor,
+                       search for it first (up to seen_search turns of searching on this level)."""
+        if on_level > self.role_opts.get("descend_after", 2000):
+            return False
+        k = self.role_opts.get("xl_gate")
+        if k is not None and self.bl(nh.NLE_BL_DEPTH) + 1 > self.bl(nh.NLE_BL_XP) + k:
+            self.gate_holds["xl"] += 1
+            return True
+        n = self.role_opts.get("seen_gate")
+        if n is not None and int(lv.seen.sum()) < n and lv.search_turns < self.role_opts.get("seen_search", 300):
+            self.gate_holds["seen"] += 1
+            return True
+        return False
+
     def should_descend(self, lv, frontier, on_level):
         if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.descend_hp:
+            return False
+        if self.descent_gated(lv, on_level):
             return False
         if self.descend_policy == "dive":
             return True
@@ -2050,6 +2069,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.mines_done_turn = 0
         self.minetown_seen = False
         self.mines_return_log = []
+        self.gate_holds = {"xl": 0, "seen": 0}
         self.prev_key = None
         self.took_stairs = False
         self.retrieve = []
@@ -2201,6 +2221,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "blind_held": getattr(self, "blind_held", 0),
             "nymph_keep": getattr(self, "nymph_keep_n", 0),
             "mines_return": self.mines_return_log,
+            "gate_holds": self.gate_holds,
             "minetown_seen": self.minetown_seen,
             "hallu_held": getattr(self, "hallu_held", 0),
             "nymph_pk": [getattr(self, "nymph_pk_elbs", 0), getattr(self, "nymph_pk_wait_total", 0)],
