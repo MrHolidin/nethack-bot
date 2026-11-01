@@ -127,11 +127,6 @@ class ThievesMixin:
                             best = (d, (ny, nx))
         return best[1] if best else None
 
-    def pickup_all(self):
-        if self.merch_risk(self.level(), self.pos()):
-            self.msg_audit["loot_pickup_merch_risk"] += 1
-        self.pickup(lambda t: "corpse" not in t and "boulder" not in t, "loot")
-
     def loot_step(self, lv):
         if self.loot_sq is None or self.loot_key != lv.key:
             return False

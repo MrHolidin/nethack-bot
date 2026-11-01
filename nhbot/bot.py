@@ -20,6 +20,7 @@ from nhbot.mapmem import MapMixin
 from nhbot.nav import NavMixin
 from nhbot.options import Options
 from nhbot.perception import PerceptionMixin
+from nhbot.pickup import PickupMixin
 from nhbot.policy import PolicyMixin
 from nhbot.pricemem import PriceMemoryMixin
 from nhbot.scrolls import ScrollMixin
@@ -31,7 +32,7 @@ from nhbot.weapons import WeaponsMixin
 
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
-          CarryMixin, FocusMixin, ScrollMixin, PriceMemoryMixin):
+          CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
         """role_opts and any other keyword arguments are options (options.py); unknown names raise."""

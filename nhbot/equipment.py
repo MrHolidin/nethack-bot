@@ -79,14 +79,6 @@ for n in ("mummy wrapping", "orcish cloak", "coarse mantelet", "dwarvish cloak",
 for n in ("Hawaiian shirt", "T-shirt"):
     UNSAFE[n] = (SHIRT, 0)
 
-# safe permanent food (no eggs: could be cockatrice; no tins: slow; no unknown corpses)
-SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration", "fortune cookie",
-             "apple", "orange", "pear", "melon", "banana", "carrot", "slime mold", "pancake", "cream pie",
-             "candy bar", "lump of royal jelly", "kelp frond", "eucalyptus leaf", "sprig of wolfsbane",
-             "clove of garlic", "meatball", "meat stick", "huge chunk of meat", "meat ring",
-             "lichen corpse", "lizard corpse")
-MAX_FOOD = 6
-
 HEAVY = {"bronze plate mail", "plate mail", "crystal plate mail", "splint mail", "banded mail"}
 
 # unknown enchantment of a floor item: ~79% uncursed (+0 mostly), ~12% cursed (often -1..-3)
@@ -272,49 +264,3 @@ class EquipMixin:
         self.price_note_text(" | ".join(names))
         return names
 
-    def food_count(self):
-        return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
-
-    def food_wanted(self, name):
-        if self.food_count() >= MAX_FOOD:
-            return False
-        if "egg" in name or re.search(r"\btins?\b", name):
-            return False
-        if "partly eaten" in name:
-            return False
-        return any(f in name for f in SAFE_FOOD)
-
-    def armor_pickup_here(self, lv):
-        self.goal_done("pile", lv, self.pos())
-        names = self.look_here()
-        # never take merchandise (a lone item is picked up without a menu, so filter here)
-        names = [n for n in names if "for sale" not in n]
-        worn = self.worn_by_slot()
-        want = []
-        for n in names:
-            a = parse_armor(n)
-            if a and self.improves(a, worn):
-                want.append(a["name"])
-            elif self.carry_wanted(n):
-                want.append(self.carry_wanted(n))
-                self.carry_stats["picked"] += 1
-            elif self.food_wanted(n):
-                fm = next((f for f in SAFE_FOOD if f in n), None)
-                if fm is None:
-                    continue
-                want.append(fm)
-                self.food_picked += 1
-        if not want:
-            return False
-        self.pickup_matching(want)
-        self.equip_events.append((self.turn(), "pickup", ",".join(want)))
-        return True
-
-    def armor_targets(self, lv, glyphs_mod):
-        """Mask of remembered '[' (and '%' food when low on food) piles not yet inspected."""
-        mask = glyphs_mod.ARMOR_GLYPH[lv.under].copy()
-        if self.food_count() < MAX_FOOD:
-            mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
-        for p in self.goal_closed_set("pile", lv.key):
-            mask[p] = False
-        return mask

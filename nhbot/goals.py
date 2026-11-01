@@ -148,11 +148,6 @@ class GoalsMixin:
             return 1
         raise ValueError(kind)
 
-    def merch_risk(self, lv, pos):
-        """Could what lies at pos be merchandise? On a shop square; and unless shop_by_square, whenever a
-        shopkeeper is in view."""
-        return bool(lv.shop[pos]) or (not self.opts.shop_by_square and self.shopkeeper_in_view())
-
     def goal_masks(self, lv, passable, gold):
         """Walk masks of the explore-tier kinds, {kind: mask}. All of them only under items_gate (not in combat),
         the gate of the steps that consume them; gold not in a shop when we visit shops (gold_here), piles never

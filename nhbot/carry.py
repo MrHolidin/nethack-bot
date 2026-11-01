@@ -199,53 +199,6 @@ class CarryMixin:
             ((nh.SPBOOK_CLASS, nh.GEM_CLASS) if self.carry_all_on() else ())
 
     # ------------------------------------------------------------ pick up
-    def carry_glyph(self, g):
-        """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
-        makes the step that inspects it (and so removes the goal) run."""
-        return bool(CARRY_GLYPH[g] or (self.carry_all_on() and MORE_GLYPH[g])
-                    or (WEAPON_GLYPH[g]) or (self.carry_all_on() and ALL_GLYPH[g]))
-
-    def carry_targets(self, lv):
-        glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_all_on() else CARRY_GLYPH
-        glyphs = glyphs | WEAPON_GLYPH
-        if self.carry_all_on():
-            glyphs = glyphs | ALL_GLYPH
-        mask = glyphs[lv.under] & ~lv.shop
-        for p in self.goal_closed_set("pile", lv.key):
-            mask[p] = False
-        return mask
-
-    def carry_wanted(self, n):
-        """A floor item (look_here text) to take: one of the carried classes, not merchandise."""
-        if "for sale" in n:
-            return None
-        if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
-            return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
-        if "corpse" not in n:
-            core = base_name(n)[2]
-            one = " ".join(singular(w) for w in core.split(" "))
-            if (core in WEAPON_NAME_OF or one in WEAPON_NAME_OF) and " cursed" not in " " + n:
-                return core
-        if self.carry_all_on():
-            a = parse_armor(n)
-            if a is not None:
-                return a["name"]
-            core = base_name(n)[2]
-            one = " ".join(singular(w) for w in core.split(" "))
-            no_tools = NO_TOOLS - {"pick-axe"} if self.carry_all_on() else NO_TOOLS
-            if (core in TOOL_WORDS or one in TOOL_WORDS) and core not in no_tools and one not in no_tools:
-                return core
-        if self.carry_all_on() and "corpse" not in n:
-            core = base_name(n)[2]
-            one = " ".join(singular(w) for w in core.split(" "))
-            if "spellbook" in core:
-                return core
-            if "gray stone" in core:
-                return None
-            if one.endswith(" gem") or "glass" in one or one in GEM_NAMES or core in GEM_NAMES:
-                return core
-        return None
-
     # ------------------------------------------------------------ never Burdened
     def drop_units(self, letter, n=None):
         """Drop n of a stack (all if None); remember the square."""

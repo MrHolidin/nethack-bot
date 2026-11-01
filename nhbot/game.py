@@ -208,34 +208,6 @@ class GameMixin:
                 out.append((m.group(1), m.group(2)))
         return out
 
-    def pickup(self, want, site):
-        """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
-        without a menu)."""
-        seq0 = self.msg_seq
-        self.press(",", expect_prompt=True)
-        tty = self.tty_text()
-        if "Pick up what?" not in tty:
-            self.settle()
-            for t in self.msgs_since(seq0):
-                mm = re.match(r"^[a-zA-Z] - (.+?)\.?$", t)
-                if mm and not want(mm.group(1)):
-                    self.msg_audit["lone_unwanted_" + site] += 1     # picked up what the filter rejects
-            return
-        if re.search(r"\(1 of \d+\)", tty):
-            self.msg_audit["pickup_multipage_" + site] += 1
-        n = 0
-        for letter, text in self.menu_items(tty, "Pick up what?"):
-            if want(text):
-                self.raw_step(ord(letter))
-                n += 1
-        self.raw_step(13 if n else 27)
-        self.settle()
-
-    def pickup_matching(self, words, no_sale=False, own=False):
-        if not own and self.merch_risk(self.level(), self.pos()):
-            return                            # in a shop: anything here may be merchandise
-        self.pickup(lambda t: any(w in t for w in words) and not (no_sale and "for sale" in t), "matching")
-
     def describe_at(self, pos):
         """Farlook (';' with autodescribe) at any square: the cursor goes there by single steps, by 8 with
         the capital keys; next to us this is ";" and one direction key."""

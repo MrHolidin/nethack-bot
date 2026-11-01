@@ -4,7 +4,6 @@ tick() updates the map memory, then runs the steps in STEPS in order; the first 
 True) ends the tick. A step that only updates bookkeeping returns False. The order is the policy: emergencies
 first, then fighting, then food and items, then exploring.
 """
-import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -15,8 +14,8 @@ from nhbot.combat import THROWABLE, THROW_STONES
 from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_squares
 from nhbot.mapmem import Level
 from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
+from nhbot.pickup import AMMO_WORDS
 
-AMMO_WORDS = re.compile(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b")
 
 STEPS = (
     "level_arrival",     # bounce off the Mines staircase (avoid_mines); Mines-return bookkeeping
@@ -327,12 +326,6 @@ class PolicyMixin:
         """Leave a digger by the shop door / take it back -- also with monsters in view (Minetown always has
         some): the shopkeeper asked just now, fights were handled above."""
         return self.stash_step(c.lv)
-
-    def pile_to_inspect(self, lv, y, x):
-        """An armor / food / carried-class pile under us that we have not looked at, outside a shop."""
-        return bool((G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                     or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.goal_closed_set("pile", lv.key)
-                    and not lv.shop[y, x])
 
     def step_housekeeping(self, c):
         """No hostile in view: pay, shop visit, Excalibur, recover stolen loot, read good scrolls, wear armor,
