@@ -47,6 +47,9 @@ RANGED_TARGETS = {"floating eye", "gas spore", "blue jelly", "spotted jelly",
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
 THROW_STONES = ("flint stone", "rock")
 # fresh-corpse whitelist (eaten only within ~40 turns of the kill)
+# mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
+IT_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches you|stings|kicks|butts|claws|scratches|"
+                          r"thrusts|swings|grabs|hugs|lashes|squeezes|engulfs|tickles|stabs|pummels|whips)\b")
 # trap.c messages for a trap going off on (or found at) our own square, for traps that leave us standing on it
 TRAP_HERE_RE = re.compile(r"There is an? [a-z ]*trap here|You escape an? [a-z ]*trap|a rock falls on your head|"
                           r"An arrow shoots out at you|A little dart shoots out at you|A bear trap closes on your|"
@@ -393,6 +396,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             lv.shk_wait = 99                    # he won't let us in while we're invisible: stop waiting at the door
         if self.role_opts.get("trap_mem", False) and lv is not None and TRAP_HERE_RE.search(m):
             lv.trap_mem.add(self.pos())   # it went off under us; a falling rock / arrow / dart on it hides the ^
+        if IT_ATTACK_RE.search(m):
+            self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
         if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
             self.dip_threat_until = self.turn() + 150
         if self.role_opts.get("vault_guard", True):
@@ -1002,6 +1007,28 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return False       # their passive is cold only, and Valkyries are born cold resistant
         return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
 
+    def blind_attackers(self, hostiles):
+        """blind_strike: while blind, an adjacent 'I' is only a target if it attacked us. mhitu.c marks the square
+        of an unseen attacker with 'I' in the same turn as its "It hits!"; 'I' also appears when we bump into or
+        search out a monster that did nothing (61969: a watchman; 61057). So: an attack message this turn and a
+        new 'I' next to us -> that one; an attack and a single 'I' next to us -> that one; otherwise unknown,
+        don't hit (blind_wait then keeps us still)."""
+        cur = {p for p, n in hostiles if n == "invisible"}
+        attacked, self.it_attacked = getattr(self, "it_attacked", False), False
+        prev = getattr(self, "prev_inv", set())
+        known = getattr(self, "inv_attackers", set())
+        if attacked:
+            new = cur - prev
+            known |= new if new else (cur if len(cur) == 1 else set())
+        known &= cur
+        self.prev_inv, self.inv_attackers = cur, known
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+            return hostiles
+        out = [(p, n) for p, n in hostiles if n != "invisible" or p in known]
+        if len(out) < len(hostiles):
+            self.blind_held = getattr(self, "blind_held", 0) + 1
+        return out
+
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
         return name == "gas spore" and self.bl(nh.NLE_BL_HP) >= 25 and self.role_opts.get("spore_melee", True)
@@ -1111,6 +1138,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.use_enhance:
             self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
+        if self.role_opts.get("blind_strike", False):
+            hostiles = self.blind_attackers(hostiles)
         cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF) and self.role_opts.get("stun_wait", True):
             # moves and attacks go in random directions while stunned/confused
@@ -1121,8 +1150,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
         if self.role_opts.get("vault_guard", True) and self.vault_step(lv, hostiles):
             return
-        if self.role_opts.get("flee_stairs", False) and self.flee_stairs_step(lv, hostiles):
-            return                            # (before blind_wait: when it can't act, waiting in place still applies)
         if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
@@ -2017,7 +2044,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
             "ward": [self.ward_writes, self.ward_waits],
             "dip_prep": getattr(self, "dip_prep_stats", None),
-            "flee_stairs": getattr(self, "flee_stairs_stats", None),
+            "blind_held": getattr(self, "blind_held", 0),
             "nymph_pk": [getattr(self, "nymph_pk_elbs", 0), getattr(self, "nymph_pk_wait_total", 0)],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
