@@ -20,7 +20,7 @@
   "steps": 3571,
   "keys": 3571,
   "keyhash": "d71b0d79a9d6141a",
-  "secs": 5.3
+  "secs": 4.8
  },
  "61001": {
   "score": 2051.0,
@@ -43,7 +43,7 @@
   "steps": 3039,
   "keys": 3039,
   "keyhash": "bf0b89e19e112e1c",
-  "secs": 5.6
+  "secs": 4.8
  },
  "61002": {
   "score": 4226.0,
@@ -66,7 +66,7 @@
   "steps": 4947,
   "keys": 4947,
   "keyhash": "9d4b491f270a4bcb",
-  "secs": 10.6
+  "secs": 8.7
  },
  "61003": {
   "score": 8101.0,
@@ -89,7 +89,7 @@
   "steps": 8256,
   "keys": 8256,
   "keyhash": "2894676986d3a02a",
-  "secs": 16.3
+  "secs": 14.9
  },
  "61004": {
   "score": 23187.0,
@@ -112,7 +112,7 @@
   "steps": 29982,
   "keys": 29982,
   "keyhash": "d81288d2c2b40cc1",
-  "secs": 124.3
+  "secs": 106.4
  },
  "61005": {
   "score": 514.0,
@@ -158,7 +158,7 @@
   "steps": 1654,
   "keys": 1654,
   "keyhash": "dff4277baa759711",
-  "secs": 3.3
+  "secs": 2.7
  },
  "61007": {
   "score": 1624.0,
@@ -181,7 +181,7 @@
   "steps": 3729,
   "keys": 3729,
   "keyhash": "7a0ba27d6728ff2b",
-  "secs": 5.3
+  "secs": 4.8
  },
  "61008": {
   "score": 23051.0,
@@ -204,7 +204,7 @@
   "steps": 20000,
   "keys": 20000,
   "keyhash": "9862a4282967e792",
-  "secs": 38.0
+  "secs": 33.0
  },
  "61009": {
   "score": 18840.0,
@@ -227,30 +227,30 @@
   "steps": 12913,
   "keys": 12913,
   "keyhash": "8ebd40073ba8f827",
-  "secs": 23.8
+  "secs": 22.3
  },
  "61010": {
-  "score": 8096.0,
-  "turns": 6560,
-  "max_depth": 10,
-  "xl": 8,
+  "score": 2678.0,
+  "turns": 5816,
+  "max_depth": 6,
+  "xl": 6,
   "last_msgs": [
-   "You kill the owlbear!  The captain bites!  The aliasing priest hits!",
-   "The hippogriff hits!  The gargoyle bites!",
-   "You hit the baby white dragon!",
-   "You are splashed by the blue dragon's oobleck!  The fog cloud bites!",
-   "The gnome bites!  The owlbear hits!  The master lich hits!",
-   "The silver dragon bites!",
-   "You kill the monkey!",
-   "You are splashed by the giant zombie's diluted water!",
-   "The yellow mold misses!  The black unicorn bites!",
-   "The black naga hits!  The baby long worm misses!  The efreeti bites!"
+   "You are hit by an orcish dagger.",
+   "You stop searching.  The hill orc swings his scimitar.",
+   "The hill orc hits!",
+   "You hit the hill orc!",
+   "You hit the hill orc!",
+   "You hit the hill orc!  The hill orc swings his scimitar.",
+   "The hill orc hits!",
+   "The hill orc hits!",
+   "You miss the hill orc.  The hill orc swings his scimitar.",
+   "The hill orc hits!"
   ],
   "truncated": false,
-  "steps": 8302,
-  "keys": 8302,
-  "keyhash": "d249729d5a1573b6",
-  "secs": 13.8
+  "steps": 6594,
+  "keys": 6594,
+  "keyhash": "2da79ea5c486fa84",
+  "secs": 8.8
  },
  "61011": {
   "score": 2164.0,
@@ -273,7 +273,7 @@
   "steps": 4828,
   "keys": 4828,
   "keyhash": "961dbf21459300e2",
-  "secs": 7.9
+  "secs": 7.0
  },
  "61012": {
   "score": 8610.0,
@@ -296,7 +296,7 @@
   "steps": 8099,
   "keys": 8099,
   "keyhash": "6fad290e1ec2bec0",
-  "secs": 11.2
+  "secs": 11.0
  },
  "61013": {
   "score": 5814.0,
@@ -319,7 +319,7 @@
   "steps": 5501,
   "keys": 5501,
   "keyhash": "7af08231cd5a6cfd",
-  "secs": 9.0
+  "secs": 7.0
  },
  "61014": {
   "score": 592.0,
@@ -342,7 +342,7 @@
   "steps": 1893,
   "keys": 1893,
   "keyhash": "50e938370d25f5ae",
-  "secs": 2.7
+  "secs": 2.6
  },
  "61015": {
   "score": 963.0,
@@ -365,7 +365,7 @@
   "steps": 3668,
   "keys": 3668,
   "keyhash": "ff060d7e44b473a4",
-  "secs": 6.1
+  "secs": 5.6
  },
  "61016": {
   "score": 6311.0,
@@ -388,7 +388,7 @@
   "steps": 7162,
   "keys": 7162,
   "keyhash": "42c57e2e4c3081a3",
-  "secs": 17.1
+  "secs": 12.5
  },
  "61017": {
   "score": 10843.0,
@@ -411,7 +411,7 @@
   "steps": 5987,
   "keys": 5987,
   "keyhash": "5838d22c62cce03c",
-  "secs": 8.9
+  "secs": 7.0
  },
  "61018": {
   "score": 11492.0,
@@ -434,7 +434,7 @@
   "steps": 6885,
   "keys": 6885,
   "keyhash": "ae7f2cb106741684",
-  "secs": 11.1
+  "secs": 8.9
  },
  "61019": {
   "score": 26484.0,
@@ -457,7 +457,7 @@
   "steps": 13748,
   "keys": 13748,
   "keyhash": "965b1fb904fc394c",
-  "secs": 27.1
+  "secs": 23.3
  },
  "61020": {
   "score": 1160.0,
@@ -480,7 +480,7 @@
   "steps": 2477,
   "keys": 2477,
   "keyhash": "4c199d6708782b9a",
-  "secs": 4.7
+  "secs": 3.6
  },
  "61021": {
   "score": 1723.0,
@@ -503,30 +503,30 @@
   "steps": 7026,
   "keys": 7026,
   "keyhash": "066842b22befcb63",
-  "secs": 8.3
+  "secs": 6.8
  },
  "61022": {
-  "score": 48028.0,
-  "turns": 13681,
-  "max_depth": 18,
-  "xl": 11,
+  "score": 29605.0,
+  "turns": 10418,
+  "max_depth": 14,
+  "xl": 10,
   "last_msgs": [
-   "One of your dark potions boils and explodes!",
-   "Call a dark potion:",
-   "Your orange potion boils and explodes!",
-   "Call an orange potion:",
-   "One of your pink potions boils and explodes!",
-   "Call a pink potion:",
-   "Your effervescent potion boils and explodes!",
-   "Something seems to be holding you.  The fire elemental hits!",
-   "You're on fire!  The fire elemental hits!  You're on fire!",
-   "Your scroll labeled VENZAR BORGAVVE catches fire and burns!"
+   "A tower of flame erupts from the ice under the fire ant!",
+   "The fire ant is uninjured.  The ice crackles and melts.",
+   "The fire ant drowns.",
+   "The fire ant drowns.",
+   "You miss the fire ant.  The fire ant bites!  The fire ant bites!",
+   "You're on fire!  You return to human form!  The fire ant bites!",
+   "The fire ant bites!  You're on fire!",
+   "The fire ant bites!  You're on fire!",
+   "You miss the fire ant.  The fire ant bites!  The fire ant bites!",
+   "You're on fire!  The fire ant bites!"
   ],
   "truncated": false,
-  "steps": 19071,
-  "keys": 19071,
-  "keyhash": "041eb5411772496c",
-  "secs": 22.7
+  "steps": 13833,
+  "keys": 13833,
+  "keyhash": "dc4fc5e8b9c6d147",
+  "secs": 15.7
  },
  "61023": {
   "score": 3409.0,
@@ -549,7 +549,7 @@
   "steps": 4806,
   "keys": 4806,
   "keyhash": "bfd322e80393136c",
-  "secs": 6.3
+  "secs": 4.8
  },
  "61024": {
   "score": 829.0,
@@ -572,7 +572,7 @@
   "steps": 2990,
   "keys": 2990,
   "keyhash": "505f5aca83b99c21",
-  "secs": 4.8
+  "secs": 2.7
  },
  "61025": {
   "score": 450.0,
@@ -595,7 +595,7 @@
   "steps": 1724,
   "keys": 1724,
   "keyhash": "9a721b4ba29bc899",
-  "secs": 1.7
+  "secs": 1.4
  },
  "61026": {
   "score": 431.0,
@@ -618,7 +618,7 @@
   "steps": 2188,
   "keys": 2188,
   "keyhash": "87bc0cb108ffa6a4",
-  "secs": 3.2
+  "secs": 2.6
  },
  "61027": {
   "score": 8689.0,
@@ -641,7 +641,7 @@
   "steps": 7709,
   "keys": 7709,
   "keyhash": "2d08994c86dd23cf",
-  "secs": 14.1
+  "secs": 12.7
  },
  "61028": {
   "score": 1815.0,
@@ -664,7 +664,7 @@
   "steps": 3091,
   "keys": 3091,
   "keyhash": "c52ec667e63aa639",
-  "secs": 6.1
+  "secs": 4.0
  },
  "61029": {
   "score": 8194.0,
@@ -687,7 +687,7 @@
   "steps": 6279,
   "keys": 6279,
   "keyhash": "d418600dbb843ffa",
-  "secs": 8.2
+  "secs": 7.3
  },
  "61030": {
   "score": 3115.0,
@@ -710,7 +710,7 @@
   "steps": 8688,
   "keys": 8688,
   "keyhash": "5950e8528703005f",
-  "secs": 12.1
+  "secs": 9.6
  },
  "61031": {
   "score": 908.0,
@@ -733,6 +733,6 @@
   "steps": 3655,
   "keys": 3655,
   "keyhash": "f4e69bdd9c679a01",
-  "secs": 6.5
+  "secs": 5.2
  }
 }
