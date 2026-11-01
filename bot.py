@@ -1396,13 +1396,16 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 if self.go_toward(lv, goal):
                     return
 
+        # carry_all: leave the digger by the shop door / take it back -- also with monsters in view
+        # (Minetown always has some): the shopkeeper asked just now, fights were handled above
+        if self.stash_step(lv):
+            return
+
         vis = self.view_threats(lv)
         if (self.use_armor or self.use_food) and not vis:
             if self.need_pay:
                 self.need_pay = False
                 self.pay()
-                return
-            if self.stash_step(lv):
                 return
             if self.use_armor and self.shop_step(lv):
                 return
