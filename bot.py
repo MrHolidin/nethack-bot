@@ -1929,7 +1929,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.gate_holds["xl"] += 1
             return True
         n = self.role_opts.get("seen_gate")
-        if n is not None and int(lv.seen.sum()) < n and lv.search_turns < self.role_opts.get("seen_search", 300):
+        # not in the Mines (dnum 2) or Sokoban (dnum 4): neither has hidden doors or corridors to find
+        if n is not None and lv.key[0] not in (2, 4) and int(lv.seen.sum()) < n \
+                and lv.search_turns < self.role_opts.get("seen_search", 300):
             self.gate_holds["seen"] += 1
             return True
         return False
