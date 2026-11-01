@@ -59,7 +59,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         obs, _ = self.env.reset()
         self.obs = obs
         self.last_bl = obs["blstats"].copy()
-        self.hostile_cache = {}
         self._grids_key, self._grids = None, None
         self.tick_no = 0
         self.peaceful_waits = 0
@@ -92,7 +91,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.last_pray = None
         self.prayers = 0
         self.pray_failed = 0
-        self.peaceful_seen = 0
         self.throws = 0
         self.lycanthropy = False
         self.deadly_prayers = 0

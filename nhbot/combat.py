@@ -349,8 +349,7 @@ class CombatMixin:
                 continue
             if not self.worth_special(pos, name):
                 continue
-            if d > 1 and (self.peaceful_now(lv, pos, far=True) if self.opts.danger_check
-                          else self.peaceful_far(lv, pos, key, d)):
+            if d > 1 and self.peaceful_now(lv, pos, far=True):
                 continue
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):

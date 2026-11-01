@@ -246,15 +246,6 @@ class GameMixin:
         self.settle()
         return desc
 
-    def describe_far(self, dirkey, d):
-        self.raw_step(ord(";"))
-        for _ in range(d):
-            self.raw_step(ord(dirkey))
-        desc = self.top_line()
-        self.raw_step(27)
-        self.settle()
-        return desc
-
     def on_message(self, m):
         """Every logged message. Each domain reads what concerns it."""
         lv = self.levels.get(self.cur_key) if self.cur_key else None

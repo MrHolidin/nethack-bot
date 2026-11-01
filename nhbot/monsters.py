@@ -35,15 +35,12 @@ NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog",
 
 PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 
-PASSIVE_ONLY = {nh.permonst(i).mname for i in range(nh.NUMMONS) if all(a[0] == "NONE" for a in ATTACKS[i])}
 
 # hurt us only when we hit them (a passive attack and no active one): molds, jellies, acid blob, floating eye.
 # A shrieker has no attack at all: hitting it is free.
 PASSIVE_DMG = {nh.permonst(i).mname for i in range(nh.NUMMONS)
                if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i])}
 
-USUALLY_PEACEFUL = {"shopkeeper", "watchman", "watch captain", "aligned priest", "high priest",
-                    "guard", "Oracle", "prisoner"}
 
 THIEVES = ("water nymph", "wood nymph", "mountain nymph", "monkey")
 

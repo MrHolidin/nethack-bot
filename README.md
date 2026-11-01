@@ -31,7 +31,8 @@ Top level:
   (80% CI on the mean difference).
 - `regress.py` checks that a refactor does not change behaviour: 32 fixed seeds under the CI clock,
   per game the outcome and a hash of every key sent, against `golden.json`
-  (`python regress.py check`; `--level outcome` for changes that only drop free actions).
+  (`python regress.py check`; `--level outcome` for changes that only drop free actions; `--kw` plays with
+  options, e.g. record with an A/B flag on before making it the default).
 - `tools/`: `cases.py` (death analysis from `hist`), `random_baseline.py`.
 - `python -m nhbot SEED` plays one game and prints its summary.
 

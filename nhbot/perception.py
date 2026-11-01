@@ -11,7 +11,7 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PASSIVE_ONLY, PM_BY_NAME, THIEVES, USUALLY_PEACEFUL, permonst_of
+from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES, permonst_of
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
 # (gas spore), the Oracle, a long worm's tail. No monster without one can move (mmove 0 for all that can't).
@@ -37,8 +37,7 @@ ATTACKER_RE = re.compile(r"(?:^|[.!?]\s+)(The [^.!?]+?|[A-Z][\w'-]*(?: [\w'-]+)*
 
 class PerceptionMixin:
     def perception_init(self):
-        self.far_peaceful = {}         # (level, glyph, pos) -> (peaceful, turn)
-        self.farlooks = 0              # ';' looks that is_peaceful made
+        self.farlooks = 0              # ';' looks that peaceful_now made
         self.peace_cls = {}            # permonst index -> 1 always peaceful / -1 never / 0 either (peace_class)
         self.peace_seen = {}           # (level, glyph, pos) -> (turn, peaceful): a look or 'Really attack?'
         self.hostile_marks = {}        # level key -> [(glyph, pos)]: 'peaceful' monsters that attacked us
@@ -47,7 +46,7 @@ class PerceptionMixin:
         self.empty_looks = 0           # looks whose description came back empty
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
 
-    # ------------------------------------------------------------------ peacefulness (danger_check)
+    # ------------------------------------------------------------------ peacefulness
     def peace_class(self, idx):
         """makemon.c peace_minded() for us: 1 = always created peaceful (M2_PEACEFUL, quest leader / guardians,
         our race's friends), -1 = never (M2_HOSTILE, nemesis, our race's enemies, alignment of the other sign,
@@ -137,7 +136,7 @@ class PerceptionMixin:
     def msg_peace(self, m, lv):
         """A monster we take for peaceful attacked us: count it (by kind), and every one of that kind next to
         us is hostile from now on."""
-        if lv is None or not self.opts.danger_check or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+        if lv is None or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
             return
         g = self.obs["glyphs"]
         y, x = self.pos()
@@ -173,21 +172,9 @@ class PerceptionMixin:
         return not self.peaceful_now(lv, pos)
 
     def visible_hostiles(self, lv):
-        if self.opts.danger_check:
-            return [(p, G.monster_name(int(self.obs["glyphs"][p]))) for p in self.visible_monsters()
-                    if self.is_actively_dangerous(lv, p)]
-        g = self.obs["glyphs"]
-        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-        py, px = self.pos()
-        res = []
-        for yy, xx in zip(ys, xs):
-            if (yy, xx) == (py, px):
-                continue
-            gg = int(g[yy, xx])
-            if gg in lv.peaceful:
-                continue
-            res.append(((int(yy), int(xx)), G.monster_name(gg)))
-        return res
+        """Monsters on screen that can hurt us of their own accord (is_actively_dangerous)."""
+        return [(p, G.monster_name(int(self.obs["glyphs"][p]))) for p in self.visible_monsters()
+                if self.is_actively_dangerous(lv, p)]
 
     def visible_monsters(self):
         """Squares of the monsters on screen other than us."""
@@ -215,7 +202,7 @@ class PerceptionMixin:
                 continue
             gg = int(g[ny, nx])
             k = G.KIND[gg]
-            if k == G.MONSTER and self.opts.danger_check:
+            if k == G.MONSTER:
                 name = G.monster_name(gg)
                 if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
@@ -223,70 +210,20 @@ class PerceptionMixin:
                     continue
                 if self.is_actively_dangerous(lv, (ny, nx)):
                     out.append(((ny, nx), name))
-            elif k == G.MONSTER and gg not in lv.peaceful:
-                name = G.monster_name(gg)
-                if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
-                                                and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
-                        and not self.spore_ok(name):
-                    continue
-                if self.is_peaceful((ny, nx)):
-                    continue
-                out.append(((ny, nx), name))
             elif k == G.INVIS and (ny, nx):
                 out.append(((ny, nx), "invisible"))
         return out
 
     def view_threats(self, lv):
-        """Visible hostiles that should stop housekeeping (pickups, equipment, shopping). The SAME list
-        gates those steps and the explore goals they consume."""
-        vis = self.visible_hostiles(lv)
-        if self.opts.danger_check:
-            return vis                       # no active attack / peaceful: all in is_actively_dangerous
-        vis = [v for v in vis if v[1] != "shopkeeper"]         # a peaceful shopkeeper is not a threat
-        # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
-        # stepping in and out of its line of sight flips this gate and two goals take turns
-        y, x = self.pos()
-        vis = [(p, n) for p, n in vis if max(abs(p[0] - y), abs(p[1] - x)) <= 1
-               or n not in PM_BY_NAME or PM_BY_NAME[n].mmove > 0]
-        # no active attack at all (molds, jellies, floating eye, shrieker): harmless unless we hit it, and
-        # we never do. Counting it only when adjacent made the gate flip on the square next to it (an item
-        # beside a brown mold was a goal from 2 squares away and forbidden on arrival).
-        vis = [(p, n) for p, n in vis if n not in PASSIVE_ONLY]
-        return vis
+        """Visible hostiles that should stop housekeeping (pickups, equipment, shopping) and resting: the
+        visible hostiles (no active attack / peaceful: all in is_actively_dangerous; no monster without an
+        active attack can move, so a far immobile one never counts)."""
+        return self.visible_hostiles(lv)
 
     def items_gate(self, lv):
         """May item goals be pursued / piles inspected now? Not in combat: nothing in melee range and not shot
         at in the last 5 turns. Goals and the steps that consume them use this same test."""
         return not self.adjacent_hostiles(lv) and self.turn() - self.last_shot_turn > 5
-
-    def is_peaceful(self, pos):
-        g = int(self.obs["glyphs"][pos])
-        if G.KIND[g] != G.MONSTER:
-            return False
-        ck = (self.cur_key, g, pos)
-        hit = self.hostile_cache.get(ck)
-        if hit is not None and self.turn() - hit[1] <= 5:
-            return hit[0]
-        desc = self.describe_at(pos)
-        self.farlooks += 1
-        peaceful = "peaceful" in desc or "tame" in desc
-        self.hostile_cache[ck] = (peaceful, self.turn())
-        if peaceful:
-            self.peaceful_seen += 1
-        return peaceful
-
-    def peaceful_far(self, lv, pos, dirkey, d):
-        g = int(self.obs["glyphs"][pos])
-        ck = (lv.key, g, pos)
-        hit = self.far_peaceful.get(ck)
-        if hit is not None and self.turn() - hit[1] <= 5:
-            return hit[0]
-        desc = self.describe_far(dirkey, d)
-        if not desc:
-            self.empty_looks += 1
-        res = ("peaceful" in desc) or ("tame" in desc) or not desc
-        self.far_peaceful[ck] = (res, self.turn())
-        return res
 
     def mark_peaceful_target(self):
         t = self.last_attack_target
@@ -294,10 +231,8 @@ class PerceptionMixin:
             return
         g = int(self.obs["glyphs"][t])
         lv = self.levels.get(self.cur_key)
-        if lv is not None and self.opts.danger_check:
+        if lv is not None:
             self.peace_seen[(lv.key, g, t)] = (self.turn(), True)      # this monster, this turn
-        elif lv is not None:
-            lv.peaceful.add(g)
 
     def line_targets(self, lv, max_d=6):
         """Hostile-looking monsters in a clear straight line: [(dirkey, d, pos, step)]."""
@@ -313,8 +248,7 @@ class PerceptionMixin:
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(int(g[yy, xx]))
-                    if (not self.peaceful_now(lv, (yy, xx), look=False) if self.opts.danger_check
-                            else name not in USUALLY_PEACEFUL and int(g[yy, xx]) not in lv.peaceful):
+                    if not self.peaceful_now(lv, (yy, xx), look=False):
                         out.append((key, i, (yy, xx), (dy, dx), name))
                     break
                 if k in (G.PET, G.BOULDER) or not G.PASSABLE[k_mem[yy, xx]] and k_mem[yy, xx] != G.UNKNOWN:

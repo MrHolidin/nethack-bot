@@ -6,6 +6,7 @@ golden file recorded from the code before the refactor.
 
   python regress.py record [--out golden.json] [-n 32] [--start 61000]
   python regress.py check  [--golden golden.json] [--level strict|outcome]
+  --kw '{"option": value}'  plays with these options (e.g. record with an A/B flag on before making it default)
 
 strict:  the key sequence is identical (nothing changed, not even free actions such as menus or farlook)
 outcome: score, turns, depth, XL and the last messages are identical (for changes that drop free actions)
@@ -28,6 +29,9 @@ def ensure_pinned_clock():
     os.execvpe(sys.executable, [sys.executable] + sys.argv, env)
 
 
+KW = {}
+
+
 def play(seed):
     sys.path.insert(0, HERE)
     from nhbot import Bot
@@ -42,7 +46,7 @@ def play(seed):
     Bot.raw_step = raw_step
     t = time.monotonic()
     try:
-        s = Bot(seed=seed, character="val").run()
+        s = Bot(seed=seed, character="val", **KW).run()
     except Exception:
         import traceback
         return seed, {"crash": traceback.format_exc()[-1500:]}
@@ -51,8 +55,12 @@ def play(seed):
     return seed, out
 
 
-def run(seeds, jobs):
-    with mp.Pool(jobs) as pool:
+def init(kw):
+    KW.update(kw)
+
+
+def run(seeds, jobs, kw=None):
+    with mp.Pool(jobs, initializer=init, initargs=(kw or {},)) as pool:
         return dict(pool.map(play, seeds, chunksize=1))
 
 
@@ -65,11 +73,12 @@ def main():
     ap.add_argument("-j", type=int, default=os.cpu_count())
     ap.add_argument("--level", choices=("strict", "outcome"), default="strict")
     ap.add_argument("--limit", type=int, default=None, help="check only the first N golden seeds (quick check)")
+    ap.add_argument("--kw", default="{}", help='options as JSON, e.g. \'{"carry_all": true}\'')
     a = ap.parse_args()
     ensure_pinned_clock()
     t = time.monotonic()
     if a.mode == "record":
-        res = run(range(a.start, a.start + a.n), a.j)
+        res = run(range(a.start, a.start + a.n), a.j, json.loads(a.kw))
         json.dump({str(k): v for k, v in sorted(res.items())}, open(a.golden, "w"), indent=1)
         bad = [k for k, v in res.items() if "crash" in v]
         print(f"recorded {len(res)} games in {time.monotonic() - t:.0f}s; crashes: {bad}")
@@ -77,7 +86,7 @@ def main():
     gold = {int(k): v for k, v in json.load(open(a.golden)).items()}
     if a.limit:
         gold = dict(sorted(gold.items())[:a.limit])
-    res = run(sorted(gold), a.j)
+    res = run(sorted(gold), a.j, json.loads(a.kw))
     fails = []
     for seed in sorted(gold):
         g, r = gold[seed], res[seed]

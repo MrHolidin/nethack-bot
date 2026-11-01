@@ -28,7 +28,6 @@ class Level:
         self.progress_count = 0
         self.last_progress = 0
         self.last_reset = 0   # downstairs leading into the Gnomish Mines
-        self.peaceful = set()     # monster glyphs that turned out peaceful here
         self.entered_turn = None
         self.elbereth = set()     # positions where we engraved
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
