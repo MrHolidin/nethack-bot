@@ -6,14 +6,36 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
+from nhbot.monattacks import ATTACKS
 from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PASSIVE_ONLY, PM_BY_NAME, THIEVES, USUALLY_PEACEFUL, permonst_of
+
+# no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
+# (gas spore) or none at all (shrieker). No monster without one can move (mmove 0 for all that can't).
+NO_ACTIVE_ATTACK = {nh.permonst(i).mname for i in range(nh.NUMMONS)
+                    if all(a[0] in ("NONE", "BOOM") for a in ATTACKS[i])}
 
 
 class PerceptionMixin:
     def perception_init(self):
         self.far_peaceful = {}         # (level, glyph, pos) -> (peaceful, turn)
+        self.farlooks = 0              # ';' looks that is_peaceful made
+
+    def is_actively_dangerous(self, lv, pos):
+        """Can the monster at pos hurt us of its own accord? False if it has no active attack (NO_ACTIVE_ATTACK)
+        or is peaceful: its glyph answered 'Really attack?' on this level, or a farlook says so (cached 5 turns
+        per monster and square). An unseen 'I': True."""
+        g = int(self.obs["glyphs"][pos])
+        k = G.KIND[g]
+        if k == G.INVIS:
+            return True
+        if k != G.MONSTER or G.monster_name(g) in NO_ACTIVE_ATTACK or g in lv.peaceful:
+            return False
+        return not self.is_peaceful(pos)
 
     def visible_hostiles(self, lv):
+        if self.opts.danger_check:
+            return [(p, G.monster_name(int(self.obs["glyphs"][p]))) for p in self.visible_monsters()
+                    if self.is_actively_dangerous(lv, p)]
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
         py, px = self.pos()
@@ -26,6 +48,13 @@ class PerceptionMixin:
                 continue
             res.append(((int(yy), int(xx)), G.monster_name(gg)))
         return res
+
+    def visible_monsters(self):
+        """Squares of the monsters on screen other than us."""
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        me = self.pos()
+        return [(int(a), int(b)) for a, b in zip(ys, xs) if (a, b) != me]
 
     def adjacent_hostiles(self, lv):
         y, x = self.pos()
@@ -46,7 +75,15 @@ class PerceptionMixin:
                 continue
             gg = int(g[ny, nx])
             k = G.KIND[gg]
-            if k == G.MONSTER and gg not in lv.peaceful:
+            if k == G.MONSTER and self.opts.danger_check:
+                name = G.monster_name(gg)
+                if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
+                                                and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
+                        and not self.spore_ok(name):
+                    continue
+                if self.is_actively_dangerous(lv, (ny, nx)):
+                    out.append(((ny, nx), name))
+            elif k == G.MONSTER and gg not in lv.peaceful:
                 name = G.monster_name(gg)
                 if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
@@ -63,6 +100,8 @@ class PerceptionMixin:
         """Visible hostiles that should stop housekeeping (pickups, equipment, shopping). The SAME list
         gates those steps and the explore goals they consume."""
         vis = self.visible_hostiles(lv)
+        if self.opts.danger_check:
+            return vis                       # no active attack / peaceful: all in is_actively_dangerous
         vis = [v for v in vis if v[1] != "shopkeeper"]         # a peaceful shopkeeper is not a threat
         # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
         # stepping in and out of its line of sight flips this gate and two goals take turns
@@ -88,7 +127,8 @@ class PerceptionMixin:
         hit = self.hostile_cache.get(ck)
         if hit is not None and self.turn() - hit[1] <= 5:
             return hit[0]
-        desc = self.describe_adjacent(pos)
+        desc = self.describe_at(pos)
+        self.farlooks += 1
         peaceful = "peaceful" in desc or "tame" in desc
         self.hostile_cache[ck] = (peaceful, self.turn())
         if peaceful:

@@ -227,11 +227,19 @@ class GameMixin:
             return                            # in a shop: anything here may be merchandise
         self.pickup(lambda t: any(w in t for w in words) and not (no_sale and "for sale" in t), "matching")
 
-    def describe_adjacent(self, pos):
+    def describe_at(self, pos):
+        """Farlook (';' with autodescribe) at any square: the cursor goes there by single steps, by 8 with
+        the capital keys; next to us this is ";" and one direction key."""
         y, x = self.pos()
-        key = DELTA2KEY[(pos[0] - y, pos[1] - x)]
+        dy, dx = pos[0] - y, pos[1] - x
         self.raw_step(ord(";"))
-        self.raw_step(ord(key))
+        while dy or dx:
+            sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
+            n = min(abs(dy), abs(dx)) if sy and sx else max(abs(dy), abs(dx))
+            step = 8 if n >= 8 else 1
+            key = DELTA2KEY[(sy, sx)]
+            self.raw_step(ord(key.upper() if step == 8 else key))
+            dy, dx = dy - sy * step, dx - sx * step
         desc = self.top_line()
         self.raw_step(27)
         self.settle()
