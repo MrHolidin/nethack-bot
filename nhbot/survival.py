@@ -226,12 +226,11 @@ class SurvivalMixin:
                 p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
                                  "Then die, mortal", "Thou durst", "You feel that Mitra is angry")):
             self.god_angry = True
-        if self.opts.vault_guard:
-            if "drop that gold" in m or "drop that money" in m:
-                self.vault_drop = True
-            if "follow me" in m:
-                self.vault_follow_until = self.turn() + 300
-                self.guard_trail = []
+        if "drop that gold" in m or "drop that money" in m:
+            self.vault_drop = True
+        if "follow me" in m:
+            self.vault_follow_until = self.turn() + 300
+            self.guard_trail = []
         if "You feel feverish" in m:
             self.lycanthropy = True
             mk = re.search(r"\b(were(?:jackal|rat|wolf))\b", m)

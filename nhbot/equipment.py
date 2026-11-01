@@ -14,7 +14,6 @@ Policy (from NetHack wiki guidance, see notes in the chat):
 """
 import re
 
-import numpy as np
 import nle.nethack as nh
 
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
@@ -257,8 +256,7 @@ class EquipMixin:
         s = next((s for l, _, s in self.inventory() if l == letter), "")
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = int(m.group(1)) if m else 1
-        if self.carry_on():                     # carry: never come back for what we dropped
-            self.goal_close("pile", self.level().key, self.pos())
+        self.goal_close("pile", self.level().key, self.pos())
         self.press("d", expect_prompt=True)
         if "drop" in self.message().lower():
             self.press(letter)
@@ -298,7 +296,7 @@ class EquipMixin:
         return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
 
     def food_wanted(self, name):
-        if not self.opts.use_food or self.food_count() >= MAX_FOOD:
+        if self.food_count() >= MAX_FOOD:
             return False
         if "egg" in name or re.search(r"\btins?\b", name):
             return False
@@ -309,13 +307,12 @@ class EquipMixin:
     def armor_pickup_here(self, lv):
         self.goal_done("pile", lv, self.pos())
         names = self.look_here()
-        if self.shop_visits_on():
-            # never take merchandise (a lone item is picked up without a menu, so filter here)
-            names = [n for n in names if "for sale" not in n]
+        # never take merchandise (a lone item is picked up without a menu, so filter here)
+        names = [n for n in names if "for sale" not in n]
         worn = self.worn_by_slot()
         want = []
         for n in names:
-            a = parse_armor(n) if self.opts.use_armor else None
+            a = parse_armor(n)
             if a and self.improves(a, worn):
                 want.append(a["name"])
             elif self.carry_wanted(n):
@@ -329,20 +326,14 @@ class EquipMixin:
                 self.food_picked += 1
         if not want:
             return False
-        cap_before = self.bl(nh.NLE_BL_CAP)
         self.pickup_matching(want)
-        if self.bl(nh.NLE_BL_CAP) > cap_before and not self.carry_on():   # (carry: its own drop order)
-            for a in self.armor_inventory():
-                if not a["worn"]:
-                    self.drop_letter(a["letter"])
-                    break
         self.equip_events.append((self.turn(), "pickup", ",".join(want)))
         return True
 
     def armor_targets(self, lv, glyphs_mod):
         """Mask of remembered '[' (and '%' food when low on food) piles not yet inspected."""
-        mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.opts.use_armor else np.zeros(lv.under.shape, bool)
-        if self.opts.use_food and self.food_count() < MAX_FOOD:
+        mask = glyphs_mod.ARMOR_GLYPH[lv.under].copy()
+        if self.food_count() < MAX_FOOD:
             mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
         for p in self.goal_closed_set("pile", lv.key):
             mask[p] = False

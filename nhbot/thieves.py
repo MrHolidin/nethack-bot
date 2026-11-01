@@ -43,7 +43,7 @@ class ThievesMixin:
                 self._theft_turn = self.turn()
                 self.thefts += 1
             self.stolen_pending = True
-        if self.opts.nymph and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
+        if re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
             self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
         if re.search(r"You turn into an? ", m):
             self.polyd = True                                 # weapons: no wielding in a borrowed body
@@ -56,8 +56,6 @@ class ThievesMixin:
             self.were_drop = None
 
     def nymph_step(self, lv, hostiles):
-        if not self.opts.nymph:
-            return False
         y, x = self.pos()
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
         adj = [(p, n) for p, n in hostiles if n in THIEVES]
@@ -82,14 +80,14 @@ class ThievesMixin:
                 return True
         have_shot = bool(self.throwables())
         # 2b) we could shoot but it isn't in line: step to a square that lines us up, at distance >= 2
-        if have_shot and self.opts.nymph_align:
+        if have_shot:
             step = self.align_step(lv, th)
             if step is not None:
                 self.cur_act = "fight"
                 self.move(step)
                 return True
         # 2c) no way to shoot: stand on Elbereth (nymphs respect it and won't steal in melee)
-        if not have_shot and self.opts.nymph_elb and (y, x) not in lv.elbereth:
+        if not have_shot and (y, x) not in lv.elbereth:
             close = [t for t in th if max(abs(t[0][0] - y), abs(t[0][1] - x)) <= 4]
             if close and G.KIND[lv.under[y, x]] not in (G.UPSTAIR, G.DOWNSTAIR) and self.nymph_elbs < 30:
                 self.nymph_elbs += 1

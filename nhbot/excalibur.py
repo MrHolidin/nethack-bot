@@ -26,7 +26,7 @@ class ExcaliburMixin:
         return None
 
     def excal_eligible(self):
-        if self.excalibur or not self.opts.use_roles or not self.opts.excal:
+        if self.excalibur:
             return False
         if int(self.last_bl[nh.NLE_BL_ALIGN]) != 1:
             return False
@@ -68,7 +68,7 @@ class ExcaliburMixin:
 
     def excal_go_up(self, lv):
         """No fountain here, but one is remembered a few levels up: walk back up to it."""
-        if not self.opts.excal_travel or lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
+        if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
             return False
         dl = lv.key[1]
         targets = [k for k, l in self.levels.items()

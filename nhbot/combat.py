@@ -343,8 +343,6 @@ class CombatMixin:
         return True
 
     def wand_step(self, lv, hostiles):
-        if not self.opts.wands:
-            return False
         wands = self.attack_wands()
         if not wands:
             return False
@@ -383,8 +381,7 @@ class CombatMixin:
 
     def msg_combat(self, m):
         """Our hits and kills, being shot at, being attacked by something unseen."""
-        if self.opts.focus:
-            self.focus_note(m)
+        self.focus_note(m)
         if re.search(r"You (kill|destroy) ", m):
             self.kill_count += 1
         mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
@@ -396,7 +393,7 @@ class CombatMixin:
                 self.goal_event("corpse", "created")
         if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
             self.last_shot_turn = self.turn()
-        if self.opts.hunt_shooter and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
+        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
                 and self.turn() - self.own_zap_turn > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)

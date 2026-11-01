@@ -191,41 +191,28 @@ class CarryMixin:
         self.selling_item = (None, "")   # (class, text) of the item on offer
         self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
 
-    def carry_on(self):
-        return bool(self.opts.carry)
-
     def carry_all_on(self):
         """carry_all: pick up everything worth carrying -- carry_more (tools, armor) plus spellbooks, gems/glass
         and diggers (pick-axe, mattock: kept, never sold).
         KEEP THIS FLAG (owner's decision, 2026-11-01): A/B -525 n.s., off by default, but it is the way to carry
         a digger for future vault / digging logic. Do not remove it in cleanups."""
-        return self.carry_on() and bool(self.opts.carry_all)
-
-    def carry_weapons_on(self):
-        """weapons: weapons join the carry pipeline (pick up, never-Burdened drop order, sell what we
-        don't keep); valk.weapon_check wields the best one."""
-        return self.carry_on() and bool(self.opts.weapons)
+        return bool(self.opts.carry_all)
 
     def carry_classes(self):
         return CARRY_CLASSES + (MORE_CLASSES if self.carry_all_on() else ()) + \
-            ((nh.WEAPON_CLASS,) if self.carry_weapons_on() else ()) + \
+            (nh.WEAPON_CLASS,) + \
             ((nh.SPBOOK_CLASS, nh.GEM_CLASS) if self.carry_all_on() else ())
 
     # ------------------------------------------------------------ pick up
     def carry_glyph(self, g):
         """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
         makes the step that inspects it (and so removes the goal) run."""
-        if not self.carry_on():
-            return False
         return bool(CARRY_GLYPH[g] or (self.carry_all_on() and MORE_GLYPH[g])
-                    or (self.carry_weapons_on() and WEAPON_GLYPH[g]) or (self.carry_all_on() and ALL_GLYPH[g]))
+                    or (WEAPON_GLYPH[g]) or (self.carry_all_on() and ALL_GLYPH[g]))
 
     def carry_targets(self, lv):
-        if not self.carry_on():
-            return None
         glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_all_on() else CARRY_GLYPH
-        if self.carry_weapons_on():
-            glyphs = glyphs | WEAPON_GLYPH
+        glyphs = glyphs | WEAPON_GLYPH
         if self.carry_all_on():
             glyphs = glyphs | ALL_GLYPH
         mask = glyphs[lv.under] & ~lv.shop
@@ -235,11 +222,11 @@ class CarryMixin:
 
     def carry_wanted(self, n):
         """A floor item (look_here text) to take: one of the carried classes, not merchandise."""
-        if not self.carry_on() or "for sale" in n:
+        if "for sale" in n:
             return None
         if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
             return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
-        if self.carry_weapons_on() and "corpse" not in n:
+        if "corpse" not in n:
             core = re.sub(r"\s*\(.*?\)", "", n)
             core = re.sub(r"\s+(called|named)\s+.*$", "", core)
             core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
@@ -292,7 +279,7 @@ class CarryMixin:
 
     def carry_drop_step(self):
         """Encumbered: drop one unit following the four tiers. True if it used the turn."""
-        if not self.carry_on() or self.bl(nh.NLE_BL_CAP) < 1:
+        if self.bl(nh.NLE_BL_CAP) < 1:
             return False
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
         equipped = lambda s: "being worn" in s or "weapon in hand" in s or "(in use)" in s or "(on " in s
@@ -330,7 +317,7 @@ class CarryMixin:
             return True
         if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
             return True
-        if c == nh.SCROLL_CLASS and self.opts.read_good \
+        if c == nh.SCROLL_CLASS \
                 and self.scroll_is_good(s):
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
@@ -355,13 +342,13 @@ class CarryMixin:
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
         c, s = self.selling_item
-        if c == nh.SCROLL_CLASS and self.opts.read_good and self.scroll_is_good(s):
+        if c == nh.SCROLL_CLASS and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
         return False
 
     def carry_shop_greeted(self, lv, stype):
-        if not self.carry_on() or lv.key in self.shops_done or not self.sellables(lv, stype):
+        if lv.key in self.shops_done or not self.sellables(lv, stype):
             return
         self.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
 
@@ -413,7 +400,7 @@ class CarryMixin:
         """shk.c: 'Will you please leave your pick-axe outside?' -- the keeper blocks the way in while one is
         in the open inventory: put it down next to the door, outside the shop. Always on (with carry): a
         mattock also comes in through the weapons pipeline."""
-        if not self.carry_on() or self.cur_key is None:
+        if self.cur_key is None:
             return
         self.stash_stats["asked"] += 1
         sh = self.shopping                          # the keeper greets and blocks in the same breath
@@ -423,8 +410,6 @@ class CarryMixin:
         self.stash_pending = (self.cur_key, self.pos())
 
     def stash_step(self, lv):
-        if not self.carry_on():
-            return False
         sp = self.stash_pending
         if sp is not None:
             if sp[0] != lv.key or not self.digger_letters():

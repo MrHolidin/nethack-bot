@@ -16,11 +16,6 @@ class ShopMixin:
         if self.shopping is None:
             self.carry_shop_greeted(lv, stype)
 
-    def shop_visits_on(self):
-        """An option that walks into shops is on: shop safety rules apply (merchandise, shop gold,
-        a peaceful shopkeeper is not a threat)."""
-        return self.carry_on()
-
     def shop_active(self, lv):
         s = self.shopping
         return s is not None and s["key"] == lv.key and self.turn() < s["until"]

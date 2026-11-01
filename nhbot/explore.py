@@ -43,7 +43,7 @@ class ExploreMixin:
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
-        if want_down and self.opts.mines_return and lv.key[0] == 2 and lv.key[1] >= 4 \
+        if want_down and lv.key[0] == 2 and lv.key[1] >= 4 \
                 and not self.minetown_seen and not self.is_minetown(lv):
             # mines level 4 done and no Minetown on 3 or 4: it won't come further down
             self.mines_return_start(lv, "no_town")
@@ -58,7 +58,7 @@ class ExploreMixin:
             if hold_loot and want_down:
                 want_down = False
                 self.loot_holds += 1
-        if want_down and self.opts.items_first \
+        if want_down \
                 and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
@@ -96,15 +96,15 @@ class ExploreMixin:
             return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
-        if self.opts.mines_return and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
+        if lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
             self.mines_return_start(lv, "bottom")
             if self.mines_return_step(lv, k_mem, k_live, passable, start):
                 return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
-        if self.opts.unblock and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
+        if self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
             return
         # nothing left: map the level if we can, else search for hidden passages
-        if self.opts.use_abilities and self.magic_map_step(lv):
+        if self.magic_map_step(lv):
             return
         self.search_mode(lv, k_mem, k_live, passable)
 
@@ -112,7 +112,7 @@ class ExploreMixin:
         """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
         start = self.pos()
         if downstairs[start]:
-            if self.opts.use_pet and self.pet_wait_before_stairs():
+            if self.pet_wait_before_stairs():
                 self.press("s")
                 return True
             self.descents += 1

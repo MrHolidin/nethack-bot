@@ -32,18 +32,7 @@ class WeaponsMixin:
                 base = re.sub(r"\b(uncursed|cursed|blessed|rustproof|[+-]\d+)\s+", "", base).strip()
                 self.main_weapon = base
             return False
-        if self.opts.weapons:
-            return self.weapon_upgrade(inv)
-        if wielded or not self.opts.nymph:
-            return False
-        weapons = [(l, s) for l, c, s in inv if c == nh.WEAPON_CLASS and not re.search(r"\b(arrows?|bolts?|ya|darts?)\b", s)]
-        pick = next(((l, s) for l, s in weapons if self.main_weapon in s), None) or (weapons[0] if weapons else None)
-        if pick and pick[0] not in self._wield_tried:
-            self._wield_tried = self._wield_tried | {pick[0]}
-            self.wield(pick[0])
-            self.rewields += 1
-            return True
-        return False
+        return self.weapon_upgrade(inv)
 
     def weapon_rank(self, s):
         """weapons: Excalibur > the two long-sword-skill blades > anything else. Lawful: katana < long sword

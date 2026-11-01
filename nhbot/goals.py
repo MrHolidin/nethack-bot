@@ -173,10 +173,8 @@ class GoalsMixin:
         raise ValueError(kind)
 
     def merch_risk(self, lv, pos):
-        """Could what lies at pos be merchandise (when we visit shops)? On a shop square; and unless
-        shop_by_square, whenever a shopkeeper is in view."""
-        if not self.shop_visits_on():
-            return False
+        """Could what lies at pos be merchandise? On a shop square; and unless shop_by_square, whenever a
+        shopkeeper is in view."""
         return bool(lv.shop[pos]) or (not self.opts.shop_by_square and self.shopkeeper_in_view())
 
     def goal_masks(self, lv, passable, gold):
@@ -184,9 +182,9 @@ class GoalsMixin:
         the gate of the steps that consume them; gold not in a shop when we visit shops (gold_here), piles never
         on a shop square (housekeeping inspects them)."""
         ok = self.items_gate(lv)
-        out = {"gold": (gold & ~lv.shop if self.shop_visits_on() else gold.copy()) & ok}
+        out = {"gold": gold & ~lv.shop & ok}
         pile = np.zeros_like(gold)
-        if ok and (self.opts.use_armor or self.opts.use_food):
+        if ok:
             im = passable & ~lv.shop
             pile |= self.armor_targets(lv, G) & im
             ct = self.carry_targets(lv)

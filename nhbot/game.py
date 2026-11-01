@@ -54,7 +54,7 @@ class GameMixin:
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
-                if "who are you" in (msg + self.top_line()).lower() and self.opts.vault_guard:
+                if "who are you" in (msg + self.top_line()).lower():
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
                     self.raw_step(13)

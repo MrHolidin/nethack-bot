@@ -83,8 +83,7 @@ class MapMixin:
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
-        if self.opts.hallu_strike and \
-                int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
+        if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False

@@ -63,8 +63,7 @@ class PerceptionMixin:
         """Visible hostiles that should stop housekeeping (pickups, equipment, shopping). The SAME list
         gates those steps and the explore goals they consume."""
         vis = self.visible_hostiles(lv)
-        if self.shop_visits_on():
-            vis = [v for v in vis if v[1] != "shopkeeper"]     # a peaceful shopkeeper is not a threat
+        vis = [v for v in vis if v[1] != "shopkeeper"]         # a peaceful shopkeeper is not a threat
         # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
         # stepping in and out of its line of sight flips this gate and two goals take turns
         y, x = self.pos()
@@ -77,12 +76,9 @@ class PerceptionMixin:
         return vis
 
     def items_gate(self, lv):
-        """May item goals be pursued / piles inspected now? Default: no hostile in view. pickup_calm: not in
-        combat -- nothing in melee range and not shot at in the last 5 turns. Goals and the inspecting step
-        use this same test."""
-        if self.opts.pickup_calm:
-            return not self.adjacent_hostiles(lv) and self.turn() - self.last_shot_turn > 5
-        return not self.view_threats(lv)
+        """May item goals be pursued / piles inspected now? Not in combat: nothing in melee range and not shot
+        at in the last 5 turns. Goals and the steps that consume them use this same test."""
+        return not self.adjacent_hostiles(lv) and self.turn() - self.last_shot_turn > 5
 
     def is_peaceful(self, pos):
         g = int(self.obs["glyphs"][pos])
@@ -262,8 +258,7 @@ class PerceptionMixin:
     def hallu_blind_ranged(self):
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
         from a peaceful (61520 threw a dagger into one)."""
-        return bool(self.opts.hallu_strike
-                    and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU
+        return bool(int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU
                     and self.strike_scope_ok(self.levels.get(self.cur_key)))
 
     def strike_scope_ok(self, lv):

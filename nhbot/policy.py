@@ -103,16 +103,15 @@ class PolicyMixin:
             self.pending_mines_mark = True
             self.press("<")
             return True
-        if self.opts.mines_return:
-            if lv.key[0] == 2:
-                if self.is_minetown(lv) or self.town_folk_visible():
-                    self.minetown_seen = True
-                if not self.minetown_seen and lv.key[1] >= 5:
-                    self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
-            elif self.mines_return_on:
-                self.mines_return_on = False
-                self.mines_done = True
-                self.mines_done_turn = self.turn()
+        if lv.key[0] == 2:
+            if self.is_minetown(lv) or self.town_folk_visible():
+                self.minetown_seen = True
+            if not self.minetown_seen and lv.key[1] >= 5:
+                self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
+        elif self.mines_return_on:
+            self.mines_return_on = False
+            self.mines_done = True
+            self.mines_done_turn = self.turn()
         return False
 
     def step_progress(self, c):
@@ -181,13 +180,10 @@ class PolicyMixin:
 
     # ------------------------------------------------------------------ monsters around
     def step_perceive(self, c):
-        if self.opts.use_enhance:
-            self.enhance_step()
+        self.enhance_step()
         hostiles = self.adjacent_hostiles(c.lv)
-        if self.opts.blind_strike:
-            hostiles = self.blind_attackers(c.lv, hostiles)
-        if self.opts.hallu_strike:
-            hostiles = self.hallu_attackers(c.lv, hostiles)
+        hostiles = self.blind_attackers(c.lv, hostiles)
+        hostiles = self.hallu_attackers(c.lv, hostiles)
         c.hostiles = hostiles
         return False
 
@@ -201,7 +197,7 @@ class PolicyMixin:
         return False
 
     def step_vault_guard(self, c):
-        return self.opts.vault_guard and self.vault_step(c.lv, c.hostiles)
+        return self.vault_step(c.lv, c.hostiles)
 
     def step_blind(self, c):
         """Wandering blind walks into things we can't see: wait."""
@@ -210,12 +206,12 @@ class PolicyMixin:
             self.blind_waits += 1
             # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
             # would look like the attacker when something else hits us in the same turn (61688)
-            self.press("." if self.opts.blind_strike and self.strike_scope_ok(c.lv) else "s")
+            self.press("." if self.strike_scope_ok(c.lv) else "s")
             return True
         return False
 
     def step_heal(self, c):
-        return self.opts.use_abilities and self.heal_step(c.hostiles)
+        return self.heal_step(c.hostiles)
 
     def step_history(self, c):
         lv, y, x, hostiles = c.lv, c.y, c.x, c.hostiles
@@ -243,20 +239,20 @@ class PolicyMixin:
         return not c.hostiles and self.weapon_check()
 
     def step_wands(self, c):
-        return self.opts.use_roles and not self.hallu_blind_ranged() and self.wand_step(c.lv, c.hostiles)
+        return not self.hallu_blind_ranged() and self.wand_step(c.lv, c.hostiles)
 
     def step_melee(self, c):
         """Attack the weakest-looking (lowest level) adjacent hostile; focus: Smith's rule among several."""
         if not c.hostiles:
             return False
         target = min(c.hostiles, key=lambda t: self.mon_level(t[0]))[0]
-        if self.opts.focus and len(c.hostiles) > 1:
+        if len(c.hostiles) > 1:
             target = self.focus_target(c.hostiles, target)
         self.attack(target)
         return True
 
     def step_hunt_shooter(self, c):
-        return self.opts.hunt_shooter and not self.hallu_blind_ranged() and self.hunt_step(c.lv)
+        return not self.hallu_blind_ranged() and self.hunt_step(c.lv)
 
     def step_rest_on_elbereth(self, c):
         if (c.y, c.x) in c.lv.elbereth and c.hp * 2 < c.maxhp:
@@ -332,26 +328,24 @@ class PolicyMixin:
         inspect the pile here. Hostiles in view but not in combat (pickup_calm): loot and the pile only."""
         lv, y, x = c.lv, c.y, c.x
         c.vis = self.view_threats(lv)
-        if not (self.opts.use_armor or self.opts.use_food):
-            return False
         if not c.vis:
             if self.need_pay:
                 self.need_pay = False
                 self.pay()
                 return True
-            if self.opts.use_armor and self.shop_step(lv):
+            if self.shop_step(lv):
                 return True
             if self.excal_step(lv):
                 return True
             if self.loot_step(lv):
                 return True
-            if self.opts.read_good and self.read_good_scroll():
+            if self.read_good_scroll():
                 return True
-            if self.opts.use_armor and self.equip_step(lv):
+            if self.equip_step(lv):
                 return True
             if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
                 return True
-        elif self.opts.pickup_calm and self.items_gate(lv):
+        elif self.items_gate(lv):
             # monsters in view but none in reach and nobody shooting: still collect what lies here
             if self.loot_step(lv):
                 return True

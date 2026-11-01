@@ -130,8 +130,6 @@ class ElberethMixin:
         return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
-        if not self.opts.elb2:
-            return False
         st = self.elb_state
         y, x = self.pos()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
