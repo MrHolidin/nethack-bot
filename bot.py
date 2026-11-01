@@ -1026,6 +1026,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return True
         return self.is_minetown(lv)
 
+    def town_folk_visible(self):
+        """Minetown's watch, temple priest or shopkeepers in view (an unlit Minetown may hide its altar)."""
+        if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            return False
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        return any(G.monster_name(int(g[yy, xx])) in ("watchman", "watch captain", "aligned priest", "shopkeeper")
+                   for yy, xx in zip(ys, xs))
+
     def is_minetown(self, lv):
         """A Mines level with an altar, a fountain or a shop: Minetown (every variant has a temple altar;
         filler Mines levels and Mines' End have none of the three)."""
@@ -1153,13 +1162,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.role_opts.get("mines_return", False):
             if lv.key[0] == 2:
-                if self.is_minetown(lv):
+                if self.is_minetown(lv) or self.town_folk_visible():
                     self.minetown_seen = True
                 if not self.minetown_seen and lv.key[1] >= 5:
                     self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
             elif self.mines_return_on:
                 self.mines_return_on = False
                 self.mines_done = True
+                self.mines_done_turn = self.turn()
         y, x = self.pos()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         hunger = self.bl(nh.NLE_BL_HUNGER)
@@ -1486,7 +1496,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
-        if lv.avoid_down and on_level < self.role_opts.get("mines_after", 3000) and self.mines_blocked():
+        # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
+        # (the branch level was first entered long before, which re-opened the Mines at once)
+        hatch = self.turn() - self.mines_done_turn if self.mines_done else on_level
+        if lv.avoid_down and hatch < self.role_opts.get("mines_after", 3000) and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
@@ -2007,6 +2020,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.mines_bounced = set()
         self.mines_return_on = False
         self.mines_done = False
+        self.mines_done_turn = 0
         self.minetown_seen = False
         self.mines_return_log = []
         self.prev_key = None
