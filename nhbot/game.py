@@ -109,6 +109,7 @@ class GameMixin:
             self.raw_step(ord("n" if self.keep_after_offer() else "y"))
             return
         if "really attack" in m:
+            self.really_attacks += 1
             self.mark_peaceful_target()
             self.raw_step(27)
         elif "are you sure you want to pray" in m:

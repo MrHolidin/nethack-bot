@@ -1,6 +1,7 @@
 """Fighting: melee, throwing (at monsters we won't melee, at a blocker in the only way through),
 picking thrown missiles back up, hunting a shooter, attack wands."""
 import re
+from collections import Counter
 
 import numpy as np
 import nle.nethack as nh
@@ -53,6 +54,7 @@ RTRAP_RE = re.compile(r"trap|shoots out at you|falls on your head|from the ceili
 
 class CombatMixin:
     def combat_init(self):
+        self.kill_by = Counter()       # our kills, by kind
         self.zaps = 0
         self.empty_wands = set()
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
@@ -380,6 +382,9 @@ class CombatMixin:
         self.focus_note(m)
         if re.search(r"You (kill|destroy) ", m):
             self.kill_count += 1
+            mk0 = re.search(r"You (?:kill|destroy) (?:the |an? )?(.+?)!", m)
+            if mk0:
+                self.kill_by[mk0.group(1)] += 1
         mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
         self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:

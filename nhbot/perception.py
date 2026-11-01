@@ -14,9 +14,11 @@ from nhbot.monattacks import ATTACKS
 from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PASSIVE_ONLY, PM_BY_NAME, THIEVES, USUALLY_PEACEFUL, permonst_of
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
-# (gas spore) or none at all (shrieker). No monster without one can move (mmove 0 for all that can't).
+# (gas spore), the Oracle, a long worm's tail. No monster without one can move (mmove 0 for all that can't).
+# Not the shrieker: no attack, but next to us it shrieks every move (mon.c m_respond): wakes the level, and
+# one shriek in 10 creates a monster (1 in 13 of those a purple worm).
 NO_ACTIVE_ATTACK = {nh.permonst(i).mname for i in range(nh.NUMMONS)
-                    if all(a[0] in ("NONE", "BOOM") for a in ATTACKS[i])}
+                    if all(a[0] in ("NONE", "BOOM") for a in ATTACKS[i])} - {"shrieker"}
 
 
 M2_HUMAN, M2_ELF, M2_DWARF, M2_GNOME, M2_ORC = 0x8, 0x10, 0x20, 0x40, 0x80

@@ -82,6 +82,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self._last_logged, self._last_logged_step = None, -1
         self.killed = None        # msg_combat: what the message being handled says we killed
         self.asked = ""          # game.ask: the last question's message
+        self.really_attacks = 0   # "Really attack?" questions (answered no)
         self.msg_audit = Counter()  # cases where message reading may go wrong (game.audit, pickup, ...)
         self.here_window = None   # (turn, pos, text) of the last 'Things that are here' window
         self.tick_seq = 0         # msg_seq at the start of this tick
@@ -279,6 +280,10 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "farlooks": self.farlooks,
             "peaceful_hits": dict(self.peaceful_hits),
             "peace_turned": self.peace_turned,
+            "really_attacks": self.really_attacks,
+            "hunger_turns": {["satiated", "not_hungry", "hungry", "weak", "fainting", "fainted", "starved"][k] if k < 7 else str(k): v for k, v in sorted(self.hunger_turns.items())},
+            "eaten_by": dict(self.eaten_by.most_common(12)),
+            "kill_by": dict(self.kill_by.most_common(15)),
             "peaceful_wait_by": dict(self.peaceful_wait_by.most_common(8)),
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],

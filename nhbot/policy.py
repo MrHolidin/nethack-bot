@@ -75,6 +75,10 @@ class PolicyMixin:
         self.last_step = None
         self.chasing = None
         self.tick_no += 1
+        t0, h0 = self._hunger_at
+        t, h = self.turn(), self.bl(nh.NLE_BL_HUNGER)
+        self.hunger_turns[h0] += t - t0
+        self._hunger_at = (t, h)
         self.tick_seq = self.msg_seq
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"

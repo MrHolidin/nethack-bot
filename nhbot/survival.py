@@ -1,6 +1,7 @@
 """Staying alive: prayer, eating (inventory food, fresh corpses of our kills), shedding weight,
 healing potions, skill enhancement, the vault guard protocol."""
 import re
+from collections import Counter
 
 import numpy as np
 import nle.nethack as nh
@@ -14,6 +15,9 @@ from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE
 
 class SurvivalMixin:
     def survival_init(self):
+        self.eaten_by = Counter()      # corpses eaten, by kind
+        self.hunger_turns = Counter()  # turns spent per hunger state (status line)
+        self._hunger_at = (0, 0)
         self.want_enhance = False
         self.enhances = 0
         self.quaffs = 0
@@ -95,6 +99,7 @@ class SurvivalMixin:
             if name and self.corpse_ok(name.group(1)):
                 self.press("y")
                 self.corpses_eaten += 1
+                self.eaten_by[name.group(1)] += 1
                 return True
             self.press("n", expect_prompt=True)
         if "what do you want to eat" in self.message().lower():
