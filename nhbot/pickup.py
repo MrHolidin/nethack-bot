@@ -64,15 +64,15 @@ def floor_kind(text):
         return nh.FOOD_CLASS, re.sub(r"s$", "", name)
     if name in FOOD_NAMES or one in FOOD_NAMES:
         return nh.FOOD_CLASS, name if name in FOOD_NAMES else one
+    a = parse_armor(text)                   # before the class words: "ring mail" is armor, not a ring
+    if a is not None:
+        return nh.ARMOR_CLASS, a["name"]
     m = CLASS_RE.search(name)
     if m:
         return CLASS_WORDS[m.group(1)], name
     w = WEAPON_NAME_OF.get(name) or WEAPON_NAME_OF.get(one)
     if w:
         return nh.WEAPON_CLASS, w
-    a = parse_armor(text)
-    if a is not None:
-        return nh.ARMOR_CLASS, a["name"]
     if name in TOOL_WORDS or one in TOOL_WORDS:
         return nh.TOOL_CLASS, one if one in TOOL_WORDS else name
     if one in ("boulder", "statue") or one.startswith("statue of"):
@@ -294,9 +294,13 @@ class PickupMixin:
         seq0 = self.msg_seq
         self._take_state = (self.food_count(), self.bl(nh.NLE_BL_CAP))    # judged as before the pickup
         try:
-            self.pickup(want, site)
-            lone = next((mm for mm in (re.match(r"^([a-zA-Z]) - (.+?)\.?$", t) for t in self.msgs_since(seq0))
-                         if mm), None)
+            how = self.pickup(want, site)
+            lone = None
+            if how == "lone":            # one item, no menu: "f - an orcish dagger." (a menu pickup of several
+                for t in self.msgs_since(seq0):     # items reports them all in one line: not this case)
+                    lone = re.match(r"^([a-zA-Z]) - ([^.]+)", t)
+                    if lone:
+                        break
             bad = lone is not None and not want(lone.group(2))
         finally:
             self._take_state = None
@@ -307,7 +311,7 @@ class PickupMixin:
     # ------------------------------------------------------------------ the menu
     def pickup(self, want, site):
         """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
-        without a menu)."""
+        without a menu). Returns "menu", or "lone" when there was no menu."""
         seq0 = self.msg_seq
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
@@ -317,7 +321,7 @@ class PickupMixin:
                 mm = re.match(r"^[a-zA-Z] - (.+?)\.?$", t)
                 if mm and not want(mm.group(1)):
                     self.msg_audit["lone_unwanted_" + site] += 1     # picked up what the filter rejects
-            return
+            return "lone"
         if re.search(r"\(1 of \d+\)", tty):
             self.msg_audit["pickup_multipage_" + site] += 1
         n = 0
@@ -327,6 +331,7 @@ class PickupMixin:
                 n += 1
         self.raw_step(13 if n else 27)
         self.settle()
+        return "menu"
 
     def pickup_matching(self, words, no_sale=False, own=False):
         if not own and self.merch_risk(self.level(), self.pos()):
