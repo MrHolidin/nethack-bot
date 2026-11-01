@@ -1153,7 +1153,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
-            self.press("s")
+            # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
+            # would look like the attacker when something else hits us in the same turn (61688)
+            self.press("." if self.role_opts.get("blind_strike", False) else "s")
             return
         if self.use_abilities and self.heal_step(hostiles):
             return
