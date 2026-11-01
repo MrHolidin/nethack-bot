@@ -61,35 +61,6 @@ class ValkMixin:
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
 
-    def nymph_elb_instead(self, lv, hostiles, pos):
-        """nymph_pk: a thief is next to us. One action either way: a swing kills it with P(kill in one hit);
-        a dust Elbereth stops its theft if spelled right, (24/25)^8 = 0.72 (engrave.c degrades each
-        character with 1/25; our own count over 4375 engravings: 0.718). Engrave if that is likelier; on an
-        intact Elbereth, wait instead of swinging (attacking from it wipes it). 20-turn cap per stand."""
-        y, x = self.pos()
-        if any(not self.respects_elbereth(n, p) for p, n in hostiles):
-            return False
-        on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
-        if on_elb:
-            if getattr(self, "nymph_pk_waits", 0) >= 20:
-                return False
-            self.nymph_pk_waits = getattr(self, "nymph_pk_waits", 0) + 1
-            self.nymph_pk_wait_total = getattr(self, "nymph_pk_wait_total", 0) + 1
-            self.cur_act = "fight"
-            self.press("s")
-            return True
-        self.nymph_pk_waits = 0
-        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
-        if cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF) or \
-                not self.can_engrave_here(lv) or G.KIND[lv.under[y, x]] in (G.UPSTAIR, G.DOWNSTAIR):
-            return False
-        if self.kill_one_hit_p(pos) >= (24 / 25) ** 8:
-            return False
-        self.nymph_pk_elbs = getattr(self, "nymph_pk_elbs", 0) + 1
-        self.cur_act = "fight"
-        self.engrave_elbereth()
-        return True
-
     def thieves_visible(self, lv):
         g = self.obs["glyphs"]
         out = []
@@ -105,8 +76,6 @@ class ValkMixin:
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
         adj = [(p, n) for p, n in hostiles if n in THIEVES]
         if adj:
-            if self.vopt("nymph_pk", False) and self.nymph_elb_instead(lv, hostiles, adj[0][0]):
-                return True
             self.attack(adj[0][0])
             return True
         th = self.thieves_visible(lv)
@@ -193,7 +162,7 @@ class ValkMixin:
             self.settle()
             return
         n = 0
-        lines = self.menu_lines(tty, "Pick up what?") if self.vopt("menu_fix", True) else tty.split("\n")
+        lines = self.menu_lines(tty, "Pick up what?")
         for line in lines:
             mm = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
             if mm and "corpse" not in mm.group(2) and "boulder" not in mm.group(2):
@@ -285,48 +254,9 @@ class ValkMixin:
         self.rewields += 1
         return True
 
-# =====================================================================================
-# kill_loot: a dead monster's inventory lies UNDER its corpse, so the '[' never shows.
-#            Look at the square of every humanoid we kill and take armor/food.
-# =====================================================================================
-M1_HUMANOID = 0x20000
 WIELDED_RE = re.compile(r"\((?:weapons? in \w+|wielded)")
 PM_BY_NAME_V = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 
-
-class ValkMixin2:
-    def valk2_init(self):
-        self.kill_loot = []           # (level key, pos, turn)
-        self.kill_loot_checks = 0
-
-    # ------------------------------------------------------------------ kill loot
-    def note_kill(self, name, pos):
-        if not self.vopt("kill_loot", False) or pos is None:
-            return
-        pm = PM_BY_NAME_V.get(name)
-        if pm is not None and pm.mflags1 & M1_HUMANOID:
-            self.kill_loot.append((self.cur_key, pos, self.turn()))
-
-    def kill_loot_step(self, lv):
-        if not self.kill_loot:
-            return False
-        t = self.turn()
-        self.kill_loot = [k for k in self.kill_loot if t - k[2] < 300]
-        y, x = self.pos()
-        cand = [k for k in self.kill_loot if k[0] == lv.key]
-        if not cand:
-            return False
-        goal = min(cand, key=lambda k: max(abs(k[1][0] - y), abs(k[1][1] - x)))
-        if goal[1] == (y, x):
-            self.kill_loot.remove(goal)
-            self.kill_loot_checks += 1
-            self.inspected.get(lv.key, set()).discard((y, x))
-            self.armor_pickup_here(lv)
-            return True
-        if max(abs(goal[1][0] - y), abs(goal[1][1] - x)) > 15 or not self.go_toward(lv, goal[1]):
-            self.kill_loot.remove(goal)
-            return False
-        return True
 
 # =====================================================================================
 # elb2: Elbereth as measured in NLE 3.6.6 wizard mode
@@ -343,7 +273,6 @@ RTHREAT_RE = re.compile(r"(?:throws|shoots) |zaps (?:a|an|the) |You are (?:almos
                         r"whizzes by you|hits you!|crashes on your head|You hear a nearby zap")
 # ...but arrow/dart/rock traps print the same 'You are hit by' lines
 RTRAP_RE = re.compile(r"trap|shoots out at you|falls on your head|from the ceiling")
-RTHREAT_TTL = 100
 
 
 B_HUMAN_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "human")
@@ -401,9 +330,6 @@ class ElberethMixin:
         self.elb_fail = 0
         self.elb_rewrites = 0
         self.elb_only_c = 0
-        self.rthreat = None          # (level key, turn of the last evidence of a ranged attacker)
-        self.rthreat_events = collections.Counter()
-        self.rthreat_msgs = []
 
     def read_engraving(self):
         """Text of the engraving under us, from the answer to THIS ':' only (older 'You read' lines in the
@@ -424,46 +350,12 @@ class ElberethMixin:
             return False
         return pm.mlet not in (B_HUMAN_MLET, B_ANGEL_MLET)
 
-    # ------------------------------------------------------------ ranged threat (rthreat)
-    def rthreat_note(self, m):
-        """Called for every message: a missile, ray or wand aimed at us (or a zap heard nearby)."""
-        if not self.vopt("rthreat", False) or not RTHREAT_RE.search(m):
-            return
-        t = self.turn()
-        if getattr(self, "own_zap_turn", None) == t:          # our own ray bouncing back
-            return
-        recent = " ".join(mm for tt, mm in list(self.messages)[-4:] if tt == t)
-        if RTRAP_RE.search(recent):
-            return
-        self.rthreat_set("msg", m)
-
-    def rthreat_set(self, why, m=""):
-        if not hasattr(self, "rthreat_events"):
-            return
-        self.rthreat = (self.cur_key, self.turn())
-        self.rthreat_events[why] += 1
-        if len(self.rthreat_msgs) < 30:
-            self.rthreat_msgs.append(f"T{self.turn()} {why}: {m[:120]}")
-
-    def rthreat_active(self):
-        """A ranged attacker (possibly unseen) is around: Elbereth does not help, don't write or rest on it.
-        Clears after RTHREAT_TTL turns without new evidence, and on another level."""
-        r = getattr(self, "rthreat", None)
-        return bool(self.vopt("rthreat", False) and r and r[0] == self.cur_key
-                    and self.turn() - r[1] <= RTHREAT_TTL)
-
     def elb_blocked(self, lv):
-        """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write.
-        rthreat: monsters that merely might carry missiles/wands (class C) count as respecting it; a ranged
-        attack seen or felt switches Elbereth off for a while instead (rthreat_active)."""
+        """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
         glyphs, me = self.obs["glyphs"], self.pos()
-        skip = ("Oracle", "shopkeeper", "aligned priest") if self.vopt("elb_peace", False) else ()
-        full = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], skip_names=skip)
-        if full and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True, skip_names=skip):
+        bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0])
+        if bl and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
-        bl = full
-        if full and self.vopt("rthreat", False):
-            bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True, skip_names=skip)
         if bl:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
         return bool(bl)
@@ -472,8 +364,7 @@ class ElberethMixin:
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
-        dip_on = self.vopt("dip_elb", False) and self.turn() < getattr(self, "dip_threat_until", -1)
-        if (self.can_pray() and not dip_on) or self.rthreat_active():
+        if self.can_pray():
             return False
         if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
@@ -485,9 +376,7 @@ class ElberethMixin:
         if not threats:
             return False
         swarm = sum(1 for _, n in threats if n in SWARMERS)
-        dip = self.vopt("dip_elb", False) and self.turn() < getattr(self, "dip_threat_until", -1) \
-            and any(n in ("water demon", "water moccasin") for _, n in threats)
-        if not (hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2 or dip):
+        if not (hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2):
             return False
         return not self.elb_blocked(lv)
 
@@ -503,18 +392,7 @@ class ElberethMixin:
                 self.elb_state = None
             else:
                 bad = [n for p, n in hostiles if not self.respects(p, n)]
-                hurt = hp < st["hp_hist"][-1]
                 st["hp_hist"].append(hp)
-                # rthreat: hurt while the engraving is intact and nothing that ignores it is adjacent -> hit
-                # from range. (A broken engraving explains a melee hit: rewrite below.)
-                if hurt and not bad and self.vopt("rthreat", False) and not self.rthreat_active() \
-                        and self.read_engraving() == "Elbereth":
-                    st["last_read"] = self.turn()
-                    self.rthreat_set("hurt on Elbereth", f"{st['hp_hist'][-2]}->{hp}")
-                if self.rthreat_active():
-                    self.elb_exits["rthreat"] += 1
-                    self.elb_state = None
-                    return False
                 # a dust engraving wears off on its own (allmain.c: 1/(40+3*Dex) per turn); with a foe
                 # adjacent check it every turn (reading is free); a hit through a smudged one means rewrite
                 if hostiles and not bad:
@@ -554,29 +432,9 @@ class ElberethMixin:
                 self.cur_act = "rest"
                 self.press("s")
                 return True
-        if self.vopt("dip_elb", False) and self.turn() < getattr(self, "dip_threat_until", -1) \
-                and not self.can_engrave_here(lv) and self.dip_step_off(lv):
-            return True
         if not self.elb_wanted(lv, hostiles):
             return False
         return self.elb_write(lv)
-
-    def dip_step_off(self, lv):
-        """A dip let out a water demon / moccasins and we stand on the fountain, where nothing can be
-        engraved: step to a free neighbouring square that can hold an Elbereth."""
-        import glyphs as G2
-        y, x = self.pos()
-        g = self.obs["glyphs"]
-        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)):
-            ny, nx = y + dy, x + dx
-            if not (0 <= ny < g.shape[0] and 0 <= nx < g.shape[1]):
-                continue
-            k = G2.KIND[int(g[ny, nx])]
-            if k in (G2.FLOOR, G2.CORPSE, G2.OBJECT) and G2.KIND[int(lv.under[ny, nx])] in (G2.FLOOR, G2.CORPSE, G2.OBJECT):
-                self.cur_act = "dipflee"
-                self.move((ny, nx))
-                return True
-        return False
 
     def elb_write(self, lv):
         """Engrave and verify by reading. Any failure to reach the text prompt (fountain/altar/stairs,

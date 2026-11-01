@@ -1,8 +1,8 @@
 """Carry valuables, never be Burdened, sell what we don't use (flag carry).
 
 Pick up: wands, rings, amulets, scrolls, potions (light and worth gold; gold on hand is score 1:1).
-carry_more: also tools (not a pick-axe -- shopkeepers keep diggers out -- nor chests, boxes, traps) and armor
-we won't wear (kept for selling instead of dropped at once).
+carry_all: also tools (not chests, boxes, traps) and armor we won't wear (kept for selling instead of dropped at
+once), spellbooks, gems/glass and diggers.
 
 Never Burdened (Burdened costs a quarter of our speed). When the status shows any encumbrance, drop one
 unit per turn, in this order:
@@ -14,7 +14,7 @@ A square we dropped something on is remembered: no going back to pick it up.
 
 Sell: in a shop that buys the class (general store: everything), drop each item we have no use for deep
 inside the shop and accept the offer; take back what the shopkeeper won't buy. Kept: identified attack
-wands (wand_step), healing potions (heal_step), scrolls known to be good (scroll_id).
+wands (wand_step), healing potions (heal_step), scrolls known to be good (read_good).
 
 Identity comes from the item text only: an unidentified potion/scroll/ring/wand/amulet/spellbook is named
 by its appearance ("bubbly potion", "scroll labeled FOO"); identified ones by "... of X".
@@ -193,9 +193,6 @@ class CarryMixin:
     def carry_on(self):
         return bool(self.role_opts.get("carry", True))
 
-    def carry_more_on(self):
-        return self.carry_on() and bool(self.role_opts.get("carry_more", False) or self.carry_all_on())
-
     def carry_all_on(self):
         """carry_all: pick up everything worth carrying -- carry_more (tools, armor) plus spellbooks, gems/glass
         and diggers (pick-axe, mattock: kept, never sold).
@@ -209,7 +206,7 @@ class CarryMixin:
         return self.carry_on() and bool(self.role_opts.get("weapons", True))
 
     def carry_classes(self):
-        return CARRY_CLASSES + (MORE_CLASSES if self.carry_more_on() else ()) + \
+        return CARRY_CLASSES + (MORE_CLASSES if self.carry_all_on() else ()) + \
             ((nh.WEAPON_CLASS,) if self.carry_weapons_on() else ()) + \
             ((nh.SPBOOK_CLASS, nh.GEM_CLASS) if self.carry_all_on() else ())
 
@@ -219,13 +216,13 @@ class CarryMixin:
         makes the step that inspects it (and so removes the goal) run."""
         if not self.carry_on():
             return False
-        return bool(CARRY_GLYPH[g] or (self.carry_more_on() and MORE_GLYPH[g])
+        return bool(CARRY_GLYPH[g] or (self.carry_all_on() and MORE_GLYPH[g])
                     or (self.carry_weapons_on() and WEAPON_GLYPH[g]) or (self.carry_all_on() and ALL_GLYPH[g]))
 
     def carry_targets(self, lv):
         if not self.carry_on():
             return None
-        glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_more_on() else CARRY_GLYPH
+        glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_all_on() else CARRY_GLYPH
         if self.carry_weapons_on():
             glyphs = glyphs | WEAPON_GLYPH
         if self.carry_all_on():
@@ -254,7 +251,7 @@ class CarryMixin:
             one = " ".join(singular(w) for w in core.split(" "))
             if (core in WEAPON_NAME_OF or one in WEAPON_NAME_OF) and " cursed" not in " " + n:
                 return core
-        if self.carry_more_on():
+        if self.carry_all_on():
             a = parse_armor(n)
             if a is not None:
                 return a["name"]
@@ -336,7 +333,7 @@ class CarryMixin:
             return True
         if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
             return True
-        if c == nh.SCROLL_CLASS and (self.role_opts.get("scroll_id") or self.role_opts.get("read_good", True)) \
+        if c == nh.SCROLL_CLASS and self.role_opts.get("read_good", True) \
                 and self.scroll_is_good(s):
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
@@ -359,16 +356,12 @@ class CarryMixin:
                 and "in quiver" not in s]
 
     def keep_after_offer(self):
-        """pid_wear: the offer just recorded may show the random-appearance armor we are selling is safe;
-        if it would also be an upgrade, don't sell it (equip_step wears it once we take it back)."""
+        """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
         c, s = getattr(self, "selling_item", (None, ""))
         if c == nh.SCROLL_CLASS and self.role_opts.get("read_good", True) and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
-        if c != nh.ARMOR_CLASS or not self.role_opts.get("pid_wear", False):
-            return False
-        a = parse_armor(s)
-        return bool(a) and self.price_safe(a["name"]) and self.improves(dict(a, safe=True), self.worn_by_slot())
+        return False
 
     def carry_shop_greeted(self, lv, stype):
         if not self.carry_on() or lv.key in self.shops_done or not self.sellables(lv, stype):

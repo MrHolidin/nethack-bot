@@ -177,8 +177,7 @@ class EquipMixin:
         return any("(weapon in hands)" in s for _, _, s in self.inventory())
 
     def improves(self, a, worn):
-        safe = a.get("safe") or (hasattr(self, "price_safe") and self.price_safe(a["name"]))
-        if a["slot"] is None or not safe or not self.slot_allowed(a["slot"]):
+        if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
             return False
         if (a["name"], a.get("letter")) in self.wear_failed:
             return False
@@ -187,9 +186,6 @@ class EquipMixin:
             return value(a) > 0.5
         if cur.get("cursed") or a["slot"] in self.cursed_slots:
             return False
-        if a["slot"] == BOOTS and hasattr(self, "magic_boots") and self.magic_boots(a["name"]) \
-                and not self.magic_boots(cur["name"]) and value(a) + 0.5 >= value(cur):
-            return True        # speed / water walking / jumping at no AC cost beats plain boots
         return value(a) > value(cur) + 0.5
 
     # ---------------------------------------------------------- main hook
@@ -206,7 +202,7 @@ class EquipMixin:
             self.wear(best, worn)
             return True
         # 2) drop carried armor we will never wear (weight)
-        junk = [] if (hasattr(self, "carry_more_on") and self.carry_more_on()) else [a for a in inv if not a["worn"]]
+        junk = [] if self.carry_all_on() else [a for a in inv if not a["worn"]]
         if junk:
             self.drop_letter(junk[0]["letter"])
             return True
@@ -311,11 +307,10 @@ class EquipMixin:
     def food_wanted(self, name):
         if not self.use_food or self.food_count() >= MAX_FOOD:
             return False
-        ro = getattr(self, "role_opts", {})
         if "egg" in name or re.search(r"\btins?\b", name):
             return False
-        if "partly eaten" in name and not ro.get("food_partly"):
-            return False                 # food_partly: a partly eaten ration is still a safe ration
+        if "partly eaten" in name:
+            return False
         if self.role == "Monk" and any(m and m in name for m in MEAT):
             return False
         return any(f in name for f in SAFE_FOOD)

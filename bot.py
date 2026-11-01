@@ -19,10 +19,8 @@ from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
 from scrolls import ScrollMixin
-from valk import ValkMixin, ValkMixin2, ElberethMixin, RTHREAT_RE, RTRAP_RE, NYMPHS
+from valk import ValkMixin, ElberethMixin, RTHREAT_RE, RTRAP_RE
 from shop import ShopMixin
-from wandid import WandIdMixin
-from armorid import ArmorIdMixin, RANDOM_APPEARANCE
 from carry import CarryMixin, CARRY_GLYPH, LEAVE_RE
 from pricemem import PriceMemoryMixin
 
@@ -55,15 +53,6 @@ IT_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches you|st
 MELEE_ON_US_RE = re.compile(r"\bThe [^.!]+? (?:hits|bites|misses|just misses|stings|kicks|butts|claws|scratches|"
                             r"thrusts|swings|grabs|lashes|tickles|stabs|pummels|whips|touches you|engulfs you|"
                             r"squeezes you|gores|charms you)!")
-# trap.c messages for a trap going off on (or found at) our own square, for traps that leave us standing on it
-TRAP_HERE_RE = re.compile(r"There is an? [a-z ]*trap here|You escape an? [a-z ]*trap|a rock falls on your head|"
-                          r"An arrow shoots out at you|A little dart shoots out at you|A bear trap closes on your|"
-                          r"You fall into a pit|You land on a set of sharp iron spikes|A board beneath you squeaks|"
-                          r"A gush of water hits (?:you\b|your )|A tower of flame (?:erupts|bursts) from the floor!|"
-                          r"A cloud of gas puts you to sleep|"
-                          r"You (?:stumble into|are caught in|flounder in) a (?:spider )?web|"
-                          r"You trigger a rolling boulder trap|You step onto a (?:polymorph|magic) trap|"
-                          r"You are caught in a magical explosion|You feel momentarily lethargic")
 # eat.c cannibal test / were.c were_beastie(): the animals that count as our kind once infected
 WERE_KIN = {"werejackal": {"jackal", "fox", "coyote", "werejackal"},
             "wererat": {"sewer rat", "giant rat", "rabid rat", "wererat"},
@@ -142,10 +131,9 @@ class Level:
         self.peaceful = set()     # monster glyphs that turned out peaceful here
         self.entered_turn = None
         self.elbereth = set()     # positions where we engraved
-        self.trap_mem = set()     # trap_mem: squares where a trap went off under us (an object may hide its ^)
 
 
-class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin, PriceMemoryMixin, WandIdMixin):
+class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ElberethMixin, FocusMixin, ScrollMixin, CarryMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  avoid_mines=False, use_armor=True, use_food=True, use_tactics=False,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
@@ -246,12 +234,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
-                if "for what do you wish" in (msg + self.top_line()).lower() and self.role_opts.get("wish", False):
-                    for c in "blessed +2 gray dragon scale mail":
-                        self.raw_step(ord(c))
-                    self.raw_step(13)
-                    self.wishes_made = getattr(self, "wishes_made", 0) + 1
-                    continue
                 if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard", True):
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
@@ -271,10 +253,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.price_note_offer(msg + " " + self.top_line())       # every offer is a price reading
         if self.selling and ("sell it" in m or "sell them" in m):
             self.raw_step(ord("n" if self.keep_after_offer() else "y"))
-            return
-        if getattr(self, "sell_probe", None) and "sell" in m:
-            self.on_sell_offer(msg + " " + self.top_line())
-            self.raw_step(ord("n"))
             return
         if "really attack" in m:
             self.mark_peaceful_target()
@@ -329,7 +307,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.prev_pos, self._cur_pos = getattr(self, "_cur_pos", None), (y, x)
         lv.visited[y, x] += 1
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
-        if self.role_opts.get("shop_side", True) and not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
+        if not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
                 and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
                 and int(lv.under[y, x]) not in (nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22):
             # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
@@ -351,7 +329,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.poison_res = True
         if self.role_opts.get("focus", True):
             self.focus_note(m)
-        self.rthreat_note(m)
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
         if lv and self.last_move_target and any(s in m for s in (
@@ -382,8 +359,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
                 self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
-            if hasattr(self, "kill_loot"):
-                self.note_kill(mk.group(2), self.last_attack_target)
         if "You feel that" in m and "displeased" in m:
             self.pray_failed += 1
         if self.last_pray is not None and self.turn() - self.last_pray <= 5 and any(
@@ -399,10 +374,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
-        if "Invisible customers are not welcome" in m and lv is not None:
-            lv.shk_wait = 99                    # he won't let us in while we're invisible: stop waiting at the door
-        if self.role_opts.get("trap_mem", False) and lv is not None and TRAP_HERE_RE.search(m):
-            lv.trap_mem.add(self.pos())   # it went off under us; a falling rock / arrow / dart on it hides the ^
         if ("You can't go up here" in m or "You can't go down here" in m) and lv is not None:
             # we remembered a staircase that isn't here (arriving next to stairs a monster stood on marks the
             # wrong square); the refusal costs no time, so pressing again looped to the step cap
@@ -413,27 +384,22 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
         if MELEE_ON_US_RE.search(m):
             self.melee_on_us = True           # hallu_strike: something attacked us in melee this turn
-        if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
-            self.dip_threat_until = self.turn() + 150
         if self.role_opts.get("vault_guard", True):
             if "drop that gold" in m or "drop that money" in m:
                 self.vault_drop = True
             if "follow me" in m:
                 self.vault_follow_until = self.turn() + 300
                 self.guard_trail = []
-        if self.role_opts.get("shop_fix", True) and lv is not None and "Closed for inventory" in m:
+        if lv is not None and "Closed for inventory" in m:
             lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
-        on_door = lv is not None and G.KIND[lv.under[self.pos()]] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)
-        if self.role_opts.get("shop_fix2", True):
-            # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
-            # instead: we are inside only if we just fell / were teleported onto this level
-            recent = " ".join(mm for _, mm in list(self.messages)[-6:])
-            on_door = not any(k in recent for k in ("trap door", "fall through", "hole", "teleport",
-                                                     "wrenching", "You materialize"))
-        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and (on_door or not self.role_opts.get("shop_fix", True)):
-            # shop entrance: never go inside (we get trapped / risk shoplifting).
-            # shop_fix: only when we are at the door -- after falling in through a trap door we are
-            # inside, and marking from here walls us in
+        # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
+        # instead: we are inside only if we just fell / were teleported onto this level
+        recent = " ".join(mm for _, mm in list(self.messages)[-6:])
+        on_door = not any(k in recent for k in ("trap door", "fall through", "hole", "teleport",
+                                                 "wrenching", "You materialize"))
+        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and on_door:
+            # shop entrance: mark the shop from the door -- after falling in through a trap door we are
+            # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())
             self.shops_seen += 1
             self.shop_greeted(lv, m)
@@ -460,19 +426,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         g = self.obs["glyphs"]
         k_live = G.KIND[g]
         k_mem = G.KIND[lv.under]
-        if lv.trap_mem:
-            k_mem = k_mem.copy()
-            for p in lv.trap_mem:
-                if k_mem[p] in (G.FLOOR, G.OBJECT, G.CORPSE, G.GOLD, G.TRAP):
-                    k_mem[p] = G.TRAP
         return k_mem, k_live
 
     def passable_grid(self, lv, k_mem, k_live):
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
-        if self.role_opts.get("nymph_keep", False):
-            self.nymph_keep_mask(p)
         if self.role_opts.get("hallu_strike", True) and \
                 int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
@@ -552,8 +511,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         before = (y, x, self.turn())
         lv = self.level()
         if target in lv.locked:
-            if self.role_opts.get("shop_fix", True) and any(max(abs(cy - ty), abs(cx - tx)) <= 1
-                                                       for cy, cx in getattr(lv, "cfi", ())):
+            if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in getattr(lv, "cfi", ())):
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
                 return
@@ -591,17 +549,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         vis = self.visible_hostiles(lv)
         if self.shop_visits_on():
             vis = [v for v in vis if v[1] != "shopkeeper"]     # a peaceful shopkeeper is not a threat
-        if self.role_opts.get("vis_mobile", True):
-            # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
-            # stepping in and out of its line of sight flips this gate and two goals take turns
-            y, x = self.pos()
-            vis = [(p, n) for p, n in vis if max(abs(p[0] - y), abs(p[1] - x)) <= 1
-                   or n not in PM_BY_NAME or PM_BY_NAME[n].mmove > 0]
-        if self.role_opts.get("vis_passive", True):
-            # no active attack at all (molds, jellies, floating eye, shrieker): harmless unless we hit it, and
-            # we never do. Counting it only when adjacent made the gate flip on the square next to it (an item
-            # beside a brown mold was a goal from 2 squares away and forbidden on arrival).
-            vis = [(p, n) for p, n in vis if n not in PASSIVE_ONLY]
+        # a monster that cannot move (molds, lichens' kin with speed 0) only matters next to us; otherwise
+        # stepping in and out of its line of sight flips this gate and two goals take turns
+        y, x = self.pos()
+        vis = [(p, n) for p, n in vis if max(abs(p[0] - y), abs(p[1] - x)) <= 1
+               or n not in PM_BY_NAME or PM_BY_NAME[n].mmove > 0]
+        # no active attack at all (molds, jellies, floating eye, shrieker): harmless unless we hit it, and
+        # we never do. Counting it only when adjacent made the gate flip on the square next to it (an item
+        # beside a brown mold was a goal from 2 squares away and forbidden on arrival).
+        vis = [(p, n) for p, n in vis if n not in PASSIVE_ONLY]
         return vis
 
     def shopkeeper_in_view(self):
@@ -651,7 +607,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def always_avoid(self):
         s = ALWAYS_AVOID
-        if self.role_opts.get("eye_avoid", True) and not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
         return s
 
@@ -668,7 +624,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         came = getattr(self, "_cur_pos", None)          # map memory is not updated yet for the door square
         if came == door:
             came = getattr(self, "prev_pos", None)
-        if self.role_opts.get("shop_side", True) and came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
+        if came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
             # the greeting comes as we step onto the door from outside: the square we came from is outside.
             # Flooding both sides marked a room beyond the door as shop and left us stuck on the door.
             outside = self._flood(inside_ok, [came]) if inside_ok[came] else {came}
@@ -829,7 +785,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
-        if self.role_opts.get("no_bats", True) and name in ("bat", "giant bat", "vampire bat"):
+        if name in ("bat", "giant bat", "vampire bat"):
             return False                      # eat.c: bat corpses stun for 30 (giant bat 60) turns
         f1, f2 = pm.mflags1, pm.mflags2
         if f2 & (M2_UNDEAD | M2_WERE | M2_SHAPESHIFTER):
@@ -837,7 +793,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
             return False                      # cannibalism
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
-        if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res and self.role_opts.get("pois_eat", True):
+        if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res:
             return True                       # poison resistant: a poisonous corpse is ordinary food
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > 20
@@ -946,9 +902,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.settle()
             return
         chosen = 0
-        lines = tty.split("\n")
-        if own or self.role_opts.get("menu_fix", True):
-            lines = self.menu_lines(tty, "Pick up what?")
+        lines = self.menu_lines(tty, "Pick up what?")
         for line in lines:
             m = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
             if m and any(w in m.group(2) for w in words) and not (no_sale and "for sale" in m.group(2)):
@@ -1022,20 +976,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         return out
 
     def never_melee(self, name):
-        """passive_nomelee: one rule from monster data instead of the hand list -- don't hit what has only a
-        passive attack (it never hurts us otherwise); desperate (stuck) still may."""
-        if name in ("cockatrice", "chickatrice") and self.role_opts.get("cocka_melee", True) \
-                and any("weapon in hand" in s for _, _, s in self.inventory()):
+        """Don't hit what has only a passive attack (it never hurts us otherwise); desperate (stuck) still may."""
+        if name in ("cockatrice", "chickatrice") and any("weapon in hand" in s for _, _, s in self.inventory()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
-        if name in ("brown mold", "blue jelly") and self.role == "Valkyrie" and self.role_opts.get("cold_melee", False):
-            return False       # their passive is cold only, and Valkyries are born cold resistant
-        return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
+        return name in NEVER_MELEE or name in PASSIVE_DMG
 
     def strike_scope_ok(self, lv):
-        """strike_town: blind_strike / hallu_strike only in Minetown -- a Mines level with an altar, a fountain or
+        """blind_strike / hallu_strike only in Minetown -- a Mines level with an altar, a fountain or
         a shop (filler Mines levels have none), where the peaceful watch, priest and shopkeepers are."""
-        if not self.role_opts.get("strike_town", True):
-            return True
         return self.is_minetown(lv)
 
     def town_folk_visible(self):
@@ -1104,22 +1052,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.blind_held = getattr(self, "blind_held", 0) + 1
         return out
 
-    def nymph_keep_mask(self, p):
-        """nymph_keep: don't walk into a visible nymph's reach (the squares next to it) -- she steals as soon as
-        she is adjacent and teleports off with it. Not while pursuing: within 300 turns of a theft whose loot
-        we haven't recovered, the nymph in view is likely the thief and we want to close in."""
-        if getattr(self, "stolen_pending", False) and self.turn() - (getattr(self, "_theft_turn", None) or -10**9) <= 300:
-            return
-        g = self.obs["glyphs"]
-        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-        y0, x0 = self.pos()
-        for yy, xx in zip(ys, xs):
-            if G.monster_name(int(g[yy, xx])) in NYMPHS:
-                sl = (slice(max(0, yy - 1), yy + 2), slice(max(0, xx - 1), xx + 2))
-                p[sl] = False
-                self.nymph_keep_n = getattr(self, "nymph_keep_n", 0) + 1
-        p[y0, x0] = True
-
     def hallu_blind_ranged(self):
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
         from a peaceful (61520 threw a dagger into one)."""
@@ -1151,7 +1083,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
-        return name == "gas spore" and self.bl(nh.NLE_BL_HP) >= 25 and self.role_opts.get("spore_melee", True)
+        return name == "gas spore" and self.bl(nh.NLE_BL_HP) >= 25
 
     def visible_hostiles(self, lv):
         g = self.obs["glyphs"]
@@ -1227,11 +1159,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         # engulfed: hit anything. The engulfer is drawn on the 8 squares AROUND us (display.c swallowed());
         # our own square shows us, so the old test on it never fired (engulf_fix)
         gg = self.obs["glyphs"]
-        if self.role_opts.get("engulf_fix", True):
-            ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
-            engulfed = int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5
-        else:
-            engulfed = G.KIND[gg[y, x]] == G.EFFECT and nh.GLYPH_SWALLOW_OFF <= gg[y, x] < nh.GLYPH_WARNING_OFF
+        ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
+        engulfed = int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5
         if engulfed:
             self.last_attack_target = None
             self.press("F"); self.press("h")
@@ -1273,7 +1202,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.role_opts.get("hallu_strike", True):
             hostiles = self.hallu_attackers(lv, hostiles)
         cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
-        if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF) and self.role_opts.get("stun_wait", True):
+        if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
             # moves and attacks go in random directions while stunned/confused
             only_passive = all(n in PASSIVE_MOLDS for _, n in hostiles)
             if not hostiles or only_passive:
@@ -1282,7 +1211,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
         if self.role_opts.get("vault_guard", True) and self.vault_step(lv, hostiles):
             return
-        if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
+        if cond2 & nh.BL_MASK_BLIND and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
             # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
@@ -1290,8 +1219,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.press("." if self.role_opts.get("blind_strike", True) and self.strike_scope_ok(lv) else "s")
             return
         if self.use_abilities and self.heal_step(hostiles):
-            return
-        if hostiles and low and not self.can_pray() and self.role_opts.get("dig_escape", True) and self.dig_down(lv, "escape"):
             return
         vis_n = len(self.visible_hostiles(lv))
         km = G.KIND[lv.under]
@@ -1305,11 +1232,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                           int(st_here) if st_here is not None else 0, adj_info))
         if len(self.hist) > 40:
             self.hist.popleft()
-        if self.role_opts.get("dip_prep", False) and self.dip_flee_step(lv, hostiles):
-            return
         if self.use_tactics and self.tactical_step(lv, hostiles):
-            return
-        if self.role_opts.get("ward", False) and self.ward_step(lv, hostiles):
             return
         if self.elb_step(lv, hostiles):
             return
@@ -1338,7 +1261,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.role_opts.get("hunt_shooter", True) and not self.hallu_blind_ranged() and self.hunt_step(lv):
             return
-        if (y, x) in lv.elbereth and hp * 2 < maxhp and not self.rthreat_active():
+        if (y, x) in lv.elbereth and hp * 2 < maxhp:
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return
@@ -1384,8 +1307,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
 
         # fresh corpse nearby
-        min_hunger = SATIATED if self.role_opts.get("eat_satiated", False) else NOT_HUNGRY
-        if hunger >= min_hunger and self.kills and not (self.shop_visits_on() and (
+        if hunger >= NOT_HUNGRY and self.kills and not (self.shop_visits_on() and (
                 self.shopkeeper_in_view() or lv.shop[y, x])):     # shop corpses are merchandise
             goal = self.corpse_goal(lv)
             if goal is not None:
@@ -1411,13 +1333,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
             if self.excal_step(lv):
                 return
-            if self.wand_id_step(lv):
+            if self.loot_step(lv):
                 return
-            if self.loot_step(lv) or self.kill_loot_step(lv):
-                return
-            if self.role_opts.get("read_good", True) and not self.role_opts.get("scroll_id") and self.read_good_scroll():
-                return
-            if self.role_opts.get("scroll_id") and self.scroll_step(lv):
+            if self.role_opts.get("read_good", True) and self.read_good_scroll():
                 return
             if self.use_armor and self.equip_step(lv):
                 return
@@ -1428,7 +1346,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     return
         elif (self.use_armor or self.use_food) and self.role_opts.get("pickup_calm", True) and self.items_gate(lv):
             # monsters in view but none in reach and nobody shooting: still collect what lies here
-            if self.loot_step(lv) or self.kill_loot_step(lv):
+            if self.loot_step(lv):
                 return
             if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
                     or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ()) \
@@ -1512,19 +1430,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         frontier = passable & dil & (lv.visited == 0)
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, k_mem, k_live, passable, start):
             return
-        dt = self.door_target_mask(lv, k_mem, passable)
-        if dt is not None:
-            frontier = frontier | dt
-        if self.role_opts.get("door_targets") == "shop" and not getattr(lv, "shop_type", None) \
-                and start in getattr(lv, "shk_doors", ()) and k_mem[start] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
-                and lv.__dict__.get("shk_wait", 0) < 15:
-            g = self.obs["glyphs"]
-            if any(0 <= y + dy < ROWS and 0 <= x + dx < COLS and G.KIND[g[y + dy, x + dx]] == G.MONSTER
-                   and G.monster_name(int(g[y + dy, x + dx])) == "shopkeeper" for dy, dx in NEIGH):
-                lv.shk_wait = lv.__dict__.get("shk_wait", 0) + 1
-                self.cur_act = "shopdoor"
-                self.press("s")               # in the doorway, in line with him: he steps aside (shk.c shk_move)
-                return
         gold = (k_mem == G.GOLD) & passable
         for p in lv.gold_tried:
             gold[p] = False
@@ -1536,7 +1441,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if lv.avoid_down and hatch < self.role_opts.get("mines_after", 3000) and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
-        want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
+        want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
         if want_down and self.role_opts.get("mines_return", True) and lv.key[0] == 2 and lv.key[1] >= 4 \
                 and not self.minetown_seen and not self.is_minetown(lv):
             # mines level 4 done and no Minetown on 3 or 4: it won't come further down
@@ -1548,17 +1453,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
             stuff = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
-            ok = self.items_gate(lv) if self.role_opts.get("item_consistent", True) else True
-            im = passable & ~lv.shop if self.role_opts.get("item_consistent", True) else passable
-            if self.role_opts.get("calm_target", False):
-                im = im & ~self.near_hostile_mask(lv)
+            ok = self.items_gate(lv)
+            im = passable & ~lv.shop
             if ok and (self.use_armor or self.use_food):
                 stuff |= self.armor_targets(lv, G) & im
                 ct = self.carry_targets(lv)
                 if ct is not None:
                     stuff |= ct & im
-            if ok and self.role_opts.get("scroll_id"):
-                stuff |= self.scroll_targets(lv) & im
             stuff[y, x] = False
             if stuff.any():
                 _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff)
@@ -1584,18 +1485,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.shop_visits_on():
             gold = gold & ~lv.shop                     # shop gold belongs to the shopkeeper
         targets = frontier | gold
-        items_ok = True
-        item_mask = passable
-        if self.role_opts.get("item_consistent", True):
-            # an item square is only a goal if the step that inspects it (and so removes the goal) will run:
-            # that step needs no hostile in view and skips shop squares
-            items_ok = self.items_gate(lv)
-            item_mask = passable & ~lv.shop
-            if self.role_opts.get("calm_target", False):
-                # pickup_calm judges where we stand; an item next to a hostile would take us into its reach
-                item_mask = item_mask & ~self.near_hostile_mask(lv)
-        if items_ok and self.role_opts.get("scroll_id"):
-            targets = targets | (self.scroll_targets(lv) & item_mask)
+        # an item square is only a goal if the step that inspects it (and so removes the goal) will run:
+        # that step needs no hostile in view and skips shop squares
+        items_ok = self.items_gate(lv)
+        item_mask = passable & ~lv.shop
         if items_ok and (self.use_armor or self.use_food):
             targets = targets | (self.armor_targets(lv, G) & item_mask)
             ct = self.carry_targets(lv)
@@ -1611,7 +1504,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             if reached == start:
                 lv.visited[start] += 1
 
-        if downstairs.any() and not self.excal_holds(lv) and not self.descent_gated(lv, on_level):
+        if downstairs.any():
             if downstairs[y, x]:
                 if self.use_pet and self.pet_wait_before_stairs():
                     self.press("s"); return
@@ -1631,9 +1524,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.mines_return_start(lv, "bottom")
             if self.mines_return_step(lv, k_mem, k_live, passable, start):
                 return
-        # stuck for good on this level: a wand of digging makes the way down
-        if lv.desperate and self.dig_down(lv, "stuck"):
-            return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
         if self.role_opts.get("unblock", True) and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
             return
@@ -1713,9 +1603,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
-            since = lv.__dict__.setdefault("unblock_since", self.turn())
-            wait = self.role_opts.get("unblock_wait", None)
-            if d == 1 and name == "floating eye" and (lv.desperate or (wait is not None and self.turn() - since > wait)):
+            if d == 1 and name == "floating eye" and lv.desperate:
                 self.unblock_melee += 1
                 self.attack(blocker)
                 return True
@@ -1734,59 +1622,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                         self.move(step)
                         return True
         return False
-
-    def ward_step(self, lv, hostiles):
-        """ward: a lycanthrope (either form: the @ form can turn into the infecting animal at any moment) or an
-        incubus/succubus within ward_r squares (default 5) -> stand on Elbereth (write it if the square has none)
-        and wait there while it is in view, plus ward_linger turns (default 5) after it was last seen. Same rule
-        for every such monster: fight normally if something that ignores Elbereth (e.g. a were in @ form) is
-        next to us; give up after 150 turns. Version 1 = ward_r=2, ward_linger=0, ward_human=False (animal form
-        only)."""
-        g = self.obs["glyphs"]
-        y, x = self.pos()
-        r = self.role_opts.get("ward_r", 5)
-        t = self.turn()
-        danger = False
-        for p, n in self.visible_hostiles(lv):
-            if max(abs(p[0] - y), abs(p[1] - x)) > r:
-                continue
-            m = nh.glyph_to_mon(int(g[p]))
-            if not (0 <= m < nh.NUMMONS):
-                continue
-            if n in ("incubus", "succubus") or (n.startswith("were") and (self.role_opts.get("ward_human", True)
-                                                                        or nh.permonst(m).mlet != HUMAN_MLET)):
-                danger = True
-                break
-        on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
-        if danger:
-            self.ward_seen = t
-        elif not (on_elb and t - getattr(self, "ward_seen", -99) <= self.role_opts.get("ward_linger", 5)):
-            self.ward_since = None
-            return False
-        if getattr(self, "ward_since", None) is None:
-            self.ward_since = t
-        if t - self.ward_since > 150:
-            return False
-        if any(not self.respects_elbereth(n, p) for p, n in hostiles):
-            return False
-        if not on_elb:
-            if not self.can_engrave_here(lv):
-                return False
-            self.ward_writes += 1
-            self.cur_act = "ward"
-            self.engrave_elbereth()
-            return True
-        self.ward_waits += 1
-        self.cur_act = "ward"
-        self.press("s")
-        return True
-
-    def near_hostile_mask(self, lv, r=1):
-        """Squares within r steps of a visible hostile: an item there is reached only by stepping into its reach."""
-        m = np.zeros((ROWS, COLS), dtype=bool)
-        for (yy, xx), _ in self.visible_hostiles(lv):
-            m[max(0, yy - r):yy + r + 1, max(0, xx - r):xx + r + 1] = True
-        return m
 
     def items_gate(self, lv):
         """May item goals be pursued / piles inspected now? Default: no hostile in view. pickup_calm: not in
@@ -1838,32 +1673,31 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return False                       # next to it: the fight step takes over
         k_mem, k_live = self.kind_grid(lv)
         passable = self.passable_grid(lv, k_mem, k_live)
-        if self.role_opts.get("hunt_offline", True):
-            # among the steps that get as close as any, prefer one off the target's lines (it fires only when
-            # lined up); distances from the target over the same grid
-            ty, tx = h["pos"]
-            p2 = passable.copy()
-            p2[ty, tx] = True
-            dmap, _, _ = self.dijkstra(lv, k_mem, k_live, p2, (ty, tx), None, max_cost=80)
-            INF = 1 << 29
-            if dmap[y, x] < INF:
-                cands = []
-                for dy, dx in NEIGH:
-                    ny, nx = y + dy, x + dx
-                    if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx] and dmap[ny, nx] < dmap[y, x] \
-                            and G.KIND[self.obs["glyphs"][ny, nx]] not in (G.MONSTER, G.PET) \
-                            and not ((k_mem[y, x] in (G.DOOR_OPEN, G.DOOR_CLOSED) or k_mem[ny, nx] in (G.DOOR_OPEN, G.DOOR_CLOSED)) and dy and dx):
-                        cands.append((int(dmap[ny, nx]), (ny, nx)))
-                if cands:
-                    best = min(c[0] for c in cands)
-                    pool = [p for d, p in cands if d == best]
-                    lined = lambda p: p[0] == ty or p[1] == tx or abs(p[0] - ty) == abs(p[1] - tx)
-                    off = [p for p in pool if not lined(p)]
-                    self.cur_act = "hunt"
-                    self.hunt_steps += 1
-                    self.hunt_offline_steps = getattr(self, "hunt_offline_steps", 0) + bool(off and any(lined(p) for p in pool))
-                    self.move((off or pool)[0])
-                    return True
+        # among the steps that get as close as any, prefer one off the target's lines (it fires only when
+        # lined up); distances from the target over the same grid
+        ty, tx = h["pos"]
+        p2 = passable.copy()
+        p2[ty, tx] = True
+        dmap, _, _ = self.dijkstra(lv, k_mem, k_live, p2, (ty, tx), None, max_cost=80)
+        INF = 1 << 29
+        if dmap[y, x] < INF:
+            cands = []
+            for dy, dx in NEIGH:
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx] and dmap[ny, nx] < dmap[y, x] \
+                        and G.KIND[self.obs["glyphs"][ny, nx]] not in (G.MONSTER, G.PET) \
+                        and not ((k_mem[y, x] in (G.DOOR_OPEN, G.DOOR_CLOSED) or k_mem[ny, nx] in (G.DOOR_OPEN, G.DOOR_CLOSED)) and dy and dx):
+                    cands.append((int(dmap[ny, nx]), (ny, nx)))
+            if cands:
+                best = min(c[0] for c in cands)
+                pool = [p for d, p in cands if d == best]
+                lined = lambda p: p[0] == ty or p[1] == tx or abs(p[0] - ty) == abs(p[1] - tx)
+                off = [p for p in pool if not lined(p)]
+                self.cur_act = "hunt"
+                self.hunt_steps += 1
+                self.hunt_offline_steps = getattr(self, "hunt_offline_steps", 0) + bool(off and any(lined(p) for p in pool))
+                self.move((off or pool)[0])
+                return True
         adj = np.zeros((ROWS, COLS), dtype=bool)
         for dy, dx in NEIGH:
             ny, nx = h["pos"][0] + dy, h["pos"][1] + dx
@@ -1881,81 +1715,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.hunt = None
         return False
 
-    def door_target_mask(self, lv, k_mem, passable):
-        """door_targets: doors we have not stood on count as unexplored ground (a lit room seen whole from
-        outside leaves its door off the frontier, so a shop could be walked past).
-          "all"  -- every door/doorway;  "shop" -- doors next to a shopkeeper seen on this level, until greeted.
-        Each door is a goal for at most door_ttl turns from when it first became one: a door we can't get onto
-        (a monster in it, a misread) expires instead of holding exploration forever."""
-        mode = self.role_opts.get("door_targets")
-        if not mode:
-            return None
-        t = self.turn()
-        doors = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | (k_mem == G.DOORWAY)
-        if mode == "shop":
-            if getattr(lv, "shop_type", None):
-                return None                          # greeted: we have been in
-            sd = lv.__dict__.setdefault("shk_doors", set())
-            g = self.obs["glyphs"]
-            ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-            for a, c in zip(ys, xs):
-                if G.monster_name(int(g[a, c])) != "shopkeeper":
-                    continue
-                for dy, dx in NEIGH:
-                    ny, nx = int(a) + dy, int(c) + dx
-                    if 0 <= ny < ROWS and 0 <= nx < COLS and doors[ny, nx]:
-                        # the door and the shopkeeper's post just inside it: standing in the doorway is not
-                        # entering (no greeting); he steps aside when we wait there in line with him
-                        sd.add((ny, nx))
-                        sd.add((int(a), int(c)))
-            cand = np.zeros_like(doors)
-            for p in sd:
-                cand[p] = True
-        else:
-            cand = doors.copy()
-        cand &= (lv.visited == 0) & passable
-        if not cand.any():
-            return None
-        since = lv.__dict__.setdefault("door_since", {})
-        ttl = self.role_opts.get("door_ttl", 300)
-        for p in zip(*np.nonzero(cand)):
-            p = (int(p[0]), int(p[1]))
-            if t - since.setdefault(p, t) > ttl:
-                cand[p] = False
-        return cand
-
-    def descent_gated(self, lv, on_level):
-        """Two experimental holds on going down (both off by default; the descend_after timer releases them):
-        xl_gate=k  -- not below depth XL + k (stay, keep exploring / searching, fight what comes, gain levels);
-        seen_gate=n -- fewer than n squares seen here: the rest is probably behind a hidden door or corridor,
-                       search for it first (up to seen_search turns of searching on this level)."""
-        if on_level > self.role_opts.get("descend_after", 2000):
-            return False
-        k = self.role_opts.get("xl_gate")
-        if k is not None and self.bl(nh.NLE_BL_DEPTH) + 1 > self.bl(nh.NLE_BL_XP) + k:
-            self.gate_holds["xl"] += 1
-            return True
-        n = self.role_opts.get("seen_gate")
-        # not in the Mines (dnum 2) or Sokoban (dnum 4): neither has hidden doors or corridors to find
-        if n is not None and lv.key[0] not in (2, 4) and int(lv.seen.sum()) < n \
-                and lv.search_turns < self.role_opts.get("seen_search", 300):
-            self.gate_holds["seen"] += 1
-            return True
-        return False
-
     def should_descend(self, lv, frontier, on_level):
         if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.descend_hp:
-            return False
-        if self.descent_gated(lv, on_level):
             return False
         if self.descend_policy == "dive":
             return True
         xl = self.bl(nh.NLE_BL_XP)
         depth = self.bl(nh.NLE_BL_DEPTH)
         if self.descend_policy == "explore":
-            dd = self.role_opts.get("dive_depth", None)
-            if dd is not None and depth >= dd and self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX) * 0.6:
-                return True                    # deep: 50 points a level, 1000 past DL20, and richer kills below
             return not frontier.any() or on_level > self.role_opts.get("descend_after", 2000)
         if self.descend_policy == "careful":
             # explore fully; only go deeper when experienced enough
@@ -1975,22 +1742,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             cnt[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] += \
                 wallish[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         wall_term = cnt * 10.0
-        if self.role_opts.get("search_blank", False):
-            # weight by how much of the map around is still blank: hidden passages lead to undiscovered
-            # rooms, which need room; the 8-neighbour count alone rates every corridor square alike
-            blank = (k_mem == G.UNKNOWN) & ~lv.near
-            blank[:, 0] = False
-            ry, rx = 4, 9
-            cs = np.zeros((ROWS + 1, COLS + 1), dtype=np.int32)
-            cs[1:, 1:] = np.cumsum(np.cumsum(blank, axis=0), axis=1)
-            yy, xx = np.mgrid[0:ROWS, 0:COLS]
-            y0, y1 = np.clip(yy - ry, 0, ROWS), np.clip(yy + ry + 1, 0, ROWS)
-            x0, x1 = np.clip(xx - rx, 0, COLS), np.clip(xx + rx + 1, 0, COLS)
-            mass = cs[y1, x1] - cs[y0, x1] - cs[y1, x0] + cs[y0, x0]
-            wall_term = wall_term * (0.4 + 1.6 * mass / ((2 * ry + 1) * (2 * rx + 1)))
         score = np.where(reach & passable, wall_term - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
         # dead-end corridors are prime spots
-        goal = getattr(lv, "search_goal", None) if self.role_opts.get("search_goal", True) else None
+        goal = getattr(lv, "search_goal", None)
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
@@ -2078,7 +1832,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.mines_done_turn = 0
         self.minetown_seen = False
         self.mines_return_log = []
-        self.gate_holds = {"xl": 0, "seen": 0}
         self.prev_key = None
         self.took_stairs = False
         self.retrieve = []
@@ -2097,11 +1850,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.class_init()
         self.excal_init()
         self.valk_init()
-        self.valk2_init()
         self.elb2_init()
         self.shop_init()
         self.scroll_init()
-        self.armor_id_init()
         self.carry_init()
         self.price_init()
         self.shops_done = set()
@@ -2176,14 +1927,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
             "carry": dict(self.carry_stats),
             "stash": dict(self.stash_stats),
-            "armor_id": dict(self.armor_id_stats,
-                             random_worn=[e for e in self.equip_events if e[1] == "wear" and e[2] in RANDOM_APPEARANCE]),
             "elb_only_c": getattr(self, "elb_only_c", 0),
-            "rthreat_events": dict(getattr(self, "rthreat_events", {})),
-            "rthreat_msgs": getattr(self, "rthreat_msgs", []),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
-            "kill_loot_checks": self.kill_loot_checks,
             "deadly_prayers": self.deadly_prayers,
             "pray_failed": self.pray_failed,
             "stun_waits": self.stun_waits,
@@ -2221,21 +1967,14 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "shops": self.shops_seen,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
-            "unknown_quaffs": getattr(self, "unknown_quaffs", 0),
             "vault": [self.vault_drops, self.vault_moves],
-            "wishes": getattr(self, "wishes_made", 0),
             "items_first": self.items_first_holds,
             "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
             "ward": [self.ward_writes, self.ward_waits],
-            "dip_prep": getattr(self, "dip_prep_stats", None),
             "blind_held": getattr(self, "blind_held", 0),
-            "nymph_keep": getattr(self, "nymph_keep_n", 0),
             "mines_return": self.mines_return_log,
-            "gate_holds": self.gate_holds,
             "minetown_seen": self.minetown_seen,
             "hallu_held": getattr(self, "hallu_held", 0),
-            "nymph_pk": [getattr(self, "nymph_pk_elbs", 0), getattr(self, "nymph_pk_wait_total", 0)],
-            "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
             "truncated": self.truncated,
