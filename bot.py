@@ -50,6 +50,11 @@ THROW_STONES = ("flint stone", "rock")
 # mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
 IT_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches you|stings|kicks|butts|claws|scratches|"
                           r"thrusts|swings|grabs|hugs|lashes|squeezes|engulfs|tickles|stabs|pummels|whips)\b")
+# mhitu.c: a melee attack on us by a monster we see: "The <name> <verb>!" (hallucination: the name is random);
+# monster-vs-monster and missiles read differently ("The gnome hits the jackal.", "You are hit by a dart.")
+MELEE_ON_US_RE = re.compile(r"\bThe [^.!]+? (?:hits|bites|misses|just misses|stings|kicks|butts|claws|scratches|"
+                            r"thrusts|swings|grabs|lashes|tickles|stabs|pummels|whips|touches you|engulfs you|"
+                            r"squeezes you|gores|charms you)!")
 # trap.c messages for a trap going off on (or found at) our own square, for traps that leave us standing on it
 TRAP_HERE_RE = re.compile(r"There is an? [a-z ]*trap here|You escape an? [a-z ]*trap|a rock falls on your head|"
                           r"An arrow shoots out at you|A little dart shoots out at you|A bear trap closes on your|"
@@ -398,6 +403,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             lv.trap_mem.add(self.pos())   # it went off under us; a falling rock / arrow / dart on it hides the ^
         if IT_ATTACK_RE.search(m):
             self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
+        if MELEE_ON_US_RE.search(m):
+            self.melee_on_us = True           # hallu_strike: something attacked us in melee this turn
         if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
             self.dip_threat_until = self.turn() + 150
         if self.role_opts.get("vault_guard", True):
@@ -454,6 +461,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
+        if self.role_opts.get("hallu_strike", False) and \
+                int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
         # stationary dangerous monsters block
@@ -1029,6 +1039,34 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.blind_held = getattr(self, "blind_held", 0) + 1
         return out
 
+    def hallu_blind_ranged(self):
+        """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
+        from a peaceful (61520 threw a dagger into one)."""
+        return bool(self.role_opts.get("hallu_strike", False)
+                    and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU)
+
+    def hallu_attackers(self, lv, hostiles):
+        """hallu_strike: while hallucinating, looks and names are random, so peacefuls can't be told apart
+        (61520 hit a shopkeeper, 61969 two peacefuls). Hit only a square whose monster attacked us: a melee
+        attack message this turn with exactly one monster next to us marks that square; it stays a target
+        while a monster stands on it. Never one inside a shop (the shopkeeper)."""
+        g = self.obs["glyphs"]
+        y, x = self.pos()
+        adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
+               and nh.glyph_is_monster(int(g[y + dy, x + dx]))]
+        attacked, self.melee_on_us = getattr(self, "melee_on_us", False), False
+        known = getattr(self, "hallu_targets", set())
+        if attacked and len(adj) == 1:
+            known.add(adj[0])
+        known &= set(adj)
+        self.hallu_targets = known
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            return hostiles
+        out = [(p, n) for p, n in hostiles if p in known and not lv.shop[p]]
+        if len(out) < len(hostiles):
+            self.hallu_held = getattr(self, "hallu_held", 0) + 1
+        return out
+
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
         return name == "gas spore" and self.bl(nh.NLE_BL_HP) >= 25 and self.role_opts.get("spore_melee", True)
@@ -1140,6 +1178,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         hostiles = self.adjacent_hostiles(lv)
         if self.role_opts.get("blind_strike", False):
             hostiles = self.blind_attackers(hostiles)
+        if self.role_opts.get("hallu_strike", False):
+            hostiles = self.hallu_attackers(lv, hostiles)
         cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF) and self.role_opts.get("stun_wait", True):
             # moves and attacks go in random directions while stunned/confused
@@ -1181,13 +1221,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if self.elb_step(lv, hostiles):
             return
-        if self.nymph_step(lv, hostiles):
+        if not self.hallu_blind_ranged() and self.nymph_step(lv, hostiles):
             return
         if not hostiles and self.weapon_check():
             return
-        if self.use_roles and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
+        if self.use_roles and not self.hallu_blind_ranged() and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
             return
-        if self.use_abilities and self.ranged_step(lv, hostiles):
+        if self.use_abilities and not self.hallu_blind_ranged() and self.ranged_step(lv, hostiles):
             return
         if hostiles:
             if hp < maxhp * self.elb_frac and (y, x) not in lv.elbereth and self.elbereths < 40:
@@ -1204,7 +1244,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 target = self.focus_target(hostiles, target)
             self.attack(target)
             return
-        if self.role_opts.get("hunt_shooter", True) and self.hunt_step(lv):
+        if self.role_opts.get("hunt_shooter", True) and not self.hallu_blind_ranged() and self.hunt_step(lv):
             return
         if (y, x) in lv.elbereth and hp * 2 < maxhp and not self.rthreat_active():
             self.cur_act = "rest"
@@ -1212,7 +1252,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         # ranged attacks on things we refuse to melee
-        rt = self.ranged_target(lv)
+        rt = None if self.hallu_blind_ranged() else self.ranged_target(lv)
         if rt:
             th = self.throwables()
             if th:
@@ -2047,6 +2087,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "ward": [self.ward_writes, self.ward_waits],
             "dip_prep": getattr(self, "dip_prep_stats", None),
             "blind_held": getattr(self, "blind_held", 0),
+            "hallu_held": getattr(self, "hallu_held", 0),
             "nymph_pk": [getattr(self, "nymph_pk_elbs", 0), getattr(self, "nymph_pk_wait_total", 0)],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
