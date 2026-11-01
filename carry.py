@@ -77,6 +77,22 @@ for _i in range(nh.NUM_OBJECTS):
         WEAPON_NAME_OF.setdefault(nh.OBJ_DESCR(_oc), nh.OBJ_NAME(_oc))
 KEEP_WEAPONS = ("dagger", "knife", "dart", "shuriken", "javelin", "spear")   # bot.THROWABLE: thrown, kept
 NO_TOOLS = {"pick-axe", "chest", "large box", "ice box", "beartrap", "land mine"}
+# carry_all: also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks), and diggers
+DIGGER_WORDS = ("pick-axe", "dwarvish mattock", "broad pick")
+LEAVE_RE = re.compile(r"[Ll]eave (?:your|the) .*outside")
+NO_GEMS = {"gray stone", "rock", "luckstone", "loadstone", "touchstone", "flint stone"}
+GEM_NAMES = set()
+ALL_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    if ord(_oc.oc_class) == nh.GEM_CLASS and nh.OBJ_NAME(_oc) and nh.OBJ_NAME(_oc) not in NO_GEMS \
+            and nh.OBJ_DESCR(_oc) != "gray":
+        GEM_NAMES.add(nh.OBJ_NAME(_oc))
+for _g in range(nh.MAX_GLYPH):
+    if nh.glyph_is_normal_object(_g):
+        _oc = nh.objclass(nh.glyph_to_obj(_g))
+        _c = ord(_oc.oc_class)
+        ALL_GLYPH[_g] = _c == nh.SPBOOK_CLASS or (_c == nh.GEM_CLASS and nh.OBJ_NAME(_oc) in GEM_NAMES)
 KEEP_TOOLS = ("unicorn horn",)
 TOOL_WORDS = set()                # tool names and looks ("oil lamp", "lamp", "bag", "wax candle")
 for _i in range(nh.NUM_OBJECTS):
@@ -170,12 +186,20 @@ class CarryMixin:
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.selling = False
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
+        self.stash_pending = None    # carry_all: (level key, door) -- a shopkeeper asked us to leave the digger outside
+        self.dig_stash = None        # dict(key, pos, turn): where we left it
+        self.stash_stats = {"asked": 0, "stashed": 0, "retrieved": 0, "lost": 0}
 
     def carry_on(self):
         return bool(self.role_opts.get("carry", True))
 
     def carry_more_on(self):
-        return self.carry_on() and bool(self.role_opts.get("carry_more", False))
+        return self.carry_on() and bool(self.role_opts.get("carry_more", False) or self.carry_all_on())
+
+    def carry_all_on(self):
+        """carry_all: pick up everything worth carrying -- carry_more (tools, armor) plus spellbooks, gems/glass
+        and diggers (pick-axe, mattock: kept, left outside a shop whose keeper won't let them in)."""
+        return self.carry_on() and bool(self.role_opts.get("carry_all", False))
 
     def carry_weapons_on(self):
         """weapons: weapons join the carry pipeline (pick up, never-Burdened drop order, sell what we
@@ -184,7 +208,8 @@ class CarryMixin:
 
     def carry_classes(self):
         return CARRY_CLASSES + (MORE_CLASSES if self.carry_more_on() else ()) + \
-            ((nh.WEAPON_CLASS,) if self.carry_weapons_on() else ())
+            ((nh.WEAPON_CLASS,) if self.carry_weapons_on() else ()) + \
+            ((nh.SPBOOK_CLASS, nh.GEM_CLASS) if self.carry_all_on() else ())
 
     # ------------------------------------------------------------ pick up
     def carry_glyph(self, g):
@@ -193,7 +218,7 @@ class CarryMixin:
         if not self.carry_on():
             return False
         return bool(CARRY_GLYPH[g] or (self.carry_more_on() and MORE_GLYPH[g])
-                    or (self.carry_weapons_on() and WEAPON_GLYPH[g]))
+                    or (self.carry_weapons_on() and WEAPON_GLYPH[g]) or (self.carry_all_on() and ALL_GLYPH[g]))
 
     def carry_targets(self, lv):
         if not self.carry_on():
@@ -201,6 +226,8 @@ class CarryMixin:
         glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_more_on() else CARRY_GLYPH
         if self.carry_weapons_on():
             glyphs = glyphs | WEAPON_GLYPH
+        if self.carry_all_on():
+            glyphs = glyphs | ALL_GLYPH
         mask = glyphs[lv.under] & ~lv.shop
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False
@@ -233,7 +260,20 @@ class CarryMixin:
             core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
             core = re.sub(r"\b(uncursed|cursed|blessed|lit|partly used|rusty|greased)\s+", "", core).strip()
             one = " ".join(singular(w) for w in core.split(" "))
-            if (core in TOOL_WORDS or one in TOOL_WORDS) and core not in NO_TOOLS and one not in NO_TOOLS:
+            no_tools = NO_TOOLS - {"pick-axe"} if self.carry_all_on() else NO_TOOLS
+            if (core in TOOL_WORDS or one in TOOL_WORDS) and core not in no_tools and one not in no_tools:
+                return core
+        if self.carry_all_on() and "corpse" not in n:
+            core = re.sub(r"\s*\(.*?\)", "", n)
+            core = re.sub(r"\s+(called|named)\s+.*$", "", core)
+            core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
+            core = re.sub(r"\b(uncursed|cursed|blessed)\s+", "", core).strip()
+            one = " ".join(singular(w) for w in core.split(" "))
+            if "spellbook" in core:
+                return core
+            if "gray stone" in core:
+                return None
+            if one.endswith(" gem") or "glass" in one or one in GEM_NAMES or core in GEM_NAMES:
                 return core
         return None
 
@@ -299,6 +339,8 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
             return True
+        if self.carry_all_on() and any(w in s for w in DIGGER_WORDS):
+            return True                      # a digger: kept (vaults, ways down), never sold
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
             if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
@@ -369,3 +411,76 @@ class CarryMixin:
             self.shopping = None
             return False
         return self.go_toward_mask(lv, targets)
+
+    # ------------------------------------------------------------ carry_all: diggers and shops
+    def digger_letters(self):
+        return [l for l, c, s in self.inventory() if any(w in s for w in DIGGER_WORDS)
+                and "weapon in" not in s and "(wielded" not in s]
+
+    def stash_request(self):
+        """shk.c: 'Will you please leave your pick-axe outside?' -- the keeper blocks the way in while one is
+        in the open inventory: put it down next to the door, outside the shop."""
+        if not self.carry_all_on() or self.cur_key is None:
+            return
+        self.stash_stats["asked"] += 1
+        sh = self.shopping                          # the keeper greets and blocks in the same breath
+        if sh is None or sh["key"] != self.cur_key:
+            self.stash_stats["skipped"] = self.stash_stats.get("skipped", 0) + 1
+            return                                   # the greeting found nothing to do in there
+        self.stash_pending = (self.cur_key, self.pos())
+
+    def stash_step(self, lv):
+        if not self.carry_all_on():
+            return False
+        sp = self.stash_pending
+        if sp is not None:
+            if sp[0] != lv.key or not self.digger_letters():
+                self.stash_pending = None
+                return False
+            door = sp[1]
+            k = G.KIND[lv.under]
+            ok = ~lv.shop & ~np.isin(k, [G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY]) & np.isin(k, [G.FLOOR, G.GOLD,
+                                                                                            G.OBJECT, G.CORPSE])
+            near = np.zeros_like(ok)
+            near[max(0, door[0] - 1):door[0] + 2, max(0, door[1] - 1):door[1] + 2] = True
+            ok &= near
+            here = self.pos()
+            if ok[here]:
+                self.cur_act = "stash"
+                self.drop_units(self.digger_letters()[0])
+                if not self.digger_letters():
+                    self.stash_stats["stashed"] += 1
+                    self.dig_stash = {"key": lv.key, "pos": here, "turn": self.turn()}
+                    self.stash_pending = None
+                return True
+            k_mem, k_live = self.kind_grid(lv)
+            p = self.passable_grid(lv, k_mem, k_live)
+            dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, here, ok)
+            step = self.first_step(prev, here, reached) if reached is not None else None
+            if step is None:
+                self.stash_pending = None
+                return False
+            self.cur_act = "stash"
+            self.move(step)
+            return True
+        st = self.dig_stash
+        if st is None:
+            return False
+        if st["key"] != lv.key:
+            self.dig_stash = None
+            self.stash_stats["lost"] += 1            # left the level without it
+            return False
+        if self.shop_active(lv) or lv.shop[self.pos()]:
+            return False                             # the visit (on since the greeting) is not over
+        if self.pos() == st["pos"]:
+            self.cur_act = "stash"
+            self.pickup_matching(DIGGER_WORDS, own=True)
+            self.dig_stash = None
+            self.stash_stats["retrieved"] += 1
+            return True
+        if self.go_toward(lv, st["pos"]):
+            self.cur_act = "stash"
+            return True
+        self.dig_stash = None
+        self.stash_stats["lost"] += 1
+        return False

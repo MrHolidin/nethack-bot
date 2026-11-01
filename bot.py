@@ -23,7 +23,7 @@ from valk import ValkMixin, ValkMixin2, ElberethMixin, RTHREAT_RE, RTRAP_RE, NYM
 from shop import ShopMixin
 from wandid import WandIdMixin
 from armorid import ArmorIdMixin, RANDOM_APPEARANCE
-from carry import CarryMixin, CARRY_GLYPH
+from carry import CarryMixin, CARRY_GLYPH, LEAVE_RE
 from pricemem import PriceMemoryMixin
 
 ROWS, COLS = 21, 79
@@ -437,6 +437,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.mark_shop(lv, self.pos())
             self.shops_seen += 1
             self.shop_greeted(lv, m)
+        if LEAVE_RE.search(m):
+            self.stash_request()
         if "Please pay before leaving" in m or "you owe" in m.lower() and "zorkmid" in m:
             self.need_pay = True
         if hasattr(self, "thefts"):
@@ -1400,6 +1402,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.need_pay = False
                 self.pay()
                 return
+            if self.stash_step(lv):
+                return
             if self.use_armor and self.shop_step(lv):
                 return
             if self.excal_step(lv):
@@ -2168,6 +2172,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "elb_rewrites": getattr(self, "elb_rewrites", 0),
             "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
             "carry": dict(self.carry_stats),
+            "stash": dict(self.stash_stats),
             "armor_id": dict(self.armor_id_stats,
                              random_worn=[e for e in self.equip_events if e[1] == "wear" and e[2] in RANDOM_APPEARANCE]),
             "elb_only_c": getattr(self, "elb_only_c", 0),
