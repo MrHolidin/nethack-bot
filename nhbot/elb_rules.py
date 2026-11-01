@@ -14,8 +14,8 @@ does not engrave at all.
 """
 import nle.nethack as nh
 
-import glyphs as G
-from monattacks import ATTACK_TYPES
+from nhbot import glyphs as G
+from nhbot.monattacks import ATTACK_TYPES
 
 M1_NOHANDS, M1_MINDLESS, M1_ANIMAL = 0x00002000, 0x00010000, 0x00040000
 M2_MINION = 0x00001000

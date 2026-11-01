@@ -21,7 +21,7 @@ import re
 
 import nle.nethack as nh
 
-from scrolls import cha_factor
+from nhbot.scrolls import cha_factor
 
 SHUFFLED_CLASSES = (nh.AMULET_CLASS, nh.POTION_CLASS, nh.RING_CLASS, nh.SCROLL_CLASS, nh.SPBOOK_CLASS,
                     nh.WAND_CLASS)

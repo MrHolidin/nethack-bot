@@ -1,0 +1,86 @@
+"""Wielding: remember the starting weapon, wield the best one we carry (Excalibur > long sword /
+katana > anything else), never a known-cursed one."""
+import re
+
+import nle.nethack as nh
+
+
+WIELDED_RE = re.compile(r"\((?:weapons? in \w+|wielded)")
+
+
+class WeaponsMixin:
+    def wield(self, letter):
+        self.press("w", expect_prompt=True)
+        if "wield" in self.message().lower():
+            self.press(letter)
+        else:
+            self.settle()
+
+    def weapon_check(self):
+        """Remember the starting weapon; re-wield it if we got it back after a theft."""
+        inv = self.inventory()
+        wielded = [s for _, _, s in inv if "weapon in hand" in s]
+        if self.main_weapon is None:
+            if wielded:
+                base = re.sub(r"\s*\(.*?\)", "", wielded[0])
+                base = re.sub(r"^(a|an|the|\d+)\s+", "", base)
+                base = re.sub(r"\b(uncursed|cursed|blessed|rustproof|[+-]\d+)\s+", "", base).strip()
+                self.main_weapon = base
+            return False
+        if self.opts.weapons:
+            return self.weapon_upgrade(inv)
+        if wielded or not self.opts.nymph:
+            return False
+        weapons = [(l, s) for l, c, s in inv if c == nh.WEAPON_CLASS and not re.search(r"\b(arrows?|bolts?|ya|darts?)\b", s)]
+        pick = next(((l, s) for l, s in weapons if self.main_weapon in s), None) or (weapons[0] if weapons else None)
+        if pick and pick[0] not in self._wield_tried:
+            self._wield_tried = self._wield_tried | {pick[0]}
+            self.wield(pick[0])
+            self.rewields += 1
+            return True
+        return False
+
+    def weapon_rank(self, s):
+        """weapons: Excalibur > the two long-sword-skill blades > anything else. Lawful: katana < long sword
+        (a long sword can still become Excalibur); others: long sword < katana. Ties: known enchantment."""
+        m = re.search(r"(?:^|\s)([+-]\d+) ", s)
+        ench = int(m.group(1)) if m else 0
+        lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
+        if "Excalibur" in s:
+            return (3, ench)
+        if re.search(r"\blong swords?\b", s):
+            return (2 if lawful else 1, ench)
+        if re.search(r"\bkatanas?\b", s) or (re.search(r"\bsamurai swords?\b", s) and "long samurai" not in s):
+            return (1 if lawful else 2, ench)
+        return (0, ench)
+
+    def weapon_upgrade(self, inv):
+        """Wield the best-ranked weapon we carry if it beats the wielded one (or nothing is wielded).
+        Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
+        if self.polyd or self.handless():
+            return False                     # animal forms can't hold weapons ("Don't be ridiculous!")
+        cur = next((s for _, c, s in inv if WIELDED_RE.search(s)), None)
+        if cur is not None and " cursed" in " " + cur:
+            return False
+        tried = self._wield_tried
+        cands = [(self.weapon_rank(s), l, s) for l, c, s in inv
+                 if c == nh.WEAPON_CLASS and not WIELDED_RE.search(s) and " cursed" not in " " + s
+                 and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", s)
+                 and (l, s) not in tried]
+        if not cands:
+            return False
+        rank, l, s = max(cands, key=lambda x: x[0])
+        if cur is not None and rank <= self.weapon_rank(cur):
+            return False
+        if cur is not None and rank[0] == 0:
+            return False                     # only the long-sword-skill blades replace a wielded weapon
+        self.cur_act = "wield"
+        t0 = self.turn()
+        self.wield(l)
+        recent = " ".join([t for tt, t in list(self.messages)[-4:] if tt >= t0] + [self.message()])
+        if "Don't be ridiculous" in recent:
+            self.polyd = True                # a form we failed to notice; retry after "You return to ... form"
+            return True
+        self._wield_tried = tried | {(l, s)}
+        self.rewields += 1
+        return True

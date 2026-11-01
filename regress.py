@@ -30,7 +30,7 @@ def ensure_pinned_clock():
 
 def play(seed):
     sys.path.insert(0, HERE)
-    from bot import Bot
+    from nhbot import Bot
     h, n = hashlib.sha256(), [0]
     orig = Bot.raw_step
 

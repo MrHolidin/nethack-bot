@@ -24,8 +24,8 @@ import re
 import numpy as np
 import nle.nethack as nh
 
-import glyphs as G
-from equipment import parse_armor
+from nhbot import glyphs as G
+from nhbot.equipment import parse_armor
 
 CARRY_CLASSES = (nh.WAND_CLASS, nh.RING_CLASS, nh.AMULET_CLASS, nh.SCROLL_CLASS, nh.POTION_CLASS)
 RANDOM_CLASSES = CARRY_CLASSES + (nh.SPBOOK_CLASS,)

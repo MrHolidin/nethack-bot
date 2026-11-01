@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 def play(args):
     seed, kw = args
-    from bot import Bot
+    from nhbot import Bot
     t = time.time()
     try:
         s = Bot(seed=seed, **kw).run()

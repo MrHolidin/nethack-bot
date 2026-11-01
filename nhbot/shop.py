@@ -1,11 +1,6 @@
 """Shop visits: the shared state for a visit (selling in carry.py) and paying."""
 import re
 
-import numpy as np
-import nle.nethack as nh
-
-import glyphs as G
-
 
 class ShopMixin:
     def shop_init(self):
@@ -51,18 +46,3 @@ class ShopMixin:
             self.shopping = None
             return False
         return self.carry_sell_step(lv)
-
-    def go_toward_mask(self, lv, mask):
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
-        start = self.pos()
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, start, mask)
-        if reached is None:
-            self.shops_done.add(lv.key)
-            self.shopping = None
-            return False
-        step = self.first_step(prev, start, reached)
-        if step is None:
-            return False
-        self.move(step)
-        return True

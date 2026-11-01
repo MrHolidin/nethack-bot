@@ -17,8 +17,8 @@ from functools import lru_cache
 
 import nle.nethack as nh
 
-from monattacks import ATTACKS
-from weapondice import WEAPON_DICE
+from nhbot.monattacks import ATTACKS
+from nhbot.weapondice import WEAPON_DICE
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "TENT", "WEAP"}
 NO_DAMAGE_AD = {"SSEX", "SEDU", "SGLD", "SITM", "STCK", "STON"}   # steal/seduce/stick: no HP damage
