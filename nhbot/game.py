@@ -261,6 +261,7 @@ class GameMixin:
             self.seen_here = (self.turn(), self.pos(), m)
         self.msg_survival(m)
         self.msg_combat(m)
+        self.msg_peace(m, lv)
         self.msg_map(m, lv)
         self.msg_shop(m, lv)
         self.msg_thieves(m)

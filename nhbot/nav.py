@@ -124,7 +124,8 @@ class NavMixin:
                 return
             self.kick(key)
             return
-        if G.KIND[self.obs["glyphs"][target]] == G.MONSTER and self.is_peaceful(target):
+        if G.KIND[self.obs["glyphs"][target]] == G.MONSTER and (
+                self.peaceful_now(lv, target) if self.opts.danger_check else self.is_peaceful(target)):
             # a peaceful monster in the way: wait for it to move (a shopkeeper in a doorway may never move;
             # making the square impassable after a few waits was tried and not taken -- peaceful_waits counts)
             lv.fail[ty, tx] += 1

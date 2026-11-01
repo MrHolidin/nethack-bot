@@ -103,8 +103,10 @@ class ElberethMixin:
     def elb_blocked(self, lv):
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
         glyphs, me = self.obs["glyphs"], self.pos()
-        bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0])
-        if bl and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True):
+        pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)} \
+            if self.opts.danger_check else None
+        bl = ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], peaceful_pos=pp)
+        if bl and not ELB.blockers(glyphs, me, lv.peaceful, lv.key[0], optimistic=True, peaceful_pos=pp):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         if bl:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
