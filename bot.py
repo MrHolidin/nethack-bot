@@ -770,7 +770,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def corpse_ok(self, name):
         """Fresh corpse of our own kill: decide from the species' flags."""
-        if self.role_opts.get("were_corpse", False) and self.lycanthropy:
+        if self.lycanthropy:
             kind = getattr(self, "lyc_kind", None)
             kin = WERE_KIN.get(kind) if kind else set().union(*WERE_KIN.values())
             if name in kin:
@@ -1075,10 +1075,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
                 self.faint_since is not None and t - self.faint_since > self.role_opts.get("faint_wait", 200)), weak=True):
             self.pray(); return
-        if self.lycanthropy and self.can_pray() and not (
-                self.role_opts.get("were_pray", False)
-                and any(n.startswith("were") for _, n in self.visible_hostiles(lv))):
-            self.pray(); return                # were_pray: not while a lycanthrope in view can bite us again
+        if self.lycanthropy and self.can_pray() and \
+                not any(n.startswith("were") for _, n in self.visible_hostiles(lv)):
+            self.pray(); return                # not while a lycanthrope in view can bite us again right after
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
         if cond & deadly and not self.god_angry and self.turn() - (self.last_pray or -9999) > 2:
