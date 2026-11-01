@@ -35,10 +35,6 @@ class ExploreMixin:
         for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
-        if self.opts.mines_up_first and self.mines_return_on and lv.key[0] == 2 and not (k_mem == G.UPSTAIR).any():
-            # mines_up_first: climbing out of the Mines and this level's up staircase is not known yet -- find it
-            # instead of going down (below, we stand on the up stairs and climb straight back: a loop)
-            downstairs[:] = False
         on_level = self.turn() - (lv.entered_turn or 0)
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)

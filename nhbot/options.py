@@ -12,9 +12,6 @@ DEFAULTS = {
     "shop_by_square": False,   # A/B: merchandise = items on shop squares only (not 'a shopkeeper is in view');
                                #      missile and corpse goals on shop squares are skipped
     "loot_holds_descent": False,   # A/B: a reachable stolen-items square on this level holds the stairs down
-    "mines_up_first": False,   # A/B: climbing out of the Mines, never go down from a level whose up stairs we
-                               #      haven't found (it looped: down, stand on the up stairs, up, down, ...)
-    "peaceful_block": False,   # A/B: six waits for a peaceful monster on a square make it impassable
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp
