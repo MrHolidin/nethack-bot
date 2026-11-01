@@ -57,7 +57,8 @@ class ValkMixin:
             self.polyd = True                                 # weapons: no wielding in a borrowed body
         if re.search(r"You return to \w+ form|You feel like a new ", m):
             self.polyd = False
-        if "return to human form" in m and getattr(self, "were_drop", None):
+        back = re.search(r"You return to \w+ form", m) if self.vopt("form_fix", False) else "return to human form" in m
+        if back and getattr(self, "were_drop", None):         # form_fix: dwarves get "You return to dwarven form!"
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
 
