@@ -13,6 +13,15 @@ DELTA2KEY = {v: k for k, v in DIRS.items()}
 
 NEIGH = list(DIRS.values())
 
+def in_bounds(y, x):
+    return 0 <= y < ROWS and 0 <= x < COLS
+
+
+def ray_squares(y, x, dy, dx, n=9):
+    """The squares a missile thrown from (y, x) in direction (dy, dx) can land on (up to n away)."""
+    return [(y + i * dy, x + i * dx) for i in range(1, n + 1) if in_bounds(y + i * dy, x + i * dx)]
+
+
 # hunger states
 SATIATED, NOT_HUNGRY, HUNGRY, WEAK, FAINTING = 0, 1, 2, 3, 4
 

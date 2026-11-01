@@ -1,11 +1,10 @@
 """Reacting to game messages: every logged message goes through on_message."""
 import re
 
-import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.carry import LEAVE_RE
-from nhbot.consts import COLS, NEIGH, ROWS
+from nhbot.consts import COLS, FLOOR_GLYPH, NEIGH, ROWS
 
 
 # mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
@@ -71,8 +70,7 @@ class MessagesMixin:
             self.pray_failed += 1
         if self.last_pray is not None and self.turn() - self.last_pray <= 5 and any(
                 p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
-                                 "Then die, mortal", "Thou durst", "You feel that Mitra is angry",
-                                 "is displeased.") if p != "is displeased."):
+                                 "Then die, mortal", "Thou durst", "You feel that Mitra is angry")):
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
@@ -87,7 +85,7 @@ class MessagesMixin:
             # wrong square); the refusal costs no time, so pressing again looped to the step cap
             yy, xx = self.pos()
             if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
-                lv.under[yy, xx] = nh.GLYPH_CMAP_OFF + 19
+                lv.under[yy, xx] = FLOOR_GLYPH
         if IT_ATTACK_RE.search(m):
             self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
         if MELEE_ON_US_RE.search(m):
@@ -115,7 +113,7 @@ class MessagesMixin:
             self.stash_request()
         if "Please pay before leaving" in m or "you owe" in m.lower() and "zorkmid" in m:
             self.need_pay = True
-        self.on_valk_message(m)
+        self.msg_thieves(m)
         if "You feel feverish" in m:
             self.lycanthropy = True
             mk = re.search(r"\b(were(?:jackal|rat|wolf))\b", m)

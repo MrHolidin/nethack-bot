@@ -6,8 +6,9 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
+from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
 from nhbot.monsters import RANGED_TARGETS
+from nhbot.nav import line_clear
 
 
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
@@ -29,7 +30,7 @@ SAFE_RAY_DIST = 7          # ray range is 7..13: a wall >= 7 away can't bounce i
 
 
 class CombatMixin:
-    def class_init(self):
+    def combat_init(self):
         self.zaps = 0
         self.empty_wands = set()
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
@@ -76,10 +77,7 @@ class CombatMixin:
             if name == "gas spore" and d < 3:
                 continue
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
-            clear = all(G.PASSABLE[k_mem[y + i * sy, x + i * sx]] and
-                        G.KIND[g[y + i * sy, x + i * sx]] not in (G.MONSTER, G.PET, G.BOULDER)
-                        for i in range(1, d))
-            if clear:
+            if line_clear(k_mem, g, y, x, sy, sx, d):
                 return DELTA2KEY[(sy, sx)], d, (ty, tx), (sy, sx)
         return None
 
@@ -168,12 +166,10 @@ class CombatMixin:
         d = max(abs(dy), abs(dx))
         if d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) and not (name == "gas spore" and d < 3):
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
-            clear = all(G.PASSABLE[k_mem[y + i * sy, x + i * sx]] and
-                        G.KIND[self.obs["glyphs"][y + i * sy, x + i * sx]] not in (G.MONSTER, G.PET, G.BOULDER)
-                        for i in range(1, d))
+            clear = line_clear(k_mem, self.obs["glyphs"], y, x, sy, sx, d)
             ex = self.expendables() if clear else []
             if ex:
-                ray = [(y + i * sy, x + i * sx) for i in range(1, 10) if 0 <= y + i * sy < ROWS and 0 <= x + i * sx < COLS]
+                ray = ray_squares(y, x, sy, sx)
                 self.cur_act = "unblock"
                 self.last_attack_target = blocker
                 self.unblock_throws += 1
@@ -332,7 +328,7 @@ class CombatMixin:
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
-                if kind in RAY_WANDS and not self.ray_safe(lv, -dy, -dx) and not self.ray_far_wall(lv, dy, dx):
+                if kind in RAY_WANDS and not self.ray_safe(lv, -dy, -dx) and not self.ray_safe(lv, dy, dx):
                     continue
                 self.cur_act = "fight"
                 self.last_attack_target = pos
@@ -340,7 +336,8 @@ class CombatMixin:
         return False
 
     def ray_safe(self, lv, dy, dx):
-        """Distance from us to the first wall/unknown along the line, doors absorb rays."""
+        """A ray going from us in direction (dy, dx) can't bounce back at us: a door within SAFE_RAY_DIST
+        absorbs it, otherwise no wall, unknown square or boulder lies within SAFE_RAY_DIST."""
         y, x = self.pos()
         k_mem = G.KIND[lv.under]
         for i in range(1, SAFE_RAY_DIST + 1):
@@ -350,21 +347,6 @@ class CombatMixin:
             k = k_mem[yy, xx]
             if k in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY):
                 return True                      # doors absorb the ray
-            if k in (G.WALL, G.UNKNOWN, G.BOULDER):
-                return False
-        return True
-
-    def ray_far_wall(self, lv, dy, dx):
-        """Wall in the firing direction is far enough that a bounce cannot come back to us."""
-        y, x = self.pos()
-        k_mem = G.KIND[lv.under]
-        for i in range(1, SAFE_RAY_DIST + 1):
-            yy, xx = y + i * dy, x + i * dx
-            if not (0 <= yy < ROWS and 0 <= xx < COLS):
-                return False
-            k = k_mem[yy, xx]
-            if k in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY):
-                return True
             if k in (G.WALL, G.UNKNOWN, G.BOULDER):
                 return False
         return True

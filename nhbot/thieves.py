@@ -3,29 +3,27 @@ hunt them and loot the square they die on."""
 import re
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, ROWS
+from nhbot.consts import COLS, ROWS, ray_squares
 from nhbot.monsters import THIEVES
+from nhbot.nav import line_clear
 
 
 class ThievesMixin:
-    def valk_init(self):
+    def thieves_init(self):
         self.thefts = 0
         self.stolen_pending = False
         self.loot_sq = None
         self.loot_key = None
         self.nymph_kills = 0
         self.loot_pickups = 0
-        self.main_weapon = None
-        self.rewields = 0
         self.nymph_waits = 0
         self.nymph_elbs = 0
         self._theft_turn = None
-        self._wield_tried = set()      # wield candidates already tried
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
 
     # ================================================================== nymphs
-    def on_valk_message(self, m):
+    def msg_thieves(self, m):
         if re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m:
             if any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m:
                 if self.turn() != self._theft_turn:
@@ -75,8 +73,7 @@ class ThievesMixin:
             self.cur_act = "fight"
             tw = self.throwables()
             if tw:
-                ray = [(y + i * dy, x + i * dx) for i in range(1, 10)
-                       if 0 <= y + i * dy < ROWS and 0 <= x + i * dx < COLS]
+                ray = ray_squares(y, x, dy, dx)
                 self.throw(tw[0][0], key, ray)
                 return True
         have_shot = bool(self.throwables())
@@ -129,8 +126,7 @@ class ThievesMixin:
                     if d < 2 or d > 6 or not (ry == 0 or rx == 0 or abs(ry) == abs(rx)):
                         continue
                     sy, sx = (ry > 0) - (ry < 0), (rx > 0) - (rx < 0)
-                    if all(G.PASSABLE[k_mem[ny + i * sy, nx + i * sx]] and G.KIND[g[ny + i * sy, nx + i * sx]] not in (G.MONSTER, G.PET, G.BOULDER)
-                           for i in range(1, d)):
+                    if line_clear(k_mem, g, ny, nx, sy, sx, d):
                         if best is None or d < best[0]:
                             best = (d, (ny, nx))
         return best[1] if best else None

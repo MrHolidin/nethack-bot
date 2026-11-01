@@ -10,7 +10,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.carry import CarryMixin
 from nhbot.combat import CombatMixin, THROWABLE, THROW_STONES
-from nhbot.consts import COLS, FAINTING, HUNGRY, NOT_HUNGRY, ROWS, WEAK
+from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_squares
 from nhbot.elbereth import ElberethMixin
 from nhbot.equipment import EquipMixin
 from nhbot.excalibur import ExcaliburMixin
@@ -19,7 +19,7 @@ from nhbot.focus import FocusMixin
 from nhbot.game import GameMixin, GameOver
 from nhbot.mapmem import MapMixin
 from nhbot.messages import MessagesMixin
-from nhbot.monsters import PASSIVE_MOLDS, PM_BY_NAME
+from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 from nhbot.nav import NavMixin
 from nhbot.options import Options
 from nhbot.perception import PerceptionMixin
@@ -179,7 +179,7 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
         sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
         d_st = int(min((max(abs(a - y), abs(b - x)) for a, b in zip(sy, sx)), default=99))
         st_here = self.stairs_kind_here(lv)
-        adj_info = [(n, bool(PM_BY_NAME[n].mflags2 & 0x01000000) if n in PM_BY_NAME else None,
+        adj_info = [(n, bool(PM_BY_NAME[n].mflags2 & M2_STALK) if n in PM_BY_NAME else None,
                      PM_BY_NAME[n].mmove if n in PM_BY_NAME else None) for _, n in hostiles]
         self.hist.append((t, hp, maxhp, len(hostiles), vis_n, self.can_pray(), self.bl(nh.NLE_BL_DEPTH),
                           self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_AC), d_st,
@@ -214,8 +214,7 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
             th = self.throwables()
             if th:
                 key, d, tpos, (sy, sx) = rt
-                ray = [(y + i * sy, x + i * sx) for i in range(1, 10)
-                       if 0 <= y + i * sy < ROWS and 0 <= x + i * sx < COLS]
+                ray = ray_squares(y, x, sy, sx)
                 self.last_attack_target = tpos
                 self.throw(th[0][0], key, ray)
                 return
@@ -226,7 +225,6 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
                 and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b", sh[2]) \
                 and "for sale" not in sh[2] and not lv.shop[y, x]:
             self.seen_here = None
-            n_before = len(self.inventory())
             self.pickup_matching(THROWABLE + ("arrow", "crossbow bolt"))
             self.ammo_pickups += 1
             return
@@ -307,7 +305,7 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
                 and not (self.shop_visits_on() and (lv.shop[y, x] or self.shopkeeper_in_view())):
             lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
             self.pickup_matching(("gold piece",))
-            lv.under[y, x] = G.STONE_GLYPH + 19
+            lv.under[y, x] = FLOOR_GLYPH
             return
 
         self.explore(lv)
@@ -401,10 +399,11 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
         self.perception_init()
         self.survival_init()
         self.explore_init()
-        self.class_init()
+        self.combat_init()
         self.excal_init()
-        self.valk_init()
-        self.elb2_init()
+        self.thieves_init()
+        self.weapons_init()
+        self.elbereth_init()
         self.shop_init()
         self.scroll_init()
         self.carry_init()

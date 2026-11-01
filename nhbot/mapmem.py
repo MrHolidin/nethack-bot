@@ -6,7 +6,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, DOWNSTAIR_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
+from nhbot.consts import ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
 
 
 class Level:
@@ -60,7 +60,7 @@ class MapMixin:
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
         if not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
                 and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
-                and int(lv.under[y, x]) not in (nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22):
+                and int(lv.under[y, x]) not in CORRIDOR_GLYPHS:
             # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
             # or an item hid are missing. Standing on such a hole (an item goal there, or the end of a shop
             # visit) locked us in, since shop squares are impassable from outside. Next to the shop and
@@ -97,7 +97,7 @@ class MapMixin:
     def mark_shop(self, lv, door):
         g = lv.under.copy()
         g[self.pos()] = g[self.pos()]
-        corridor = {nh.GLYPH_CMAP_OFF + 21, nh.GLYPH_CMAP_OFF + 22}
+        corridor = set(CORRIDOR_GLYPHS)
         k = G.KIND[g]
         inside_ok = np.isin(k, [G.FLOOR, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP, G.BOULDER]) & \
             ~np.isin(g, list(corridor))
@@ -144,7 +144,7 @@ class MapMixin:
         filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
-        return bool(lv.shop.any() or np.isin(lv.under, (nh.GLYPH_CMAP_OFF + 27, nh.GLYPH_CMAP_OFF + 31)).any())
+        return bool(lv.shop.any() or np.isin(lv.under, (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
 
     def stairs_kind_here(self, lv):
         k = G.KIND[lv.under[self.pos()]]

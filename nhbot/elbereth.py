@@ -11,11 +11,12 @@ import nle.nethack as nh
 from nhbot import elb_rules as ELB
 from nhbot import glyphs as G
 from nhbot.consts import NO_ENGRAVE_CMAP
+from nhbot.elb_rules import M1_NOHANDS
 from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
 
 
 class ElberethMixin:
-    def elb2_init(self):
+    def elbereth_init(self):
         self.elb_state = None        # dict(pos, key, since, last_read, hp_hist)
         self.elb_engraves = 0
         self.elb_misspelled = 0
@@ -36,7 +37,6 @@ class ElberethMixin:
             return False
         self.press("-", expect_prompt=True)
         for _ in range(5):
-            m = self.message().lower()
             if self.obs["misc"][0]:          # "Do you want to add to the current engraving?"
                 self.press("n", expect_prompt=True)
                 continue
@@ -79,25 +79,17 @@ class ElberethMixin:
         if form is None:
             return False
         pm = PM_BY_NAME.get(form)
-        if form.startswith("were"):
+        if form.startswith("were"):          # lycanthrope: the status line names it, the body is the animal
             pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
                       if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
-        return pm is None or bool(pm.mflags1 & 0x2000) or pm.msize == 0
+        return pm is None or bool(pm.mflags1 & M1_NOHANDS) or pm.msize == 0
 
     def can_engrave_here(self, lv):
         """What a player knows before trying: the square, and whether they have hands."""
         g = int(lv.under[self.pos()])
         if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in NO_ENGRAVE_CMAP:
             return False
-        form = self.poly_form()
-        if form is not None:
-            pm = PM_BY_NAME.get(form)
-            if form.startswith("were"):          # lycanthrope: the status line names it, the body is the animal
-                pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
-                          if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
-            if pm is None or pm.mflags1 & 0x2000 or pm.msize == 0:     # M1_NOHANDS / very small
-                return False
-        return True
+        return not self.handless()
 
     def respects(self, pos, name):
         if name == "invisible" or name in ELB_IGNORE_NAMES:
@@ -196,7 +188,6 @@ class ElberethMixin:
     def elb_write(self, lv):
         """Engrave and verify by reading. Any failure to reach the text prompt (fountain/altar/stairs,
         polymorphed into a handless form, levitating, ...) backs off instead of retrying every tick."""
-        here = (lv.key, self.pos())
         for attempt in range(3):
             ok = self.engrave_elbereth()
             self.elb_engraves += 1

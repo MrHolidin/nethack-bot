@@ -9,6 +9,14 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 
 
+def line_clear(k_mem, glyphs, y, x, dy, dx, d):
+    """The d - 1 squares between (y, x) and the square d steps away in direction (dy, dx) are passable terrain
+    with no monster, pet or boulder on them."""
+    return all(G.PASSABLE[k_mem[y + i * dy, x + i * dx]] and
+               G.KIND[glyphs[y + i * dy, x + i * dx]] not in (G.MONSTER, G.PET, G.BOULDER)
+               for i in range(1, d))
+
+
 class NavMixin:
     def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000):
         INF = 1 << 30

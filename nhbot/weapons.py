@@ -9,6 +9,11 @@ WIELDED_RE = re.compile(r"\((?:weapons? in \w+|wielded)")
 
 
 class WeaponsMixin:
+    def weapons_init(self):
+        self.main_weapon = None
+        self.rewields = 0
+        self._wield_tried = set()      # wield candidates already tried
+
     def wield(self, letter):
         self.press("w", expect_prompt=True)
         if "wield" in self.message().lower():

@@ -24,6 +24,8 @@ WERE_KIN = {"werejackal": {"jackal", "fox", "coyote", "werejackal"},
 M1_ACID, M1_POIS = 0x08000000, 0x10000000
 
 M2_UNDEAD, M2_WERE, M2_SHAPESHIFTER = 0x2, 0x4, 0x4000
+M2_STALK = 0x01000000          # follows you up and down stairs
+M1_NOHANDS = 0x00002000
 
 RACE_FLAG = {"human": 0x8, "elf": 0x10, "elven": 0x10, "dwarf": 0x20, "dwarven": 0x20,
              "gnome": 0x40, "gnomish": 0x40, "orc": 0x80, "orcish": 0x80}

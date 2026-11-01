@@ -141,7 +141,6 @@ class PerceptionMixin:
         return sorted(out, key=lambda t: t[1])
 
     def thieves_visible(self, lv):
-        g = self.obs["glyphs"]
         out = []
         for p, name in self.visible_hostiles(lv):
             if name in THIEVES:
