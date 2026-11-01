@@ -329,7 +329,29 @@ class ExcaliburMixin:
         if lv.key[0] == 2:
             fmask[:] = False          # Minetown: a fountain drying up angers the watch
         y, x = self.pos()
+        if self.dip_prep_on():
+            go = getattr(self, "dip_prep_go", None)
+            if go and go[0] == lv.key and go[1] == (y, x):
+                # dip_prep: on the square next to the fountain -- write the retreat Elbereth before dipping
+                self.dip_prep_go = None
+                self.cur_act = "excal"
+                if self.engrave_elbereth() and self.read_engraving() == "Elbereth":
+                    self.dip_prep = (lv.key, (y, x), go[2])
+                    self.dip_prep_stats[0] += 1
+                else:
+                    self.dip_prep_fail.add((lv.key, go[2]))
+                return True
         if fmask[y, x]:
+            if self.dip_prep_on() and (lv.key, (y, x)) not in self.dip_prep_fail:
+                prep = getattr(self, "dip_prep", None)
+                if not (prep and prep[0] == lv.key and prep[2] == (y, x) and prep[1] in lv.elbereth):
+                    sq = self.dip_prep_square(lv, y, x)
+                    if sq is not None:
+                        self.dip_prep_go = (lv.key, sq, (y, x))
+                        self.cur_act = "excal"
+                        self.move(sq)
+                        return True
+                    self.dip_prep_fail.add((lv.key, (y, x)))
             return self.dip(lv)
         k_mem, k_live = self.kind_grid(lv)
         p = self.passable_grid(lv, k_mem, k_live)
@@ -343,6 +365,62 @@ class ExcaliburMixin:
             return False
         self.cur_act = "excal"
         self.move(step)
+        return True
+
+    def dip_prep_on(self):
+        if not self.role_opts.get("dip_prep", False):
+            return False
+        if not hasattr(self, "dip_prep_stats"):
+            self.dip_prep_stats = [0, 0, 0, 0]      # Elbereths prepared, retreats, retreat moves, waits
+            self.dip_prep_fail = set()
+        return True
+
+    def dip_prep_square(self, lv, fy, fx):
+        """A free floor neighbour of the fountain at (fy, fx) that can hold an engraving."""
+        g = self.obs["glyphs"]
+        for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)):
+            ny, nx = fy + dy, fx + dx
+            if not (0 <= ny < g.shape[0] and 0 <= nx < g.shape[1]) or lv.shop[ny, nx]:
+                continue
+            if G.KIND[int(g[ny, nx])] in (G.FLOOR, G.CORPSE, G.OBJECT) and \
+                    G.KIND[int(lv.under[ny, nx])] in (G.FLOOR, G.CORPSE, G.OBJECT):
+                return (ny, nx)
+        return None
+
+    def dip_flee_step(self, lv, hostiles):
+        """dip_prep: the dip let out snakes / a water demon / a nymph -> step onto the prepared Elbereth next
+        to the fountain and wait there while they are in view (all three respect it); 150-turn cap."""
+        fl = getattr(self, "dip_flee", None)
+        if not fl:
+            return False
+        key, sq, until = fl
+        if lv.key != key or self.turn() > until:
+            self.dip_flee = None
+            return False
+        y, x = self.pos()
+        danger = [n for _, n in self.visible_hostiles(lv) if n in ("water demon", "water moccasin", "water nymph")]
+        if (y, x) != sq:
+            if not danger or nh.glyph_is_monster(int(self.obs["glyphs"][sq])) or \
+                    max(abs(sq[0] - y), abs(sq[1] - x)) > 1:
+                self.dip_flee = None
+                return False
+            self.cur_act = "dipflee"
+            self.dip_prep_stats[2] += 1
+            self.move(sq)
+            return True
+        if not danger or any(not self.respects_elbereth(n, p) for p, n in hostiles):
+            self.dip_flee = None
+            return False
+        if self.read_engraving() != "Elbereth":
+            if not self.can_engrave_here(lv):
+                self.dip_flee = None
+                return False
+            self.cur_act = "dipflee"
+            self.engrave_elbereth()
+            return True
+        self.cur_act = "dipflee"
+        self.dip_prep_stats[3] += 1
+        self.press("s")
         return True
 
     def excal_go_up(self, lv):
@@ -401,6 +479,11 @@ class ExcaliburMixin:
         self.dips += 1
         recent = " ".join(t for _, t in list(self.messages)[-6:])
         y, x = self.pos()
+        prep = getattr(self, "dip_prep", None)
+        if self.dip_prep_on() and prep and prep[0] == lv.key and prep[2] == (y, x) and \
+                re.search(r"unleash a water demon|stream of snakes|attract a water nymph", recent):
+            self.dip_flee = (lv.key, prep[1], self.turn() + 150)
+            self.dip_prep_stats[1] += 1
         if "Excalibur" in recent or "hand reaches up" in recent or \
                 any("Excalibur" in s for _, _, s in self.inventory()):
             self.excalibur = True

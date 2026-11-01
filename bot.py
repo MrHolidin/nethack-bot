@@ -1125,6 +1125,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                           int(st_here) if st_here is not None else 0, adj_info))
         if len(self.hist) > 40:
             self.hist.popleft()
+        if self.role_opts.get("dip_prep", False) and self.dip_flee_step(lv, hostiles):
+            return
         if self.use_tactics and self.tactical_step(lv, hostiles):
             return
         if self.role_opts.get("ward", False) and self.ward_step(lv, hostiles):
@@ -1995,6 +1997,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "items_first": self.items_first_holds,
             "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
             "ward": [self.ward_writes, self.ward_waits],
+            "dip_prep": getattr(self, "dip_prep_stats", None),
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
