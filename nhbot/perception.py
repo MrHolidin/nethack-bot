@@ -44,6 +44,7 @@ class PerceptionMixin:
         self.hostile_marks = {}        # level key -> [(glyph, pos)]: 'peaceful' monsters that attacked us
         self.peaceful_hits = Counter() # species: attacks on us by a monster we took for peaceful
         self.peace_turned = 0          # looks that found a kind created peaceful hostile
+        self.empty_looks = 0           # looks whose description came back empty
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
 
     # ------------------------------------------------------------------ peacefulness (danger_check)
@@ -94,11 +95,12 @@ class PerceptionMixin:
         self.hostile_marks[lv.key] = out
         return taken
 
-    def peaceful_now(self, lv, pos, look=True, slack=0):
+    def peaceful_now(self, lv, pos, look=True, slack=0, far=False):
         """Is the monster at pos peaceful? Attacked us after being taken for peaceful, or a look found it
         hostile: no. Looked at (or it answered 'Really attack?') this turn: that answer. A kind never created
         peaceful: no. Otherwise next to us (and look) a look (';') decides; farther away its kind does: created
-        peaceful -> yes, either way -> no."""
+        peaceful -> yes, either way -> no. far: also look from a distance (before a ranged attack: a missile or
+        a ray angers a peaceful without asking)."""
         g = int(self.obs["glyphs"][pos])
         if G.KIND[g] != G.MONSTER:
             return False
@@ -112,12 +114,14 @@ class PerceptionMixin:
         if cls < 0:
             return False
         y, x = self.pos()
-        if look and max(abs(pos[0] - y), abs(pos[1] - x)) == 1:
+        if look and (far or max(abs(pos[0] - y), abs(pos[1] - x)) == 1):
             # next to us: look, also at kinds created peaceful -- they turn hostile (a throne room, onlookers
             # when we hit a peaceful, an angry shopkeeper) and need not attack in melee to be dangerous
             desc = self.describe_at(pos)
             self.farlooks += 1
             peaceful = "peaceful" in desc or "tame" in desc
+            if not desc.strip():
+                self.empty_looks += 1
             if len(self.peace_seen) > 400:
                 t = self.turn()
                 self.peace_seen = {k: v for k, v in self.peace_seen.items() if v[0] >= t - 2}
@@ -278,6 +282,8 @@ class PerceptionMixin:
         if hit is not None and self.turn() - hit[1] <= 5:
             return hit[0]
         desc = self.describe_far(dirkey, d)
+        if not desc:
+            self.empty_looks += 1
         res = ("peaceful" in desc) or ("tame" in desc) or not desc
         self.far_peaceful[ck] = (res, self.turn())
         return res

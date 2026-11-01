@@ -281,6 +281,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "peaceful_hits": dict(self.peaceful_hits),
             "peace_turned": self.peace_turned,
             "really_attacks": self.really_attacks,
+            "empty_looks": self.empty_looks,
             "hunger_turns": {["satiated", "not_hungry", "hungry", "weak", "fainting", "fainted", "starved"][k] if k < 7 else str(k): v for k, v in sorted(self.hunger_turns.items())},
             "eaten_by": dict(self.eaten_by.most_common(12)),
             "kill_by": dict(self.kill_by.most_common(15)),

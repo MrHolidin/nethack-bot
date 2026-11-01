@@ -64,7 +64,7 @@ class ThievesMixin:
         for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=7):
             if name not in THIEVES or d < 2:
                 continue
-            if self.peaceful_far(lv, pos, key, d):
+            if self.peaceful_now(lv, pos, far=True) if self.opts.danger_check else self.peaceful_far(lv, pos, key, d):
                 continue
             self.last_attack_target = pos
             self.cur_act = "fight"
