@@ -1,5 +1,6 @@
 """Map memory per level: what lies under monsters, what we visited, searched, learned to avoid,
 where the shops are; terrain and passability grids for path finding."""
+import re
 from collections import deque
 
 import numpy as np
@@ -8,6 +9,44 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FLOOR_GLYPH, FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
 
+
+
+# engrave.c wipeout_text: a worn engraving keeps its length; a letter becomes one of its rubouts, or '?' (no
+# rubout), and '?' and small punctuation become ' ' -- repeatedly, so substitutes wear on in turn.
+RUBOUTS = {"A": "^", "B": "Pb[", "C": "(", "D": "|)[", "E": "|FL[_", "F": "|-", "G": "C(", "H": "|-", "I": "|",
+           "K": "|<", "L": "|_", "M": "|", "N": "|\\", "O": "C(", "P": "F", "Q": "C(", "R": "PF", "T": "|", "U": "J",
+           "V": "/\\", "W": "V/\\", "Z": "/", "b": "|", "d": "c|", "e": "c", "g": "c", "h": "n", "j": "i", "k": "|",
+           "l": "|", "m": "nr", "n": "r", "o": "c", "q": "c", "w": "v", "y": "v", ":": ".", ";": ",:", ",": ".",
+           "=": "-", "+": "-|", "*": "+", "@": "0", "0": "C(", "1": "|", "6": "o", "7": "/", "8": "3o"}
+
+
+def worn_to(c):
+    """Every character c can wear into (itself included)."""
+    out, todo = {c, "?", " "}, [c]
+    while todo:
+        for d in RUBOUTS.get(todo.pop(), ""):
+            if d not in out:
+                out.add(d)
+                todo.append(d)
+    return out
+
+
+def engraving_says(seen, text, min_exact=6):
+    """Could the engraving we read (seen) be text worn down? Same length, every character the original or
+    something it wears into, and at least min_exact characters still exact (a fully worn engraving says
+    nothing)."""
+    if len(seen) != len(text):
+        return False
+    exact = 0
+    for a, b in zip(seen, text):
+        if a == b:
+            exact += b != " "
+        elif a not in worn_to(b):
+            return False
+    return exact >= min_exact
+
+
+CFI_RE = re.compile(r'You read: "([^"]*)"')
 
 class Level:
     def __init__(self, key):
@@ -166,7 +205,10 @@ class MapMixin:
         if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:
             # can't kick from here (a form without legs; in a pit): kicking the door again would loop
             lv.blocked[self.last_move_target] = True
-        if "Closed for inventory" in m and lv:
+        if lv and ("Closed for inventory" in m or any(engraving_says(t, "Closed for inventory")
+                                                         for t in CFI_RE.findall(m))):
+            # the closed shop's door: kicking it open angers the shopkeeper ("How dare you break my door?");
+            # the engraving in the dust wears as we walk on it
             y, x = self.pos()
             for dy, dx in NEIGH:
                 ny, nx = y + dy, x + dx
