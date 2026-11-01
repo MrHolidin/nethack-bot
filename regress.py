@@ -64,6 +64,7 @@ def main():
     ap.add_argument("--start", type=int, default=61000)
     ap.add_argument("-j", type=int, default=os.cpu_count())
     ap.add_argument("--level", choices=("strict", "outcome"), default="strict")
+    ap.add_argument("--limit", type=int, default=None, help="check only the first N golden seeds (quick check)")
     a = ap.parse_args()
     ensure_pinned_clock()
     t = time.monotonic()
@@ -74,6 +75,8 @@ def main():
         print(f"recorded {len(res)} games in {time.monotonic() - t:.0f}s; crashes: {bad}")
         return
     gold = {int(k): v for k, v in json.load(open(a.golden)).items()}
+    if a.limit:
+        gold = dict(sorted(gold.items())[:a.limit])
     res = run(sorted(gold), a.j)
     fails = []
     for seed in sorted(gold):

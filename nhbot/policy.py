@@ -295,11 +295,11 @@ class PolicyMixin:
     def step_retrieve_missiles(self, c):
         """Pick thrown weapons back up."""
         if self.retrieve:
-            goal = self.retrieve_goal(c.lv)
-            if goal is not None:
+            goals = self.retrieve_goals(c.lv)
+            if goals:
                 if self.opts.goal_gate_own and not self.items_gate(c.lv):
                     return False
-                return self.pursue("retrieve", c.lv, goal, lambda g: self.pickup_matching(THROWABLE + THROW_STONES))
+                return self.pursue("retrieve", c.lv, goals, lambda g: self.pickup_matching(THROWABLE + THROW_STONES))
         return False
 
     def step_eat(self, c):
@@ -309,11 +309,11 @@ class PolicyMixin:
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""
         lv, y, x = c.lv, c.y, c.x
         if c.hunger >= NOT_HUNGRY and self.kills and (self.opts.shop_by_square or not self.merch_risk(lv, (y, x))):
-            goal = self.corpse_goal(lv)
-            if goal is not None:
+            goals = self.corpse_goals(lv)
+            if goals:
                 if self.opts.goal_gate_own and not self.items_gate(lv):
                     return False
-                return self.pursue("corpse", lv, goal, lambda g: self.eat_corpse_here())
+                return self.pursue("corpse", lv, goals, lambda g: self.eat_corpse_here())
         return False
 
     def step_digger_stash(self, c):

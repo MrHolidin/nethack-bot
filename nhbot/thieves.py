@@ -154,7 +154,7 @@ class ThievesMixin:
     def loot_step(self, lv):
         if self.loot_sq is None or self.loot_key != lv.key:
             return False
-        return self.pursue("loot", lv, self.loot_sq, self.loot_consume)
+        return self.pursue("loot", lv, [self.loot_sq], self.loot_consume)
 
     def loot_consume(self, goal):
         self.pickup_all()

@@ -19,6 +19,8 @@ Statistics per kind (summary 'goals'):
   unfinished  still open at the end of the game
   chase_turns game turns spent on ticks whose action was a step toward this kind (frontier and downstairs
               are counted too, for comparison)
+  unreach_cell / unreach_path   own tier: ticks on which no goal of the kind could be reached because the
+              goal square itself is impassable (a never-melee monster, a shop, blocked) / the way is cut
 """
 from dataclasses import dataclass
 
@@ -46,7 +48,8 @@ GOALS = {
 }
 EXPLORE_KINDS = tuple(k for k, g in GOALS.items() if g.tier == "explore")
 CHASE_ONLY = ("frontier", "downstairs")       # walked to, but not goals with a lifetime
-STAT_FIELDS = ("created", "consumed", "expired", "abandoned", "vanished", "unfinished", "chase_turns")
+STAT_FIELDS = ("created", "consumed", "expired", "abandoned", "vanished", "unfinished", "chase_turns",
+               "unreach_cell", "unreach_path")
 
 
 class GoalsMixin:
@@ -109,19 +112,50 @@ class GoalsMixin:
         self.goal_event(kind, "consumed")
 
     # ------------------------------------------------------------------ own tier
-    def pursue(self, kind, lv, goal, consume):
-        """One tick toward an own-tier goal: on it, consume(goal) and close it; else step toward it; if that
-        fails, apply the kind's on_unreachable ('drop': forget it). True if the tick acted."""
-        if goal == self.pos():
+    def pursue(self, kind, lv, goals, consume):
+        """One tick toward an own-tier goal, goals = its candidate squares, best first.
+
+        Default: the first one only -- on it, consume and close it; else step toward it; if that fails, apply
+        the kind's on_unreachable ('drop': forget it).
+        goal_reach_unified: like the explore tier -- on any of them, consume it; else step toward the nearest
+        reachable one by path; none reachable: nothing happens, they stay goals. True if the tick acted."""
+        here = self.pos()
+        if self.opts.goal_reach_unified:
+            if here in goals:
+                consume(here)
+                self.goal_event(kind, "consumed", self.goal_forget(kind, lv, here))
+                return True
+            k_mem, k_live = self.kind_grid(lv)
+            passable = self.passable_grid(lv, k_mem, k_live)
+            mask = np.zeros(lv.under.shape, dtype=bool)
+            for p in goals:
+                mask[p] = True
+            _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask)
+            step = self.first_step(prev, here, reached) if reached is not None else None
+            if step is None:
+                self.goal_unreachable(kind, goals, passable)
+                return False
+            self.goal_chase(kind)
+            self.move(step)
+            return True
+        goal = goals[0]
+        if goal == here:
             consume(goal)
             self.goal_event(kind, "consumed", self.goal_forget(kind, lv, goal))
             return True
         if self.go_toward(lv, goal):
             self.goal_chase(kind)
             return True
+        k_mem, k_live = self.kind_grid(lv)
+        self.goal_unreachable(kind, [goal], self.passable_grid(lv, k_mem, k_live))
         if GOALS[kind].on_unreachable == "drop":
             self.goal_event(kind, "abandoned", self.goal_forget(kind, lv, goal))
         return False
+
+    def goal_unreachable(self, kind, goals, passable):
+        """Count a tick with no reachable goal of this kind, by cause."""
+        cell = not any(passable[p] for p in goals)
+        self.goal_event(kind, "unreach_cell" if cell else "unreach_path")
 
     def goal_forget(self, kind, lv, goal):
         """Remove an own-tier goal at goal from its list; returns how many entries went."""

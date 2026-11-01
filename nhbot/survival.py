@@ -103,13 +103,14 @@ class SurvivalMixin:
             self.settle()
         return False
 
-    def corpse_goal(self, lv):
+    def corpse_goals(self, lv):
+        """Fresh corpses of our kills here that we would eat, within max_dist, nearest (straight line) first."""
         t = self.turn()
         kind = GOALS["corpse"]
         n = len(self.kills)
         self.kills = [k for k in self.kills if t - k[0] < kind.ttl]
         self.goal_event("corpse", "expired", n - len(self.kills))
-        best = None
+        cands = []
         for kt, name, pos, key in self.kills:
             if key != lv.key or not self.corpse_ok(name):
                 continue
@@ -118,9 +119,10 @@ class SurvivalMixin:
             if self.opts.shop_by_square and self.merch_risk(lv, pos):
                 continue
             d = max(abs(pos[0] - self.pos()[0]), abs(pos[1] - self.pos()[1]))
-            if d <= kind.max_dist and (best is None or d < best[0]):
-                best = (d, pos)
-        return best[1] if best else None
+            if d <= kind.max_dist and pos not in [p for _, p in cands]:
+                cands.append((d, pos))
+        cands.sort(key=lambda c: c[0])           # stable: the first of equally near ones, as before
+        return [p for _, p in cands]
 
     def drop_heavy(self):
         """Strained or worse (e.g. polymorphed into something small): shed non-essentials."""

@@ -116,12 +116,14 @@ class CombatMixin:
         self.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
         self.goal_event("retrieve", "created")
 
-    def retrieve_goal(self, lv):
+    def retrieve_goals(self, lv):
+        """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
         t = self.turn()
         n = len(self.retrieve)
         self.retrieve = [r for r in self.retrieve if r[2] > t]
         self.goal_event("retrieve", "expired", n - len(self.retrieve))
         g = self.obs["glyphs"]
+        out = []
         for key, ray, _ in self.retrieve:
             if key != lv.key:
                 continue
@@ -129,9 +131,10 @@ class CombatMixin:
                 if self.opts.shop_by_square and self.merch_risk(lv, p):
                     continue
                 if G.KIND[g[p]] == G.OBJECT and nh.glyph_is_object(int(g[p])) and \
-                        ord(nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class) in (nh.WEAPON_CLASS, nh.GEM_CLASS):
-                    return p
-        return None
+                        ord(nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class) in (nh.WEAPON_CLASS, nh.GEM_CLASS) \
+                        and p not in out:
+                    out.append(p)
+        return out
 
     def expendables(self):
         """Inventory items worth less than a way through: missiles first, then gems/rocks, spare weapons,
