@@ -164,7 +164,8 @@ class MapMixin:
                 "You are carrying too much to get through",
                 "You don't have enough room to maneuver")):
             lv.blocked[self.last_move_target] = True
-        if "no shape for kicking" in m and lv and self.last_move_target:
+        if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:
+            # can't kick from here (a form without legs; in a pit): kicking the door again would loop
             lv.blocked[self.last_move_target] = True
         if "Closed for inventory" in m and lv:
             y, x = self.pos()

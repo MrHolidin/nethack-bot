@@ -182,6 +182,7 @@ def describe(ocls, s):
 
 class CarryMixin:
     def carry_init(self):
+        self.cant_drop = set()     # letters the game refused to drop (a cursed loadstone): never again
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.selling = False
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
@@ -268,12 +269,15 @@ class CarryMixin:
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = n or (int(m.group(1)) if m else 1)
         self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
+        seq0 = self.msg_seq
         if not self.ask("d", "drop"):
             return
         if n:
             for c in str(n):
                 self.raw_step(ord(c))
         self.press(letter)
+        if any("cannot drop" in t for t in self.msgs_since(seq0)):
+            self.cant_drop.add(letter)        # "For some reason, you cannot drop the stone!"
 
     def carry_drop_step(self):
         """Encumbered: drop one unit following the four tiers. True if it used the turn."""
@@ -281,7 +285,7 @@ class CarryMixin:
             return False
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
         equipped = lambda s: "being worn" in s or "weapon in hand" in s or "(in use)" in s or "(on " in s
-        free = [x for x in inv if not equipped(x[2])]
+        free = [x for x in inv if not equipped(x[2]) and x[0] not in self.cant_drop]
         keys = {}
         for l, c, s, d in free:
             if d["unid"]:

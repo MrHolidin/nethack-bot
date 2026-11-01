@@ -92,15 +92,12 @@ class GameMixin:
         Otherwise whatever came instead is cleared and False; the message is in self.asked either way."""
         self.press(cmd, expect_prompt=True)
         self.asked = self.message().lower()
-        if word in self.asked and not self.obs["misc"][0]:
-            # not a question: a refusal that happens to contain the word ("You can't throw or shoot
-            # without hands."); without hands_check the item letter and the direction went in as commands
-            self.msg_audit["ask_not_question_" + cmd] += 1
-            if self.opts.hands_check:
-                self.settle()
-                return False
-        if word in self.asked:
+        if word in self.asked and self.obs["misc"][0]:
             return True
+        if word in self.asked:
+            # not a question: a refusal that happens to contain the word ("You can't throw or shoot without
+            # hands.") -- answering it sent the item letter and the direction as commands, every tick
+            self.msg_audit["ask_not_question_" + cmd] += 1
         self.settle()
         return False
 
