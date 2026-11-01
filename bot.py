@@ -1121,6 +1121,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
         if self.role_opts.get("vault_guard", True) and self.vault_step(lv, hostiles):
             return
+        if self.role_opts.get("flee_stairs", False) and self.flee_stairs_step(lv, hostiles):
+            return                            # (before blind_wait: when it can't act, waiting in place still applies)
         if cond2 & nh.BL_MASK_BLIND and self.role_opts.get("blind_wait", True) and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
@@ -1143,8 +1145,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if len(self.hist) > 40:
             self.hist.popleft()
         if self.role_opts.get("dip_prep", False) and self.dip_flee_step(lv, hostiles):
-            return
-        if self.role_opts.get("flee_stairs", False) and self.flee_stairs_step(lv, hostiles):
             return
         if self.use_tactics and self.tactical_step(lv, hostiles):
             return
