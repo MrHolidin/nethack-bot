@@ -23,6 +23,7 @@ from valk import ValkMixin, ElberethMixin, RTHREAT_RE, RTRAP_RE
 from shop import ShopMixin
 from carry import CarryMixin, CARRY_GLYPH, LEAVE_RE
 from pricemem import PriceMemoryMixin
+from options import Options
 
 ROWS, COLS = 21, 79
 DIRS = {  # key: (dy, dx)
@@ -108,27 +109,20 @@ class Level:
 
 class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ElberethMixin, FocusMixin, ScrollMixin, CarryMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
-                 avoid_mines=False, use_armor=True, use_food=True,
-                 use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
-                 rest_frac=0.5):
+                 role_opts=None, **options):
+        """role_opts and any other keyword arguments are options (options.py); unknown names raise."""
         from nle.env.tasks import NetHackScore
+        self.opts = Options({**(role_opts or {}), **options})
         self.env = NetHackScore(character=character,
-                            actions=nh.ACTIONS, allow_all_yn_questions=True,
-                            allow_all_modes=True, max_episode_steps=1_000_000,
-                            penalty_step=0.0, penalty_time=0.0,
-                            observation_keys=("glyphs", "blstats", "message", "inv_strs",
-                                              "inv_letters", "inv_oclasses", "tty_chars", "misc"))
+                                actions=nh.ACTIONS, allow_all_yn_questions=True,
+                                allow_all_modes=True, max_episode_steps=1_000_000,
+                                penalty_step=0.0, penalty_time=0.0,
+                                observation_keys=("glyphs", "blstats", "message", "inv_strs",
+                                                  "inv_letters", "inv_oclasses", "tty_chars", "misc"))
         self.seed = seed
         self.verbose = verbose
         self.max_steps = max_steps
         self.max_turns = max_turns
-        self.avoid_mines = avoid_mines
-        self.use_armor = use_armor
-        self.use_food = use_food
-        self.use_enhance, self.use_pet, self.use_abilities = use_enhance, use_pet, use_abilities
-        self.use_roles = use_roles
-        self.role_opts = role_opts or {}
-        self.rest_frac = rest_frac
         acts = self.env.unwrapped.actions
         self.key2act = {}
         for i, a in enumerate(acts):
@@ -202,7 +196,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
-                if "who are you" in (msg + self.top_line()).lower() and self.role_opts.get("vault_guard", True):
+                if "who are you" in (msg + self.top_line()).lower() and self.opts.vault_guard:
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
                     self.raw_step(13)
@@ -295,7 +289,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         # eat.c givit(POISON_RES): "You feel healthy."; eating poison while resistant: "You seem unaffected"
         if "You feel healthy" in m or "You seem unaffected by the poison" in m:
             self.poison_res = True
-        if self.role_opts.get("focus", True):
+        if self.opts.focus:
             self.focus_note(m)
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
@@ -338,7 +332,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.price_note_text(m)
         if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
             self.last_shot_turn = self.turn()
-        if self.role_opts.get("hunt_shooter", True) and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
+        if self.opts.hunt_shooter and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
                 and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
@@ -352,7 +346,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
         if MELEE_ON_US_RE.search(m):
             self.melee_on_us = True           # hallu_strike: something attacked us in melee this turn
-        if self.role_opts.get("vault_guard", True):
+        if self.opts.vault_guard:
             if "drop that gold" in m or "drop that money" in m:
                 self.vault_drop = True
             if "follow me" in m:
@@ -400,7 +394,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
-        if self.role_opts.get("hallu_strike", True) and \
+        if self.opts.hallu_strike and \
                 int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
@@ -629,10 +623,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         Excalibur in the main dungeon (the Mines have no usable fountains)."""
         if getattr(self, "mines_done", False):
             return True                       # mines_return brought us back: the Mines are finished
-        if self.avoid_mines == "until_excalibur":
+        if self.opts.avoid_mines == "until_excalibur":
             return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
                 and self.long_sword() is not None and self.turn() < 8000
-        return bool(self.avoid_mines)
+        return bool(self.opts.avoid_mines)
 
     def law_nearby(self):
         g = self.obs["glyphs"]
@@ -688,8 +682,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
         if weak:
-            return gap > self.role_opts.get("hunger_gap", 500)
-        return gap > self.role_opts.get("pray_gap", 1000)
+            return gap > self.opts.hunger_gap
+        return gap > self.opts.pray_gap
 
     def engrave_elbereth(self):
         lv = self.level()
@@ -1016,7 +1010,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def hallu_blind_ranged(self):
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
         from a peaceful (61520 threw a dagger into one)."""
-        return bool(self.role_opts.get("hallu_strike", True)
+        return bool(self.opts.hallu_strike
                     and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU
                     and self.strike_scope_ok(self.levels.get(self.cur_key)))
 
@@ -1081,7 +1075,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.pending_mines_mark = True
             self.press("<")
             return
-        if self.role_opts.get("mines_return", True):
+        if self.opts.mines_return:
             if lv.key[0] == 2:
                 if self.is_minetown(lv) or self.town_folk_visible():
                     self.minetown_seen = True
@@ -1129,7 +1123,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
         # emergencies
         low = hp <= 5 or hp * 7 <= maxhp
-        if (low or hp * self.role_opts.get("pray_div", 7) <= maxhp) and self.can_pray():
+        if (low or hp * self.opts.pray_div <= maxhp) and self.can_pray():
             self.pray(); return
         if hunger >= FAINTING:
             if self.faint_since is None:
@@ -1137,7 +1131,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         else:
             self.faint_since = None
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
-                self.faint_since is not None and t - self.faint_since > self.role_opts.get("faint_wait", 200)), weak=True):
+                self.faint_since is not None and t - self.faint_since > self.opts.faint_wait), weak=True):
             self.pray(); return
         if self.lycanthropy and self.can_pray() and \
                 not any(n.startswith("were") for _, n in self.visible_hostiles(lv)):
@@ -1153,12 +1147,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
-        if self.use_enhance:
+        if self.opts.use_enhance:
             self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
-        if self.role_opts.get("blind_strike", True):
+        if self.opts.blind_strike:
             hostiles = self.blind_attackers(lv, hostiles)
-        if self.role_opts.get("hallu_strike", True):
+        if self.opts.hallu_strike:
             hostiles = self.hallu_attackers(lv, hostiles)
         cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
@@ -1168,16 +1162,16 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.stun_waits += 1
                 self.press("s")
                 return
-        if self.role_opts.get("vault_guard", True) and self.vault_step(lv, hostiles):
+        if self.opts.vault_guard and self.vault_step(lv, hostiles):
             return
         if cond2 & nh.BL_MASK_BLIND and not hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.blind_waits += 1             # wandering blind walks into things we can't see
             # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
             # would look like the attacker when something else hits us in the same turn (61688)
-            self.press("." if self.role_opts.get("blind_strike", True) and self.strike_scope_ok(lv) else "s")
+            self.press("." if self.opts.blind_strike and self.strike_scope_ok(lv) else "s")
             return
-        if self.use_abilities and self.heal_step(hostiles):
+        if self.opts.use_abilities and self.heal_step(hostiles):
             return
         vis_n = len(self.visible_hostiles(lv))
         km = G.KIND[lv.under]
@@ -1197,16 +1191,16 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
         if not hostiles and self.weapon_check():
             return
-        if self.use_roles and not self.hallu_blind_ranged() and self.wand_step(lv, hostiles):
+        if self.opts.use_roles and not self.hallu_blind_ranged() and self.wand_step(lv, hostiles):
             return
         if hostiles:
             # attack the weakest-looking (lowest level) target
             target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
-            if self.role_opts.get("focus", True) and len(hostiles) > 1:
+            if self.opts.focus and len(hostiles) > 1:
                 target = self.focus_target(hostiles, target)
             self.attack(target)
             return
-        if self.role_opts.get("hunt_shooter", True) and not self.hallu_blind_ranged() and self.hunt_step(lv):
+        if self.opts.hunt_shooter and not self.hallu_blind_ranged() and self.hunt_step(lv):
             return
         if (y, x) in lv.elbereth and hp * 2 < maxhp:
             self.cur_act = "rest"
@@ -1271,27 +1265,27 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         vis = self.view_threats(lv)
-        if (self.use_armor or self.use_food) and not vis:
+        if (self.opts.use_armor or self.opts.use_food) and not vis:
             if self.need_pay:
                 self.need_pay = False
                 self.pay()
                 return
-            if self.use_armor and self.shop_step(lv):
+            if self.opts.use_armor and self.shop_step(lv):
                 return
             if self.excal_step(lv):
                 return
             if self.loot_step(lv):
                 return
-            if self.role_opts.get("read_good", True) and self.read_good_scroll():
+            if self.opts.read_good and self.read_good_scroll():
                 return
-            if self.use_armor and self.equip_step(lv):
+            if self.opts.use_armor and self.equip_step(lv):
                 return
             if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
                     or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ()) \
                     and not lv.shop[y, x]:
                 if self.armor_pickup_here(lv):
                     return
-        elif (self.use_armor or self.use_food) and self.role_opts.get("pickup_calm", True) and self.items_gate(lv):
+        elif (self.opts.use_armor or self.opts.use_food) and self.opts.pickup_calm and self.items_gate(lv):
             # monsters in view but none in reach and nobody shooting: still collect what lies here
             if self.loot_step(lv):
                 return
@@ -1302,7 +1296,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     return
 
         # rest if hurt and nothing around
-        if hp < maxhp * self.rest_frac and not vis:
+        if hp < maxhp * self.opts.rest_frac and not vis:
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return
@@ -1374,24 +1368,24 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)
         hatch = self.turn() - self.mines_done_turn if self.mines_done else on_level
-        if lv.avoid_down and hatch < self.role_opts.get("mines_after", 3000) and self.mines_blocked():
+        if lv.avoid_down and hatch < self.opts.mines_after and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
-        if want_down and self.role_opts.get("mines_return", True) and lv.key[0] == 2 and lv.key[1] >= 4 \
+        if want_down and self.opts.mines_return and lv.key[0] == 2 and lv.key[1] >= 4 \
                 and not self.minetown_seen and not self.is_minetown(lv):
             # mines level 4 done and no Minetown on 3 or 4: it won't come further down
             self.mines_return_start(lv, "no_town")
             if self.mines_return_step(lv, k_mem, k_live, passable, start):
                 return
-        if want_down and self.role_opts.get("items_first", True) \
-                and on_level <= self.role_opts.get("descend_after", 2000):
+        if want_down and self.opts.items_first \
+                and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
             stuff = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
             ok = self.items_gate(lv)
             im = passable & ~lv.shop
-            if ok and (self.use_armor or self.use_food):
+            if ok and (self.opts.use_armor or self.opts.use_food):
                 stuff |= self.armor_targets(lv, G) & im
                 ct = self.carry_targets(lv)
                 if ct is not None:
@@ -1405,7 +1399,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
         if want_down:
             if downstairs[y, x]:
-                if self.use_pet and self.pet_wait_before_stairs():
+                if self.opts.use_pet and self.pet_wait_before_stairs():
                     self.press("s"); return
                 self.descents += 1
                 self.took_stairs = True
@@ -1425,7 +1419,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         # that step needs no hostile in view and skips shop squares
         items_ok = self.items_gate(lv)
         item_mask = passable & ~lv.shop
-        if items_ok and (self.use_armor or self.use_food):
+        if items_ok and (self.opts.use_armor or self.opts.use_food):
             targets = targets | (self.armor_targets(lv, G) & item_mask)
             ct = self.carry_targets(lv)
             if ct is not None:
@@ -1442,7 +1436,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
         if downstairs.any():
             if downstairs[y, x]:
-                if self.use_pet and self.pet_wait_before_stairs():
+                if self.opts.use_pet and self.pet_wait_before_stairs():
                     self.press("s"); return
                 self.descents += 1
                 self.took_stairs = True
@@ -1456,15 +1450,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
-        if self.role_opts.get("mines_return", True) and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
+        if self.opts.mines_return and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
             self.mines_return_start(lv, "bottom")
             if self.mines_return_step(lv, k_mem, k_live, passable, start):
                 return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
-        if self.role_opts.get("unblock", True) and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
+        if self.opts.unblock and self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
             return
         # nothing left: map the level if we can, else search for hidden passages
-        if self.use_abilities and self.magic_map_step(lv):
+        if self.opts.use_abilities and self.magic_map_step(lv):
             return
         self.search_mode(lv, k_mem, k_live, passable)
 
@@ -1563,7 +1557,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         """May item goals be pursued / piles inspected now? Default: no hostile in view. pickup_calm: not in
         combat -- nothing in melee range and not shot at in the last 5 turns. Goals and the inspecting step
         use this same test."""
-        if self.role_opts.get("pickup_calm", True):
+        if self.opts.pickup_calm:
             return not self.adjacent_hostiles(lv) and self.turn() - getattr(self, "last_shot_turn", -99) > 5
         return not self.view_threats(lv)
 
@@ -1653,7 +1647,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def should_descend(self, lv, frontier, on_level):
         """Explored (no frontier left) or on this level for longer than descend_after turns."""
-        return not frontier.any() or on_level > self.role_opts.get("descend_after", 2000)
+        return not frontier.any() or on_level > self.opts.descend_after
 
     def search_mode(self, lv, k_mem, k_live, passable):
         self.cur_act = "search"

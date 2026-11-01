@@ -1,4 +1,4 @@
-"""Valkyrie-branch features, each behind its own flag in role_opts.
+"""Valkyrie-branch features (nymphs and thieves, weapons, Elbereth), each behind its own option.
 
 nymph:       nymphs (and monkeys) steal and teleport. Shoot them from range, melee them first,
              and after a theft hunt them and loot the square they die on; re-wield the stolen
@@ -29,9 +29,6 @@ class ValkMixin:
         self.nymph_waits = 0
         self.nymph_elbs = 0
 
-    def vopt(self, k, d=None):
-        return self.role_opts.get(k, d)
-
     # ================================================================== nymphs
     def on_valk_message(self, m):
         if re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m:
@@ -51,7 +48,7 @@ class ValkMixin:
                 self._theft_turn = self.turn()
                 self.thefts += 1
             self.stolen_pending = True
-        if self.vopt("nymph", True) and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
+        if self.opts.nymph and re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
             self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
         if re.search(r"You turn into an? ", m):
             self.polyd = True                                 # weapons: no wielding in a borrowed body
@@ -70,7 +67,7 @@ class ValkMixin:
         return out
 
     def nymph_step(self, lv, hostiles):
-        if not self.vopt("nymph", True):
+        if not self.opts.nymph:
             return False
         y, x = self.pos()
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
@@ -97,14 +94,14 @@ class ValkMixin:
                 return True
         have_shot = bool(self.throwables())
         # 2b) we could shoot but it isn't in line: step to a square that lines us up, at distance >= 2
-        if have_shot and self.vopt("nymph_align", True):
+        if have_shot and self.opts.nymph_align:
             step = self.align_step(lv, th)
             if step is not None:
                 self.cur_act = "fight"
                 self.move(step)
                 return True
         # 2c) no way to shoot: stand on Elbereth (nymphs respect it and won't steal in melee)
-        if not have_shot and self.vopt("nymph_elb", True) and (y, x) not in lv.elbereth:
+        if not have_shot and self.opts.nymph_elb and (y, x) not in lv.elbereth:
             close = [t for t in th if max(abs(t[0][0] - y), abs(t[0][1] - x)) <= 4]
             if close and G.KIND[lv.under[y, x]] not in (G.UPSTAIR, G.DOWNSTAIR) and self.nymph_elbs < 30:
                 self.nymph_elbs += 1
@@ -113,8 +110,8 @@ class ValkMixin:
                 return True
         # 3) no shot: never step next to a thief (that hands it the first move). Hold still and
         #    let it come; nymphs come back to steal more, so waiting is also how we get our items back.
-        close = [t for t in th if 2 <= max(abs(t[0][0] - y), abs(t[0][1] - x)) <= self.vopt("nymph_hold", 4)]
-        if close and self.nymph_waits < self.vopt("nymph_wait_max", 8):
+        close = [t for t in th if 2 <= max(abs(t[0][0] - y), abs(t[0][1] - x)) <= self.opts.nymph_hold]
+        if close and self.nymph_waits < self.opts.nymph_wait_max:
             self.nymph_waits += 1
             self.cur_act = "fight"
             self.press("s")
@@ -192,9 +189,9 @@ class ValkMixin:
                 base = re.sub(r"\b(uncursed|cursed|blessed|rustproof|[+-]\d+)\s+", "", base).strip()
                 self.main_weapon = base
             return False
-        if self.vopt("weapons", True):
+        if self.opts.weapons:
             return self.weapon_upgrade(inv)
-        if wielded or not self.vopt("nymph", True):
+        if wielded or not self.opts.nymph:
             return False
         weapons = [(l, s) for l, c, s in inv if c == nh.WEAPON_CLASS and not re.search(r"\b(arrows?|bolts?|ya|darts?)\b", s)]
         pick = next(((l, s) for l, s in weapons if self.main_weapon in s), None) or (weapons[0] if weapons else None)
@@ -372,12 +369,12 @@ class ElberethMixin:
         if not threats:
             return False
         swarm = sum(1 for _, n in threats if n in SWARMERS)
-        if not (hp < maxhp * self.vopt("elb_hp", 0.5) or swarm >= 2):
+        if not (hp < maxhp * self.opts.elb_hp or swarm >= 2):
             return False
         return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
-        if not self.vopt("elb2", True):
+        if not self.opts.elb2:
             return False
         st = self.elb_state
         y, x = self.pos()
@@ -408,11 +405,11 @@ class ElberethMixin:
                     return False                       # fight / let tactics handle it
                 visible = self.visible_hostiles(lv)
                 early = not visible and hp >= maxhp * 0.6
-                if hp >= maxhp * self.vopt("elb_exit", 0.85) or early:
+                if hp >= maxhp * self.opts.elb_exit or early:
                     self.elb_exits["healed"] += 1
                     self.elb_state = None
                     return False
-                if self.turn() - st["since"] > self.vopt("elb_max", 400):
+                if self.turn() - st["since"] > self.opts.elb_max:
                     self.elb_exits["timeout"] += 1
                     self.elb_state = None
                     return False

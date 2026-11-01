@@ -301,7 +301,7 @@ class EquipMixin:
         return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
 
     def food_wanted(self, name):
-        if not self.use_food or self.food_count() >= MAX_FOOD:
+        if not self.opts.use_food or self.food_count() >= MAX_FOOD:
             return False
         if "egg" in name or re.search(r"\btins?\b", name):
             return False
@@ -320,7 +320,7 @@ class EquipMixin:
         worn = self.worn_by_slot()
         want = []
         for n in names:
-            a = parse_armor(n) if self.use_armor else None
+            a = parse_armor(n) if self.opts.use_armor else None
             if a and self.improves(a, worn):
                 want.append(a["name"])
             elif self.carry_wanted(n):
@@ -346,8 +346,8 @@ class EquipMixin:
 
     def armor_targets(self, lv, glyphs_mod):
         """Mask of remembered '[' (and '%' food when low on food) piles not yet inspected."""
-        mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.use_armor else np.zeros(lv.under.shape, bool)
-        if self.use_food and self.food_count() < MAX_FOOD:
+        mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.opts.use_armor else np.zeros(lv.under.shape, bool)
+        if self.opts.use_food and self.food_count() < MAX_FOOD:
             mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
         for p in self.inspected.get(lv.key, ()):
             mask[p] = False

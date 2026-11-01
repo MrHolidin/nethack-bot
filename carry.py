@@ -191,19 +191,19 @@ class CarryMixin:
         self.stash_stats = {"asked": 0, "stashed": 0, "retrieved": 0, "lost": 0}
 
     def carry_on(self):
-        return bool(self.role_opts.get("carry", True))
+        return bool(self.opts.carry)
 
     def carry_all_on(self):
         """carry_all: pick up everything worth carrying -- carry_more (tools, armor) plus spellbooks, gems/glass
         and diggers (pick-axe, mattock: kept, never sold).
         KEEP THIS FLAG (owner's decision, 2026-11-01): A/B -525 n.s., off by default, but it is the way to carry
         a digger for future vault / digging logic. Do not remove it in cleanups."""
-        return self.carry_on() and bool(self.role_opts.get("carry_all", False))
+        return self.carry_on() and bool(self.opts.carry_all)
 
     def carry_weapons_on(self):
         """weapons: weapons join the carry pipeline (pick up, never-Burdened drop order, sell what we
         don't keep); valk.weapon_check wields the best one."""
-        return self.carry_on() and bool(self.role_opts.get("weapons", True))
+        return self.carry_on() and bool(self.opts.weapons)
 
     def carry_classes(self):
         return CARRY_CLASSES + (MORE_CLASSES if self.carry_all_on() else ()) + \
@@ -333,7 +333,7 @@ class CarryMixin:
             return True
         if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
             return True
-        if c == nh.SCROLL_CLASS and self.role_opts.get("read_good", True) \
+        if c == nh.SCROLL_CLASS and self.opts.read_good \
                 and self.scroll_is_good(s):
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
@@ -358,7 +358,7 @@ class CarryMixin:
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
         c, s = getattr(self, "selling_item", (None, ""))
-        if c == nh.SCROLL_CLASS and self.role_opts.get("read_good", True) and self.scroll_is_good(s):
+        if c == nh.SCROLL_CLASS and self.opts.read_good and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
         return False
