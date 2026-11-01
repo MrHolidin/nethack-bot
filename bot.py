@@ -19,7 +19,7 @@ from abilities import AbilitiesMixin
 from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
 from scrolls import ScrollMixin
-from valk import ValkMixin, ValkMixin2, ElberethMixin, RTHREAT_RE, RTRAP_RE
+from valk import ValkMixin, ValkMixin2, ElberethMixin, RTHREAT_RE, RTRAP_RE, NYMPHS
 from shop import ShopMixin
 from wandid import WandIdMixin
 from armorid import ArmorIdMixin, RANDOM_APPEARANCE
@@ -469,6 +469,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
+        if self.role_opts.get("nymph_keep", False):
+            self.nymph_keep_mask(p)
         if self.role_opts.get("hallu_strike", True) and \
                 int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
@@ -1099,6 +1101,22 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if len(out) < len(hostiles):
             self.blind_held = getattr(self, "blind_held", 0) + 1
         return out
+
+    def nymph_keep_mask(self, p):
+        """nymph_keep: don't walk into a visible nymph's reach (the squares next to it) -- she steals as soon as
+        she is adjacent and teleports off with it. Not while pursuing: within 300 turns of a theft whose loot
+        we haven't recovered, the nymph in view is likely the thief and we want to close in."""
+        if getattr(self, "stolen_pending", False) and self.turn() - (getattr(self, "_theft_turn", None) or -10**9) <= 300:
+            return
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        y0, x0 = self.pos()
+        for yy, xx in zip(ys, xs):
+            if G.monster_name(int(g[yy, xx])) in NYMPHS:
+                sl = (slice(max(0, yy - 1), yy + 2), slice(max(0, xx - 1), xx + 2))
+                p[sl] = False
+                self.nymph_keep_n = getattr(self, "nymph_keep_n", 0) + 1
+        p[y0, x0] = True
 
     def hallu_blind_ranged(self):
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
@@ -2181,6 +2199,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "ward": [self.ward_writes, self.ward_waits],
             "dip_prep": getattr(self, "dip_prep_stats", None),
             "blind_held": getattr(self, "blind_held", 0),
+            "nymph_keep": getattr(self, "nymph_keep_n", 0),
             "mines_return": self.mines_return_log,
             "minetown_seen": self.minetown_seen,
             "hallu_held": getattr(self, "hallu_held", 0),
