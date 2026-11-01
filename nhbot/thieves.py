@@ -109,8 +109,7 @@ class ThievesMixin:
     def align_step(self, lv, th):
         """A neighbouring free square from which some thief is in a straight clear line, 2..6 away."""
         y, x = self.pos()
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
+        k_mem, _, p = self.grids(lv)
         g = self.obs["glyphs"]
         best = None
         for dy in (-1, 0, 1):

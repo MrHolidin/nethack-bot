@@ -69,35 +69,43 @@ class NavMixin:
                 return None
         return cur
 
-    def go_toward(self, lv, goal):
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
-        mask = np.zeros((ROWS, COLS), dtype=bool)
-        mask[goal] = True
-        start = self.pos()
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, start, mask)
-        if reached is None:
-            return False
-        step = self.first_step(prev, start, reached)
-        if step is None:
-            return False
-        self.move(step)
-        return True
+    def grids(self, lv):
+        """(k_mem, k_live, passable) for this level now, computed once per tick and game state: the key changes
+        every tick (a move that sends no key -- a door we won't kick -- still changes the map memory), with
+        every key sent (any observation change), the shop visit state and the never-melee squares.
+        The arrays are read-only: copy before changing."""
+        key = (self.tick_no, self.steps, lv.key, self.shop_active(lv), tuple(self.avoid_cells))
+        if self._grids_key != key:
+            k_mem, k_live = self.kind_grid(lv)
+            passable = self.passable_grid(lv, k_mem, k_live)
+            for a in (k_mem, k_live, passable):
+                a.setflags(write=False)
+            self._grids_key, self._grids = key, (k_mem, k_live, passable)
+        return self._grids
 
-    def go_toward_mask(self, lv, mask):
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
-        start = self.pos()
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, start, mask)
-        if reached is None:
-            self.shops_done.add(lv.key)
-            self.shopping = None
-            return False
-        step = self.first_step(prev, start, reached)
+    def walk_to(self, lv, mask, max_cost=10_000, act=None, chase=None, grids=None, also=None):
+        """One step toward the nearest square of mask by path. Returns (status, square):
+          "here"         we stand on a square of the mask (the caller does what it came for)
+          "moved"        stepped toward square (act: cur_act label; chase: goal-statistics label, or a
+                         function of the square giving it)
+          "unreachable"  no square of the mask within max_cost
+        grids: (k_mem, k_live, passable) to use instead of self.grids(lv); also: squares made passable."""
+        here = self.pos()
+        if mask[here]:
+            return "here", here
+        k_mem, k_live, passable = grids if grids is not None else self.grids(lv)
+        if also is not None:
+            passable = passable | also
+        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask, max_cost=max_cost)
+        step = self.first_step(prev, here, reached) if reached is not None else None
         if step is None:
-            return False
+            return "unreachable", None
+        if act is not None:
+            self.cur_act = act
+        if chase is not None:
+            self.goal_chase(chase(reached) if callable(chase) else chase)
         self.move(step)
-        return True
+        return "moved", reached
 
     def move(self, target):
         y, x = self.pos()

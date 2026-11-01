@@ -19,8 +19,7 @@ class ExploreMixin:
     def explore(self, lv):
         self.cur_act = "explore"
         self.goal_observe(lv)
-        k_mem, k_live = self.kind_grid(lv)
-        passable = self.passable_grid(lv, k_mem, k_live)
+        k_mem, k_live, passable = grids = self.grids(lv)
         start = self.pos()
         y, x = start
 
@@ -30,7 +29,7 @@ class ExploreMixin:
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
-        if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, k_mem, k_live, passable, start):
+        if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
         gold = (k_mem == G.GOLD) & passable
         for p in self.goal_closed_set("gold", lv.key):
@@ -52,7 +51,7 @@ class ExploreMixin:
                 and not self.minetown_seen and not self.is_minetown(lv):
             # mines level 4 done and no Minetown on 3 or 4: it won't come further down
             self.mines_return_start(lv, "no_town")
-            if self.mines_return_step(lv, k_mem, k_live, passable, start):
+            if self.mines_return_step(lv, grids):
                 return
         hold_loot = False
         if self.opts.loot_holds_descent and self.loot_sq is not None and self.loot_key == lv.key \
@@ -78,7 +77,7 @@ class ExploreMixin:
                     want_down = False
                     self.items_first_holds += 1
 
-        if want_down and self.go_down(lv, k_mem, k_live, passable, downstairs):
+        if want_down and self.go_down(lv, grids, downstairs):
             return
 
         goals = self.goal_masks(lv, passable, gold)
@@ -86,34 +85,31 @@ class ExploreMixin:
         for m in goals.values():
             targets |= m
         if targets.any():
-            dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
-            if reached is not None and reached != start:
-                step = self.first_step(prev, start, reached)
-                if step:
-                    self.goal_chase(next((k for k, m in goals.items() if m[reached]), "frontier"))
-                    self.move(step)
-                    return
-            if reached == start:
+            status, _ = self.walk_to(lv, targets, grids=grids,
+                                     chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))
+            if status == "moved":
+                return
+            if status == "here":
                 lv.visited[start] += 1
 
         # nothing left to walk to here: go down if we know the way
-        if downstairs.any() and not hold_loot and self.go_down(lv, k_mem, k_live, passable, downstairs):
+        if downstairs.any() and not hold_loot and self.go_down(lv, grids, downstairs):
             return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
         if lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
             self.mines_return_start(lv, "bottom")
-            if self.mines_return_step(lv, k_mem, k_live, passable, start):
+            if self.mines_return_step(lv, grids):
                 return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
-        if self.unblock_step(lv, k_mem, k_live, passable, frontier | downstairs):
+        if self.unblock_step(lv, grids, frontier | downstairs):
             return
         # nothing left: map the level if we can, else search for hidden passages
         if self.magic_map_step(lv):
             return
-        self.search_mode(lv, k_mem, k_live, passable)
+        self.search_mode(lv, grids)
 
-    def go_down(self, lv, k_mem, k_live, passable, downstairs):
+    def go_down(self, lv, grids, downstairs):
         """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
         start = self.pos()
         if downstairs[start]:
@@ -125,20 +121,14 @@ class ExploreMixin:
             self.took_stairs = True
             self.press(">")
             return True
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, downstairs)
-        if reached is not None:
-            step = self.first_step(prev, start, reached)
-            if step:
-                self.goal_chase("downstairs")
-                self.move(step)
-                return True
-        return False
+        return self.walk_to(lv, downstairs, chase="downstairs", grids=grids)[0] == "moved"
 
     def should_descend(self, lv, frontier, on_level):
         """Explored (no frontier left) or on this level for longer than descend_after turns."""
         return not frontier.any() or on_level > self.opts.descend_after
 
-    def search_mode(self, lv, k_mem, k_live, passable):
+    def search_mode(self, lv, grids):
+        k_mem, k_live, passable = grids
         self.cur_act = "search"
         start = self.pos()
         dist, prev, _ = self.dijkstra(lv, k_mem, k_live, passable, start, None)
@@ -187,27 +177,19 @@ class ExploreMixin:
             self.mines_return_on = True
             self.mines_return_log.append((self.turn(), list(lv.key), why, self.bl(nh.NLE_BL_DEPTH)))
 
-    def mines_return_step(self, lv, k_mem, k_live, passable, start):
+    def mines_return_step(self, lv, grids):
         """mines_return: climb back to the main dungeon -- walk to this level's up staircase and take it; the
         branch staircase we arrive on gets the Mines mark (avoid_down), and mines_done keeps us out."""
         self.cur_act = "minesup"
-        up = k_mem == G.UPSTAIR
+        start = self.pos()
+        up = grids[0] == G.UPSTAIR
         if up[start]:
             if lv.key[1] == 1:
                 self.pending_mines_mark = True      # next tick, on the branch level: mark its Mines staircase
             self.took_stairs = True
             self.press("<")
             return True
-        if not up.any():
-            return False
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, up)
-        if reached is None:
-            return False
-        step = self.first_step(prev, start, reached)
-        if not step:
-            return False
-        self.move(step)
-        return True
+        return up.any() and self.walk_to(lv, up, grids=grids)[0] == "moved"
 
     def magic_map_step(self, lv):
         if lv.mapped:

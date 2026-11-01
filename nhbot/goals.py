@@ -120,19 +120,13 @@ class GoalsMixin:
             consume(here)
             self.goal_event(kind, "consumed", self.goal_forget(kind, lv, here))
             return True
-        k_mem, k_live = self.kind_grid(lv)
-        passable = self.passable_grid(lv, k_mem, k_live)
         mask = np.zeros(lv.under.shape, dtype=bool)
         for p in goals:
             mask[p] = True
-        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask)
-        step = self.first_step(prev, here, reached) if reached is not None else None
-        if step is None:
-            self.goal_unreachable(kind, goals, passable)
-            return False
-        self.goal_chase(kind)
-        self.move(step)
-        return True
+        if self.walk_to(lv, mask, chase=kind)[0] == "moved":
+            return True
+        self.goal_unreachable(kind, goals, self.grids(lv)[2])
+        return False
 
     def goal_unreachable(self, kind, goals, passable):
         """Count a tick with no reachable goal of this kind, by cause."""

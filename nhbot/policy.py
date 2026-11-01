@@ -72,6 +72,7 @@ class PolicyMixin:
         self.cur_key = lv.key
         self.last_step = None
         self.chasing = None
+        self.tick_no += 1
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return

@@ -60,6 +60,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.obs = obs
         self.last_bl = obs["blstats"].copy()
         self.hostile_cache = {}
+        self._grids_key, self._grids = None, None
+        self.tick_no = 0
         self.peaceful_waits = 0
         self._cur_pos = self.prev_pos = None
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn

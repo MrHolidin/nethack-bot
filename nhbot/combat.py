@@ -158,12 +158,13 @@ class CombatMixin:
                 seen.add(l); res.append((l, s))
         return res
 
-    def unblock_step(self, lv, k_mem, k_live, passable, goal):
+    def unblock_step(self, lv, grids, goal):
         """Explore/descend goals are reachable only through squares held by monsters we refuse to melee
         (a floating eye in a doorway, a mold in a corridor): throw whatever is expendable at the blocker;
         stuck long with nothing to throw, hit a floating eye anyway (paralysis beats starving)."""
         if not self.avoid_cells:
             return False
+        k_mem, k_live, passable = grids
         p2 = passable.copy()
         for c in self.avoid_cells:
             p2[c] = bool(G.PASSABLE[k_mem[c]]) or k_mem[c] == G.DOORWAY
@@ -215,14 +216,8 @@ class CombatMixin:
             for ny, nx in ((blocker[0] + a, blocker[1] + b) for a, b in NEIGH):
                 if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx]:
                     adj[ny, nx] = True
-            if adj.any():
-                dist, prev, r2 = self.dijkstra(lv, k_mem, k_live, passable, start, adj)
-                if r2 is not None and r2 != start:
-                    step = self.first_step(prev, start, r2)
-                    if step:
-                        self.cur_act = "unblock"
-                        self.move(step)
-                        return True
+            if adj.any() and self.walk_to(lv, adj, act="unblock", grids=(k_mem, k_live, passable))[0] == "moved":
+                return True
         return False
 
     def hunt_step(self, lv):
@@ -265,8 +260,7 @@ class CombatMixin:
                 return False
         if dist(h["pos"]) <= 1:
             return False                       # next to it: the fight step takes over
-        k_mem, k_live = self.kind_grid(lv)
-        passable = self.passable_grid(lv, k_mem, k_live)
+        k_mem, k_live, passable = self.grids(lv)
         # among the steps that get as close as any, prefer one off the target's lines (it fires only when
         # lined up); distances from the target over the same grid
         ty, tx = h["pos"]
@@ -297,15 +291,12 @@ class CombatMixin:
             ny, nx = h["pos"][0] + dy, h["pos"][1] + dx
             if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx]:
                 adj[ny, nx] = True
-        if adj.any():
-            _, prev, got = self.dijkstra(lv, k_mem, k_live, passable, (y, x), adj, max_cost=60)
-            if got is not None and got != (y, x):
-                step = self.first_step(prev, (y, x), got)
-                if step:
-                    self.cur_act = "hunt"
-                    self.hunt_steps += 1
-                    self.move(step)
-                    return True
+        if adj.any() and not adj[y, x]:
+            hs = self.hunt_steps
+            self.hunt_steps += 1                     # counted before the step, as before
+            if self.walk_to(lv, adj, max_cost=60, act="hunt", grids=(k_mem, k_live, passable))[0] == "moved":
+                return True
+            self.hunt_steps = hs
         self.hunt = None
         return False
 

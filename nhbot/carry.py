@@ -389,7 +389,11 @@ class CarryMixin:
             self.shops_done.add(lv.key)
             self.shopping = None
             return False
-        return self.go_toward_mask(lv, targets)
+        if self.walk_to(lv, targets)[0] == "moved":
+            return True
+        self.shops_done.add(lv.key)          # can't get further in: the visit is over
+        self.shopping = None
+        return False
 
     # ------------------------------------------------------------ carry_all: diggers and shops
     def digger_letters(self):
@@ -431,16 +435,10 @@ class CarryMixin:
                     self.dig_stash = {"key": lv.key, "pos": here, "turn": self.turn()}
                     self.stash_pending = None
                 return True
-            k_mem, k_live = self.kind_grid(lv)
-            p = self.passable_grid(lv, k_mem, k_live)
-            dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, here, ok)
-            step = self.first_step(prev, here, reached) if reached is not None else None
-            if step is None:
-                self.stash_pending = None
-                return False
-            self.cur_act = "stash"
-            self.move(step)
-            return True
+            if self.walk_to(lv, ok, act="stash")[0] == "moved":
+                return True
+            self.stash_pending = None
+            return False
         st = self.dig_stash
         if st is None:
             return False
@@ -456,7 +454,9 @@ class CarryMixin:
             self.dig_stash = None
             self.stash_stats["retrieved"] += 1
             return True
-        if self.go_toward(lv, st["pos"]):
+        m = np.zeros(lv.under.shape, dtype=bool)
+        m[st["pos"]] = True
+        if self.walk_to(lv, m)[0] == "moved":
             self.cur_act = "stash"
             return True
         self.dig_stash = None

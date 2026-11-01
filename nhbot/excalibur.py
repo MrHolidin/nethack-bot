@@ -52,19 +52,10 @@ class ExcaliburMixin:
         y, x = self.pos()
         if fmask[y, x]:
             return self.dip(lv)
-        k_mem, k_live = self.kind_grid(lv)
-        p = self.passable_grid(lv, k_mem, k_live)
-        p |= fmask
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), fmask, max_cost=self.opts.excal_cost)
-        if reached is None:
-            self.excal_skip.add(lv.key)            # can't reach it: don't keep coming back
-            return False
-        step = self.first_step(prev, (y, x), reached)
-        if step is None:
-            return False
-        self.cur_act = "excal"
-        self.move(step)
-        return True
+        if self.walk_to(lv, fmask, max_cost=self.opts.excal_cost, act="excal", also=fmask)[0] == "moved":
+            return True
+        self.excal_skip.add(lv.key)                # can't reach it: don't keep coming back
+        return False
 
     def excal_go_up(self, lv):
         """No fountain here, but one is remembered a few levels up: walk back up to it."""
@@ -76,7 +67,7 @@ class ExcaliburMixin:
                    and (l.under == FOUNTAIN_GLYPH).any() and not (l.shop.any() and (l.under == FOUNTAIN_GLYPH)[l.shop].all())]
         if not targets:
             return False
-        k_mem, k_live = self.kind_grid(lv)
+        k_mem = self.grids(lv)[0]
         up = k_mem == G.UPSTAIR
         if not up.any():
             return False
@@ -86,16 +77,7 @@ class ExcaliburMixin:
             self.excal_trips += 1
             self.press("<")
             return True
-        p = self.passable_grid(lv, k_mem, k_live)
-        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, p, (y, x), up, max_cost=self.opts.excal_cost_up)
-        if reached is None:
-            return False
-        step = self.first_step(prev, (y, x), reached)
-        if step is None:
-            return False
-        self.cur_act = "excal"
-        self.move(step)
-        return True
+        return self.walk_to(lv, up, max_cost=self.opts.excal_cost_up, act="excal")[0] == "moved"
 
     def dip(self, lv):
         it = self.long_sword()
