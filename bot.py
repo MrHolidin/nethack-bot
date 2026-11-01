@@ -987,7 +987,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
-        return name == "gas spore" and self.bl(nh.NLE_BL_HP) >= 25
+        return name == "gas spore" and self.bl(nh.NLE_BL_HP) >= 25 and self.role_opts.get("spore_melee", True)
 
     def visible_hostiles(self, lv):
         g = self.obs["glyphs"]
