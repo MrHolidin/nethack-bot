@@ -28,12 +28,16 @@ class ValkMixin:
         self.rewields = 0
         self.nymph_waits = 0
         self.nymph_elbs = 0
+        self._theft_turn = None
+        self._wield_tried = set()      # wield candidates already tried
+        self.polyd = False             # polymorphed: no wearing / wielding
+        self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
 
     # ================================================================== nymphs
     def on_valk_message(self, m):
         if re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m:
             if any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m:
-                if self.turn() != getattr(self, "_theft_turn", None):
+                if self.turn() != self._theft_turn:
                     self._theft_turn = self.turn()
                     self.thefts += 1
                 self.stolen_pending = True
@@ -44,7 +48,7 @@ class ValkMixin:
                 self.loot_sq = self.last_attack_target
                 self.loot_key = self.cur_key
         if "It stole" in m or "It steals" in m or "She charms you" in m:
-            if self.turn() != getattr(self, "_theft_turn", None):
+            if self.turn() != self._theft_turn:
                 self._theft_turn = self.turn()
                 self.thefts += 1
             self.stolen_pending = True
@@ -54,7 +58,7 @@ class ValkMixin:
             self.polyd = True                                 # weapons: no wielding in a borrowed body
         if re.search(r"You return to \w+ form|You feel like a new ", m):
             self.polyd = False
-        if re.search(r"You return to \w+ form", m) and getattr(self, "were_drop", None):   # dwarves: "dwarven form"
+        if re.search(r"You return to \w+ form", m) and self.were_drop:   # dwarves: "dwarven form"
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
 
@@ -195,8 +199,8 @@ class ValkMixin:
             return False
         weapons = [(l, s) for l, c, s in inv if c == nh.WEAPON_CLASS and not re.search(r"\b(arrows?|bolts?|ya|darts?)\b", s)]
         pick = next(((l, s) for l, s in weapons if self.main_weapon in s), None) or (weapons[0] if weapons else None)
-        if pick and pick[0] not in getattr(self, "_wield_tried", set()):
-            self._wield_tried = getattr(self, "_wield_tried", set()) | {pick[0]}
+        if pick and pick[0] not in self._wield_tried:
+            self._wield_tried = self._wield_tried | {pick[0]}
             self.wield(pick[0])
             self.rewields += 1
             return True
@@ -219,12 +223,12 @@ class ValkMixin:
     def weapon_upgrade(self, inv):
         """Wield the best-ranked weapon we carry if it beats the wielded one (or nothing is wielded).
         Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
-        if getattr(self, "polyd", False) or self.handless():
+        if self.polyd or self.handless():
             return False                     # animal forms can't hold weapons ("Don't be ridiculous!")
         cur = next((s for _, c, s in inv if WIELDED_RE.search(s)), None)
         if cur is not None and " cursed" in " " + cur:
             return False
-        tried = getattr(self, "_wield_tried", set())
+        tried = self._wield_tried
         cands = [(self.weapon_rank(s), l, s) for l, c, s in inv
                  if c == nh.WEAPON_CLASS and not WIELDED_RE.search(s) and " cursed" not in " " + s
                  and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", s)

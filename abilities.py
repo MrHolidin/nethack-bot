@@ -77,7 +77,7 @@ class AbilitiesMixin:
         return False
 
     def magic_map_step(self, lv):
-        if getattr(lv, "mapped", False):
+        if lv.mapped:
             return False
         it = self.find_item(nh.SCROLL_CLASS, ("magic mapping",))
         if not it:

@@ -216,7 +216,7 @@ class PriceMemoryMixin:
         offer, item = int(m.group(1)), m.group(2).strip()
         shk = msg.split(" offers ")[0].split(".")[-1].strip()
         # "for your scrolls labeled X": the offer is for the whole stack, whose size the message omits
-        qty = getattr(self, "last_drop_qty", None) if re.search(r"\b(potions|scrolls|rings|wands|amulets|spellbooks|pairs)\b", item) else 1
+        qty = self.last_drop_qty if re.search(r"\b(potions|scrolls|rings|wands|amulets|spellbooks|pairs)\b", item) else 1
         self._record(item, "sell", offer, ("sell", shk, item, offer, qty), qty)
 
     def price_posterior(self, key):

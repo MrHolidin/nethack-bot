@@ -35,6 +35,7 @@ class ClassTacticsMixin:
     def class_init(self):
         self.zaps = 0
         self.empty_wands = set()
+        self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
     # ------------------------------------------------------------ danger of one monster
     def worth_special(self, pos, name):

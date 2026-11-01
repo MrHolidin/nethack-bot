@@ -187,7 +187,7 @@ class EquipMixin:
     # ---------------------------------------------------------- main hook
     def equip_step(self, lv):
         """Called when no hostiles are visible. Returns True if it used the turn."""
-        if getattr(self, "polyd", False) or (hasattr(self, "handless") and self.handless()):
+        if self.polyd or self.handless():
             return False                      # do_wear.c: very small / handless forms can't ("Don't even bother.")
         inv = self.armor_inventory()
         worn = self.worn_by_slot(inv)
@@ -293,8 +293,7 @@ class EquipMixin:
                 continue
             break
         self.settle()
-        if hasattr(self, "price_note_text"):
-            self.price_note_text(" | ".join(names))
+        self.price_note_text(" | ".join(names))
         return names
 
     def food_count(self):

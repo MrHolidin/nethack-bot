@@ -189,6 +189,8 @@ class CarryMixin:
         self.stash_pending = None    # (level key, door) -- a shopkeeper asked us to leave the digger outside
         self.dig_stash = None        # dict(key, pos, turn): where we left it
         self.stash_stats = {"asked": 0, "stashed": 0, "retrieved": 0, "lost": 0}
+        self.selling_item = (None, "")   # (class, text) of the item on offer
+        self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
 
     def carry_on(self):
         return bool(self.opts.carry)
@@ -357,7 +359,7 @@ class CarryMixin:
 
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
-        c, s = getattr(self, "selling_item", (None, ""))
+        c, s = self.selling_item
         if c == nh.SCROLL_CLASS and self.opts.read_good and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse

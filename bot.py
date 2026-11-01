@@ -105,6 +105,10 @@ class Level:
         self.peaceful = set()     # monster glyphs that turned out peaceful here
         self.entered_turn = None
         self.elbereth = set()     # positions where we engraved
+        self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
+        self.search_goal = None   # square chosen for searching, kept until reached
+        self.mapped = False       # a magic mapping scroll was read here
+        self.shop_type = None     # from the shopkeeper's greeting
 
 
 class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ElberethMixin, FocusMixin, ScrollMixin, CarryMixin, PriceMemoryMixin):
@@ -123,6 +127,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.verbose = verbose
         self.max_steps = max_steps
         self.max_turns = max_turns
+        self.last_bl = None
         acts = self.env.unwrapped.actions
         self.key2act = {}
         for i, a in enumerate(acts):
@@ -138,7 +143,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.done = term or trunc
         if not self.done:
             self.last_bl = self.obs["blstats"].copy()
-            self.last_tty = self.obs["tty_chars"]
         if self.done:
             raise GameOver()
         if self.steps >= self.max_steps or (self.max_turns and self.turn() >= self.max_turns):
@@ -245,7 +249,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         return int(self.last_bl[idx])
 
     def turn(self):
-        return int(self.last_bl[nh.NLE_BL_TIME]) if hasattr(self, "last_bl") else 0
+        return int(self.last_bl[nh.NLE_BL_TIME]) if self.last_bl is not None else 0
 
     def pos(self):
         return self.bl(nh.NLE_BL_Y), self.bl(nh.NLE_BL_X)
@@ -265,8 +269,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         lv.under[known] = g[known]
         lv.seen |= known & (g != G.STONE_GLYPH)
         y, x = self.pos()
-        if getattr(self, "_cur_pos", None) != (y, x):
-            self.prev_pos, self._cur_pos = getattr(self, "_cur_pos", None), (y, x)
+        if self._cur_pos != (y, x):
+            self.prev_pos, self._cur_pos = self._cur_pos, (y, x)
         lv.visited[y, x] += 1
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
         if not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
@@ -330,10 +334,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.god_angry = True
         if "for sale" in m:
             self.price_note_text(m)
-        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
+        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
             self.last_shot_turn = self.turn()
         if self.opts.hunt_shooter and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
-                and self.turn() - getattr(self, "own_zap_turn", -99) > 1:
+                and self.turn() - self.own_zap_turn > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
         if ("You can't go up here" in m or "You can't go down here" in m) and lv is not None:
@@ -353,7 +357,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.vault_follow_until = self.turn() + 300
                 self.guard_trail = []
         if lv is not None and "Closed for inventory" in m:
-            lv.cfi = getattr(lv, "cfi", set()) | {self.pos()}
+            lv.cfi = lv.cfi | {self.pos()}
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
         recent = " ".join(mm for _, mm in list(self.messages)[-6:])
@@ -369,8 +373,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.stash_request()
         if "Please pay before leaving" in m or "you owe" in m.lower() and "zorkmid" in m:
             self.need_pay = True
-        if hasattr(self, "thefts"):
-            self.on_valk_message(m)
+        self.on_valk_message(m)
         if "You feel feverish" in m:
             self.lycanthropy = True
             mk = re.search(r"\b(were(?:jackal|rat|wolf))\b", m)
@@ -473,7 +476,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         before = (y, x, self.turn())
         lv = self.level()
         if target in lv.locked:
-            if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in getattr(lv, "cfi", ())):
+            if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
                 return
@@ -583,9 +586,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         seen = set()
         q = deque()
         y, x = door
-        came = getattr(self, "_cur_pos", None)          # map memory is not updated yet for the door square
+        came = self._cur_pos          # map memory is not updated yet for the door square
         if came == door:
-            came = getattr(self, "prev_pos", None)
+            came = self.prev_pos
         if came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
             # the greeting comes as we step onto the door from outside: the square we came from is outside.
             # Flooding both sides marked a room beyond the door as shop and left us stuck on the door.
@@ -621,7 +624,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def mines_blocked(self):
         """avoid_mines: True/False, or "until_excalibur": lawful long-sword users first look for
         Excalibur in the main dungeon (the Mines have no usable fountains)."""
-        if getattr(self, "mines_done", False):
+        if self.mines_done:
             return True                       # mines_return brought us back: the Mines are finished
         if self.opts.avoid_mines == "until_excalibur":
             return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
@@ -735,7 +738,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def corpse_ok(self, name):
         """Fresh corpse of our own kill: decide from the species' flags."""
         if self.lycanthropy:
-            kind = getattr(self, "lyc_kind", None)
+            kind = self.lyc_kind
             kin = WERE_KIN.get(kind) if kind else set().union(*WERE_KIN.values())
             if name in kin:
                 return False                  # eat.c: our own were-kind is cannibalism (Luck, aggravate)
@@ -992,9 +995,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         new 'I' next to us -> that one; an attack and a single 'I' next to us -> that one; otherwise unknown,
         don't hit (blind_wait then keeps us still)."""
         cur = {p for p, n in hostiles if n == "invisible"}
-        attacked, self.it_attacked = getattr(self, "it_attacked", False), False
-        prev = getattr(self, "prev_inv", set())
-        known = getattr(self, "inv_attackers", set())
+        attacked, self.it_attacked = self.it_attacked, False
+        prev = self.prev_inv
+        known = self.inv_attackers
         if attacked:
             new = cur - prev
             known |= new if new else (cur if len(cur) == 1 else set())
@@ -1004,7 +1007,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return hostiles
         out = [(p, n) for p, n in hostiles if n != "invisible" or p in known]
         if len(out) < len(hostiles):
-            self.blind_held = getattr(self, "blind_held", 0) + 1
+            self.blind_held += 1
         return out
 
     def hallu_blind_ranged(self):
@@ -1023,8 +1026,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
                and nh.glyph_is_monster(int(g[y + dy, x + dx]))]
-        attacked, self.melee_on_us = getattr(self, "melee_on_us", False), False
-        known = getattr(self, "hallu_targets", set())
+        attacked, self.melee_on_us = self.melee_on_us, False
+        known = self.hallu_targets
         if attacked and len(adj) == 1:
             known.add(adj[0])
         known &= set(adj)
@@ -1033,7 +1036,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return hostiles
         out = [(p, n) for p, n in hostiles if p in known and not lv.shop[p]]
         if len(out) < len(hostiles):
-            self.hallu_held = getattr(self, "hallu_held", 0) + 1
+            self.hallu_held += 1
         return out
 
     def spore_ok(self, name):
@@ -1558,7 +1561,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         combat -- nothing in melee range and not shot at in the last 5 turns. Goals and the inspecting step
         use this same test."""
         if self.opts.pickup_calm:
-            return not self.adjacent_hostiles(lv) and self.turn() - getattr(self, "last_shot_turn", -99) > 5
+            return not self.adjacent_hostiles(lv) and self.turn() - self.last_shot_turn > 5
         return not self.view_threats(lv)
 
     def hunt_step(self, lv):
@@ -1571,7 +1574,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if hp < maxhp * 0.4:
             self.hunt = None
             return False
-        ev = getattr(self, "shot_event", None)
+        ev = self.shot_event
         dist = lambda p: max(abs(p[0] - y), abs(p[1] - x))
         if ev and t - ev[0] <= 2:
             self.shot_event = None
@@ -1584,7 +1587,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 p, n = min(cands, key=lambda c: dist(c[0]))
                 self.hunt = {"key": lv.key, "pos": p, "name": n, "until": t + 25, "lost": 0}
                 self.hunts += 1
-        h = getattr(self, "hunt", None)
+        h = self.hunt
         if not h:
             return False
         if h["key"] != lv.key or t > h["until"]:
@@ -1625,7 +1628,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 off = [p for p in pool if not lined(p)]
                 self.cur_act = "hunt"
                 self.hunt_steps += 1
-                self.hunt_offline_steps = getattr(self, "hunt_offline_steps", 0) + bool(off and any(lined(p) for p in pool))
+                self.hunt_offline_steps += bool(off and any(lined(p) for p in pool))
                 self.move((off or pool)[0])
                 return True
         adj = np.zeros((ROWS, COLS), dtype=bool)
@@ -1662,7 +1665,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         wall_term = cnt * 10.0
         score = np.where(reach & passable, wall_term - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
         # dead-end corridors are prime spots
-        goal = getattr(lv, "search_goal", None)
+        goal = lv.search_goal
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
@@ -1691,6 +1694,13 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.obs = obs
         self.last_bl = obs["blstats"].copy()
         self.hostile_cache = {}
+        self._cur_pos = self.prev_pos = None
+        self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn
+        self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
+        self.blind_held = self.hallu_held = 0
+        self.last_shot_turn = -99
+        self.hunt_offline_steps = 0
+        self.lyc_kind = None
         self.steps = 0
         self.reward = 0.0
         self.done = False
@@ -1832,18 +1842,18 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
-            "elb_fail": getattr(self, "elb_fail", 0),
+            "elb_fail": self.elb_fail,
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "scrolls": dict(self.scroll_stats), "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
             "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 
-            "elb_fail_msgs": getattr(self, "elb_fail_msgs", [])[:5],
-            "elb_rewrites": getattr(self, "elb_rewrites", 0),
-            "elb_blocked": dict(getattr(self, "elb_block_reasons", {})),
+            "elb_fail_msgs": self.elb_fail_msgs[:5],
+            "elb_rewrites": self.elb_rewrites,
+            "elb_blocked": dict(self.elb_block_reasons),
             "carry": dict(self.carry_stats),
             "stash": dict(self.stash_stats),
-            "elb_only_c": getattr(self, "elb_only_c", 0),
+            "elb_only_c": self.elb_only_c,
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "deadly_prayers": self.deadly_prayers,
@@ -1878,12 +1888,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "vault": [self.vault_drops, self.vault_moves],
             "items_first": self.items_first_holds,
-            "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
+            "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],
-            "blind_held": getattr(self, "blind_held", 0),
+            "blind_held": self.blind_held,
             "mines_return": self.mines_return_log,
             "minetown_seen": self.minetown_seen,
-            "hallu_held": getattr(self, "hallu_held", 0),
+            "hallu_held": self.hallu_held,
             "resets": self.resets,
             "god_angry": self.god_angry,
             "truncated": self.truncated,
