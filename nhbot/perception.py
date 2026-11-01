@@ -41,6 +41,8 @@ class PerceptionMixin:
         self.peace_seen = {}           # (level, glyph, pos) -> (turn, peaceful): a look or 'Really attack?'
         self.hostile_marks = {}        # level key -> [(glyph, pos)]: 'peaceful' monsters that attacked us
         self.peaceful_hits = Counter() # species: attacks on us by a monster we took for peaceful
+        self.peace_turned = 0          # looks that found a kind created peaceful hostile
+        self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
 
     # ------------------------------------------------------------------ peacefulness (danger_check)
     def peace_class(self, idx):
@@ -91,9 +93,10 @@ class PerceptionMixin:
         return taken
 
     def peaceful_now(self, lv, pos, look=True, slack=0):
-        """Is the monster at pos peaceful? Attacked us after being taken for peaceful: no. Looked at (or it
-        answered 'Really attack?') this turn: that answer. Else by its kind (peace_class); a kind that can be
-        either is looked at (';') when next to us and look, otherwise taken for hostile."""
+        """Is the monster at pos peaceful? Attacked us after being taken for peaceful, or a look found it
+        hostile: no. Looked at (or it answered 'Really attack?') this turn: that answer. A kind never created
+        peaceful: no. Otherwise next to us (and look) a look (';') decides; farther away its kind does: created
+        peaceful -> yes, either way -> no."""
         g = int(self.obs["glyphs"][pos])
         if G.KIND[g] != G.MONSTER:
             return False
@@ -104,10 +107,12 @@ class PerceptionMixin:
         if s is not None and s[0] >= self.turn() - slack:
             return s[1]
         cls = self.peace_class(nh.glyph_to_mon(g))
-        if cls:
-            return cls > 0
+        if cls < 0:
+            return False
         y, x = self.pos()
         if look and max(abs(pos[0] - y), abs(pos[1] - x)) == 1:
+            # next to us: look, also at kinds created peaceful -- they turn hostile (a throne room, onlookers
+            # when we hit a peaceful, an angry shopkeeper) and need not attack in melee to be dangerous
             desc = self.describe_at(pos)
             self.farlooks += 1
             peaceful = "peaceful" in desc or "tame" in desc
@@ -115,8 +120,13 @@ class PerceptionMixin:
                 t = self.turn()
                 self.peace_seen = {k: v for k, v in self.peace_seen.items() if v[0] >= t - 2}
             self.peace_seen[ck] = (self.turn(), peaceful)
+            if cls > 0 and not peaceful:
+                self.peace_turned += 1
+                marks = self.hostile_marks.setdefault(lv.key, [])
+                if (g, pos) not in marks:
+                    marks.append((g, pos))           # stays hostile while we can follow it
             return peaceful
-        return False
+        return cls > 0
 
     def msg_peace(self, m, lv):
         """A monster we take for peaceful attacked us: count it (by kind), and every one of that kind next to

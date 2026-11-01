@@ -278,6 +278,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "msg_audit": dict(self.msg_audit),
             "farlooks": self.farlooks,
             "peaceful_hits": dict(self.peaceful_hits),
+            "peace_turned": self.peace_turned,
+            "peaceful_wait_by": dict(self.peaceful_wait_by.most_common(8)),
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],
             "blind_held": self.blind_held,

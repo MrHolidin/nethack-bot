@@ -130,6 +130,7 @@ class NavMixin:
             # making the square impassable after a few waits was tried and not taken -- peaceful_waits counts)
             lv.fail[ty, tx] += 1
             self.peaceful_waits += 1
+            self.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
             self.press("s")
             return
         self.press(key)
