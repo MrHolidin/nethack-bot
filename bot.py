@@ -691,6 +691,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
     def mines_blocked(self):
         """avoid_mines: True/False, or "until_excalibur": lawful long-sword users first look for
         Excalibur in the main dungeon (the Mines have no usable fountains)."""
+        if getattr(self, "mines_done", False):
+            return True                       # mines_return brought us back: the Mines are finished
         if self.avoid_mines == "until_excalibur":
             return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
                 and self.long_sword() is not None and self.turn() < 8000
@@ -1022,9 +1024,42 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         a shop (filler Mines levels have none), where the peaceful watch, priest and shopkeepers are."""
         if not self.role_opts.get("strike_town", True):
             return True
+        return self.is_minetown(lv)
+
+    def is_minetown(self, lv):
+        """A Mines level with an altar, a fountain or a shop: Minetown (every variant has a temple altar;
+        filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
         return bool(lv.shop.any() or np.isin(lv.under, (nh.GLYPH_CMAP_OFF + 27, nh.GLYPH_CMAP_OFF + 31)).any())
+
+    # ------------------------------------------------------------ mines_return
+    def mines_return_start(self, lv, why):
+        if not self.mines_return_on:
+            self.mines_return_on = True
+            self.mines_return_log.append((self.turn(), list(lv.key), why, self.bl(nh.NLE_BL_DEPTH)))
+
+    def mines_return_step(self, lv, k_mem, k_live, passable, start):
+        """mines_return: climb back to the main dungeon -- walk to this level's up staircase and take it; the
+        branch staircase we arrive on gets the Mines mark (avoid_down), and mines_done keeps us out."""
+        self.cur_act = "minesup"
+        up = k_mem == G.UPSTAIR
+        if up[start]:
+            if lv.key[1] == 1:
+                self.pending_mines_mark = True      # next tick, on the branch level: mark its Mines staircase
+            self.took_stairs = True
+            self.press("<")
+            return True
+        if not up.any():
+            return False
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, up)
+        if reached is None:
+            return False
+        step = self.first_step(prev, start, reached)
+        if not step:
+            return False
+        self.move(step)
+        return True
 
     def blind_attackers(self, lv, hostiles):
         """blind_strike: while blind, an adjacent 'I' is only a target if it attacked us. mhitu.c marks the square
@@ -1116,6 +1151,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.pending_mines_mark = True
             self.press("<")
             return
+        if self.role_opts.get("mines_return", False):
+            if lv.key[0] == 2:
+                if self.is_minetown(lv):
+                    self.minetown_seen = True
+                if not self.minetown_seen and lv.key[1] >= 5:
+                    self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
+            elif self.mines_return_on:
+                self.mines_return_on = False
+                self.mines_done = True
         y, x = self.pos()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         hunger = self.bl(nh.NLE_BL_HUNGER)
@@ -1422,6 +1466,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
+        if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, k_mem, k_live, passable, start):
+            return
         dt = self.door_target_mask(lv, k_mem, passable)
         if dt is not None:
             frontier = frontier | dt
@@ -1444,6 +1490,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
+        if want_down and self.role_opts.get("mines_return", False) and lv.key[0] == 2 and lv.key[1] >= 4 \
+                and not self.minetown_seen and not self.is_minetown(lv):
+            # mines level 4 done and no Minetown on 3 or 4: it won't come further down
+            self.mines_return_start(lv, "no_town")
+            if self.mines_return_step(lv, k_mem, k_live, passable, start):
+                return
         if want_down and self.role_opts.get("items_first", True) \
                 and on_level <= self.role_opts.get("descend_after", 2000):
             # explored, but something worth having still lies here: the same goals the target step below
@@ -1527,6 +1579,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     self.move(step)
                     return
 
+        # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
+        if self.role_opts.get("mines_return", False) and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
+            self.mines_return_start(lv, "bottom")
+            if self.mines_return_step(lv, k_mem, k_live, passable, start):
+                return
         # stuck for good on this level: a wand of digging makes the way down
         if lv.desperate and self.dig_down(lv, "stuck"):
             return
@@ -1948,6 +2005,10 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.god_angry = False
         self.pending_mines_mark = False
         self.mines_bounced = set()
+        self.mines_return_on = False
+        self.mines_done = False
+        self.minetown_seen = False
+        self.mines_return_log = []
         self.prev_key = None
         self.took_stairs = False
         self.retrieve = []
@@ -2097,6 +2158,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "ward": [self.ward_writes, self.ward_waits],
             "dip_prep": getattr(self, "dip_prep_stats", None),
             "blind_held": getattr(self, "blind_held", 0),
+            "mines_return": self.mines_return_log,
+            "minetown_seen": self.minetown_seen,
             "hallu_held": getattr(self, "hallu_held", 0),
             "nymph_pk": [getattr(self, "nymph_pk_elbs", 0), getattr(self, "nymph_pk_wait_total", 0)],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
