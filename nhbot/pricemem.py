@@ -21,6 +21,7 @@ import re
 
 import nle.nethack as nh
 
+from nhbot.items import base_name
 from nhbot.scrolls import cha_factor
 
 SHUFFLED_CLASSES = (nh.AMULET_CLASS, nh.POTION_CLASS, nh.RING_CLASS, nh.SCROLL_CLASS, nh.SPBOOK_CLASS,
@@ -122,17 +123,9 @@ def likelihood(name, cls, r):
 
 
 # ---------------------------------------------------------------- text -> appearance
-_STRIP = re.compile(r"\b(uncursed|cursed|blessed|rustproof|fireproof|corrodeproof|rotted|very|thoroughly|rusty|"
-                    r"rusted|corroded|burnt|burned|greased|diluted|lit|partly used)\s+")
-
-
 def appearance(text):
     """(class, appearance key) of an UNIDENTIFIED item named by its looks, else None."""
-    t = re.sub(r"\s*\(.*?\)", "", text).strip()
-    t = re.sub(r"\s+(called|named)\s+.*$", "", t)
-    t = re.sub(r"^(a|an|the|\d+)\s+", "", t)
-    t = _STRIP.sub("", t)
-    t = re.sub(r"^[+-]\d+\s+", "", t)
+    t = base_name(text)[2]
     t = re.sub(r"^(pair|set)s? of ", "", t).strip()
     if re.search(r"\b(potion|scroll|ring|wand|amulet|spellbook)s? of ", t):
         return None

@@ -66,3 +66,36 @@ def parse_item(letter, ocls, s):
                 ring_on="(on left " in s or "(on right " in s,
                 lit="(lit)" in s,
                 cursed=bool(CURSED_RE.search(s)))
+
+
+# ---------------------------------------------------------------- names
+# Words NetHack 3.6.6 puts in front of an object's name (objnam.c doname_base / xname / add_erosion_words):
+# containers "empty", "broken" / "locked" / "unlocked"; candles "partly used"; food "partly eaten";
+# BUC; "greased"; "poisoned"; erosion (very / thoroughly) rusty | burnt, corroded | rotted;
+# erodeproof fixed | rustproof | corrodeproof | fireproof; potions "diluted". Then the enchantment.
+PREFIX_WORDS = ("empty", "broken", "locked", "unlocked", "partly used", "partly eaten", "uncursed", "cursed",
+                "blessed", "greased", "poisoned", "very", "thoroughly", "rusty", "burnt", "corroded", "rotted",
+                "fixed", "rustproof", "corrodeproof", "fireproof", "diluted")
+PREFIX_RE = re.compile(r"^(?:%s)\s+" % "|".join(sorted(PREFIX_WORDS, key=len, reverse=True)))
+
+
+def base_name(s, called=False):
+    """Inventory / floor text -> (quantity, enchantment or None, bare name): no state suffixes, article or
+    count, prefix words, enchantment; no 'called' / 'named' part unless called."""
+    t = re.sub(r"\s*\(.*?\)", "", s).strip()
+    if not called:
+        t = re.sub(r"\s+(called|named)\s+.*$", "", t)
+    m = re.match(r"^(\d+)\s+", t)
+    qty = int(m.group(1)) if m else 1
+    t = re.sub(r"^(a|an|the|some|\d+)\s+", "", t)
+    while True:
+        t2 = PREFIX_RE.sub("", t)
+        if t2 == t:
+            break
+        t = t2
+    ench = None
+    m = re.match(r"^([+-]\d+)\s+", t)
+    if m:
+        ench = int(m.group(1))
+        t = t[m.end():]
+    return qty, ench, t.strip()

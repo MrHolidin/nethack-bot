@@ -4,6 +4,8 @@ import re
 
 import nle.nethack as nh
 
+from nhbot.items import base_name
+
 
 class WeaponsMixin:
     def weapons_init(self):
@@ -21,10 +23,7 @@ class WeaponsMixin:
         wielded = [it.text for it in self.items() if it.wielded]
         if self.main_weapon is None:
             if wielded:
-                base = re.sub(r"\s*\(.*?\)", "", wielded[0])
-                base = re.sub(r"^(a|an|the|\d+)\s+", "", base)
-                base = re.sub(r"\b(uncursed|cursed|blessed|rustproof|[+-]\d+)\s+", "", base).strip()
-                self.main_weapon = base
+                self.main_weapon = base_name(wielded[0])[2]
             return False
         return self.weapon_upgrade(inv)
 

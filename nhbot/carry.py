@@ -26,6 +26,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.equipment import parse_armor
+from nhbot.items import base_name
 
 CARRY_CLASSES = (nh.WAND_CLASS, nh.RING_CLASS, nh.AMULET_CLASS, nh.SCROLL_CLASS, nh.POTION_CLASS)
 RANDOM_CLASSES = CARRY_CLASSES + (nh.SPBOOK_CLASS,)
@@ -136,14 +137,7 @@ def singular(w):
 
 def describe(ocls, s):
     """Inventory/floor text -> dict(qty, unit weight, unit cost (None if unknown), unidentified, key)."""
-    t = re.sub(r"\s*\(.*?\)", "", s).strip()
-    t = re.sub(r"\s+(called|named)\s+.*$", "", t)
-    m = re.match(r"^(\d+)\s+", t)
-    qty = int(m.group(1)) if m else 1
-    t = re.sub(r"^(a|an|the|\d+)\s+", "", t)
-    t = re.sub(r"\b(uncursed|cursed|blessed|rustproof|fireproof|corrodeproof|rotted|very|thoroughly|rusty|"
-               r"rusted|corroded|burnt|burned|partly eaten|greased|poisoned|diluted)\s+", "", t)
-    t = re.sub(r"^[+-]\d+\s+", "", t)
+    qty, _, t = base_name(s)
     t = re.sub(r"^(pair|set)s? of ", "", t).strip()
     unid, name = False, None
     if ocls in RANDOM_CLASSES:
@@ -228,12 +222,7 @@ class CarryMixin:
         if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
             return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
         if "corpse" not in n:
-            core = re.sub(r"\s*\(.*?\)", "", n)
-            core = re.sub(r"\s+(called|named)\s+.*$", "", core)
-            core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
-            core = re.sub(r"\b(uncursed|cursed|blessed|rustproof|fireproof|corrodeproof|rotted|very|thoroughly|"
-                          r"rusty|rusted|corroded|burnt|burned|greased|poisoned)\s+", "", core)
-            core = re.sub(r"^[+-]\d+\s+", "", core).strip()
+            core = base_name(n)[2]
             one = " ".join(singular(w) for w in core.split(" "))
             if (core in WEAPON_NAME_OF or one in WEAPON_NAME_OF) and " cursed" not in " " + n:
                 return core
@@ -241,18 +230,13 @@ class CarryMixin:
             a = parse_armor(n)
             if a is not None:
                 return a["name"]
-            core = re.sub(r"\s*\(.*?\)", "", n)
-            core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
-            core = re.sub(r"\b(uncursed|cursed|blessed|lit|partly used|rusty|greased)\s+", "", core).strip()
+            core = base_name(n)[2]
             one = " ".join(singular(w) for w in core.split(" "))
             no_tools = NO_TOOLS - {"pick-axe"} if self.carry_all_on() else NO_TOOLS
             if (core in TOOL_WORDS or one in TOOL_WORDS) and core not in no_tools and one not in no_tools:
                 return core
         if self.carry_all_on() and "corpse" not in n:
-            core = re.sub(r"\s*\(.*?\)", "", n)
-            core = re.sub(r"\s+(called|named)\s+.*$", "", core)
-            core = re.sub(r"^(a|an|the|\d+)\s+", "", core)
-            core = re.sub(r"\b(uncursed|cursed|blessed)\s+", "", core).strip()
+            core = base_name(n)[2]
             one = " ".join(singular(w) for w in core.split(" "))
             if "spellbook" in core:
                 return core

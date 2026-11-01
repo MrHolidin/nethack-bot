@@ -17,6 +17,7 @@ import re
 import nle.nethack as nh
 
 from nhbot.game import MENU_RE
+from nhbot.items import base_name, parse_item
 
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
 
@@ -94,19 +95,9 @@ UNKNOWN_ENCH = -0.15
 
 def parse_armor(s):
     """Inventory/floor text -> dict(slot, ac, ench, worn, cursed, name) or None."""
-    t = s.strip()
-    worn = "(being worn)" in t
-    t = re.sub(r"\s*\(.*?\)", "", t)
-    t = re.sub(r"\s+(called|named)\s+.*$", "", t)
-    cursed = bool(re.search(r"\bcursed\b", t)) and "uncursed" not in t
-    t = re.sub(r"^(a|an|the|\d+)\s+", "", t)
-    t = re.sub(r"\b(uncursed|cursed|blessed|rustproof|fireproof|corrodeproof|rotted|very|thoroughly|"
-               r"rusty|rusted|corroded|burnt|burned|partly eaten)\s+", "", t)
-    m = re.match(r"^([+-]\d+)\s+", t)
-    ench = None
-    if m:
-        ench = int(m.group(1))
-        t = t[m.end():]
+    it = parse_item(None, nh.ARMOR_CLASS, s)
+    worn, cursed = it.worn, it.cursed
+    _, ench, t = base_name(s)
     t = re.sub(r"^(pair|set) of ", "", t).strip()
     safe = True
     if t in ARMOR:
