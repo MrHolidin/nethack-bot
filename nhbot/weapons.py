@@ -15,11 +15,8 @@ class WeaponsMixin:
         self._wield_tried = set()      # wield candidates already tried
 
     def wield(self, letter):
-        self.press("w", expect_prompt=True)
-        if "wield" in self.message().lower():
+        if self.ask("w", "wield"):
             self.press(letter)
-        else:
-            self.settle()
 
     def weapon_check(self):
         """Remember the starting weapon; re-wield it if we got it back after a theft."""

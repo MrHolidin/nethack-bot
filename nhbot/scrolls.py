@@ -61,9 +61,7 @@ class ScrollMixin:
                 continue              # enchant armor on a +4 piece may evaporate it
             if "enchant weapon" in s and not any("weapon in hand" in t for _, _, t in inv):
                 continue
-            self.press("r", expect_prompt=True)
-            if "read" not in self.message().lower():
-                self.settle()
+            if not self.ask("r", "read"):
                 return False
             self.press(letter)
             self.scroll_stats["read"] += 1

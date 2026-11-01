@@ -104,9 +104,8 @@ class CombatMixin:
         return None
 
     def throw(self, letter, key, ray):
-        self.press("t", expect_prompt=True)
-        if "throw" not in self.message().lower():
-            self.settle(); return
+        if not self.ask("t", "throw"):
+            return
         self.press(letter, expect_prompt=True)
         if "direction" in self.message().lower() or self.obs["misc"][0] == 0:
             self.press(key)
@@ -318,9 +317,8 @@ class CombatMixin:
 
     def zap(self, letter, key):
         self.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
-        self.press("z", expect_prompt=True)
-        if "zap" not in self.message().lower():
-            self.settle(); return False
+        if not self.ask("z", "zap"):
+            return False
         self.press(letter, expect_prompt=True)
         m = self.message().lower()
         if "direction" in m:
@@ -376,6 +374,7 @@ class CombatMixin:
         if re.search(r"You (kill|destroy) ", m):
             self.kill_count += 1
         mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
+        self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
             lvk = self.levels.get(self.cur_key)
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
@@ -384,8 +383,6 @@ class CombatMixin:
                 self.goal_event("corpse", "created")
         if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
             self.last_shot_turn = self.turn()
-        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
-                and self.turn() - self.own_zap_turn > 1:
             mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
         if IT_ATTACK_RE.search(m):

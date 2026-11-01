@@ -80,6 +80,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.focus_init()
         self.all_msgs = []
         self._last_logged, self._last_logged_step = None, -1
+        self.killed = None        # msg_combat: what the message being handled says we killed
+        self.asked = ""          # game.ask: the last question's message
         self.cur_key = None
         self.last_move_target = None
         self.last_attack_target = None

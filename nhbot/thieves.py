@@ -24,25 +24,20 @@ class ThievesMixin:
 
     # ================================================================== nymphs
     def msg_thieves(self, m):
-        if re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m:
-            if any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m:
-                if self.turn() != self._theft_turn:
-                    self._theft_turn = self.turn()
-                    self.thefts += 1
-                self.stolen_pending = True
-        mk = re.search(r"You (?:kill|destroy) (?:the |an? )?(.+?)!", m)
-        if mk and any(t in mk.group(1) for t in THIEVES) and self.last_attack_target:
+        stole = (re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m) and \
+            (any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m)
+        if stole or "It stole" in m or "It steals" in m or "She charms you" in m:
+            if self.turn() != self._theft_turn:
+                self._theft_turn = self.turn()
+                self.thefts += 1
+            self.stolen_pending = True
+        if self.killed and any(t in self.killed for t in THIEVES) and self.last_attack_target:
             self.nymph_kills += 1
             if self.stolen_pending:
                 self.goal_event("loot", "abandoned", self.loot_sq is not None)    # replaced by a newer one
                 self.goal_event("loot", "created")
                 self.loot_sq = self.last_attack_target
                 self.loot_key = self.cur_key
-        if "It stole" in m or "It steals" in m or "She charms you" in m:
-            if self.turn() != self._theft_turn:
-                self._theft_turn = self.turn()
-                self.thefts += 1
-            self.stolen_pending = True
         if re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
             self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
         if re.search(r"You turn into an? ", m):
@@ -133,20 +128,7 @@ class ThievesMixin:
         return best[1] if best else None
 
     def pickup_all(self):
-        self.press(",", expect_prompt=True)
-        tty = self.tty_text()
-        if "Pick up what?" not in tty:
-            self.settle()
-            return
-        n = 0
-        lines = self.menu_lines(tty, "Pick up what?")
-        for line in lines:
-            mm = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
-            if mm and "corpse" not in mm.group(2) and "boulder" not in mm.group(2):
-                self.raw_step(ord(mm.group(1)))
-                n += 1
-        self.raw_step(13 if n else 27)
-        self.settle()
+        self.pickup(lambda t: "corpse" not in t and "boulder" not in t)
 
     def loot_step(self, lv):
         if self.loot_sq is None or self.loot_key != lv.key:

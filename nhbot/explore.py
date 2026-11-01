@@ -194,12 +194,10 @@ class ExploreMixin:
         if not it:
             return False
         lv.mapped = True
-        self.press("r", expect_prompt=True)
-        if "read" in self.message().lower():
+        if self.ask("r", "read"):
             self.press(it[0])
             self.maps_read += 1
             return True
-        self.settle()
         return False
 
     def pet_wait_before_stairs(self):

@@ -16,6 +16,8 @@ import re
 
 import nle.nethack as nh
 
+from nhbot.game import MENU_RE
+
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
 
 # name (appearance or identified) -> (slot, base AC)
@@ -214,11 +216,9 @@ class EquipMixin:
             if not self.take_off(worn[slot]):
                 self.cursed_slots.add(slot)
                 return
-        self.press("W", expect_prompt=True)
-        if "what do you want to wear" not in self.message().lower():
-            if "even bother" in self.message().lower():
+        if not self.ask("W", "what do you want to wear"):
+            if "even bother" in self.asked:
                 self.polyd = True             # a form we failed to notice; cleared by "You return to ... form"
-            self.settle()
             return
         self.press(a["letter"])
         msgs = " ".join(m for _, m in list(self.messages)[-4:])
@@ -235,13 +235,8 @@ class EquipMixin:
     def take_off(self, a):
         """Take off a worn item. False if cursed / failed."""
         n_worn = sum(1 for x in self.armor_inventory() if x["worn"])
-        self.press("T", expect_prompt=True)
-        if "what do you want to take off" in self.message().lower():
+        if self.ask("T", "what do you want to take off"):
             self.press(a["letter"])
-        elif n_worn > 1:
-            self.settle()
-        else:
-            self.settle()
         msgs = " ".join(m for _, m in list(self.messages)[-4:])
         if "cursed" in msgs and "You can't" in msgs:
             self.cursed_slots.add(a["slot"])
@@ -257,11 +252,8 @@ class EquipMixin:
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = int(m.group(1)) if m else 1
         self.goal_close("pile", self.level().key, self.pos())
-        self.press("d", expect_prompt=True)
-        if "drop" in self.message().lower():
+        if self.ask("d", "drop"):
             self.press(letter)
-        else:
-            self.settle()
 
     # ---------------------------------------------------------- floor items
     def look_here(self):
@@ -275,16 +267,12 @@ class EquipMixin:
             if m:
                 names.append(m.group(1))
             if "Things that are here" in tty or "There are several objects here" in tty:
-                lines = tty.split("\n")
-                start = next((i for i, l in enumerate(lines) if "Things that are here" in l), None)
-                if start is not None:
-                    col = lines[start].index("Things that are here")
-                    for l in lines[start + 1:]:
-                        item = l[col:].strip() if len(l) > col else ""
+                if "Things that are here" in tty:
+                    for item in (l.strip() for l in self.menu_lines(tty, "Things that are here")):
                         if not item or item.startswith("--More--") or item.startswith("(end)"):
                             continue
                         names.append(item.replace("--More--", "").strip())
-            if self.obs["misc"][2] or "--More--" in tty.replace("\n", "") or re.search(r"\(end\)|\(\d+ of \d+\)", tty):
+            if self.obs["misc"][2] or "--More--" in tty.replace("\n", "") or MENU_RE.search(tty):
                 self.raw_step(13 if "(end)" not in tty else 27)
                 continue
             break

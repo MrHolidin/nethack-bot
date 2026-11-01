@@ -145,12 +145,10 @@ class SurvivalMixin:
         it = self.find_item(nh.POTION_CLASS, HEAL_POTIONS)
         if it:
             self.cur_act = "heal"
-            self.press("q", expect_prompt=True)
-            if "drink" in self.message().lower():
+            if self.ask("q", "drink"):
                 self.press(it[0])
                 self.quaffs += 1
                 return True
-            self.settle()
         return False
 
     def enhance_step(self):
@@ -177,11 +175,8 @@ class SurvivalMixin:
         if self.vault_drop:
             self.vault_drop = False
             self.vault_drops += 1
-            self.press("d", expect_prompt=True)
-            if "drop" in self.message().lower():
+            if self.ask("d", "drop"):
                 self.press("$")
-            else:
-                self.settle()
             return True
         if self.turn() > self.vault_follow_until:
             return False

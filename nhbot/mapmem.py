@@ -172,7 +172,6 @@ class MapMixin:
                 ny, nx = y + dy, x + dx
                 if 0 <= ny < ROWS and 0 <= nx < COLS and G.KIND[lv.under[ny, nx]] == G.DOOR_CLOSED:
                     lv.blocked[ny, nx] = True
-        if lv is not None and "Closed for inventory" in m:
             lv.cfi = lv.cfi | {self.pos()}
         if ("You can't go up here" in m or "You can't go down here" in m) and lv is not None:
             # we remembered a staircase that isn't here (arriving next to stairs a monster stood on marks the

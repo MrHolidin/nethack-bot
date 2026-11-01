@@ -6,6 +6,10 @@ import nle.nethack as nh
 from nhbot.consts import DELTA2KEY
 
 
+MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is on screen
+MENU_ITEM_RE = re.compile(r"^\s*([a-zA-Z]) - (.*)$")
+
+
 class GameOver(Exception):
     pass
 
@@ -39,7 +43,7 @@ class GameMixin:
             tty = self.tty_text()
             msg = self.message()
             flat = tty.replace("\n", "")
-            menu = re.search(r"\(end\)|\(\d+ of \d+\)", tty)
+            menu = MENU_RE.search(tty)
             if "--More--" in flat or (self.obs["misc"][2] and not menu):
                 self.log_msg(msg if msg else self.top_line().replace("--More--", ""))
                 self.raw_step(13)
@@ -61,11 +65,21 @@ class GameMixin:
                     continue
                 self.raw_step(27)
                 continue
-            if re.search(r"\(end\)|\(\d+ of \d+\)", tty):
+            if menu:
                 self.raw_step(27)
                 continue
             self.log_msg(msg)
             return
+
+    def ask(self, cmd, word):
+        """Give a command that asks which item / direction: True if that question came (word in the message).
+        Otherwise whatever came instead is cleared and False; the message is in self.asked either way."""
+        self.press(cmd, expect_prompt=True)
+        self.asked = self.message().lower()
+        if word in self.asked:
+            return True
+        self.settle()
+        return False
 
     def answer_yn(self, msg):
         m = msg.lower()
@@ -156,23 +170,35 @@ class GameMixin:
         col = lines[hi].index(header)
         return [l[col:] for l in lines[hi + 1:]]
 
-    def pickup_matching(self, words, no_sale=False, own=False):
-        if not own and self.merch_risk(self.level(), self.pos()):
-            return                            # in a shop: anything here may be merchandise
+    def menu_items(self, tty, header):
+        """(letter, text) of the selectable lines of a menu."""
+        out = []
+        for line in self.menu_lines(tty, header):
+            m = MENU_ITEM_RE.match(line.strip())
+            if m:
+                out.append((m.group(1), m.group(2)))
+        return out
+
+    def pickup(self, want):
+        """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
+        without a menu)."""
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
         if "Pick up what?" not in tty:
             self.settle()
             return
-        chosen = 0
-        lines = self.menu_lines(tty, "Pick up what?")
-        for line in lines:
-            m = re.match(r"^\s*([a-zA-Z]) - (.*)$", line.strip())
-            if m and any(w in m.group(2) for w in words) and not (no_sale and "for sale" in m.group(2)):
-                self.raw_step(ord(m.group(1)))
-                chosen += 1
-        self.raw_step(13 if chosen else 27)
+        n = 0
+        for letter, text in self.menu_items(tty, "Pick up what?"):
+            if want(text):
+                self.raw_step(ord(letter))
+                n += 1
+        self.raw_step(13 if n else 27)
         self.settle()
+
+    def pickup_matching(self, words, no_sale=False, own=False):
+        if not own and self.merch_risk(self.level(), self.pos()):
+            return                            # in a shop: anything here may be merchandise
+        self.pickup(lambda t: any(w in t for w in words) and not (no_sale and "for sale" in t))
 
     def describe_adjacent(self, pos):
         y, x = self.pos()

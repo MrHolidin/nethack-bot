@@ -31,9 +31,7 @@ class ElberethMixin:
 
     def engrave_elbereth(self):
         lv = self.level()
-        self.press("E", expect_prompt=True)
-        if "write with" not in self.message().lower():
-            self.settle()
+        if not self.ask("E", "write with"):
             return False
         self.press("-", expect_prompt=True)
         for _ in range(5):

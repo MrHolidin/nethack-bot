@@ -268,9 +268,7 @@ class CarryMixin:
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = n or (int(m.group(1)) if m else 1)
         self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
-        self.press("d", expect_prompt=True)
-        if "drop" not in self.message().lower():
-            self.settle()
+        if not self.ask("d", "drop"):
             return
         if n:
             for c in str(n):
