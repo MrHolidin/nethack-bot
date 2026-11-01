@@ -2,7 +2,7 @@
 
 Objective: in-game score; also tracks max depth."""
 import re
-from collections import deque
+from collections import Counter, deque
 
 import nle.nethack as nh
 
@@ -82,6 +82,9 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self._last_logged, self._last_logged_step = None, -1
         self.killed = None        # msg_combat: what the message being handled says we killed
         self.asked = ""          # game.ask: the last question's message
+        self.msg_audit = Counter()  # cases where message reading may go wrong (game.audit, pickup, ...)
+        self.here_window = None   # (turn, pos, text) of the last 'Things that are here' window
+        self.tick_seq = 0         # msg_seq at the start of this tick
         self.cur_key = None
         self.last_move_target = None
         self.last_attack_target = None
@@ -272,6 +275,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "loot_holds": self.loot_holds,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits,
+            "msg_audit": dict(self.msg_audit),
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],
             "blind_held": self.blind_held,

@@ -107,6 +107,8 @@ class CombatMixin:
         if not self.ask("t", "throw"):
             return
         self.press(letter, expect_prompt=True)
+        if "direction" not in self.message().lower() and self.obs["misc"][0] == 0:
+            self.msg_audit["throw_key_without_direction"] += 1
         if "direction" in self.message().lower() or self.obs["misc"][0] == 0:
             self.press(key)
         else:
@@ -317,6 +319,7 @@ class CombatMixin:
 
     def zap(self, letter, key):
         self.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
+        seq0 = self.msg_seq
         if not self.ask("z", "zap"):
             return False
         self.press(letter, expect_prompt=True)
@@ -326,7 +329,7 @@ class CombatMixin:
         else:
             self.settle()
         msgs = " ".join(t for _, t in list(self.messages)[-3:])
-        if "Nothing happens" in msgs or "You wrest" in msgs:
+        if self.audit("zap", msgs, seq0, lambda s: "Nothing happens" in s or "You wrest" in s):
             self.empty_wands.add(letter)
         self.zaps += 1
         return True

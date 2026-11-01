@@ -216,13 +216,14 @@ class EquipMixin:
             if not self.take_off(worn[slot]):
                 self.cursed_slots.add(slot)
                 return
+        seq0 = self.msg_seq
         if not self.ask("W", "what do you want to wear"):
             if "even bother" in self.asked:
                 self.polyd = True             # a form we failed to notice; cleared by "You return to ... form"
             return
         self.press(a["letter"])
         msgs = " ".join(m for _, m in list(self.messages)[-4:])
-        if "two-handed" in msgs:
+        if self.audit("wear", msgs, seq0, lambda s: "two-handed" in s):
             self.no_shield = True
         now = [x for x in self.armor_inventory() if x["letter"] == a["letter"]]
         if not (now and now[0]["worn"]):
@@ -234,11 +235,11 @@ class EquipMixin:
 
     def take_off(self, a):
         """Take off a worn item. False if cursed / failed."""
-        n_worn = sum(1 for x in self.armor_inventory() if x["worn"])
+        seq0 = self.msg_seq
         if self.ask("T", "what do you want to take off"):
             self.press(a["letter"])
         msgs = " ".join(m for _, m in list(self.messages)[-4:])
-        if "cursed" in msgs and "You can't" in msgs:
+        if self.audit("take_off", msgs, seq0, lambda s: "cursed" in s and "You can't" in s):
             self.cursed_slots.add(a["slot"])
             return False
         still = [x for x in self.armor_inventory() if x["letter"] == a["letter"] and x["worn"]]

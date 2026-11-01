@@ -58,8 +58,7 @@ class ElberethMixin:
         seq0 = self.msg_seq
         self.raw_step(ord(":"))
         self.settle()
-        n_new = min(self.msg_seq - seq0, len(self.messages))
-        txt = " ".join(m for _, m in list(self.messages)[len(self.messages) - n_new:]) if n_new else ""
+        txt = " ".join(self.msgs_since(seq0))
         found = re.findall(r'You read: "([^"]*)"', txt)
         return found[-1] if found else ""
 

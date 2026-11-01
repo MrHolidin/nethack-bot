@@ -44,6 +44,9 @@ class GameMixin:
             msg = self.message()
             flat = tty.replace("\n", "")
             menu = MENU_RE.search(tty)
+            if "Things that are here" in tty:
+                self.here_window = (self.turn(), self.pos(), " | ".join(
+                    l.strip() for l in self.menu_lines(tty, "Things that are here")))
             if "--More--" in flat or (self.obs["misc"][2] and not menu):
                 self.log_msg(msg if msg else self.top_line().replace("--More--", ""))
                 self.raw_step(13)
@@ -70,6 +73,19 @@ class GameMixin:
                 continue
             self.log_msg(msg)
             return
+
+    def msgs_since(self, seq0):
+        """Messages logged since the log counter was seq0 (as many as the log still holds)."""
+        n = min(self.msg_seq - seq0, len(self.messages))
+        return [t for _, t in list(self.messages)[len(self.messages) - n:]] if n else []
+
+    def audit(self, site, used, seq0, pred, alt_pred=None):
+        """pred(used): a decision read from a window of recent messages. Counts the cases where reading only
+        the messages since seq0 (with alt_pred, if given) would decide otherwise."""
+        a = pred(used)
+        if a != (alt_pred or pred)(" ".join(self.msgs_since(seq0))):
+            self.msg_audit["window_" + site] += 1
+        return a
 
     def ask(self, cmd, word):
         """Give a command that asks which item / direction: True if that question came (word in the message).
@@ -179,14 +195,21 @@ class GameMixin:
                 out.append((m.group(1), m.group(2)))
         return out
 
-    def pickup(self, want):
+    def pickup(self, want, site):
         """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
         without a menu)."""
+        seq0 = self.msg_seq
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
         if "Pick up what?" not in tty:
             self.settle()
+            for t in self.msgs_since(seq0):
+                mm = re.match(r"^[a-zA-Z] - (.+?)\.?$", t)
+                if mm and not want(mm.group(1)):
+                    self.msg_audit["lone_unwanted_" + site] += 1     # picked up what the filter rejects
             return
+        if re.search(r"\(1 of \d+\)", tty):
+            self.msg_audit["pickup_multipage_" + site] += 1
         n = 0
         for letter, text in self.menu_items(tty, "Pick up what?"):
             if want(text):
@@ -198,7 +221,7 @@ class GameMixin:
     def pickup_matching(self, words, no_sale=False, own=False):
         if not own and self.merch_risk(self.level(), self.pos()):
             return                            # in a shop: anything here may be merchandise
-        self.pickup(lambda t: any(w in t for w in words) and not (no_sale and "for sale" in t))
+        self.pickup(lambda t: any(w in t for w in words) and not (no_sale and "for sale" in t), "matching")
 
     def describe_adjacent(self, pos):
         y, x = self.pos()

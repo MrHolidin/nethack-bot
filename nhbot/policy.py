@@ -16,6 +16,8 @@ from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_sq
 from nhbot.mapmem import Level
 from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 
+AMMO_WORDS = re.compile(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b")
+
 STEPS = (
     "level_arrival",     # bounce off the Mines staircase (avoid_mines); Mines-return bookkeeping
     "progress",          # no-time loop guard; forget obstacles / go desperate on a stalled level
@@ -73,6 +75,7 @@ class PolicyMixin:
         self.last_step = None
         self.chasing = None
         self.tick_no += 1
+        self.tick_seq = self.msg_seq
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return
@@ -280,8 +283,13 @@ class PolicyMixin:
         """Missiles lying where we stand (our own thrown ones)."""
         sh = self.seen_here
         y, x = c.y, c.x
+        hw = self.here_window
+        if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws and hw and hw[:2] == sh[:2] \
+                and not AMMO_WORDS.search(sh[2]) and AMMO_WORDS.search(hw[2]) and "for sale" not in hw[2] \
+                and not c.lv.shop[y, x]:
+            self.msg_audit["ammo_only_in_window"] += 1     # missiles here, listed only in the pile window
         if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws \
-                and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b", sh[2]) \
+                and AMMO_WORDS.search(sh[2]) \
                 and "for sale" not in sh[2] and not c.lv.shop[y, x]:
             self.seen_here = None
             self.pickup_matching(THROWABLE + ("arrow", "crossbow bolt"))

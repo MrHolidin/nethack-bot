@@ -66,10 +66,10 @@ class WeaponsMixin:
         if cur is not None and rank[0] == 0:
             return False                     # only the long-sword-skill blades replace a wielded weapon
         self.cur_act = "wield"
-        t0 = self.turn()
+        t0, seq0 = self.turn(), self.msg_seq
         self.wield(l)
         recent = " ".join([t for tt, t in list(self.messages)[-4:] if tt >= t0] + [self.message()])
-        if "Don't be ridiculous" in recent:
+        if self.audit("wield", recent, seq0, lambda s: "Don't be ridiculous" in s):
             self.polyd = True                # a form we failed to notice; retry after "You return to ... form"
             return True
         self._wield_tried = tried | {(l, s)}

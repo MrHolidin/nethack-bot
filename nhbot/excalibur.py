@@ -84,6 +84,7 @@ class ExcaliburMixin:
         if not it:
             return False
         self.cur_act = "excal"
+        seq0 = self.msg_seq
         self.raw_step(228)                       # M-d: #dip
         if "dip" not in self.message().lower():
             self.settle(); return False
@@ -100,7 +101,7 @@ class ExcaliburMixin:
         self.dips += 1
         recent = " ".join(t for _, t in list(self.messages)[-6:])
         y, x = self.pos()
-        if "Excalibur" in recent or "hand reaches up" in recent or \
+        if self.audit("dip", recent, seq0, lambda s: "Excalibur" in s or "hand reaches up" in s) or \
                 any("Excalibur" in s for _, _, s in self.inventory()):
             self.excalibur = True
             self.excal_turn = self.turn()

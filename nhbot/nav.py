@@ -139,11 +139,12 @@ class NavMixin:
                 lv.blocked[ty, tx] = True
 
     def kick(self, key):
+        seq0 = self.msg_seq
         self.press(4, expect_prompt=True)   # ^D
         if self.obs["misc"][0] or "direction" in self.message().lower():
             self.press(key)
         else:
             self.settle()
         m = " ".join(t for _, t in list(self.messages)[-3:])
-        if "crashes open" in m or "shatters" in m or "breaks open" in m:
+        if self.audit("kick", m, seq0, lambda s: "crashes open" in s or "shatters" in s or "breaks open" in s):
             self.level().locked.discard(self.last_move_target)
