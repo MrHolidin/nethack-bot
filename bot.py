@@ -47,6 +47,15 @@ RANGED_TARGETS = {"floating eye", "gas spore", "blue jelly", "spotted jelly",
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
 THROW_STONES = ("flint stone", "rock")
 # fresh-corpse whitelist (eaten only within ~40 turns of the kill)
+# trap.c messages for a trap going off on (or found at) our own square, for traps that leave us standing on it
+TRAP_HERE_RE = re.compile(r"There is an? [a-z ]*trap here|You escape an? [a-z ]*trap|a rock falls on your head|"
+                          r"An arrow shoots out at you|A little dart shoots out at you|A bear trap closes on your|"
+                          r"You fall into a pit|You land on a set of sharp iron spikes|A board beneath you squeaks|"
+                          r"A gush of water hits (?:you\b|your )|A tower of flame (?:erupts|bursts) from the floor!|"
+                          r"A cloud of gas puts you to sleep|"
+                          r"You (?:stumble into|are caught in|flounder in) a (?:spider )?web|"
+                          r"You trigger a rolling boulder trap|You step onto a (?:polymorph|magic) trap|"
+                          r"You are caught in a magical explosion|You feel momentarily lethargic")
 # eat.c cannibal test / were.c were_beastie(): the animals that count as our kind once infected
 WERE_KIN = {"werejackal": {"jackal", "fox", "coyote", "werejackal"},
             "wererat": {"sewer rat", "giant rat", "rabid rat", "wererat"},
@@ -125,6 +134,7 @@ class Level:
         self.peaceful = set()     # monster glyphs that turned out peaceful here
         self.entered_turn = None
         self.elbereth = set()     # positions where we engraved
+        self.trap_mem = set()     # trap_mem: squares where a trap went off under us (an object may hide its ^)
 
 
 class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ValkMixin2, ElberethMixin, FocusMixin, ScrollMixin, ArmorIdMixin, CarryMixin, PriceMemoryMixin, WandIdMixin):
@@ -381,6 +391,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
         if "Invisible customers are not welcome" in m and lv is not None:
             lv.shk_wait = 99                    # he won't let us in while we're invisible: stop waiting at the door
+        if self.role_opts.get("trap_mem", False) and lv is not None and TRAP_HERE_RE.search(m):
+            lv.trap_mem.add(self.pos())   # it went off under us; a falling rock / arrow / dart on it hides the ^
         if "unleash a water demon" in m or "stream of snakes pours" in m or "hear something hissing" in m:
             self.dip_threat_until = self.turn() + 150
         if self.role_opts.get("vault_guard", True):
@@ -426,6 +438,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         g = self.obs["glyphs"]
         k_live = G.KIND[g]
         k_mem = G.KIND[lv.under]
+        if lv.trap_mem:
+            k_mem = k_mem.copy()
+            for p in lv.trap_mem:
+                if k_mem[p] in (G.FLOOR, G.OBJECT, G.CORPSE, G.GOLD, G.TRAP):
+                    k_mem[p] = G.TRAP
         return k_mem, k_live
 
     def passable_grid(self, lv, k_mem, k_live):
