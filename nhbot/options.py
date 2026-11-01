@@ -12,6 +12,9 @@ DEFAULTS = {
     "shop_by_square": False,   # A/B: merchandise = items on shop squares only (not 'a shopkeeper is in view');
                                #      missile and corpse goals on shop squares are skipped
     "loot_holds_descent": False,   # A/B: a reachable stolen-items square on this level holds the stairs down
+    "pickup_v2": False,        # A/B: one rule what to take (pickup.take_reason, by item type): no lone unwanted
+                               #      items, loot = stolen + wanted, no ammo without a launcher, weapons only
+                               #      missiles / wield candidates / worth >= 1 zm per weight, not while Burdened
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

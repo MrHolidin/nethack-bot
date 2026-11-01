@@ -4,6 +4,7 @@ tick() updates the map memory, then runs the steps in STEPS in order; the first 
 True) ends the tick. A step that only updates bookkeeping returns False. The order is the policy: emergencies
 first, then fighting, then food and items, then exploring.
 """
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -14,7 +15,8 @@ from nhbot.combat import THROWABLE, THROW_STONES
 from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_squares
 from nhbot.mapmem import Level
 from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
-from nhbot.pickup import AMMO_WORDS
+from nhbot.items import CURSED_RE
+from nhbot.pickup import AMMO_WORDS, MISSILE_TYPES, floor_kind
 
 
 STEPS = (
@@ -289,6 +291,17 @@ class PolicyMixin:
                 and not AMMO_WORDS.search(sh[2]) and AMMO_WORDS.search(hw[2]) and "for sale" not in hw[2] \
                 and not c.lv.shop[y, x]:
             self.msg_audit["ammo_only_in_window"] += 1     # missiles here, listed only in the pile window
+        if self.opts.pickup_v2:
+            # the pile window lists what "Things that are here" leaves out
+            txt = (sh[2] if sh else "") + (" | " + hw[2] if hw and sh and hw[:2] == sh[:2] else "")
+            if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws and not c.lv.shop[y, x] \
+                    and any(floor_kind(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
+                            for t in re.split(r" \| |You see here |\.$", txt) if t.strip()):
+                self.seen_here = None
+                self.take_ammo()
+                self.ammo_pickups += 1
+                return True
+            return False
         if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws \
                 and AMMO_WORDS.search(sh[2]) \
                 and "for sale" not in sh[2] and not c.lv.shop[y, x]:
@@ -305,7 +318,8 @@ class PolicyMixin:
             if goals:
                 if self.opts.goal_gate_own and not self.items_gate(c.lv):
                     return False
-                return self.pursue("retrieve", c.lv, goals, lambda g: self.pickup_matching(THROWABLE + THROW_STONES))
+                return self.pursue("retrieve", c.lv, goals, lambda g: self.take_ammo() if self.opts.pickup_v2
+                                   else self.pickup_matching(THROWABLE + THROW_STONES))
         return False
 
     def step_eat(self, c):

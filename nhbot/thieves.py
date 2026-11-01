@@ -5,7 +5,9 @@ import re
 from nhbot import glyphs as G
 from nhbot.consts import COLS, ROWS, ray_squares
 from nhbot.monsters import THIEVES
+from nhbot.items import base_name
 from nhbot.nav import line_clear
+from nhbot.pickup import STOLE_RE
 
 
 class ThievesMixin:
@@ -24,6 +26,8 @@ class ThievesMixin:
 
     # ================================================================== nymphs
     def msg_thieves(self, m):
+        for what in STOLE_RE.findall(m):                    # "She stole a +0 orcish helm." / "It steals ...!"
+            self.stolen_names.add(base_name(what)[2])
         stole = (re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m) and \
             (any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m)
         if stole or "It stole" in m or "It steals" in m or "She charms you" in m:
