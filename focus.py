@@ -125,6 +125,46 @@ class FocusMixin:
         tmp = 1 + to_hit_abon(st, dex, xl) + pm.ac + xl + ench + hitbon
         return min(max((tmp - 1) / 20.0, 0.05), 1.0), dmg
 
+    def kill_one_hit_p(self, pos):
+        """P(our next melee swing kills the monster at pos): P(hit) * P(damage >= its remaining HP), with the
+        weapon dice + enchantment + Str bonus (+d10 Excalibur) and HP ~ d(level,8) conditioned on our landed hits."""
+        g = int(self.obs["glyphs"][pos])
+        if not nh.glyph_is_monster(g):
+            return 0.0
+        idx = nh.glyph_to_mon(g)
+        pm = nh.permonst(idx)
+        p_hit, mean_dmg = self.my_attack(idx)
+        s = self.wielded()
+        dice, ench = [2], 0                                # bare hands d2
+        if s:
+            m = re.search(r"([+-]\d+) ", s)
+            ench = int(m.group(1)) if m else 0
+            name = next((w for w in sorted(WEAPON_DICE, key=len, reverse=True) if w in s), None)
+            if name is None and "Excalibur" in s:
+                name = "long sword"
+            if name:
+                sd, ld, _ = WEAPON_DICE[name]
+                dice = [ld if pm.msize >= 3 else sd]
+            if "Excalibur" in s:
+                dice.append(10)
+        bonus = ench + str_dbon(self.bl(nh.NLE_BL_STR125))
+        dmg = {0: 1.0}
+        for d in dice:
+            nxt = {}
+            for v, p in dmg.items():
+                for k in range(1, d + 1):
+                    nxt[v + k] = nxt.get(v + k, 0.0) + p / d
+            dmg = nxt
+        dmg = {max(v + bonus, 1): p for v, p in dmg.items()}
+        rec = self.focus_hits.get((self.cur_key, pos))
+        dealt = (rec[1] if rec and rec[0] == idx and self.turn() - rec[2] <= 30 else 0) * mean_dmg
+        hp = {h - dealt: p for h, p in _hp_dist(min(pm.mlevel, 30)).items() if h > dealt}
+        z = sum(hp.values())
+        if z <= 1e-9:
+            return p_hit * 0.5
+        kill = sum(ph * sum(pd for v, pd in dmg.items() if v >= h) for h, ph in hp.items()) / z
+        return p_hit * kill
+
     def focus_note(self, m):
         """Count our landed hits on the square we attacked."""
         if not self.last_attack_target or self.cur_key is None:

@@ -61,6 +61,35 @@ class ValkMixin:
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
 
+    def nymph_elb_instead(self, lv, hostiles, pos):
+        """nymph_pk: a thief is next to us. One action either way: a swing kills it with P(kill in one hit);
+        a dust Elbereth stops its theft if spelled right, (24/25)^8 = 0.72 (engrave.c degrades each
+        character with 1/25; our own count over 4375 engravings: 0.718). Engrave if that is likelier; on an
+        intact Elbereth, wait instead of swinging (attacking from it wipes it). 20-turn cap per stand."""
+        y, x = self.pos()
+        if any(not self.respects_elbereth(n, p) for p, n in hostiles):
+            return False
+        on_elb = (y, x) in lv.elbereth and self.read_engraving() == "Elbereth"
+        if on_elb:
+            if getattr(self, "nymph_pk_waits", 0) >= 20:
+                return False
+            self.nymph_pk_waits = getattr(self, "nymph_pk_waits", 0) + 1
+            self.nymph_pk_wait_total = getattr(self, "nymph_pk_wait_total", 0) + 1
+            self.cur_act = "fight"
+            self.press("s")
+            return True
+        self.nymph_pk_waits = 0
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF) or \
+                not self.can_engrave_here(lv) or G.KIND[lv.under[y, x]] in (G.UPSTAIR, G.DOWNSTAIR):
+            return False
+        if self.kill_one_hit_p(pos) >= (24 / 25) ** 8:
+            return False
+        self.nymph_pk_elbs = getattr(self, "nymph_pk_elbs", 0) + 1
+        self.cur_act = "fight"
+        self.engrave_elbereth()
+        return True
+
     def thieves_visible(self, lv):
         g = self.obs["glyphs"]
         out = []
@@ -76,6 +105,8 @@ class ValkMixin:
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
         adj = [(p, n) for p, n in hostiles if n in THIEVES]
         if adj:
+            if self.vopt("nymph_pk", False) and self.nymph_elb_instead(lv, hostiles, adj[0][0]):
+                return True
             self.attack(adj[0][0])
             return True
         th = self.thieves_visible(lv)

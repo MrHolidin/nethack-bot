@@ -1998,6 +1998,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "hunt": [self.hunts, self.hunt_steps, getattr(self, "hunt_offline_steps", 0)],
             "ward": [self.ward_writes, self.ward_waits],
             "dip_prep": getattr(self, "dip_prep_stats", None),
+            "nymph_pk": [getattr(self, "nymph_pk_elbs", 0), getattr(self, "nymph_pk_wait_total", 0)],
             "wand_id": [getattr(self, "wand_stats", None), getattr(self, "wand_log", None)],
             "resets": self.resets,
             "god_angry": self.god_angry,
