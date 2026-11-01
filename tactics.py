@@ -43,6 +43,8 @@ class TacticsMixin:
         self.stair_rests = 0
         self.last_stair_dir = None
         self.stair_wait = 0
+        self.flee_stairs = None       # flee_stairs: dict(from=level key, up=climbed?, blocked=n)
+        self.flee_stairs_stats = [0, 0, 0]   # times entered, climbs, waits above
 
     # ---------------------------------------------------------- helpers
     def threat(self, g):
@@ -131,6 +133,67 @@ class TacticsMixin:
         self.cur_act = "rest"
         self.stair_rests += 1
         self.press("2"); self.press("0"); self.press("s")
+
+    # ---------------------------------------------------------- flee_stairs
+    def flee_stairs_step(self, lv, hostiles):
+        """flee_stairs: blind or hallucinating, we can't tell a peaceful from a foe (61969 hit a watchman while
+        blind, 61520 a shopkeeper while hallucinating). Walk to this level's up staircase, climb, and wait on
+        the arrival stairs until it wears off; then the mode ends and normal play resumes. Not on DL1 (that
+        staircase leaves the dungeon), not when Weak from hunger, and not when something keeps hurting us."""
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        fs = self.flee_stairs
+        if not cond & (nh.BL_MASK_BLIND | nh.BL_MASK_HALLU) or self.bl(nh.NLE_BL_HUNGER) >= 3:
+            self.flee_stairs = None
+            return False
+        hp = self.bl(nh.NLE_BL_HP)
+        if fs is None:
+            fs = self.flee_stairs = {"from": lv.key, "up": False, "blocked": 0, "hp": hp}
+            self.flee_stairs_stats[0] += 1
+        hurt = hp < fs["hp"]
+        fs["hp"] = hp
+        if hurt and hostiles:
+            return False                          # something is hitting us: let the fight logic answer
+        if fs["up"]:
+            if lv.key == fs["from"]:
+                self.flee_stairs = None           # back where we started (fell, or stairs refused)
+                return False
+            self.cur_act = "fleestairs"
+            self.flee_stairs_stats[2] += 1
+            self.press("s")
+            return True
+        here = self.stairs_kind_here(lv)
+        if here == G.UPSTAIR and self.can_use_stairs(lv, here):
+            fs["up"] = True
+            self.flee_stairs_stats[1] += 1
+            self.cur_act = "fleestairs"
+            self.press("<")
+            return True
+        if self.bl(nh.NLE_BL_DEPTH) == 1:
+            return False
+        k_mem, k_live = self.kind_grid(lv)
+        up = k_mem == G.UPSTAIR
+        if not up.any():
+            return False
+        passable = self.passable_grid(lv, k_mem, k_live)
+        start = self.pos()
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, up, max_cost=300)
+        if reached is None:
+            return False
+        step = self.first_step(prev, start, reached)
+        if step is None:
+            return False
+        g = int(self.obs["glyphs"][step])
+        if nh.glyph_is_monster(g) or nh.glyph_is_invisible(g):
+            # someone (unseen, or unrecognisable) stands in the way: don't bump into it, wait a little
+            fs["blocked"] += 1
+            if fs["blocked"] > 10:
+                return False
+            self.cur_act = "fleestairs"
+            self.press("s")
+            return True
+        self.cur_act = "fleestairs"
+        self.move(step)
+        return True
 
     # ---------------------------------------------------------- main
     def tactical_step(self, lv, hostiles):
