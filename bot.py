@@ -16,7 +16,7 @@ import glyphs as G
 from equipment import EquipMixin
 from tactics import TacticsMixin
 from abilities import AbilitiesMixin
-from roles import RolesMixin, AMMO, ClassTacticsMixin, ExcaliburMixin
+from roles import RolesMixin, ClassTacticsMixin, ExcaliburMixin
 from focus import FocusMixin
 from scrolls import ScrollMixin
 from valk import ValkMixin, ElberethMixin, RTHREAT_RE, RTRAP_RE
@@ -57,34 +57,7 @@ MELEE_ON_US_RE = re.compile(r"\bThe [^.!]+? (?:hits|bites|misses|just misses|sti
 WERE_KIN = {"werejackal": {"jackal", "fox", "coyote", "werejackal"},
             "wererat": {"sewer rat", "giant rat", "rabid rat", "wererat"},
             "werewolf": {"wolf", "warg", "winter wolf", "werewolf"}}
-SAFE_CORPSES = {"newt", "jackal", "coyote", "fox", "sewer rat", "giant rat",
-                "lichen", "floating eye", "gecko", "iguana", "giant ant",
-                "fire ant", "rothe", "wolf", "pony", "horse", "hobbit",
-                "giant beetle", "baby crocodile", "crocodile", "lizard", "warg",
-                "winter wolf cub", "bugbear", "mumak", "leocrotta", "wumpus",
-                "titanothere", "baluchitherium", "ape", "owlbear", "yeti",
-                "carnivorous ape", "monkey", "quivering blob", "giant mimic",
-                "large mimic", "small mimic", "rock piercer", "iron piercer",
-                "jaguar", "lynx", "panther", "tiger", "dingo", "jackalwere" and "",
-                "gnome", "gnome lord", "gnomish wizard", "gnome king",
-                "dwarf", "dwarf lord", "dwarf king",
-                "hill orc", "Mordor orc", "Uruk-hai", "orc shaman", "orc-captain", "snaga" and "",
-                "Woodland-elf", "Green-elf", "Grey-elf", "elf-lord",
-                "cave spider", "centipede" and "", "giant spider" and "",
-                "mountain nymph", "water nymph", "wood nymph",
-                "rabbit" and "", "giant turtle", "large cat" and ""}
-SAFE_CORPSES.discard("")
-RACE_KIN = {"gnome": ("gnome", "gnomish"), "gnomish": ("gnome", "gnomish"),
-            "dwarf": ("dwarf",), "dwarven": ("dwarf",),
-            "elf": ("elf", "elven"), "elven": ("elf", "elven"),
-            "orc": ("orc", "Uruk", "snaga"), "orcish": ("orc", "Uruk", "snaga"),
-            "human": ("human",)}
-ELBERETH_IGNORERS = {"minotaur", "shopkeeper", "guard", "watchman",
-                     "watch captain", "aligned priest", "high priest"}
-HUMAN_MLET = nh.permonst(next(i for i in range(nh.NUMMONS)
-                              if nh.permonst(i).mname == "human")).mlet
-MINOTAUR_MLET = nh.permonst(next(i for i in range(nh.NUMMONS)
-                                 if nh.permonst(i).mname == "minotaur")).mlet
+
 
 
 # monflag.h (NetHack 3.6)
@@ -135,10 +108,9 @@ class Level:
 
 class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixin, ShopMixin, ExcaliburMixin, ValkMixin, ElberethMixin, FocusMixin, ScrollMixin, CarryMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
-                 avoid_mines=False, use_armor=True, use_food=True, use_tactics=False,
+                 avoid_mines=False, use_armor=True, use_food=True,
                  use_enhance=True, use_pet=True, use_abilities=True, use_roles=True, role_opts=None,
-                 flee_hp=0.5, danger_k=3, recover_hp=0.8, corpse_policy="flags", flee_turns=4.0, rest_frac=0.5, elb_frac=0.0, descend_hp=0.0,
-                 descend_policy="explore"):
+                 rest_frac=0.5):
         from nle.env.tasks import NetHackScore
         self.env = NetHackScore(character=character,
                             actions=nh.ACTIONS, allow_all_yn_questions=True,
@@ -152,15 +124,11 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         self.max_turns = max_turns
         self.avoid_mines = avoid_mines
         self.use_armor = use_armor
-        self.use_food, self.use_tactics = use_food, use_tactics
+        self.use_food = use_food
         self.use_enhance, self.use_pet, self.use_abilities = use_enhance, use_pet, use_abilities
         self.use_roles = use_roles
         self.role_opts = role_opts or {}
-        self.flee_hp, self.danger_k, self.recover_hp = flee_hp, danger_k, recover_hp
-        self.corpse_policy = corpse_policy
-        self.flee_turns = flee_turns
-        self.rest_frac, self.elb_frac, self.descend_hp = rest_frac, elb_frac, descend_hp
-        self.descend_policy = descend_policy
+        self.rest_frac = rest_frac
         acts = self.env.unwrapped.actions
         self.key2act = {}
         for i, a in enumerate(acts):
@@ -777,11 +745,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             kin = WERE_KIN.get(kind) if kind else set().union(*WERE_KIN.values())
             if name in kin:
                 return False                  # eat.c: our own were-kind is cannibalism (Luck, aggravate)
-        if self.corpse_policy == "whitelist":
-            if name not in SAFE_CORPSES:
-                return False
-            kin = RACE_KIN.get((self.race or "").lower(), ())
-            return not any(k.lower() in name.lower() for k in kin)
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
@@ -797,8 +760,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return True                       # poison resistant: a poisonous corpse is ordinary food
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > 20
-        if self.role == "Monk":
-            return hunger >= HUNGRY           # vegetarian conduct: meat only when needed
         return True
 
     def eat_corpse_here(self):
@@ -1192,8 +1153,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
             return
 
-        if self.use_roles and (self.role_setup() or self.healer_early_quaff()):
-            return
         if self.use_enhance:
             self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
@@ -1232,27 +1191,15 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                           int(st_here) if st_here is not None else 0, adj_info))
         if len(self.hist) > 40:
             self.hist.popleft()
-        if self.use_tactics and self.tactical_step(lv, hostiles):
-            return
         if self.elb_step(lv, hostiles):
             return
         if not self.hallu_blind_ranged() and self.nymph_step(lv, hostiles):
             return
         if not hostiles and self.weapon_check():
             return
-        if self.use_roles and not self.hallu_blind_ranged() and (self.camera_step(lv, hostiles) or self.wand_step(lv, hostiles)):
-            return
-        if self.use_abilities and not self.hallu_blind_ranged() and self.ranged_step(lv, hostiles):
+        if self.use_roles and not self.hallu_blind_ranged() and self.wand_step(lv, hostiles):
             return
         if hostiles:
-            if hp < maxhp * self.elb_frac and (y, x) not in lv.elbereth and self.elbereths < 40:
-                if all(self.respects_elbereth(n, p) for p, n in hostiles):
-                    self.engrave_elbereth()
-                    return
-            if (y, x) in lv.elbereth and hp < maxhp * self.elb_frac and all(
-                    self.respects_elbereth(n, p) for p, n in hostiles):
-                self.press("s")   # rest on Elbereth instead of attacking (attacking erases it)
-                return
             # attack the weakest-looking (lowest level) target
             target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
             if self.role_opts.get("focus", True) and len(hostiles) > 1:
@@ -1278,9 +1225,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 self.throw(th[0][0], key, ray)
                 return
 
-        # missiles lying where we stand (our own thrown ones, or new ammo for missile roles)
+        # missiles lying where we stand (our own thrown ones)
         sh = self.seen_here
-        if sh and sh[0] == self.turn() and sh[1] == (y, x) and (self.throws or self.role in ("Tourist", "Rogue", "Ranger")) \
+        if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws \
                 and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b", sh[2]) \
                 and "for sale" not in sh[2] and not lv.shop[y, x]:
             self.seen_here = None
@@ -1369,17 +1316,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return
 
         self.explore(lv)
-
-    def respects_elbereth(self, name, pos):
-        if name == "invisible" or name in ELBERETH_IGNORERS:
-            return False
-        g = int(self.obs["glyphs"][pos])
-        m = nh.glyph_to_mon(g)
-        if 0 <= m < nh.NUMMONS:
-            let = nh.permonst(m).mlet
-            if let == HUMAN_MLET or let == MINOTAUR_MLET:
-                return False
-        return True
 
     def mon_level(self, pos):
         g = int(self.obs["glyphs"][pos])
@@ -1716,20 +1652,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         return False
 
     def should_descend(self, lv, frontier, on_level):
-        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.descend_hp:
-            return False
-        if self.descend_policy == "dive":
-            return True
-        xl = self.bl(nh.NLE_BL_XP)
-        depth = self.bl(nh.NLE_BL_DEPTH)
-        if self.descend_policy == "explore":
-            return not frontier.any() or on_level > self.role_opts.get("descend_after", 2000)
-        if self.descend_policy == "careful":
-            # explore fully; only go deeper when experienced enough
-            if depth >= xl + 3 and on_level < 4000:
-                return False
-            return not frontier.any() or on_level > 2000
-        return not frontier.any()
+        """Explored (no frontier left) or on this level for longer than descend_after turns."""
+        return not frontier.any() or on_level > self.role_opts.get("descend_after", 2000)
 
     def search_mode(self, lv, k_mem, k_live, passable):
         self.cur_act = "search"
@@ -1907,11 +1831,9 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "kills": self.kill_count,
             "skill_msgs": self.skill_msgs,
             "enhances": self.enhances,
-            "casts": self.casts,
             "quaffs": self.quaffs,
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
-            "missiles": self.missiles,
             "zaps": self.zaps,
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
@@ -1942,9 +1864,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             "dip_events": self.dip_events,
             "fountain_levels": len(self.fountain_levels),
             "align": int(self.last_bl[nh.NLE_BL_ALIGN]),
-            "flashes": self.flashes,
-            "early_quaffs": self.early_quaffs,
-            "fires": self.fires,
             "ammo_pickups": self.ammo_pickups,
             "pet_last_seen": self.pet_last_seen,
             "time_by": self.time_by,
@@ -1954,10 +1873,6 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                                  mines_branch=bool(v.avoid_down), desperate=v.desperate,
                                  seen=int(v.seen.sum()))
                             for k, v in self.levels.items()],
-            "flees": self.flees,
-            "escape_log": self.escape_log,
-            "stair_rests": self.stair_rests,
-            "stair_runs": self.stair_runs,
             "food_picked": self.food_picked,
             "hist": list(self.hist),
             "last_pray": self.last_pray,

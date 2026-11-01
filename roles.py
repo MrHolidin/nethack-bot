@@ -1,11 +1,6 @@
-"""Role-specific behaviour (strategy from the NetHack wiki role pages).
+"""Wands (attack wands at worthy targets) and Excalibur.
 
-  Archeologist: wield the pick-axe (d6) instead of the bullwhip (d2); dig down instead of
-                searching for hidden passages when a level has nothing left to explore.
-  Ranger:       wield the launcher (bow/crossbow is the alternate weapon at start) and fire
-                quivered missiles; pick them up again; fall back to the dagger when out.
-  Knight:       do not melee a monster that just "turns to flee" (-1 alignment, "You caitiff!").
-  Rogue:        throw daggers only at range >= 2, melee adjacent foes with the short sword.
+Role-specific behaviour lives behind self.role checks; the bot currently plays Valkyries only.
 """
 import re
 
@@ -14,23 +9,11 @@ import nle.nethack as nh
 import glyphs as G
 
 ROWS, COLS = 21, 79
-LAUNCHERS = ("bow", "crossbow", "yumi")
-AMMO = ("arrow", "crossbow bolt", "ya")
 
 
 class RolesMixin:
     def roles_init(self):
-        self.ranger_bow = False
-        self.ranger_out = False
-        self.fires = 0
-        self.role_setup_done = False
-
-    # ---------------------------------------------------------- helpers
-    def find_inv(self, pred):
-        for letter, ocls, s in self.inventory():
-            if pred(ocls, s):
-                return letter, s
-        return None
+        pass
 
     def wield(self, letter):
         self.press("w", expect_prompt=True)
@@ -39,57 +22,9 @@ class RolesMixin:
         else:
             self.settle()
 
-    def role_setup(self):
-        """One-time start-of-game adjustments."""
-        if self.role_setup_done:
-            return False
-        self.role_setup_done = True
-        if self.role == "Ranger":
-            alt = self.find_inv(lambda c, s: "alternate weapon" in s and any(l in s for l in LAUNCHERS))
-            if alt:
-                self.press("x")
-                self.ranger_bow = True
-                return True
-        return False
-
-    # ---------------------------------------------------------- Ranger: fire
-    def ranger_can_fire(self):
-        if self.role != "Ranger" or not self.ranger_bow or self.ranger_out:
-            return False
-        return any(any(a in s for a in AMMO) for _, c, s in self.inventory() if c == nh.WEAPON_CLASS
-                   and "weapon in hand" not in s)
-
-    def fire(self, key):
-        self.press("f", expect_prompt=True)
-        m = self.message().lower()
-        if "what do you want to fire" in m or "what do you want to throw" in m:
-            it = self.find_inv(lambda c, s: c == nh.WEAPON_CLASS and any(a in s for a in AMMO)
-                               and "weapon in hand" not in s)
-            if not it:
-                self.raw_step(27); self.settle()
-                self.ranger_out = True
-                return False
-            self.press(it[0], expect_prompt=True)
-            m = self.message().lower()
-        if "direction" in m:
-            self.press(key)
-        else:
-            self.settle()
-        self.fires += 1
-        return True
-
-    def ranger_check_ammo(self):
-        """Out of missiles: switch back to the melee weapon."""
-        if self.role == "Ranger" and self.ranger_bow and not self.ranger_can_fire():
-            self.ranger_out = True
-            self.ranger_bow = False
-            self.press("x")
-            return True
-        return False
-
 
 # =====================================================================================
-# Class tactics v2 (wiki: Healer, Tourist, Wizard, Expensive camera, Wand of sleep pages)
+# Attack wands (wiki: Wand of sleep and the ray wand pages)
 # =====================================================================================
 RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bounce off walls
 BEAM_WANDS = ("striking",)                                            # no bounce
@@ -99,9 +34,6 @@ SAFE_RAY_DIST = 7          # ray range is 7..13: a wall >= 7 away can't bounce i
 class ClassTacticsMixin:
     def class_init(self):
         self.zaps = 0
-        self.flashes = 0
-        self.early_quaffs = 0
-        self.flashed = {}
         self.empty_wands = set()
 
     def opt(self, name, default=True):
@@ -203,56 +135,6 @@ class ClassTacticsMixin:
             if k in (G.WALL, G.UNKNOWN, G.BOULDER):
                 return False
         return True
-
-    # ------------------------------------------------------------ Healer
-    def healer_early_quaff(self):
-        """Wiki: drink the starting extra healing at full HP for +2 (+5 blessed) max HP each."""
-        if self.role != "Healer" or not self.opt("hea_xh"):
-            return False
-        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) or self.turn() > 300:
-            return False
-        for letter, ocls, s in self.inventory():
-            if ocls == nh.POTION_CLASS and "potion" in s and "extra healing" in s and " cursed" not in s:
-                self.press("q", expect_prompt=True)
-                if "drink" in self.message().lower():
-                    self.press(letter)
-                    self.early_quaffs += 1
-                    return True
-                self.settle()
-                return False
-        return False
-
-    # ------------------------------------------------------------ Tourist camera
-    def camera_step(self, lv, hostiles):
-        if self.role != "Tourist" or not self.opt("camera") or hostiles:
-            return False
-        cam = None
-        for letter, ocls, s in self.inventory():
-            if "expensive camera" in s and not re.search(r"\(0:0\)", s):
-                cam = letter
-        if cam is None:
-            return False
-        for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=2):
-            if d != 2 or not self.worth_special(pos, name):
-                continue
-            g = int(self.obs["glyphs"][pos])
-            if self.turn() - self.flashed.get(g, -999) < 30:
-                continue
-            if self.peaceful_far(lv, pos, key, d):
-                continue
-            self.flashed[g] = self.turn()
-            self.press("a", expect_prompt=True)
-            if "apply" not in self.message().lower():
-                self.settle(); return False
-            self.press(cam, expect_prompt=True)
-            if "direction" in self.message().lower():
-                self.press(key)
-            else:
-                self.settle()
-            self.flashes += 1
-            self.cur_act = "fight"
-            return True
-        return False
 
 
 # =====================================================================================

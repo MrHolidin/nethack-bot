@@ -10,7 +10,6 @@ Policy (from NetHack wiki guidance, see notes in the chat):
   * randomized cloaks (tattered cape, opera cloak, ornamental cope, piece of
     cloth) are all useful (protection / invisibility / MR / displacement) -> ok.
   * ~12% of random armor is cursed (often -1); accepted: still nets AC.
-  * Monks never wear body armor or shields (martial arts penalty).
   * no shield while wielding a two-handed weapon ("weapon in hands").
 """
 import re
@@ -84,7 +83,6 @@ SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration
              "candy bar", "lump of royal jelly", "kelp frond", "eucalyptus leaf", "sprig of wolfsbane",
              "clove of garlic", "meatball", "meat stick", "huge chunk of meat", "meat ring",
              "lichen corpse", "lizard corpse")
-MEAT = ("meatball", "meat stick", "huge chunk of meat", "meat ring", "lichen corpse" and "", "lizard corpse")
 MAX_FOOD = 6
 
 HEAVY = {"bronze plate mail", "plate mail", "crystal plate mail", "splint mail", "banded mail"}
@@ -165,8 +163,6 @@ class EquipMixin:
         return worn
 
     def slot_allowed(self, slot):
-        if self.role == "Monk" and slot in (SUIT, SHIELD):
-            return False
         if slot == SHIELD and (self.no_shield or self.two_handed()):
             return False
         if slot == SUIT and self.no_suit:
@@ -310,8 +306,6 @@ class EquipMixin:
         if "egg" in name or re.search(r"\btins?\b", name):
             return False
         if "partly eaten" in name:
-            return False
-        if self.role == "Monk" and any(m and m in name for m in MEAT):
             return False
         return any(f in name for f in SAFE_FOOD)
 

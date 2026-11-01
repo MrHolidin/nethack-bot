@@ -35,13 +35,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-n", type=int, default=40)
     ap.add_argument("--start", type=int, default=1000)
-    ap.add_argument("--policy", default="explore")
     ap.add_argument("--char", default="@")
     ap.add_argument("--out", default="results.jsonl")
     ap.add_argument("-j", type=int, default=2)
     ap.add_argument("--kw", default="{}", help="extra Bot kwargs as JSON")
     a = ap.parse_args()
-    kw = {"descend_policy": a.policy, "character": a.char, **json.loads(a.kw)}
+    kw = {"character": a.char, **json.loads(a.kw)}
     t = time.time()
     with mp.Pool(a.j) as pool:
         res = pool.map(play, [(s, kw) for s in range(a.start, a.start + a.n)], chunksize=1)

@@ -89,17 +89,13 @@ class ValkMixin:
                 continue
             self.last_attack_target = pos
             self.cur_act = "fight"
-            if self.can_cast("force bolt"):
-                return self.cast("force bolt", key)
-            if self.use_roles and self.ranger_can_fire():
-                return self.fire(key)
             tw = self.throwables()
             if tw:
                 ray = [(y + i * dy, x + i * dx) for i in range(1, 10)
                        if 0 <= y + i * dy < ROWS and 0 <= x + i * dx < COLS]
                 self.throw(tw[0][0], key, ray)
                 return True
-        have_shot = bool(self.throwables()) or self.can_cast("force bolt") or (self.use_roles and self.ranger_can_fire())
+        have_shot = bool(self.throwables())
         # 2b) we could shoot but it isn't in line: step to a square that lines us up, at distance >= 2
         if have_shot and self.vopt("nymph_align", True):
             step = self.align_step(lv, th)

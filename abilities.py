@@ -1,11 +1,10 @@
-"""Character development and role abilities (only identified items / known spells).
+"""Character development and abilities (only identified items).
 
   * #enhance whenever the game says a skill can be advanced.
   * keep the pet: before descending, wait (a few turns) for a nearby pet to come adjacent.
-  * spells: force bolt at hostiles (adjacent or in line), healing on self when hurt.
   * identified healing potions when HP is low and prayer is unavailable.
   * identified scroll of magic mapping when a level runs out of places to explore.
-  * missile roles (Tourist darts, Rogue daggers): throw at hostiles in a clear line.
+  * line targets and far-look peaceful checks for ranged attacks (wands, missiles at nymphs).
 """
 import re
 
@@ -18,9 +17,7 @@ ROWS, COLS = 21, 79
 DIRS = {"k": (-1, 0), "j": (1, 0), "h": (0, -1), "l": (0, 1),
         "y": (-1, -1), "u": (-1, 1), "b": (1, -1), "n": (1, 1)}
 DELTA2KEY = {v: k for k, v in DIRS.items()}
-SPELL_COST = {"force bolt": 5, "healing": 5, "extra healing": 15}
 HEAL_POTIONS = ("full healing", "extra healing", "healing")      # best first
-MISSILE_ROLES = {"Tourist", "Rogue"}
 USUALLY_PEACEFUL = {"shopkeeper", "watchman", "watch captain", "aligned priest", "high priest",
                     "guard", "Oracle", "prisoner"}
 
@@ -29,13 +26,10 @@ class AbilitiesMixin:
     def abilities_init(self):
         self.want_enhance = False
         self.enhances = 0
-        self.spells = None             # name -> (letter, fail%)
-        self.casts = {}
         self.quaffs = 0
         self.maps_read = 0
         self.pet_waits = 0
         self.pet_waited_total = 0
-        self.missiles = 0
         self.far_peaceful = {}         # (level, glyph, pos) -> (peaceful, turn)
 
     # ---------------------------------------------------------- #enhance
@@ -58,37 +52,6 @@ class AbilitiesMixin:
             self.enhances += 1
         return False                                 # takes no game time
 
-    # ---------------------------------------------------------- spells
-    def load_spells(self):
-        self.spells = {}
-        self.raw_step(ord("Z"))
-        tty = self.tty_text()
-        for m in re.finditer(r"([a-zA-Z]) - ([a-z ]+?)\s+\d+\s+\w+\s+(\d+)%", tty):
-            self.spells[m.group(2).strip()] = (m.group(1), int(m.group(3)))
-        self.raw_step(27)
-        self.settle()
-
-    def can_cast(self, name, max_fail=25):
-        if self.spells is None:
-            self.load_spells()
-        if name not in self.spells:
-            return False
-        letter, fail = self.spells[name]
-        return fail <= max_fail and self.bl(nh.NLE_BL_ENE) >= SPELL_COST.get(name, 5)
-
-    def cast(self, name, dirkey):
-        letter, _ = self.spells[name]
-        self.raw_step(ord("Z"))
-        if "Choose which spell" not in self.tty_text():
-            self.settle(); return False
-        self.press(letter, expect_prompt=True)
-        if "direction" in self.message().lower():
-            self.press(dirkey)
-        else:
-            self.settle()
-        self.casts[name] = self.casts.get(name, 0) + 1
-        return True
-
     # ---------------------------------------------------------- items
     def find_item(self, ocls, names):
         for n in names:
@@ -102,9 +65,6 @@ class AbilitiesMixin:
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if hp * 3 >= maxhp or self.can_pray():
             return False
-        if self.can_cast("healing", max_fail=20) and not hostiles:
-            self.cur_act = "heal"
-            return self.cast("healing", ".")
         it = self.find_item(nh.POTION_CLASS, HEAL_POTIONS)
         if it:
             self.cur_act = "heal"
@@ -114,9 +74,6 @@ class AbilitiesMixin:
                 self.quaffs += 1
                 return True
             self.settle()
-        if self.can_cast("healing", max_fail=20):
-            self.cur_act = "heal"
-            return self.cast("healing", ".")
         return False
 
     def magic_map_step(self, lv):
@@ -144,8 +101,7 @@ class AbilitiesMixin:
             return False
         y, x = self.pos()
         d = min(max(abs(a - y), abs(b - x)) for a, b in zip(ys, xs))
-        far, turns = (12, 30) if (self.role == "Archeologist" and self.use_roles
-                                  and self.role_opts.get("arc_pet", True)) else (7, 15)
+        far, turns = 7, 15
         if d <= 1 or d > far or self.pet_waits >= turns:
             self.pet_waits = 0
             return False
@@ -195,41 +151,3 @@ class AbilitiesMixin:
                     break
         return sorted(out, key=lambda t: t[1])
 
-    def ranged_step(self, lv, hostiles):
-        """Force bolt (if known) or missiles (missile roles). Returns True if acted."""
-        use_bolt = self.can_cast("force bolt") if self.spells is not False else False
-        use_missiles = self.role in MISSILE_ROLES and self.throwables()
-        use_fire = self.use_roles and self.ranger_can_fire()
-        if self.use_roles and self.ranger_check_ammo():
-            return True
-        if not (use_bolt or use_missiles or use_fire):
-            return False
-        for key, d, pos, (dy, dx), name in self.line_targets(lv):
-            if name in ("floating eye",) and not use_missiles:
-                continue
-            if d == 1:
-                if pos not in [p for p, _ in hostiles]:
-                    continue                     # adjacent but peaceful/unchecked
-                if self.use_roles and self.role == "Rogue" and not use_bolt:
-                    continue                     # melee adjacent foes, throw only at range
-            elif self.peaceful_far(lv, pos, key, d):
-                continue
-            y, x = self.pos()
-            if use_bolt and self.use_roles and self.role_opts.get("bolt_conserve", True) \
-                    and not self.worth_special(pos, name):
-                if not (use_missiles or use_fire):
-                    continue                     # melee weak stuff, keep energy for real threats
-                use_bolt = False
-            self.last_attack_target = pos
-            self.cur_act = "fight"
-            if use_bolt:
-                return self.cast("force bolt", key)
-            if use_fire:
-                self.fire(key)
-                return True
-            ray = [(y + i * dy, x + i * dx) for i in range(1, 10)
-                   if 0 <= y + i * dy < ROWS and 0 <= x + i * dx < COLS]
-            self.missiles += 1
-            self.throw(self.throwables()[0][0], key, ray)
-            return True
-        return False
