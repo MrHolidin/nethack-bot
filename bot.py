@@ -1166,7 +1166,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.pending_mines_mark = True
             self.press("<")
             return
-        if self.role_opts.get("mines_return", False):
+        if self.role_opts.get("mines_return", True):
             if lv.key[0] == 2:
                 if self.is_minetown(lv) or self.town_folk_visible():
                     self.minetown_seen = True
@@ -1509,7 +1509,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             for p in lv.avoid_down:
                 downstairs[p] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level) and not self.excal_holds(lv)
-        if want_down and self.role_opts.get("mines_return", False) and lv.key[0] == 2 and lv.key[1] >= 4 \
+        if want_down and self.role_opts.get("mines_return", True) and lv.key[0] == 2 and lv.key[1] >= 4 \
                 and not self.minetown_seen and not self.is_minetown(lv):
             # mines level 4 done and no Minetown on 3 or 4: it won't come further down
             self.mines_return_start(lv, "no_town")
@@ -1599,7 +1599,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                     return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
-        if self.role_opts.get("mines_return", False) and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
+        if self.role_opts.get("mines_return", True) and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
             self.mines_return_start(lv, "bottom")
             if self.mines_return_step(lv, k_mem, k_live, passable, start):
                 return
