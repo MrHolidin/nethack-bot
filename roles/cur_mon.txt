@@ -1,8 +1,0 @@
-games 60  crashes 0  wall 191s
-score  mean 2239  median 1664  max 11033
-depth  mean 7.40  median 8.0  max 14  hist [(3, 7), (4, 3), (5, 5), (6, 4), (7, 7), (8, 14), (9, 8), (10, 8), (11, 2), (13, 1), (14, 1)]
-turns  median 3167.0   xl median 5.0
-truncated: 0
-causes: [('?', 7), ('unseen', 5), ('cockatrice', 4), ('soldier ant', 3), ('owlbear', 3), ('werewolf', 3), ('starvation', 2), ('mumak', 2), ('giant ant', 2), ('gray unicorn', 1), ('bolt of cold', 1), ('goblin', 1)]
-died in mines: 1 / 60
-by role: {'Monk': (60, 1664)}

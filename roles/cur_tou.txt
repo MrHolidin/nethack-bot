@@ -1,8 +1,0 @@
-games 60  crashes 0  wall 90s
-score  mean 660  median 634  max 1947
-depth  mean 4.27  median 4.0  max 9  hist [(1, 3), (2, 8), (3, 3), (4, 18), (5, 17), (6, 8), (7, 2), (9, 1)]
-turns  median 2408.0   xl median 4.0
-truncated: 0
-causes: [('rothe', 7), ('giant bat', 5), ('hill orc', 3), ('werejackal', 3), ('guard', 2), ('pony', 2), ('dwarf', 2), ('homunculus', 2), ('little dog', 2), ('wererat', 2), ('starvation', 2), ('imp', 2)]
-died in mines: 1 / 60
-by role: {'Tourist': (60, 634)}

@@ -1,8 +1,0 @@
-games 40  crashes 0  wall 50s
-score  mean 590  median 504  max 1724
-depth  mean 3.80  median 4.0  max 8  hist [(1, 2), (2, 9), (3, 6), (4, 8), (5, 10), (6, 4), (8, 1)]
-turns  median 2165.5   xl median 3.0
-truncated: 0
-causes: [('starvation', 7), ('imp', 4), ('rock mole', 4), ('?', 3), ('hobgoblin', 2), ('wererat', 2), ('rabid rat', 2), ('giant bat', 2), ('werejackal', 1), ('angered law', 1), ('rock piercer', 1), ('gnome', 1)]
-died in mines: 0 / 40
-by role: {'Healer': (40, 504)}

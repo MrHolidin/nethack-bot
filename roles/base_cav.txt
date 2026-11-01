@@ -1,8 +1,0 @@
-games 40  crashes 0  wall 73s
-score  mean 1162  median 1019  max 3115
-depth  mean 5.00  median 5.0  max 8  hist [(1, 2), (2, 4), (3, 2), (4, 9), (5, 7), (6, 5), (7, 5), (8, 6)]
-turns  median 2862.5   xl median 5.0
-truncated: 0
-causes: [('starvation', 5), ('rothe', 4), ('hill orc', 3), ('giant ant', 3), ('little dog', 2), ('killer bee', 2), ('jaguar', 2), ('werejackal', 2), ('guard', 2), ('wand', 2), ('rabid rat', 2), ('coyote', 1)]
-died in mines: 2 / 40
-by role: {'Cavewoman': (16, 1218), 'Caveman': (24, 978)}

@@ -1,8 +1,0 @@
-games 40  crashes 0  wall 121s
-score  mean 2398  median 1664  max 7899
-depth  mean 6.62  median 7.0  max 11  hist [(2, 2), (3, 1), (4, 2), (5, 8), (6, 6), (7, 7), (8, 7), (9, 3), (10, 2), (11, 2)]
-turns  median 4797.0   xl median 5.0
-truncated: 0
-causes: [('?', 7), ('starvation', 5), ('gnome king', 2), ('unseen', 2), ('rabid rat', 2), ('giant ant', 2), ('dwarf king', 2), ('orc mummy', 1), ('bolt of fire', 1), ('wand', 1), ('kobold zombie', 1), ('gnome lord', 1)]
-died in mines: 2 / 40
-by role: {'Barbarian': (40, 1664)}

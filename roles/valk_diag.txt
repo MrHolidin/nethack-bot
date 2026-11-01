@@ -1,8 +1,0 @@
-games 120  crashes 0  wall 232s
-score  mean 1770  median 1328  max 12316
-depth  mean 6.28  median 6.0  max 13  hist [(2, 4), (3, 11), (4, 15), (5, 18), (6, 15), (7, 24), (8, 14), (9, 9), (10, 5), (11, 1), (12, 1), (13, 3)]
-turns  median 3340.5   xl median 5.0
-truncated: 0
-causes: [('starvation', 11), ('?', 10), ('soldier ant', 8), ('wolf', 4), ('giant bat', 4), ('unseen', 4), ('rothe', 4), ('homunculus', 4), ('killer bee', 3), ('rabid rat', 3), ('hill orc', 3), ('pony', 3)]
-died in mines: 1 / 120
-by role: {'Valkyrie': (120, 1328)}

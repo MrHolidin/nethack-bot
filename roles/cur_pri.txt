@@ -1,8 +1,0 @@
-games 60  crashes 0  wall 91s
-score  mean 1039  median 679  max 5787
-depth  mean 4.60  median 4.5  max 9  hist [(1, 3), (2, 6), (3, 14), (4, 7), (5, 10), (6, 6), (7, 8), (8, 5), (9, 1)]
-turns  median 2675.5   xl median 4.0
-truncated: 0
-causes: [('starvation', 8), ('hobbit', 4), ('giant bat', 4), ('wand', 3), ('soldier ant', 3), ('werejackal', 3), ('wererat', 3), ('plains centaur', 2), ('gnome lord', 2), ('?', 2), ('giant ant', 2), ('gnome', 2)]
-died in mines: 4 / 60
-by role: {'Priestess': (26, 706), 'Priest': (34, 628)}

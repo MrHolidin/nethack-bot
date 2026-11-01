@@ -1,8 +1,0 @@
-games 40  crashes 0  wall 72s
-score  mean 1099  median 940  max 3199
-depth  mean 5.28  median 5.0  max 10  hist [(2, 2), (3, 6), (4, 7), (5, 10), (6, 3), (7, 6), (8, 4), (9, 1), (10, 1)]
-turns  median 3143.5   xl median 4.0
-truncated: 0
-causes: [('unseen', 8), ('rothe', 6), ('starvation', 5), ('pony', 3), ('wand', 2), ('hell hound', 1), ('gecko', 1), ('wolf', 1), ('dwarf', 1), ('jackal', 1), ('rotten food', 1), ('giant beetle', 1)]
-died in mines: 1 / 40
-by role: {'Priestess': (16, 982), 'Priest': (24, 882)}

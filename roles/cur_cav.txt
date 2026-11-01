@@ -1,8 +1,0 @@
-games 60  crashes 0  wall 85s
-score  mean 1335  median 1102  max 4712
-depth  mean 5.52  median 6.0  max 10  hist [(2, 5), (3, 6), (4, 8), (5, 9), (6, 12), (7, 10), (8, 7), (9, 2), (10, 1)]
-turns  median 3324.5   xl median 5.0
-truncated: 0
-causes: [('starvation', 7), ('?', 6), ('homunculus', 4), ('magic missile', 3), ('hobbit', 3), ('rothe', 3), ('wand', 3), ('giant rat', 3), ('giant ant', 2), ('little dog', 2), ('horse', 2), ('rabid rat', 2)]
-died in mines: 3 / 60
-by role: {'Caveman': (34, 1228), 'Cavewoman': (26, 878)}

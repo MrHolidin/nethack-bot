@@ -1,8 +1,0 @@
-games 60  crashes 0  wall 84s
-score  mean 1224  median 1180  max 2923
-depth  mean 5.75  median 6.0  max 10  hist [(1, 3), (2, 2), (3, 2), (4, 8), (5, 8), (6, 15), (7, 9), (8, 11), (9, 1), (10, 1)]
-turns  median 2692.5   xl median 5.0
-truncated: 0
-causes: [('gnome lord', 5), ('giant beetle', 5), ('werejackal', 4), ('wand', 4), ('guard', 3), ('bugbear', 3), ('?', 3), ('giant ant', 2), ('killer bee', 2), ('housecat', 2), ('pony', 2), ('unseen', 2)]
-died in mines: 3 / 60
-by role: {'Ranger': (60, 1180)}

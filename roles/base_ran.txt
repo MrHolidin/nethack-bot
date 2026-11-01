@@ -1,8 +1,0 @@
-games 40  crashes 0  wall 74s
-score  mean 870  median 736  max 3582
-depth  mean 4.90  median 5.0  max 10  hist [(1, 1), (2, 3), (3, 6), (4, 5), (5, 10), (6, 9), (7, 4), (9, 1), (10, 1)]
-turns  median 2562.5   xl median 4.0
-truncated: 0
-causes: [('wand', 4), ('werejackal', 4), ('rothe', 3), ('?', 3), ('unseen', 3), ('giant bat', 2), ('bugbear', 2), ('guard', 2), ('starvation', 2), ('manes', 2), ('pony', 1), ('dwarf', 1)]
-died in mines: 1 / 40
-by role: {'Ranger': (40, 736)}

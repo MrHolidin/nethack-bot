@@ -1,8 +1,0 @@
-games 60  crashes 0  wall 147s
-score  mean 1947  median 1482  max 8822
-depth  mean 6.28  median 7.0  max 12  hist [(1, 2), (2, 5), (3, 6), (4, 2), (5, 7), (6, 6), (7, 10), (8, 10), (9, 4), (10, 7), (12, 1)]
-turns  median 3627.5   xl median 5.0
-truncated: 0
-causes: [('starvation', 8), ('wand', 6), ('?', 5), ('white unicorn', 4), ('dwarf king', 4), ('rope golem', 3), ('unseen', 2), ('hobbit', 2), ('jaguar', 2), ('cockatrice', 2), ('gray unicorn', 2), ('pony', 2)]
-died in mines: 0 / 60
-by role: {'Barbarian': (60, 1482)}

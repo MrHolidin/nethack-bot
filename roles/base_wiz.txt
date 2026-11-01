@@ -1,8 +1,0 @@
-games 40  crashes 0  wall 50s
-score  mean 1064  median 884  max 3578
-depth  mean 5.15  median 5.0  max 9  hist [(1, 2), (2, 2), (3, 5), (4, 8), (5, 4), (6, 6), (7, 8), (8, 4), (9, 1)]
-turns  median 2554.5   xl median 4.0
-truncated: 0
-causes: [('?', 5), ('starvation', 4), ('little dog', 4), ('unseen', 3), ('white unicorn', 2), ('pony', 2), ('rothe', 2), ('giant ant', 2), ('fox', 1), ('giant bat', 1), ('killer bee', 1), ('fire ant', 1)]
-died in mines: 1 / 40
-by role: {'Wizard': (40, 884)}
