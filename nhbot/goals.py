@@ -1,7 +1,7 @@
 """Goals: squares the bot walks to for something lying there, in one registry.
 
 Each kind of goal is one GoalKind record: how it is walked to (tier), how long it lives, how far we go for
-it, what happens when we can't get there, whether it holds us on the level (items_first). Two tiers:
+it, whether it holds us on the level (items_first). Two tiers:
 
   explore  the goal joins the exploration frontier: explore() walks to the nearest of frontier + goals, and
            another step consumes it when we stand on it. Its walk mask must use the same gate as the
@@ -13,7 +13,7 @@ Statistics per kind (summary 'goals'):
   created     goals that appeared (mask kinds: squares first seen with an uninspected pile / gold on them)
   consumed    we stood on it and did what it was for (picked up, inspected, ate)
   expired     its time ran out
-  abandoned   given up because it could not be reached
+  abandoned   loot: replaced by a newer theft before we got there
   vanished    mask kinds: gone from the map memory without us consuming it (picked up by a monster, the
               square turned out to be part of a shop, ...)
   unfinished  still open at the end of the game
@@ -35,16 +35,15 @@ class GoalKind:
     tier: str                      # "explore" | "own"
     ttl: int = None                # turns a goal lives, None: until consumed
     max_dist: int = None           # Chebyshev distance at most, None: any
-    on_unreachable: str = "skip"   # "skip": not walked to while unreachable; "drop": forgotten; "keep"
     holds_descent: bool = False    # items_first: don't take the stairs down while one is reachable
 
 
 GOALS = {
     "gold": GoalKind("gold", "explore", holds_descent=True),
     "pile": GoalKind("pile", "explore", holds_descent=True),
-    "retrieve": GoalKind("retrieve", "own", ttl=60, on_unreachable="drop"),
-    "corpse": GoalKind("corpse", "own", ttl=40, max_dist=8, on_unreachable="keep"),
-    "loot": GoalKind("loot", "own", on_unreachable="drop"),
+    "retrieve": GoalKind("retrieve", "own", ttl=60),
+    "corpse": GoalKind("corpse", "own", ttl=40, max_dist=8),
+    "loot": GoalKind("loot", "own"),
 }
 EXPLORE_KINDS = tuple(k for k, g in GOALS.items() if g.tier == "explore")
 CHASE_ONLY = ("frontier", "downstairs")       # walked to, but not goals with a lifetime
@@ -113,44 +112,27 @@ class GoalsMixin:
 
     # ------------------------------------------------------------------ own tier
     def pursue(self, kind, lv, goals, consume):
-        """One tick toward an own-tier goal, goals = its candidate squares, best first.
-
-        Default: the first one only -- on it, consume and close it; else step toward it; if that fails, apply
-        the kind's on_unreachable ('drop': forget it).
-        goal_reach_unified: like the explore tier -- on any of them, consume it; else step toward the nearest
-        reachable one by path; none reachable: nothing happens, they stay goals. True if the tick acted."""
+        """One tick toward an own-tier goal, goals = its candidate squares. Like the explore tier: on any of
+        them, consume it; else step toward the nearest reachable one by path; none reachable: nothing
+        happens, they stay goals (until consumed or expired). True if the tick acted."""
         here = self.pos()
-        if self.opts.goal_reach_unified:
-            if here in goals:
-                consume(here)
-                self.goal_event(kind, "consumed", self.goal_forget(kind, lv, here))
-                return True
-            k_mem, k_live = self.kind_grid(lv)
-            passable = self.passable_grid(lv, k_mem, k_live)
-            mask = np.zeros(lv.under.shape, dtype=bool)
-            for p in goals:
-                mask[p] = True
-            _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask)
-            step = self.first_step(prev, here, reached) if reached is not None else None
-            if step is None:
-                self.goal_unreachable(kind, goals, passable)
-                return False
-            self.goal_chase(kind)
-            self.move(step)
-            return True
-        goal = goals[0]
-        if goal == here:
-            consume(goal)
-            self.goal_event(kind, "consumed", self.goal_forget(kind, lv, goal))
-            return True
-        if self.go_toward(lv, goal):
-            self.goal_chase(kind)
+        if here in goals:
+            consume(here)
+            self.goal_event(kind, "consumed", self.goal_forget(kind, lv, here))
             return True
         k_mem, k_live = self.kind_grid(lv)
-        self.goal_unreachable(kind, [goal], self.passable_grid(lv, k_mem, k_live))
-        if GOALS[kind].on_unreachable == "drop":
-            self.goal_event(kind, "abandoned", self.goal_forget(kind, lv, goal))
-        return False
+        passable = self.passable_grid(lv, k_mem, k_live)
+        mask = np.zeros(lv.under.shape, dtype=bool)
+        for p in goals:
+            mask[p] = True
+        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask)
+        step = self.first_step(prev, here, reached) if reached is not None else None
+        if step is None:
+            self.goal_unreachable(kind, goals, passable)
+            return False
+        self.goal_chase(kind)
+        self.move(step)
+        return True
 
     def goal_unreachable(self, kind, goals, passable):
         """Count a tick with no reachable goal of this kind, by cause."""

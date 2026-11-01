@@ -12,8 +12,6 @@ DEFAULTS = {
     "shop_by_square": False,   # A/B: merchandise = items on shop squares only (not 'a shopkeeper is in view');
                                #      missile and corpse goals on shop squares are skipped
     "loot_holds_descent": False,   # A/B: a reachable stolen-items square on this level holds the stairs down
-    "goal_reach_unified": False,   # A/B: missiles / corpses / loot like the explore tier: nearest reachable by
-                                   #      path, unreachable ones stay goals (no 'drop', no 'first in list')
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp
