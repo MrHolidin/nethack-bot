@@ -6,7 +6,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
+from nhbot.consts import ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FLOOR_GLYPH, FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
 
 
 class Level:
@@ -154,3 +154,31 @@ class MapMixin:
         if arrived and self.last_stair_dir:
             lv.under[self.pos()] = UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH
         self.last_stair_dir = None
+
+    def msg_map(self, m, lv):
+        """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
+        if "This door is locked" in m and self.last_move_target and lv:
+            lv.locked.add(self.last_move_target)
+        if lv and self.last_move_target and any(s in m for s in (
+                "You try to move the boulder, but in vain",
+                "Perhaps that's why you cannot move past it",
+                "There is a boulder in your way",
+                "You are carrying too much to get through",
+                "You don't have enough room to maneuver")):
+            lv.blocked[self.last_move_target] = True
+        if "no shape for kicking" in m and lv and self.last_move_target:
+            lv.blocked[self.last_move_target] = True
+        if "Closed for inventory" in m and lv:
+            y, x = self.pos()
+            for dy, dx in NEIGH:
+                ny, nx = y + dy, x + dx
+                if 0 <= ny < ROWS and 0 <= nx < COLS and G.KIND[lv.under[ny, nx]] == G.DOOR_CLOSED:
+                    lv.blocked[ny, nx] = True
+        if lv is not None and "Closed for inventory" in m:
+            lv.cfi = lv.cfi | {self.pos()}
+        if ("You can't go up here" in m or "You can't go down here" in m) and lv is not None:
+            # we remembered a staircase that isn't here (arriving next to stairs a monster stood on marks the
+            # wrong square); the refusal costs no time, so pressing again looped to the step cap
+            yy, xx = self.pos()
+            if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
+                lv.under[yy, xx] = FLOOR_GLYPH

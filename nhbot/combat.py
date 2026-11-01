@@ -29,6 +29,28 @@ BEAM_WANDS = ("striking",)                                            # no bounc
 SAFE_RAY_DIST = 7          # ray range is 7..13: a wall >= 7 away can't bounce it back onto us
 
 
+
+# mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
+IT_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches you|stings|kicks|butts|claws|scratches|"
+                          r"thrusts|swings|grabs|hugs|lashes|squeezes|engulfs|tickles|stabs|pummels|whips)\b")
+
+
+# mhitu.c: a melee attack on us by a monster we see: "The <name> <verb>!" (hallucination: the name is random);
+# monster-vs-monster and missiles read differently ("The gnome hits the jackal.", "You are hit by a dart.")
+MELEE_ON_US_RE = re.compile(r"\bThe [^.!]+? (?:hits|bites|misses|just misses|stings|kicks|butts|claws|scratches|"
+                            r"thrusts|swings|grabs|lashes|tickles|stabs|pummels|whips|touches you|engulfs you|"
+                            r"squeezes you|gores|charms you)!")
+
+
+# Somebody attacked us from a distance (mthrowu.c monshoot / thitu, zap.c buzz, muse.c), seen or not.
+RTHREAT_RE = re.compile(r"(?:throws|shoots) |zaps (?:a|an|the) |You are (?:almost )?hit by |You are hit!|misses you\.|"
+                        r"whizzes by you|hits you!|crashes on your head|You hear a nearby zap")
+
+
+# ...but arrow/dart/rock traps print the same 'You are hit by' lines
+RTRAP_RE = re.compile(r"trap|shoots out at you|falls on your head|from the ceiling")
+
+
 class CombatMixin:
     def combat_init(self):
         self.zaps = 0
@@ -350,3 +372,26 @@ class CombatMixin:
             if k in (G.WALL, G.UNKNOWN, G.BOULDER):
                 return False
         return True
+
+    def msg_combat(self, m):
+        """Our hits and kills, being shot at, being attacked by something unseen."""
+        if self.opts.focus:
+            self.focus_note(m)
+        if re.search(r"You (kill|destroy) ", m):
+            self.kill_count += 1
+        mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
+        if mk and self.last_attack_target:
+            lvk = self.levels.get(self.cur_key)
+            old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
+            if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
+                self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
+        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
+            self.last_shot_turn = self.turn()
+        if self.opts.hunt_shooter and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \
+                and self.turn() - self.own_zap_turn > 1:
+            mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
+            self.shot_event = (self.turn(), mm.group(1) if mm else None)
+        if IT_ATTACK_RE.search(m):
+            self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
+        if MELEE_ON_US_RE.search(m):
+            self.melee_on_us = True           # hallu_strike: something attacked us in melee this turn

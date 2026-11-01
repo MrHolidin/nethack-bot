@@ -4,13 +4,11 @@ Objective: in-game score; also tracks max depth."""
 import re
 from collections import deque
 
-import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.carry import CarryMixin
-from nhbot.combat import CombatMixin, THROWABLE, THROW_STONES
-from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_squares
+from nhbot.combat import CombatMixin
 from nhbot.elbereth import ElberethMixin
 from nhbot.equipment import EquipMixin
 from nhbot.excalibur import ExcaliburMixin
@@ -18,11 +16,10 @@ from nhbot.explore import ExploreMixin
 from nhbot.focus import FocusMixin
 from nhbot.game import GameMixin, GameOver
 from nhbot.mapmem import MapMixin
-from nhbot.messages import MessagesMixin
-from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 from nhbot.nav import NavMixin
 from nhbot.options import Options
 from nhbot.perception import PerceptionMixin
+from nhbot.policy import PolicyMixin
 from nhbot.pricemem import PriceMemoryMixin
 from nhbot.scrolls import ScrollMixin
 from nhbot.shop import ShopMixin
@@ -31,7 +28,7 @@ from nhbot.thieves import ThievesMixin
 from nhbot.weapons import WeaponsMixin
 
 
-class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, SurvivalMixin, CombatMixin,
+class Bot(PolicyMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, FocusMixin, ScrollMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -54,261 +51,6 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
         self.key2act = {}
         for i, a in enumerate(acts):
             self.key2act.setdefault(int(a), i)
-
-    def tick(self):
-        lv = self.update_memory()
-        self.cur_key = lv.key
-        if self.pending_mines_mark:
-            self.pending_mines_mark = False
-            if lv.key[0] == 0:
-                lv.avoid_down.add(self.pos())
-        arrived_by_stairs = False
-        if lv.key != self.prev_key:
-            arrived_by_stairs = self.took_stairs
-            self.note_stair_arrival(lv, True)
-            self.prev_key = lv.key
-        else:
-            self.last_stair_dir = None
-        self.took_stairs = False
-        if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines_bounced \
-                and arrived_by_stairs:
-            self.mines_bounced.add(lv.key)
-            self.pending_mines_mark = True
-            self.press("<")
-            return
-        if self.opts.mines_return:
-            if lv.key[0] == 2:
-                if self.is_minetown(lv) or self.town_folk_visible():
-                    self.minetown_seen = True
-                if not self.minetown_seen and lv.key[1] >= 5:
-                    self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
-            elif self.mines_return_on:
-                self.mines_return_on = False
-                self.mines_done = True
-                self.mines_done_turn = self.turn()
-        y, x = self.pos()
-        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        hunger = self.bl(nh.NLE_BL_HUNGER)
-
-        t = self.turn()
-        if (G.KIND[self.obs["glyphs"]] == G.PET).any():
-            self.pet_last_seen = t
-        if t != self.loop_turn:
-            self.loop_turn, self.loop_steps = t, self.steps
-        elif self.steps - self.loop_steps > 300:      # stuck in a no-time loop
-            self.loops += 1
-            self.loop_steps = self.steps
-            self.raw_step(27); self.press("s")
-            return
-        stall = t - max(lv.last_progress, lv.entered_turn or 0)
-        if stall > 500 and t - lv.last_reset > 500:
-            # forget learned obstacles: they are often transient (monsters, misreads)
-            lv.fail[:] = 0
-            lv.blocked[:] = False
-            lv.last_reset = t
-            self.resets += 1
-        if not lv.desperate and (stall > 1500 or (t - (lv.entered_turn or t) > 2500 and
-                                                 not (G.KIND[lv.under] == G.DOWNSTAIR).any())):
-            lv.desperate = True
-            self.desperations += 1
-
-        # engulfed: hit anything. The engulfer is drawn on the 8 squares AROUND us (display.c swallowed());
-        # our own square shows us, so the old test on it never fired (engulf_fix)
-        gg = self.obs["glyphs"]
-        ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
-        engulfed = int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5
-        if engulfed:
-            self.last_attack_target = None
-            self.press("F"); self.press("h")
-            return
-
-        # emergencies
-        low = hp <= 5 or hp * 7 <= maxhp
-        if (low or hp * self.opts.pray_div <= maxhp) and self.can_pray():
-            self.pray(); return
-        if hunger >= FAINTING:
-            if self.faint_since is None:
-                self.faint_since = t
-        else:
-            self.faint_since = None
-        if hunger >= WEAK and self.can_pray(hunger_emergency=(
-                self.faint_since is not None and t - self.faint_since > self.opts.faint_wait), weak=True):
-            self.pray(); return
-        if self.lycanthropy and self.can_pray() and \
-                not any(n.startswith("were") for _, n in self.visible_hostiles(lv)):
-            self.pray(); return                # not while a lycanthrope in view can bite us again right after
-        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
-        deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
-        if cond & deadly and not self.god_angry and self.turn() - (self.last_pray or -9999) > 2:
-            # certain death otherwise: pray even if the timeout may not have expired
-            self.deadly_prayers += 1
-            self.pray(); return
-        if self.carry_drop_step():
-            return
-        if self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy():
-            return
-
-        if self.opts.use_enhance:
-            self.enhance_step()
-        hostiles = self.adjacent_hostiles(lv)
-        if self.opts.blind_strike:
-            hostiles = self.blind_attackers(lv, hostiles)
-        if self.opts.hallu_strike:
-            hostiles = self.hallu_attackers(lv, hostiles)
-        cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
-        if cond2 & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
-            # moves and attacks go in random directions while stunned/confused
-            only_passive = all(n in PASSIVE_MOLDS for _, n in hostiles)
-            if not hostiles or only_passive:
-                self.stun_waits += 1
-                self.press("s")
-                return
-        if self.opts.vault_guard and self.vault_step(lv, hostiles):
-            return
-        if cond2 & nh.BL_MASK_BLIND and not hostiles \
-                and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
-            self.blind_waits += 1             # wandering blind walks into things we can't see
-            # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
-            # would look like the attacker when something else hits us in the same turn (61688)
-            self.press("." if self.opts.blind_strike and self.strike_scope_ok(lv) else "s")
-            return
-        if self.opts.use_abilities and self.heal_step(hostiles):
-            return
-        vis_n = len(self.visible_hostiles(lv))
-        km = G.KIND[lv.under]
-        sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
-        d_st = int(min((max(abs(a - y), abs(b - x)) for a, b in zip(sy, sx)), default=99))
-        st_here = self.stairs_kind_here(lv)
-        adj_info = [(n, bool(PM_BY_NAME[n].mflags2 & M2_STALK) if n in PM_BY_NAME else None,
-                     PM_BY_NAME[n].mmove if n in PM_BY_NAME else None) for _, n in hostiles]
-        self.hist.append((t, hp, maxhp, len(hostiles), vis_n, self.can_pray(), self.bl(nh.NLE_BL_DEPTH),
-                          self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_AC), d_st,
-                          int(st_here) if st_here is not None else 0, adj_info))
-        if len(self.hist) > 40:
-            self.hist.popleft()
-        if self.elb_step(lv, hostiles):
-            return
-        if not self.hallu_blind_ranged() and self.nymph_step(lv, hostiles):
-            return
-        if not hostiles and self.weapon_check():
-            return
-        if self.opts.use_roles and not self.hallu_blind_ranged() and self.wand_step(lv, hostiles):
-            return
-        if hostiles:
-            # attack the weakest-looking (lowest level) target
-            target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
-            if self.opts.focus and len(hostiles) > 1:
-                target = self.focus_target(hostiles, target)
-            self.attack(target)
-            return
-        if self.opts.hunt_shooter and not self.hallu_blind_ranged() and self.hunt_step(lv):
-            return
-        if (y, x) in lv.elbereth and hp * 2 < maxhp:
-            self.cur_act = "rest"
-            self.press("2"); self.press("0"); self.press("s")
-            return
-
-        # ranged attacks on things we refuse to melee
-        rt = None if self.hallu_blind_ranged() else self.ranged_target(lv)
-        if rt:
-            th = self.throwables()
-            if th:
-                key, d, tpos, (sy, sx) = rt
-                ray = ray_squares(y, x, sy, sx)
-                self.last_attack_target = tpos
-                self.throw(th[0][0], key, ray)
-                return
-
-        # missiles lying where we stand (our own thrown ones)
-        sh = self.seen_here
-        if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws \
-                and re.search(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b", sh[2]) \
-                and "for sale" not in sh[2] and not lv.shop[y, x]:
-            self.seen_here = None
-            self.pickup_matching(THROWABLE + ("arrow", "crossbow bolt"))
-            self.ammo_pickups += 1
-            return
-
-        # pick thrown weapons back up
-        if self.retrieve:
-            goal = self.retrieve_goal(lv)
-            if goal is not None:
-                if goal == (y, x):
-                    self.pickup_matching(THROWABLE + THROW_STONES)
-                    self.retrieve = [r for r in self.retrieve if goal not in r[1]]
-                    return
-                if self.go_toward(lv, goal):
-                    return
-                self.retrieve = [r for r in self.retrieve if goal not in r[1]]
-
-        # hunger
-        if hunger >= HUNGRY and self.turn() >= self.no_eat_until:
-            if self.eat_from_inventory():
-                return
-
-        # fresh corpse nearby
-        if hunger >= NOT_HUNGRY and self.kills and not (self.shop_visits_on() and (
-                self.shopkeeper_in_view() or lv.shop[y, x])):     # shop corpses are merchandise
-            goal = self.corpse_goal(lv)
-            if goal is not None:
-                if goal == (y, x):
-                    self.eat_corpse_here()
-                    self.kills = [k for k in self.kills if k[2] != goal or k[3] != lv.key]
-                    return
-                if self.go_toward(lv, goal):
-                    return
-
-        # leave a digger (pick-axe, mattock) by the shop door / take it back -- also with monsters in view
-        # (Minetown always has some): the shopkeeper asked just now, fights were handled above
-        if self.stash_step(lv):
-            return
-
-        vis = self.view_threats(lv)
-        if (self.opts.use_armor or self.opts.use_food) and not vis:
-            if self.need_pay:
-                self.need_pay = False
-                self.pay()
-                return
-            if self.opts.use_armor and self.shop_step(lv):
-                return
-            if self.excal_step(lv):
-                return
-            if self.loot_step(lv):
-                return
-            if self.opts.read_good and self.read_good_scroll():
-                return
-            if self.opts.use_armor and self.equip_step(lv):
-                return
-            if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                    or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ()) \
-                    and not lv.shop[y, x]:
-                if self.armor_pickup_here(lv):
-                    return
-        elif (self.opts.use_armor or self.opts.use_food) and self.opts.pickup_calm and self.items_gate(lv):
-            # monsters in view but none in reach and nobody shooting: still collect what lies here
-            if self.loot_step(lv):
-                return
-            if (G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                    or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ()) \
-                    and not lv.shop[y, x]:
-                if self.armor_pickup_here(lv):
-                    return
-
-        # rest if hurt and nothing around
-        if hp < maxhp * self.opts.rest_frac and not vis:
-            self.cur_act = "rest"
-            self.press("2"); self.press("0"); self.press("s")
-            return
-
-        # gold under us
-        if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried \
-                and not (self.shop_visits_on() and (lv.shop[y, x] or self.shopkeeper_in_view())):
-            lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
-            self.pickup_matching(("gold piece",))
-            lv.under[y, x] = FLOOR_GLYPH
-            return
-
-        self.explore(lv)
 
     def run(self):
         if self.seed is not None:
@@ -408,6 +150,7 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
         self.scroll_init()
         self.carry_init()
         self.price_init()
+        self.policy_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -429,7 +172,10 @@ class Bot(GameMixin, MapMixin, NavMixin, PerceptionMixin, MessagesMixin, Surviva
                 self.tick()
                 dt = self.turn() - t0
                 if dt > 0:
-                    self.time_by[self.cur_act] = self.time_by.get(self.cur_act, 0) + dt
+                    # time per activity: the label an action set (fight, rest, explore, search, ...), else the
+                    # policy step that acted
+                    act = self.cur_act if self.cur_act != "other" else (self.last_step or "other")
+                    self.time_by[act] = self.time_by.get(act, 0) + dt
                     lvc = self.levels.get(self.cur_key)
                     if lvc is not None:
                         lvc.turns_here += dt

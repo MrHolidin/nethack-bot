@@ -50,14 +50,7 @@ class ExploreMixin:
                 and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
-            stuff = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
-            ok = self.items_gate(lv)
-            im = passable & ~lv.shop
-            if ok and (self.opts.use_armor or self.opts.use_food):
-                stuff |= self.armor_targets(lv, G) & im
-                ct = self.carry_targets(lv)
-                if ct is not None:
-                    stuff |= ct & im
+            stuff = self.item_goals(lv, passable, gold)
             stuff[y, x] = False
             if stuff.any():
                 _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff)
@@ -65,33 +58,10 @@ class ExploreMixin:
                     want_down = False
                     self.items_first_holds += 1
 
-        if want_down:
-            if downstairs[y, x]:
-                if self.opts.use_pet and self.pet_wait_before_stairs():
-                    self.press("s"); return
-                self.descents += 1
-                self.took_stairs = True
-                self.press(">")
-                return
-            dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, downstairs)
-            if reached is not None:
-                step = self.first_step(prev, start, reached)
-                if step:
-                    self.move(step)
-                    return
+        if want_down and self.go_down(lv, k_mem, k_live, passable, downstairs):
+            return
 
-        if self.shop_visits_on():
-            gold = gold & ~lv.shop                     # shop gold belongs to the shopkeeper
-        targets = frontier | gold
-        # an item square is only a goal if the step that inspects it (and so removes the goal) will run:
-        # that step needs no hostile in view and skips shop squares
-        items_ok = self.items_gate(lv)
-        item_mask = passable & ~lv.shop
-        if items_ok and (self.opts.use_armor or self.opts.use_food):
-            targets = targets | (self.armor_targets(lv, G) & item_mask)
-            ct = self.carry_targets(lv)
-            if ct is not None:
-                targets = targets | (ct & item_mask)
+        targets = frontier | self.item_goals(lv, passable, gold)
         if targets.any():
             dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
             if reached is not None and reached != start:
@@ -102,20 +72,9 @@ class ExploreMixin:
             if reached == start:
                 lv.visited[start] += 1
 
-        if downstairs.any():
-            if downstairs[y, x]:
-                if self.opts.use_pet and self.pet_wait_before_stairs():
-                    self.press("s"); return
-                self.descents += 1
-                self.took_stairs = True
-                self.press(">")
-                return
-            dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, downstairs)
-            if reached is not None:
-                step = self.first_step(prev, start, reached)
-                if step:
-                    self.move(step)
-                    return
+        # nothing left to walk to here: go down if we know the way
+        if downstairs.any() and self.go_down(lv, k_mem, k_live, passable, downstairs):
+            return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
         if self.opts.mines_return and lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
@@ -129,6 +88,39 @@ class ExploreMixin:
         if self.opts.use_abilities and self.magic_map_step(lv):
             return
         self.search_mode(lv, k_mem, k_live, passable)
+
+    def item_goals(self, lv, passable, gold):
+        """Squares worth walking to for what lies there: gold (not in a shop when we visit shops), and armor /
+        food / carried-class piles we have not inspected. An item square is only a goal if the step that
+        inspects it (and so removes the goal) will run: that step needs items_gate and skips shop squares."""
+        goals = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
+        ok = self.items_gate(lv)
+        im = passable & ~lv.shop
+        if ok and (self.opts.use_armor or self.opts.use_food):
+            goals |= self.armor_targets(lv, G) & im
+            ct = self.carry_targets(lv)
+            if ct is not None:
+                goals |= ct & im
+        return goals
+
+    def go_down(self, lv, k_mem, k_live, passable, downstairs):
+        """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
+        start = self.pos()
+        if downstairs[start]:
+            if self.opts.use_pet and self.pet_wait_before_stairs():
+                self.press("s")
+                return True
+            self.descents += 1
+            self.took_stairs = True
+            self.press(">")
+            return True
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, downstairs)
+        if reached is not None:
+            step = self.first_step(prev, start, reached)
+            if step:
+                self.move(step)
+                return True
+        return False
 
     def should_descend(self, lv, frontier, on_level):
         """Explored (no frontier left) or on this level for longer than descend_after turns."""

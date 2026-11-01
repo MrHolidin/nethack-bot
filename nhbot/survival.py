@@ -203,3 +203,32 @@ class SurvivalMixin:
         self.cur_act = "vault"
         self.press("s")
         return True
+
+    def msg_survival(self, m):
+        """Poison resistance, skills, prayer outcome, the vault guard, lycanthropy, eating."""
+        # eat.c givit(POISON_RES): "You feel healthy."; eating poison while resistant: "You seem unaffected"
+        if "You feel healthy" in m or "You seem unaffected by the poison" in m:
+            self.poison_res = True
+        if "more confident in your" in m:
+            self.skill_msgs += 1
+            self.want_enhance = True
+        if "You feel that" in m and "displeased" in m:
+            self.pray_failed += 1
+        if self.last_pray is not None and self.turn() - self.last_pray <= 5 and any(
+                p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
+                                 "Then die, mortal", "Thou durst", "You feel that Mitra is angry")):
+            self.god_angry = True
+        if self.opts.vault_guard:
+            if "drop that gold" in m or "drop that money" in m:
+                self.vault_drop = True
+            if "follow me" in m:
+                self.vault_follow_until = self.turn() + 300
+                self.guard_trail = []
+        if "You feel feverish" in m:
+            self.lycanthropy = True
+            mk = re.search(r"\b(were(?:jackal|rat|wolf))\b", m)
+            self.lyc_kind = mk.group(1) if mk else None      # None: infected by something we didn't see
+        if "You feel purified" in m:
+            self.lycanthropy = False
+        if "carrying so much" in m:
+            self.no_eat_until = self.turn() + 20

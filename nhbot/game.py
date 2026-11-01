@@ -194,3 +194,16 @@ class GameMixin:
         self.raw_step(27)
         self.settle()
         return desc
+
+    def on_message(self, m):
+        """Every logged message. Each domain reads what concerns it."""
+        lv = self.levels.get(self.cur_key) if self.cur_key else None
+        if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
+            self.seen_here = (self.turn(), self.pos(), m)
+        self.msg_survival(m)
+        self.msg_combat(m)
+        self.msg_map(m, lv)
+        self.msg_shop(m, lv)
+        self.msg_thieves(m)
+        if "You die" in m or "You starve" in m:
+            self.death_msgs = [mm for _, mm in list(self.messages)[-8:]]
