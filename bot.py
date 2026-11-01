@@ -401,6 +401,12 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             lv.shk_wait = 99                    # he won't let us in while we're invisible: stop waiting at the door
         if self.role_opts.get("trap_mem", False) and lv is not None and TRAP_HERE_RE.search(m):
             lv.trap_mem.add(self.pos())   # it went off under us; a falling rock / arrow / dart on it hides the ^
+        if ("You can't go up here" in m or "You can't go down here" in m) and lv is not None:
+            # we remembered a staircase that isn't here (arriving next to stairs a monster stood on marks the
+            # wrong square); the refusal costs no time, so pressing again looped to the step cap
+            yy, xx = self.pos()
+            if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
+                lv.under[yy, xx] = nh.GLYPH_CMAP_OFF + 19
         if IT_ATTACK_RE.search(m):
             self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
         if MELEE_ON_US_RE.search(m):
