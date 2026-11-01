@@ -117,7 +117,13 @@ class NavMixin:
             self.kick(key)
             return
         if G.KIND[self.obs["glyphs"][target]] == G.MONSTER and self.is_peaceful(target):
+            # a peaceful monster in the way: wait for it to move. peaceful_block: like other failed steps,
+            # six on a square make it impassable (until the next obstacle reset) -- a shopkeeper standing
+            # in a doorway never moves, and waiting there used to last until we starved
             lv.fail[ty, tx] += 1
+            self.peaceful_waits += 1
+            if self.opts.peaceful_block and lv.fail[ty, tx] >= 6:
+                lv.blocked[ty, tx] = True
             self.press("s")
             return
         self.press(key)

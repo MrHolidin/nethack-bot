@@ -60,6 +60,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.obs = obs
         self.last_bl = obs["blstats"].copy()
         self.hostile_cache = {}
+        self.peaceful_waits = 0
         self._cur_pos = self.prev_pos = None
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn
         self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
@@ -265,6 +266,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "vault": [self.vault_drops, self.vault_moves],
             "items_first": self.items_first_holds,
             "loot_holds": self.loot_holds,
+            "mines_return_descents": self.mines_return_descents,
+            "peaceful_waits": self.peaceful_waits,
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],
             "blind_held": self.blind_held,
