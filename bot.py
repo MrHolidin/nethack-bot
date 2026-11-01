@@ -1396,7 +1396,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 if self.go_toward(lv, goal):
                     return
 
-        # carry_all: leave the digger by the shop door / take it back -- also with monsters in view
+        # leave a digger (pick-axe, mattock) by the shop door / take it back -- also with monsters in view
         # (Minetown always has some): the shopkeeper asked just now, fights were handled above
         if self.stash_step(lv):
             return

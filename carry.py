@@ -186,7 +186,7 @@ class CarryMixin:
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.selling = False
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
-        self.stash_pending = None    # carry_all: (level key, door) -- a shopkeeper asked us to leave the digger outside
+        self.stash_pending = None    # (level key, door) -- a shopkeeper asked us to leave the digger outside
         self.dig_stash = None        # dict(key, pos, turn): where we left it
         self.stash_stats = {"asked": 0, "stashed": 0, "retrieved": 0, "lost": 0}
 
@@ -198,7 +198,9 @@ class CarryMixin:
 
     def carry_all_on(self):
         """carry_all: pick up everything worth carrying -- carry_more (tools, armor) plus spellbooks, gems/glass
-        and diggers (pick-axe, mattock: kept, left outside a shop whose keeper won't let them in)."""
+        and diggers (pick-axe, mattock: kept, never sold).
+        KEEP THIS FLAG (owner's decision, 2026-11-01): A/B -525 n.s., off by default, but it is the way to carry
+        a digger for future vault / digging logic. Do not remove it in cleanups."""
         return self.carry_on() and bool(self.role_opts.get("carry_all", False))
 
     def carry_weapons_on(self):
@@ -419,8 +421,9 @@ class CarryMixin:
 
     def stash_request(self):
         """shk.c: 'Will you please leave your pick-axe outside?' -- the keeper blocks the way in while one is
-        in the open inventory: put it down next to the door, outside the shop."""
-        if not self.carry_all_on() or self.cur_key is None:
+        in the open inventory: put it down next to the door, outside the shop. Always on (with carry): a
+        mattock also comes in through the weapons pipeline."""
+        if not self.carry_on() or self.cur_key is None:
             return
         self.stash_stats["asked"] += 1
         sh = self.shopping                          # the keeper greets and blocks in the same breath
@@ -430,7 +433,7 @@ class CarryMixin:
         self.stash_pending = (self.cur_key, self.pos())
 
     def stash_step(self, lv):
-        if not self.carry_all_on():
+        if not self.carry_on():
             return False
         sp = self.stash_pending
         if sp is not None:
