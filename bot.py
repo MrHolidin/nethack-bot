@@ -462,7 +462,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
         if self.role_opts.get("hallu_strike", False) and \
-                int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+                int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
@@ -1017,7 +1017,16 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             return False       # their passive is cold only, and Valkyries are born cold resistant
         return name in NEVER_MELEE or (self.role_opts.get("passive_nomelee", True) and name in PASSIVE_DMG)
 
-    def blind_attackers(self, hostiles):
+    def strike_scope_ok(self, lv):
+        """strike_town: blind_strike / hallu_strike only in Minetown -- a Mines level with an altar, a fountain or
+        a shop (filler Mines levels have none), where the peaceful watch, priest and shopkeepers are."""
+        if not self.role_opts.get("strike_town", False):
+            return True
+        if lv is None or lv.key[0] != 2:
+            return False
+        return bool(lv.shop.any() or np.isin(lv.under, (nh.GLYPH_CMAP_OFF + 27, nh.GLYPH_CMAP_OFF + 31)).any())
+
+    def blind_attackers(self, lv, hostiles):
         """blind_strike: while blind, an adjacent 'I' is only a target if it attacked us. mhitu.c marks the square
         of an unseen attacker with 'I' in the same turn as its "It hits!"; 'I' also appears when we bump into or
         search out a monster that did nothing (61969: a watchman; 61057). So: an attack message this turn and a
@@ -1032,7 +1041,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             known |= new if new else (cur if len(cur) == 1 else set())
         known &= cur
         self.prev_inv, self.inv_attackers = cur, known
-        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND or not self.strike_scope_ok(lv):
             return hostiles
         out = [(p, n) for p, n in hostiles if n != "invisible" or p in known]
         if len(out) < len(hostiles):
@@ -1043,7 +1052,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
         from a peaceful (61520 threw a dagger into one)."""
         return bool(self.role_opts.get("hallu_strike", False)
-                    and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU)
+                    and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU
+                    and self.strike_scope_ok(self.levels.get(self.cur_key)))
 
     def hallu_attackers(self, lv, hostiles):
         """hallu_strike: while hallucinating, looks and names are random, so peacefuls can't be told apart
@@ -1060,7 +1070,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             known.add(adj[0])
         known &= set(adj)
         self.hallu_targets = known
-        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU or not self.strike_scope_ok(lv):
             return hostiles
         out = [(p, n) for p, n in hostiles if p in known and not lv.shop[p]]
         if len(out) < len(hostiles):
@@ -1177,7 +1187,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.enhance_step()
         hostiles = self.adjacent_hostiles(lv)
         if self.role_opts.get("blind_strike", False):
-            hostiles = self.blind_attackers(hostiles)
+            hostiles = self.blind_attackers(lv, hostiles)
         if self.role_opts.get("hallu_strike", False):
             hostiles = self.hallu_attackers(lv, hostiles)
         cond2 = int(self.last_bl[nh.NLE_BL_CONDITION])
@@ -1195,7 +1205,7 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.blind_waits += 1             # wandering blind walks into things we can't see
             # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
             # would look like the attacker when something else hits us in the same turn (61688)
-            self.press("." if self.role_opts.get("blind_strike", False) else "s")
+            self.press("." if self.role_opts.get("blind_strike", False) and self.strike_scope_ok(lv) else "s")
             return
         if self.use_abilities and self.heal_step(hostiles):
             return
