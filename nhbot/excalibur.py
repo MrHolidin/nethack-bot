@@ -19,10 +19,10 @@ class ExcaliburMixin:
         self.excal_skip = set()
 
     def long_sword(self):
-        for letter, ocls, s in self.inventory():
-            if ocls == nh.WEAPON_CLASS and re.search(r"\blong sword\b", s) and "named" not in s \
-                    and "Excalibur" not in s and " cursed" not in s:
-                return letter, s
+        for it in self.items():
+            if it.ocls == nh.WEAPON_CLASS and re.search(r"\blong sword\b", it.text) and "named" not in it.text \
+                    and "Excalibur" not in it.text and not it.cursed:
+                return it.letter, it.text
         return None
 
     def excal_eligible(self):

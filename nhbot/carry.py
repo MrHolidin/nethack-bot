@@ -283,9 +283,10 @@ class CarryMixin:
         """Encumbered: drop one unit following the four tiers. True if it used the turn."""
         if self.bl(nh.NLE_BL_CAP) < 1:
             return False
+        items = {it.letter: it for it in self.items()}
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
-        equipped = lambda s: "being worn" in s or "weapon in hand" in s or "(in use)" in s or "(on " in s
-        free = [x for x in inv if not equipped(x[2]) and x[0] not in self.cant_drop]
+        equipped = lambda l: items[l].on_body
+        free = [x for x in inv if not equipped(x[0]) and x[0] not in self.cant_drop]
         keys = {}
         for l, c, s, d in free:
             if d["unid"]:
@@ -300,10 +301,10 @@ class CarryMixin:
                 self.drop_units(l, 1 if d["qty"] > 1 else None)
                 self.carry_stats["dropped"][tier] += 1
                 return True
-        worn = [x for x in inv if equipped(x[2])]
+        worn = [x for x in inv if equipped(x[0])]
         if worn:
             l, c, s, d = min(worn, key=lambda x: (x[3]["cost"] or 0) / x[3]["wt"])
-            if c == nh.ARMOR_CLASS and "being worn" in s:
+            if c == nh.ARMOR_CLASS and items[l].worn:
                 a = parse_armor(s) or {"slot": None}
                 a["letter"] = l
                 if not self.take_off(a):
@@ -334,12 +335,10 @@ class CarryMixin:
 
     def sellables(self, lv, stype):
         buys = SHOP_BUYS.get(stype, set())
-        return [(l, c, s) for l, c, s in self.inventory()
-                if c in self.carry_classes() and (buys is ALL or c in buys) and not self.needed(c, s)
-                and (lv.key, s) not in self.sell_tried and "being worn" not in s and "(on " not in s
-                and "(weapon in " not in s and "(weapons in " not in s and "(wielded" not in s
-                and "alternate weapon" not in s
-                and "in quiver" not in s]
+        return [(it.letter, it.ocls, it.text) for it in self.items()
+                if it.ocls in self.carry_classes() and (buys is ALL or it.ocls in buys)
+                and not self.needed(it.ocls, it.text) and (lv.key, it.text) not in self.sell_tried
+                and not it.on_body and not it.alternate and not it.quivered]
 
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
@@ -399,8 +398,7 @@ class CarryMixin:
 
     # ------------------------------------------------------------ carry_all: diggers and shops
     def digger_letters(self):
-        return [l for l, c, s in self.inventory() if any(w in s for w in DIGGER_WORDS)
-                and "weapon in" not in s and "(wielded" not in s]
+        return [it.letter for it in self.items() if any(w in it.text for w in DIGGER_WORDS) and not it.held]
 
     def stash_request(self):
         """shk.c: 'Will you please leave your pick-axe outside?' -- the keeper blocks the way in while one is

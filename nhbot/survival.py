@@ -133,11 +133,11 @@ class SurvivalMixin:
         """Strained or worse (e.g. polymorphed into something small): shed non-essentials."""
         order = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.TOOL_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS,
                  nh.SPBOOK_CLASS, nh.POTION_CLASS, nh.WAND_CLASS, nh.SCROLL_CLASS)
-        inv = self.inventory()
+        inv = self.items()
         for cls in order:
-            for letter, ocls, s in inv:
-                if ocls == cls and "being worn" not in s and "weapon in hand" not in s \
-                        and (letter, s) not in self.undroppable:
+            for it in inv:
+                letter, ocls, s = it.letter, it.ocls, it.text
+                if ocls == cls and not it.on_body and (letter, s) not in self.undroppable:
                     self.undroppable.add((letter, s))   # try each item once
                     self.drop_letter(letter)
                     return True

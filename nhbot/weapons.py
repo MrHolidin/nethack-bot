@@ -5,9 +5,6 @@ import re
 import nle.nethack as nh
 
 
-WIELDED_RE = re.compile(r"\((?:weapons? in \w+|wielded)")
-
-
 class WeaponsMixin:
     def weapons_init(self):
         self.main_weapon = None
@@ -21,7 +18,7 @@ class WeaponsMixin:
     def weapon_check(self):
         """Remember the starting weapon; re-wield it if we got it back after a theft."""
         inv = self.inventory()
-        wielded = [s for _, _, s in inv if "weapon in hand" in s]
+        wielded = [it.text for it in self.items() if it.wielded]
         if self.main_weapon is None:
             if wielded:
                 base = re.sub(r"\s*\(.*?\)", "", wielded[0])
@@ -50,14 +47,16 @@ class WeaponsMixin:
         Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
         if self.polyd or self.handless():
             return False                     # animal forms can't hold weapons ("Don't be ridiculous!")
-        cur = next((s for _, c, s in inv if WIELDED_RE.search(s)), None)
-        if cur is not None and " cursed" in " " + cur:
+        items = self.items()
+        cur_it = next((it for it in items if it.wielded), None)
+        cur = cur_it.text if cur_it else None
+        if cur_it is not None and cur_it.cursed:
             return False
         tried = self._wield_tried
-        cands = [(self.weapon_rank(s), l, s) for l, c, s in inv
-                 if c == nh.WEAPON_CLASS and not WIELDED_RE.search(s) and " cursed" not in " " + s
-                 and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", s)
-                 and (l, s) not in tried]
+        cands = [(self.weapon_rank(it.text), it.letter, it.text) for it in items
+                 if it.ocls == nh.WEAPON_CLASS and not it.held and not it.cursed
+                 and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", it.text)
+                 and (it.letter, it.text) not in tried]
         if not cands:
             return False
         rank, l, s = max(cands, key=lambda x: x[0])

@@ -82,6 +82,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.killed = None        # msg_combat: what the message being handled says we killed
         self.asked = ""          # game.ask: the last question's message
         self.really_attacks = 0   # "Really attack?" questions (answered no)
+        self._items, self._items_at = [], -1
         self.msg_audit = Counter()  # cases where message reading may go wrong (game.audit, pickup, ...)
         self.here_window = None   # (turn, pos, text) of the last 'Things that are here' window
         self.tick_seq = 0         # msg_seq at the start of this tick

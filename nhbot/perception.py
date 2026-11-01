@@ -293,7 +293,7 @@ class PerceptionMixin:
 
     def never_melee(self, name):
         """Don't hit what has only a passive attack (it never hurts us otherwise); desperate (stuck) still may."""
-        if name in ("cockatrice", "chickatrice") and any("weapon in hand" in s for _, _, s in self.inventory()):
+        if name in ("cockatrice", "chickatrice") and any(it.wielded for it in self.items()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
         return name in NEVER_MELEE or name in PASSIVE_DMG
 

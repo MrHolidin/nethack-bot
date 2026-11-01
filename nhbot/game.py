@@ -4,6 +4,7 @@ import re
 import nle.nethack as nh
 
 from nhbot.consts import DELTA2KEY
+from nhbot.items import parse_item
 
 
 MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is on screen
@@ -174,12 +175,19 @@ class GameMixin:
             items.append((chr(letter), int(ocls), bytes(s).decode("latin1").rstrip("\x00")))
         return items
 
+    def items(self):
+        """The inventory as Items (nhbot.items), parsed once per observation."""
+        if self._items_at != self.steps:
+            self._items = [parse_item(l, c, s) for l, c, s in self.inventory()]
+            self._items_at = self.steps
+        return self._items
+
     def find_item(self, ocls, names):
         for n in names:
-            for letter, c, s in self.inventory():
-                if c == ocls and re.search(r"\b(potions?|scrolls?) of " + re.escape(n) + r"\b", s) \
-                        and "cursed" not in s.replace("uncursed", ""):
-                    return letter, n
+            for it in self.items():
+                if it.ocls == ocls and re.search(r"\b(potions?|scrolls?) of " + re.escape(n) + r"\b", it.text) \
+                        and not it.cursed:
+                    return it.letter, n
         return None
 
     @staticmethod

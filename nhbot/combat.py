@@ -75,13 +75,13 @@ class CombatMixin:
         if self.handless():
             return []                        # "You can't throw or shoot without hands."
         out = []
-        for letter, ocls, s in self.inventory():
-            if "weapon in hand" in s or "(wielded)" in s or " cursed" in s:
+        for it in self.items():
+            if it.held or it.cursed:
                 continue
-            if ocls == nh.WEAPON_CLASS and any(t in s for t in THROWABLE):
-                out.append((0, letter, s))
-            elif ocls == nh.GEM_CLASS and any(t in s for t in THROW_STONES):
-                out.append((1, letter, s))
+            if it.ocls == nh.WEAPON_CLASS and any(t in it.text for t in THROWABLE):
+                out.append((0, it.letter, it.text))
+            elif it.ocls == nh.GEM_CLASS and any(t in it.text for t in THROW_STONES):
+                out.append((1, it.letter, it.text))
         out.sort()
         return [(l, s) for _, l, s in out]
 
@@ -147,9 +147,10 @@ class CombatMixin:
         if self.handless():
             return []
         out = [(0, l, s) for l, s in self.throwables()]
-        for letter, ocls, s in self.inventory():
-            if any(w in s for w in ("weapon in hand", "(wielded", "being worn", "(in use", " cursed", "alternate weapon")):
+        for it in self.items():
+            if it.on_body or it.alternate or it.cursed:
                 continue
+            letter, ocls, s = it.letter, it.ocls, it.text
             if ocls == nh.GEM_CLASS:
                 out.append((1, letter, s))
             elif ocls == nh.WEAPON_CLASS:

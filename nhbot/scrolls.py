@@ -32,7 +32,7 @@ class ScrollMixin:
 
     def sucker(self):
         """Visible dunce cap or a shirt with nothing over it: shopkeepers add 1/3."""
-        worn = [s for _, _, s in self.inventory() if "being worn" in s]
+        worn = [it.text for it in self.items() if it.worn]
         if any("dunce cap" in s for s in worn):
             return True
         shirt = any("shirt" in s for s in worn)
@@ -51,15 +51,15 @@ class ScrollMixin:
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False              # confused remove curse / enchant armor do other things
         inv = self.inventory()
-        worn_ench = [int(m.group(1)) for _, c, s in inv if c == nh.ARMOR_CLASS and "being worn" in s
-                     for m in [re.search(r"([+-]\d+) ", s)] if m]
+        worn_ench = [int(m.group(1)) for it in self.items() if it.ocls == nh.ARMOR_CLASS and it.worn
+                     for m in [re.search(r"([+-]\d+) ", it.text)] if m]
         for letter, c, s in inv:
             if c != nh.SCROLL_CLASS or not self.scroll_is_good(s):
                 continue
             maybe_armor = "enchant armor" in s or "labeled" in s
             if maybe_armor and worn_ench and max(worn_ench) >= 4 and "remove curse" not in s:
                 continue              # enchant armor on a +4 piece may evaporate it
-            if "enchant weapon" in s and not any("weapon in hand" in t for _, _, t in inv):
+            if "enchant weapon" in s and not any(it.wielded for it in self.items()):
                 continue
             if not self.ask("r", "read"):
                 return False

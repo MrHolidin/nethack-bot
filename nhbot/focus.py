@@ -97,9 +97,9 @@ class FocusMixin:
         self.focus_calls = 0
 
     def wielded(self):
-        for _, ocls, s in self.inventory():
-            if ocls == nh.WEAPON_CLASS and ("weapon in hand" in s or "(wielded)" in s):
-                return s
+        for it in self.items():
+            if it.ocls == nh.WEAPON_CLASS and it.wielded:
+                return it.text
         return None
 
     def my_attack(self, mon_idx):

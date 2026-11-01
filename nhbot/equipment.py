@@ -170,7 +170,7 @@ class EquipMixin:
         return True
 
     def two_handed(self):
-        return any("(weapon in hands)" in s for _, _, s in self.inventory())
+        return any(it.two_hands for it in self.items())
 
     def improves(self, a, worn):
         if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
