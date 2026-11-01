@@ -8,6 +8,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.carry import HEAL_POTIONS
 from nhbot.consts import DELTA2KEY, WEAK
+from nhbot.goals import GOALS
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
 
 
@@ -104,7 +105,10 @@ class SurvivalMixin:
 
     def corpse_goal(self, lv):
         t = self.turn()
-        self.kills = [k for k in self.kills if t - k[0] < 40]
+        kind = GOALS["corpse"]
+        n = len(self.kills)
+        self.kills = [k for k in self.kills if t - k[0] < kind.ttl]
+        self.goal_event("corpse", "expired", n - len(self.kills))
         best = None
         for kt, name, pos, key in self.kills:
             if key != lv.key or not self.corpse_ok(name):
@@ -112,7 +116,7 @@ class SurvivalMixin:
             if G.KIND[lv.under[pos]] != G.CORPSE:
                 continue
             d = max(abs(pos[0] - self.pos()[0]), abs(pos[1] - self.pos()[1]))
-            if d <= 8 and (best is None or d < best[0]):
+            if d <= kind.max_dist and (best is None or d < best[0]):
                 best = (d, pos)
         return best[1] if best else None
 

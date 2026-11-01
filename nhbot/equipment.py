@@ -312,6 +312,7 @@ class EquipMixin:
         key = lv.key
         insp = self.inspected.setdefault(key, set())
         insp.add(self.pos())
+        self.goal_done("pile", lv, self.pos())
         names = self.look_here()
         if self.shop_visits_on():
             # never take merchandise (a lone item is picked up without a menu, so filter here)

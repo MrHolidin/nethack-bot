@@ -5,6 +5,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, NEIGH, ROWS
+from nhbot.goals import GOALS
 
 
 class ExploreMixin:
@@ -15,6 +16,7 @@ class ExploreMixin:
 
     def explore(self, lv):
         self.cur_act = "explore"
+        self.goal_observe(lv)
         k_mem, k_live = self.kind_grid(lv)
         passable = self.passable_grid(lv, k_mem, k_live)
         start = self.pos()
@@ -50,7 +52,10 @@ class ExploreMixin:
                 and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
-            stuff = self.item_goals(lv, passable, gold)
+            stuff = np.zeros_like(gold)
+            for kind, m in self.goal_masks(lv, passable, gold).items():
+                if GOALS[kind].holds_descent:
+                    stuff |= m
             stuff[y, x] = False
             if stuff.any():
                 _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff)
@@ -61,12 +66,16 @@ class ExploreMixin:
         if want_down and self.go_down(lv, k_mem, k_live, passable, downstairs):
             return
 
-        targets = frontier | self.item_goals(lv, passable, gold)
+        goals = self.goal_masks(lv, passable, gold)
+        targets = frontier.copy()
+        for m in goals.values():
+            targets |= m
         if targets.any():
             dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, start, targets)
             if reached is not None and reached != start:
                 step = self.first_step(prev, start, reached)
                 if step:
+                    self.goal_chase(next((k for k, m in goals.items() if m[reached]), "frontier"))
                     self.move(step)
                     return
             if reached == start:
@@ -89,20 +98,6 @@ class ExploreMixin:
             return
         self.search_mode(lv, k_mem, k_live, passable)
 
-    def item_goals(self, lv, passable, gold):
-        """Squares worth walking to for what lies there: gold (not in a shop when we visit shops), and armor /
-        food / carried-class piles we have not inspected. An item square is only a goal if the step that
-        inspects it (and so removes the goal) will run: that step needs items_gate and skips shop squares."""
-        goals = gold & ~lv.shop if self.shop_visits_on() else gold.copy()
-        ok = self.items_gate(lv)
-        im = passable & ~lv.shop
-        if ok and (self.opts.use_armor or self.opts.use_food):
-            goals |= self.armor_targets(lv, G) & im
-            ct = self.carry_targets(lv)
-            if ct is not None:
-                goals |= ct & im
-        return goals
-
     def go_down(self, lv, k_mem, k_live, passable, downstairs):
         """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
         start = self.pos()
@@ -118,6 +113,7 @@ class ExploreMixin:
         if reached is not None:
             step = self.first_step(prev, start, reached)
             if step:
+                self.goal_chase("downstairs")
                 self.move(step)
                 return True
         return False

@@ -7,6 +7,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
+from nhbot.goals import GOALS
 from nhbot.monsters import RANGED_TARGETS
 from nhbot.nav import line_clear
 
@@ -27,7 +28,6 @@ BEAM_WANDS = ("striking",)                                            # no bounc
 
 
 SAFE_RAY_DIST = 7          # ray range is 7..13: a wall >= 7 away can't bounce it back onto us
-
 
 
 # mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
@@ -113,11 +113,14 @@ class CombatMixin:
         else:
             self.settle()
         self.throws += 1
-        self.retrieve.append((self.cur_key, ray, self.turn() + 60))
+        self.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
+        self.goal_event("retrieve", "created")
 
     def retrieve_goal(self, lv):
         t = self.turn()
+        n = len(self.retrieve)
         self.retrieve = [r for r in self.retrieve if r[2] > t]
+        self.goal_event("retrieve", "expired", n - len(self.retrieve))
         g = self.obs["glyphs"]
         for key, ray, _ in self.retrieve:
             if key != lv.key:
@@ -385,6 +388,7 @@ class CombatMixin:
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
                 self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
+                self.goal_event("corpse", "created")
         if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
             self.last_shot_turn = self.turn()
         if self.opts.hunt_shooter and RTHREAT_RE.search(m) and not RTRAP_RE.search(m) \

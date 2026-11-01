@@ -34,6 +34,8 @@ class ThievesMixin:
         if mk and any(t in mk.group(1) for t in THIEVES) and self.last_attack_target:
             self.nymph_kills += 1
             if self.stolen_pending:
+                self.goal_event("loot", "abandoned", self.loot_sq is not None)    # replaced by a newer one
+                self.goal_event("loot", "created")
                 self.loot_sq = self.last_attack_target
                 self.loot_key = self.cur_key
         if "It stole" in m or "It steals" in m or "She charms you" in m:
@@ -48,6 +50,8 @@ class ThievesMixin:
         if re.search(r"You return to \w+ form|You feel like a new ", m):
             self.polyd = False
         if re.search(r"You return to \w+ form", m) and self.were_drop:   # dwarves: "dwarven form"
+            self.goal_event("loot", "abandoned", self.loot_sq is not None)
+            self.goal_event("loot", "created")
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
 
@@ -153,10 +157,13 @@ class ThievesMixin:
         if self.pos() == self.loot_sq:
             self.pickup_all()
             self.loot_pickups += 1
+            self.goal_event("loot", "consumed")
             self.loot_sq = None
             self.stolen_pending = False
             return True
         if self.go_toward(lv, self.loot_sq):
+            self.goal_chase("loot")
             return True
+        self.goal_event("loot", "abandoned")
         self.loot_sq = None
         return False

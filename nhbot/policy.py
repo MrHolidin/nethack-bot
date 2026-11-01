@@ -71,6 +71,7 @@ class PolicyMixin:
         lv = self.update_memory()
         self.cur_key = lv.key
         self.last_step = None
+        self.chasing = None
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return
@@ -296,13 +297,17 @@ class PolicyMixin:
         if self.retrieve:
             goal = self.retrieve_goal(c.lv)
             if goal is not None:
+                n = len(self.retrieve)
                 if goal == (c.y, c.x):
                     self.pickup_matching(THROWABLE + THROW_STONES)
                     self.retrieve = [r for r in self.retrieve if goal not in r[1]]
+                    self.goal_event("retrieve", "consumed", n - len(self.retrieve))
                     return True
                 if self.go_toward(c.lv, goal):
+                    self.goal_chase("retrieve")
                     return True
                 self.retrieve = [r for r in self.retrieve if goal not in r[1]]
+                self.goal_event("retrieve", "abandoned", n - len(self.retrieve))
         return False
 
     def step_eat(self, c):
@@ -317,9 +322,12 @@ class PolicyMixin:
             if goal is not None:
                 if goal == (y, x):
                     self.eat_corpse_here()
+                    n = len(self.kills)
                     self.kills = [k for k in self.kills if k[2] != goal or k[3] != lv.key]
+                    self.goal_event("corpse", "consumed", n - len(self.kills))
                     return True
                 if self.go_toward(lv, goal):
+                    self.goal_chase("corpse")
                     return True
         return False
 
@@ -379,6 +387,7 @@ class PolicyMixin:
         if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried \
                 and not (self.shop_visits_on() and (lv.shop[y, x] or self.shopkeeper_in_view())):
             lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
+            self.goal_done("gold", lv, (y, x))
             self.pickup_matching(("gold piece",))
             lv.under[y, x] = FLOOR_GLYPH
             return True

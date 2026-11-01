@@ -15,6 +15,7 @@ from nhbot.excalibur import ExcaliburMixin
 from nhbot.explore import ExploreMixin
 from nhbot.focus import FocusMixin
 from nhbot.game import GameMixin, GameOver
+from nhbot.goals import GoalsMixin
 from nhbot.mapmem import MapMixin
 from nhbot.nav import NavMixin
 from nhbot.options import Options
@@ -28,7 +29,7 @@ from nhbot.thieves import ThievesMixin
 from nhbot.weapons import WeaponsMixin
 
 
-class Bot(PolicyMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
+class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, FocusMixin, ScrollMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -151,6 +152,7 @@ class Bot(PolicyMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalM
         self.carry_init()
         self.price_init()
         self.policy_init()
+        self.goals_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -176,6 +178,8 @@ class Bot(PolicyMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalM
                     # policy step that acted
                     act = self.cur_act if self.cur_act != "other" else (self.last_step or "other")
                     self.time_by[act] = self.time_by.get(act, 0) + dt
+                    if self.chasing:
+                        self.goal_stats[self.chasing]["chase_turns"] += dt
                     lvc = self.levels.get(self.cur_key)
                     if lvc is not None:
                         lvc.turns_here += dt
@@ -222,6 +226,7 @@ class Bot(PolicyMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalM
             "elb_fail_msgs": self.elb_fail_msgs[:5],
             "elb_rewrites": self.elb_rewrites,
             "elb_blocked": dict(self.elb_block_reasons),
+            "goals": self.goal_summary(),
             "carry": dict(self.carry_stats),
             "stash": dict(self.stash_stats),
             "elb_only_c": self.elb_only_c,
