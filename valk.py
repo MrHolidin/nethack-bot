@@ -226,7 +226,7 @@ class ValkMixin:
     def weapon_upgrade(self, inv):
         """Wield the best-ranked weapon we carry if it beats the wielded one (or nothing is wielded).
         Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
-        if getattr(self, "polyd", False):
+        if getattr(self, "polyd", False) or self.handless():
             return False                     # animal forms can't hold weapons ("Don't be ridiculous!")
         cur = next((s for _, c, s in inv if WIELDED_RE.search(s)), None)
         if cur is not None and " cursed" in " " + cur:
@@ -332,6 +332,17 @@ class ElberethMixin:
         if not m or m.group(1).lower() in VALK_RANKS:
             return None
         return m.group(1).lower()
+
+    def handless(self):
+        """Polymorphed into a form that can't wear or wield (nohands / very small: do_wear.c, wield.c)."""
+        form = self.poly_form()
+        if form is None:
+            return False
+        pm = PM_BY_NAME_V.get(form)
+        if form.startswith("were"):
+            pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
+                      if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
+        return pm is None or bool(pm.mflags1 & 0x2000) or pm.msize == 0
 
     def can_engrave_here(self, lv):
         """What a player knows before trying: the square, and whether they have hands."""
