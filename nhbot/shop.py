@@ -3,12 +3,17 @@ import re
 from nhbot.carry import LEAVE_RE
 
 
+# shk.c: "Welcome to Asidonhopo's general store!" -- a name ending in s takes only the apostrophe
+# ("Kinojevis' general store"); those shops used to go unmarked (nothing sold there)
+SHOP_WELCOME_RE = re.compile(r"Welcome to [A-Z][\w' -]*?(?:'s|s') ([^!]+)!")
+
+
 class ShopMixin:
     def shop_init(self):
         self.shopping = None
 
     def shop_greeted(self, lv, m):
-        mm = re.search(r"Welcome to [A-Z][\w' -]*?'s ([a-z ]+)!", m)
+        mm = SHOP_WELCOME_RE.search(m)
         if not mm:
             return
         stype = mm.group(1)
@@ -49,7 +54,7 @@ class ShopMixin:
             self.price_note_text(m)
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
-        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and not self.audit(
+        if lv and SHOP_WELCOME_RE.search(m) and not self.audit(
                 "shop_door", " ".join(mm for _, mm in list(self.messages)[-6:]), self.tick_seq,
                 lambda s: any(k in s for k in ("trap door", "fall through", "hole", "teleport", "wrenching",
                                                "You materialize")),
