@@ -182,9 +182,7 @@ class PolicyMixin:
         return False
 
     def step_weight(self, c):
-        if self.carry_drop_step():
-            return True
-        return self.bl(nh.NLE_BL_CAP) >= 2 and self.drop_heavy()
+        return self.carry_drop_step()
 
     # ------------------------------------------------------------------ monsters around
     def step_perceive(self, c):

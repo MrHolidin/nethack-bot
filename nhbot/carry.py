@@ -176,7 +176,7 @@ def describe(ocls, s):
 
 class CarryMixin:
     def carry_init(self):
-        self.cant_drop = set()     # letters the game refused to drop (a cursed loadstone): never again
+        self.cant_drop = set()     # Item.key of items the game refused to drop (a cursed loadstone): never again
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.selling = False
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
@@ -249,7 +249,8 @@ class CarryMixin:
     # ------------------------------------------------------------ never Burdened
     def drop_units(self, letter, n=None):
         """Drop n of a stack (all if None); remember the square."""
-        s = next((s for l, _, s in self.inventory() if l == letter), "")
+        item = next((it for it in self.items() if it.letter == letter), None)
+        s = item.text if item else ""
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = n or (int(m.group(1)) if m else 1)
         self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
@@ -260,8 +261,8 @@ class CarryMixin:
             for c in str(n):
                 self.raw_step(ord(c))
         self.press(letter)
-        if any("cannot drop" in t for t in self.msgs_since(seq0)):
-            self.cant_drop.add(letter)        # "For some reason, you cannot drop the stone!"
+        if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
+            self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
 
     def carry_drop_step(self):
         """Encumbered: drop one unit following the four tiers. True if it used the turn."""
@@ -270,7 +271,7 @@ class CarryMixin:
         items = {it.letter: it for it in self.items()}
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
         equipped = lambda l: items[l].on_body
-        free = [x for x in inv if not equipped(x[0]) and x[0] not in self.cant_drop]
+        free = [x for x in inv if not equipped(x[0]) and items[x[0]].key not in self.cant_drop]
         keys = {}
         for l, c, s, d in free:
             if d["unid"]:
@@ -299,9 +300,10 @@ class CarryMixin:
         return False
 
     # ------------------------------------------------------------ sell
-    def needed(self, c, s):
+    def needed(self, it):
+        c, s = it.ocls, it.text
         if c == nh.WAND_CLASS and re.search(r"wand of (%s)\b" % "|".join(ATTACK_WANDS), s):
-            return True
+            return not self.wand_spent(it)   # an empty one is only weight
         if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
             return True
         if c == nh.SCROLL_CLASS \
@@ -321,7 +323,7 @@ class CarryMixin:
         buys = SHOP_BUYS.get(stype, set())
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes() and (buys is ALL or it.ocls in buys)
-                and not self.needed(it.ocls, it.text) and (lv.key, it.text) not in self.sell_tried
+                and not self.needed(it) and (lv.key, it.text) not in self.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered]
 
     def keep_after_offer(self):

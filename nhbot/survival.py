@@ -129,20 +129,6 @@ class SurvivalMixin:
         cands.sort(key=lambda c: c[0])           # stable: the first of equally near ones, as before
         return [p for _, p in cands]
 
-    def drop_heavy(self):
-        """Strained or worse (e.g. polymorphed into something small): shed non-essentials."""
-        order = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.TOOL_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS,
-                 nh.SPBOOK_CLASS, nh.POTION_CLASS, nh.WAND_CLASS, nh.SCROLL_CLASS)
-        inv = self.items()
-        for cls in order:
-            for it in inv:
-                letter, ocls, s = it.letter, it.ocls, it.text
-                if ocls == cls and not it.on_body and (letter, s) not in self.undroppable:
-                    self.undroppable.add((letter, s))   # try each item once
-                    self.drop_letter(letter)
-                    return True
-        return False
-
     def heal_step(self, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if hp * 3 >= maxhp or self.can_pray():

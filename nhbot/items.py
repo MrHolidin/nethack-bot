@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 WIELD_RE = re.compile(r"\((?:tethered )?weapon in (\w+)")
 CURSED_RE = re.compile(r"\bcursed\b")               # not "uncursed"
+WAND_SPENT_RE = re.compile(r"\(\d+:(?:0|-1)\)")     # a wand known to have no charges (-1: cancelled)
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,13 @@ class Item:
     ring_on: bool = False
     lit: bool = False
     cursed: bool = False     # known cursed
+
+    @property
+    def key(self):
+        """Identity for 'don't try again' memories: the letter with the text minus its state suffixes (a
+        letter alone is reused by the next item we pick up; the suffixes change while it stays the same item,
+        e.g. a wand's charges once known)."""
+        return self.letter, re.sub(r"\s*\(.*?\)", "", self.text).strip()
 
     @property
     def wielded(self):

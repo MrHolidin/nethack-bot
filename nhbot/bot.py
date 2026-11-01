@@ -109,7 +109,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.faint_since = None
         self.hist = deque()
         self.no_eat_until = 0
-        self.undroppable = set()
         self.shops_seen = 0
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
         self.desperations = 0

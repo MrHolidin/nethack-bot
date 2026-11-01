@@ -7,6 +7,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
+from nhbot.items import WAND_SPENT_RE
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
 from nhbot.goals import GOALS
 from nhbot.monsters import RANGED_TARGETS
@@ -56,7 +57,7 @@ class CombatMixin:
     def combat_init(self):
         self.kill_by = Counter()       # our kills, by kind
         self.zaps = 0
-        self.empty_wands = set()
+        self.empty_wands = set()       # Item.key of wands that said "Nothing happens" / "You wrest"
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
     def attack(self, target):
@@ -78,6 +79,7 @@ class CombatMixin:
         for it in self.items():
             if it.held or it.cursed:
                 continue
+            # the alternate weapon too: a Valkyrie's is her starting dagger, a missile
             if it.ocls == nh.WEAPON_CLASS and any(t in it.text for t in THROWABLE):
                 out.append((0, it.letter, it.text))
             elif it.ocls == nh.GEM_CLASS and any(t in it.text for t in THROW_STONES):
@@ -146,7 +148,7 @@ class CombatMixin:
         unworn armor, ordinary tools."""
         if self.handless():
             return []
-        out = [(0, l, s) for l, s in self.throwables()]
+        out = [(0, l, s) for l, s in self.throwables()]          # missiles, the alternate weapon included
         for it in self.items():
             if it.on_body or it.alternate or it.cursed:
                 continue
@@ -308,17 +310,20 @@ class CombatMixin:
         self.hunt = None
         return False
 
+    def wand_spent(self, it):
+        """A wand we know is empty: its charges show (n:0) / (n:-1), or zapping it did nothing."""
+        return it.ocls == nh.WAND_CLASS and (it.key in self.empty_wands or bool(WAND_SPENT_RE.search(it.text)))
+
     def attack_wands(self):
         out = []
-        for letter, ocls, s in self.inventory():
-            if ocls != nh.WAND_CLASS or letter in self.empty_wands:
+        for it in self.items():
+            letter, ocls, s = it.letter, it.ocls, it.text
+            if ocls != nh.WAND_CLASS or self.wand_spent(it):
                 continue
             m = re.search(r"wand of ([a-z ]+?)(?: \(|$)", s)
             if not m:
                 continue
             kind = m.group(1).strip()
-            if re.search(r"\(\d+:0\)", s):
-                continue
             if kind in RAY_WANDS or kind in BEAM_WANDS:
                 out.append((letter, kind))
         prio = {"sleep": 0, "striking": 1, "magic missile": 2, "cold": 3, "fire": 4, "lightning": 5}
@@ -327,6 +332,7 @@ class CombatMixin:
     def zap(self, letter, key):
         self.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
         seq0 = self.msg_seq
+        wand = next(it for it in self.items() if it.letter == letter)
         if not self.ask("z", "zap"):
             return False
         self.press(letter, expect_prompt=True)
@@ -337,7 +343,7 @@ class CombatMixin:
             self.settle()
         msgs = " ".join(t for _, t in list(self.messages)[-3:])
         if self.audit("zap", msgs, seq0, lambda s: "Nothing happens" in s or "You wrest" in s):
-            self.empty_wands.add(letter)
+            self.empty_wands.add(wand.key)
         self.zaps += 1
         return True
 
