@@ -182,7 +182,6 @@ def describe(ocls, s):
 
 class CarryMixin:
     def carry_init(self):
-        self.dropped_at = set()      # (level key, pos): never collect there again
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.selling = False
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
@@ -230,11 +229,8 @@ class CarryMixin:
         if self.carry_all_on():
             glyphs = glyphs | ALL_GLYPH
         mask = glyphs[lv.under] & ~lv.shop
-        for p in self.inspected.get(lv.key, ()):
+        for p in self.goal_closed_set("pile", lv.key):
             mask[p] = False
-        for k, p in self.dropped_at:
-            if k == lv.key:
-                mask[p] = False
         return mask
 
     def carry_wanted(self, n):
@@ -284,8 +280,7 @@ class CarryMixin:
         s = next((s for l, _, s in self.inventory() if l == letter), "")
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = n or (int(m.group(1)) if m else 1)
-        self.dropped_at.add((self.level().key, self.pos()))
-        self.inspected.setdefault(self.level().key, set()).add(self.pos())
+        self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
         self.press("d", expect_prompt=True)
         if "drop" not in self.message().lower():
             self.settle()

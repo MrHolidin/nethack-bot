@@ -154,16 +154,9 @@ class ThievesMixin:
     def loot_step(self, lv):
         if self.loot_sq is None or self.loot_key != lv.key:
             return False
-        if self.pos() == self.loot_sq:
-            self.pickup_all()
-            self.loot_pickups += 1
-            self.goal_event("loot", "consumed")
-            self.loot_sq = None
-            self.stolen_pending = False
-            return True
-        if self.go_toward(lv, self.loot_sq):
-            self.goal_chase("loot")
-            return True
-        self.goal_event("loot", "abandoned")
-        self.loot_sq = None
-        return False
+        return self.pursue("loot", lv, self.loot_sq, self.loot_consume)
+
+    def loot_consume(self, goal):
+        self.pickup_all()
+        self.loot_pickups += 1
+        self.stolen_pending = False

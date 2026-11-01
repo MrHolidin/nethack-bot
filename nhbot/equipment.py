@@ -135,7 +135,6 @@ class EquipMixin:
         self.cursed_slots = set()
         self.wear_failed = set()
         self.equip_events = []        # (turn, action, name)
-        self.inspected = {}           # level key -> set of positions looked at
         self.start_ac = None
         self.food_picked = 0
 
@@ -259,8 +258,7 @@ class EquipMixin:
         m = re.match(r"^(\d+) ", s)
         self.last_drop_qty = int(m.group(1)) if m else 1
         if self.carry_on():                     # carry: never come back for what we dropped
-            self.dropped_at.add((self.level().key, self.pos()))
-            self.inspected.setdefault(self.level().key, set()).add(self.pos())
+            self.goal_close("pile", self.level().key, self.pos())
         self.press("d", expect_prompt=True)
         if "drop" in self.message().lower():
             self.press(letter)
@@ -309,9 +307,6 @@ class EquipMixin:
         return any(f in name for f in SAFE_FOOD)
 
     def armor_pickup_here(self, lv):
-        key = lv.key
-        insp = self.inspected.setdefault(key, set())
-        insp.add(self.pos())
         self.goal_done("pile", lv, self.pos())
         names = self.look_here()
         if self.shop_visits_on():
@@ -349,6 +344,6 @@ class EquipMixin:
         mask = glyphs_mod.ARMOR_GLYPH[lv.under] if self.opts.use_armor else np.zeros(lv.under.shape, bool)
         if self.opts.use_food and self.food_count() < MAX_FOOD:
             mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
-        for p in self.inspected.get(lv.key, ()):
+        for p in self.goal_closed_set("pile", lv.key):
             mask[p] = False
         return mask

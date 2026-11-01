@@ -115,6 +115,8 @@ class SurvivalMixin:
                 continue
             if G.KIND[lv.under[pos]] != G.CORPSE:
                 continue
+            if self.opts.shop_by_square and self.merch_risk(lv, pos):
+                continue
             d = max(abs(pos[0] - self.pos()[0]), abs(pos[1] - self.pos()[1]))
             if d <= kind.max_dist and (best is None or d < best[0]):
                 best = (d, pos)

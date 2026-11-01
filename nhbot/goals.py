@@ -53,7 +53,7 @@ class GoalsMixin:
     def goals_init(self):
         self.goal_stats = {k: dict.fromkeys(STAT_FIELDS, 0) for k in tuple(GOALS) + CHASE_ONLY}
         self.goal_open = {}            # (kind, level key) -> set of open goal squares (mask kinds)
-        self.goal_closed = {}          # (kind, level key) -> squares consumed
+        self.goal_closed = {}          # (kind, level key) -> squares done: consumed, or dropped there by us
         self.chasing = None            # kind walked toward by this tick's action
 
     # ------------------------------------------------------------------ events
@@ -69,15 +69,13 @@ class GoalsMixin:
         """Goal squares of a mask kind as the map memory shows them, before any gate (for statistics)."""
         if kind == "gold":
             m = G.KIND[lv.under] == G.GOLD
-            for p in lv.gold_tried:
-                m[p] = False
         else:
             m = G.ARMOR_GLYPH[lv.under] | G.FOOD_GLYPH[lv.under]
             ct = self.carry_targets(lv)
             if ct is not None:
                 m |= ct
-            for p in self.inspected.get(lv.key, ()):
-                m[p] = False
+        for p in self.goal_closed_set(kind, lv.key):
+            m[p] = False
         return m & ~lv.shop
 
     def goal_observe(self, lv):
@@ -90,6 +88,15 @@ class GoalsMixin:
             self.goal_event(kind, "vanished", len(prev - cur))
             self.goal_open[key] = cur
 
+    def goal_closed_set(self, kind, key):
+        """Squares of this kind already done on level key: never a goal again (gold: a pile shows '$' on top
+        again after we leave, so it is tried once; piles: inspected once; anything we dropped ourselves)."""
+        return self.goal_closed.setdefault((kind, key), set())
+
+    def goal_close(self, kind, key, pos):
+        """Mark done without counting a consumption (we dropped something here ourselves)."""
+        self.goal_closed_set(kind, key).add(pos)
+
     def goal_done(self, kind, lv, pos):
         """A mask-kind goal at pos consumed (also when we got there before it was ever observed)."""
         key = (kind, lv.key)
@@ -98,8 +105,45 @@ class GoalsMixin:
             op.discard(pos)
         else:
             self.goal_event(kind, "created")
-        self.goal_closed.setdefault(key, set()).add(pos)
+        self.goal_close(kind, lv.key, pos)
         self.goal_event(kind, "consumed")
+
+    # ------------------------------------------------------------------ own tier
+    def pursue(self, kind, lv, goal, consume):
+        """One tick toward an own-tier goal: on it, consume(goal) and close it; else step toward it; if that
+        fails, apply the kind's on_unreachable ('drop': forget it). True if the tick acted."""
+        if goal == self.pos():
+            consume(goal)
+            self.goal_event(kind, "consumed", self.goal_forget(kind, lv, goal))
+            return True
+        if self.go_toward(lv, goal):
+            self.goal_chase(kind)
+            return True
+        if GOALS[kind].on_unreachable == "drop":
+            self.goal_event(kind, "abandoned", self.goal_forget(kind, lv, goal))
+        return False
+
+    def goal_forget(self, kind, lv, goal):
+        """Remove an own-tier goal at goal from its list; returns how many entries went."""
+        if kind == "retrieve":
+            n = len(self.retrieve)
+            self.retrieve = [r for r in self.retrieve if goal not in r[1]]
+            return n - len(self.retrieve)
+        if kind == "corpse":
+            n = len(self.kills)
+            self.kills = [k for k in self.kills if k[2] != goal or k[3] != lv.key]
+            return n - len(self.kills)
+        if kind == "loot":
+            self.loot_sq = None
+            return 1
+        raise ValueError(kind)
+
+    def merch_risk(self, lv, pos):
+        """Could what lies at pos be merchandise (when we visit shops)? On a shop square; and unless
+        shop_by_square, whenever a shopkeeper is in view."""
+        if not self.shop_visits_on():
+            return False
+        return bool(lv.shop[pos]) or (not self.opts.shop_by_square and self.shopkeeper_in_view())
 
     def goal_masks(self, lv, passable, gold):
         """Walk masks of the explore-tier kinds, {kind: mask}. Each uses the gate of the step that consumes it:
@@ -107,6 +151,8 @@ class GoalsMixin:
         (housekeeping inspects it)."""
         out = {"gold": gold & ~lv.shop if self.shop_visits_on() else gold.copy()}
         ok = self.items_gate(lv)
+        if self.opts.goal_gate_gold and not ok:
+            out["gold"][:] = False
         pile = np.zeros_like(gold)
         if ok and (self.opts.use_armor or self.opts.use_food):
             im = passable & ~lv.shop

@@ -126,6 +126,8 @@ class CombatMixin:
             if key != lv.key:
                 continue
             for p in ray:
+                if self.opts.shop_by_square and self.merch_risk(lv, p):
+                    continue
                 if G.KIND[g[p]] == G.OBJECT and nh.glyph_is_object(int(g[p])) and \
                         ord(nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class) in (nh.WEAPON_CLASS, nh.GEM_CLASS):
                     return p

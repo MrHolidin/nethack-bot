@@ -297,17 +297,9 @@ class PolicyMixin:
         if self.retrieve:
             goal = self.retrieve_goal(c.lv)
             if goal is not None:
-                n = len(self.retrieve)
-                if goal == (c.y, c.x):
-                    self.pickup_matching(THROWABLE + THROW_STONES)
-                    self.retrieve = [r for r in self.retrieve if goal not in r[1]]
-                    self.goal_event("retrieve", "consumed", n - len(self.retrieve))
-                    return True
-                if self.go_toward(c.lv, goal):
-                    self.goal_chase("retrieve")
-                    return True
-                self.retrieve = [r for r in self.retrieve if goal not in r[1]]
-                self.goal_event("retrieve", "abandoned", n - len(self.retrieve))
+                if self.opts.goal_gate_own and not self.items_gate(c.lv):
+                    return False
+                return self.pursue("retrieve", c.lv, goal, lambda g: self.pickup_matching(THROWABLE + THROW_STONES))
         return False
 
     def step_eat(self, c):
@@ -316,19 +308,12 @@ class PolicyMixin:
     def step_eat_corpse(self, c):
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""
         lv, y, x = c.lv, c.y, c.x
-        if c.hunger >= NOT_HUNGRY and self.kills and not (self.shop_visits_on() and (
-                self.shopkeeper_in_view() or lv.shop[y, x])):
+        if c.hunger >= NOT_HUNGRY and self.kills and (self.opts.shop_by_square or not self.merch_risk(lv, (y, x))):
             goal = self.corpse_goal(lv)
             if goal is not None:
-                if goal == (y, x):
-                    self.eat_corpse_here()
-                    n = len(self.kills)
-                    self.kills = [k for k in self.kills if k[2] != goal or k[3] != lv.key]
-                    self.goal_event("corpse", "consumed", n - len(self.kills))
-                    return True
-                if self.go_toward(lv, goal):
-                    self.goal_chase("corpse")
-                    return True
+                if self.opts.goal_gate_own and not self.items_gate(lv):
+                    return False
+                return self.pursue("corpse", lv, goal, lambda g: self.eat_corpse_here())
         return False
 
     def step_digger_stash(self, c):
@@ -339,7 +324,7 @@ class PolicyMixin:
     def pile_to_inspect(self, lv, y, x):
         """An armor / food / carried-class pile under us that we have not looked at, outside a shop."""
         return bool((G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                     or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.inspected.get(lv.key, ())
+                     or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.goal_closed_set("pile", lv.key)
                     and not lv.shop[y, x])
 
     def step_housekeeping(self, c):
@@ -384,9 +369,9 @@ class PolicyMixin:
 
     def step_gold_here(self, c):
         lv, y, x = c.lv, c.y, c.x
-        if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in lv.gold_tried \
-                and not (self.shop_visits_on() and (lv.shop[y, x] or self.shopkeeper_in_view())):
-            lv.gold_tried.add((y, x))          # a pile shows '$' on top again after we leave: try once
+        if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in self.goal_closed_set("gold", lv.key) \
+                and not self.merch_risk(lv, (y, x)) \
+                and (not self.opts.goal_gate_gold or self.items_gate(lv)):
             self.goal_done("gold", lv, (y, x))
             self.pickup_matching(("gold piece",))
             lv.under[y, x] = FLOOR_GLYPH

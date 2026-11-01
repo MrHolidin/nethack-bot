@@ -20,7 +20,6 @@ class Level:
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
         self.locked = set()
-        self.gold_tried = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.desperate = False

@@ -157,10 +157,8 @@ class GameMixin:
         return [l[col:] for l in lines[hi + 1:]]
 
     def pickup_matching(self, words, no_sale=False, own=False):
-        if self.shop_visits_on() and not own:
-            lv = self.level()
-            if lv.shop[self.pos()] or self.shopkeeper_in_view():
-                return                        # in a shop: anything here may be merchandise
+        if not own and self.merch_risk(self.level(), self.pos()):
+            return                            # in a shop: anything here may be merchandise
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
         if "Pick up what?" not in tty:

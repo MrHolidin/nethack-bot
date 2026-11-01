@@ -13,6 +13,7 @@ class ExploreMixin:
         self.maps_read = 0
         self.pet_waits = 0
         self.pet_waited_total = 0
+        self.loot_holds = 0
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -31,7 +32,7 @@ class ExploreMixin:
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, k_mem, k_live, passable, start):
             return
         gold = (k_mem == G.GOLD) & passable
-        for p in lv.gold_tried:
+        for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
@@ -48,6 +49,15 @@ class ExploreMixin:
             self.mines_return_start(lv, "no_town")
             if self.mines_return_step(lv, k_mem, k_live, passable, start):
                 return
+        hold_loot = False
+        if self.opts.loot_holds_descent and self.loot_sq is not None and self.loot_key == lv.key \
+                and on_level <= self.opts.descend_after:
+            m = np.zeros_like(gold)
+            m[self.loot_sq] = True
+            hold_loot = self.dijkstra(lv, k_mem, k_live, passable, start, m)[2] is not None
+            if hold_loot and want_down:
+                want_down = False
+                self.loot_holds += 1
         if want_down and self.opts.items_first \
                 and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
@@ -82,7 +92,7 @@ class ExploreMixin:
                 lv.visited[start] += 1
 
         # nothing left to walk to here: go down if we know the way
-        if downstairs.any() and self.go_down(lv, k_mem, k_live, passable, downstairs):
+        if downstairs.any() and not hold_loot and self.go_down(lv, k_mem, k_live, passable, downstairs):
             return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
