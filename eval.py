@@ -6,13 +6,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 def play(args):
     seed, kw = args
     from nhbot import Bot
-    t = time.time()
+    t = time.monotonic()
     try:
         s = Bot(seed=seed, **kw).run()
     except Exception as e:  # keep the batch going, record crash
         import traceback
         return {"seed": seed, "crash": traceback.format_exc()[-800:], "score": 0, "max_depth": 0}
-    s["secs"] = round(time.time() - t, 1)
+    s["secs"] = round(time.monotonic() - t, 1)
     return s
 
 
@@ -41,7 +41,7 @@ def main():
     ap.add_argument("--kw", default="{}", help="extra Bot kwargs as JSON")
     a = ap.parse_args()
     kw = {"character": a.char, **json.loads(a.kw)}
-    t = time.time()
+    t = time.monotonic()
     with mp.Pool(a.j) as pool:
         res = pool.map(play, [(s, kw) for s in range(a.start, a.start + a.n)], chunksize=1)
     with open(a.out, "w") as f:
@@ -51,7 +51,7 @@ def main():
     ok = [r for r in res if "crash" not in r]
     sc = [r["score"] for r in ok]
     dp = [r["max_depth"] for r in ok]
-    print(f"games {len(res)}  crashes {len(crashes)}  wall {time.time()-t:.0f}s")
+    print(f"games {len(res)}  crashes {len(crashes)}  wall {time.monotonic()-t:.0f}s")
     print(f"score  mean {st.mean(sc):.0f}  median {st.median(sc):.0f}  max {max(sc):.0f}")
     print(f"depth  mean {st.mean(dp):.2f}  median {st.median(dp)}  max {max(dp)}  hist {sorted(collections.Counter(dp).items())}")
     print(f"turns  median {st.median([r['turns'] for r in ok])}   xl median {st.median([r['xl'] for r in ok])}")

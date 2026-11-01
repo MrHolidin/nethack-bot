@@ -40,10 +40,12 @@ jobs:
       - name: play
         env:
           KW: ${{ inputs.kw }}
-          # NetHack reads the clock: night (local hour < 6 or > 21) and the moon phase / Friday 13th change
-          # the game. Pin date and time so runs started at different hours stay comparable.
+          # NetHack reads the clock (night, moon phase, Friday 13th, and something finer: a game's result also
+          # depended on the minute it started at). Freeze the wall clock so every game sees the same time
+          # wherever it falls in the shard; the monotonic clock stays real (multiprocessing waits on it).
           TZ: UTC
-          FAKETIME: "@2026-10-14 12:00:00"
+          FAKETIME: "2026-10-14 12:00:00"
+          DONT_FAKE_MONOTONIC: "1"
           LD_PRELOAD: /usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
         run: |
           J=$(nproc)
