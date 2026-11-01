@@ -70,6 +70,8 @@ class CombatMixin:
         self.press(key)
 
     def throwables(self):
+        if self.opts.hands_check and self.handless():
+            return []                        # "You can't throw or shoot without hands."
         out = []
         for letter, ocls, s in self.inventory():
             if "weapon in hand" in s or "(wielded)" in s or " cursed" in s:
@@ -140,6 +142,8 @@ class CombatMixin:
     def expendables(self):
         """Inventory items worth less than a way through: missiles first, then gems/rocks, spare weapons,
         unworn armor, ordinary tools."""
+        if self.opts.hands_check and self.handless():
+            return []
         out = [(0, l, s) for l, s in self.throwables()]
         for letter, ocls, s in self.inventory():
             if any(w in s for w in ("weapon in hand", "(wielded", "being worn", "(in use", " cursed", "alternate weapon")):

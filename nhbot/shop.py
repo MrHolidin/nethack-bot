@@ -49,11 +49,11 @@ class ShopMixin:
             self.price_note_text(m)
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
-        recent = " ".join(mm for _, mm in list(self.messages)[-6:])
-        on_door = not self.audit("shop_door", recent, self.tick_seq, lambda s: any(k in s for k in (
-            "trap door", "fall through", "hole", "teleport", "wrenching", "You materialize")),
-            lambda s: re.search(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize", s))
-        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and on_door:
+        if lv and re.search(r"Welcome to [A-Z][\w' -]*'s ", m) and not self.audit(
+                "shop_door", " ".join(mm for _, mm in list(self.messages)[-6:]), self.tick_seq,
+                lambda s: any(k in s for k in ("trap door", "fall through", "hole", "teleport", "wrenching",
+                                               "You materialize")),
+                lambda s: bool(re.search(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize", s))):
             # shop entrance: mark the shop from the door -- after falling in through a trap door we are
             # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())

@@ -14,6 +14,8 @@ from nhbot.consts import NO_ENGRAVE_CMAP
 from nhbot.elb_rules import M1_NOHANDS
 from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
 
+_HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
+
 
 class ElberethMixin:
     def elbereth_init(self):
@@ -75,11 +77,13 @@ class ElberethMixin:
         form = self.poly_form()
         if form is None:
             return False
-        pm = PM_BY_NAME.get(form)
-        if form.startswith("were"):          # lycanthrope: the status line names it, the body is the animal
-            pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
-                      if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
-        return pm is None or bool(pm.mflags1 & M1_NOHANDS) or pm.msize == 0
+        if form not in _HANDLESS:
+            pm = PM_BY_NAME.get(form)
+            if form.startswith("were"):      # lycanthrope: the status line names it, the body is the animal
+                pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
+                          if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
+            _HANDLESS[form] = pm is None or bool(pm.mflags1 & M1_NOHANDS) or pm.msize == 0
+        return _HANDLESS[form]
 
     def can_engrave_here(self, lv):
         """What a player knows before trying: the square, and whether they have hands."""
