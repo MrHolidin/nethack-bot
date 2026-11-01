@@ -285,6 +285,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
             self.raw_step(ord("n"))
         elif "continue eating" in m:
             self.raw_step(ord("n"))
+        elif "stop eating" in m:
+            self.raw_step(ord("y"))           # eat.c: "hard time getting all of it down" -- the next bites choke
         elif "eat it" in m or "eat one" in m:
             self.raw_step(ord("n"))
         elif "itemized billing" in m:
@@ -1362,7 +1364,8 @@ class Bot(EquipMixin, TacticsMixin, AbilitiesMixin, RolesMixin, ClassTacticsMixi
                 return
 
         # fresh corpse nearby
-        if hunger >= NOT_HUNGRY and self.kills and not (self.shop_visits_on() and (
+        min_hunger = SATIATED if self.role_opts.get("eat_satiated", False) else NOT_HUNGRY
+        if hunger >= min_hunger and self.kills and not (self.shop_visits_on() and (
                 self.shopkeeper_in_view() or lv.shop[y, x])):     # shop corpses are merchandise
             goal = self.corpse_goal(lv)
             if goal is not None:
