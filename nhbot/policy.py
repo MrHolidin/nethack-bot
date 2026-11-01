@@ -371,7 +371,7 @@ class PolicyMixin:
         lv, y, x = c.lv, c.y, c.x
         if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in self.goal_closed_set("gold", lv.key) \
                 and not self.merch_risk(lv, (y, x)) \
-                and (not self.opts.goal_gate_gold or self.items_gate(lv)):
+                and self.items_gate(lv):
             self.goal_done("gold", lv, (y, x))
             self.pickup_matching(("gold piece",))
             lv.under[y, x] = FLOOR_GLYPH

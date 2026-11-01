@@ -35,7 +35,6 @@ DEFAULTS = {
     "carry_all": False,        # also tools, unworn armor, spellbooks, gems, diggers (kept: owner's decision)
     "avoid_mines": False,      # True / False / "until_excalibur"
     "goal_gate_own": False,    # A/B: missiles and corpses are walked to / consumed only under items_gate
-    "goal_gate_gold": False,   # A/B: gold too (walk mask and gold_here)
     "shop_by_square": False,   # A/B: merchandise = items on shop squares only (not 'a shopkeeper is in view');
                                #      missile and corpse goals on shop squares are skipped
     "loot_holds_descent": False,   # A/B: a reachable stolen-items square on this level holds the stairs down

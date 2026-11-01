@@ -146,13 +146,11 @@ class GoalsMixin:
         return bool(lv.shop[pos]) or (not self.opts.shop_by_square and self.shopkeeper_in_view())
 
     def goal_masks(self, lv, passable, gold):
-        """Walk masks of the explore-tier kinds, {kind: mask}. Each uses the gate of the step that consumes it:
-        gold -- not in a shop when we visit shops (gold_here); pile -- items_gate and not a shop square
-        (housekeeping inspects it)."""
-        out = {"gold": gold & ~lv.shop if self.shop_visits_on() else gold.copy()}
+        """Walk masks of the explore-tier kinds, {kind: mask}. All of them only under items_gate (not in combat),
+        the gate of the steps that consume them; gold not in a shop when we visit shops (gold_here), piles never
+        on a shop square (housekeeping inspects them)."""
         ok = self.items_gate(lv)
-        if self.opts.goal_gate_gold and not ok:
-            out["gold"][:] = False
+        out = {"gold": (gold & ~lv.shop if self.shop_visits_on() else gold.copy()) & ok}
         pile = np.zeros_like(gold)
         if ok and (self.opts.use_armor or self.opts.use_food):
             im = passable & ~lv.shop
