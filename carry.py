@@ -180,7 +180,7 @@ class CarryMixin:
     def carry_weapons_on(self):
         """weapons: weapons join the carry pipeline (pick up, never-Burdened drop order, sell what we
         don't keep); valk.weapon_check wields the best one."""
-        return self.carry_on() and bool(self.role_opts.get("weapons", False))
+        return self.carry_on() and bool(self.role_opts.get("weapons", True))
 
     def carry_classes(self):
         return CARRY_CLASSES + (MORE_CLASSES if self.carry_more_on() else ()) + \

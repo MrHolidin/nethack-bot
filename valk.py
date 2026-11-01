@@ -196,7 +196,7 @@ class ValkMixin:
                 base = re.sub(r"\b(uncursed|cursed|blessed|rustproof|[+-]\d+)\s+", "", base).strip()
                 self.main_weapon = base
             return False
-        if self.vopt("weapons", False):
+        if self.vopt("weapons", True):
             return self.weapon_upgrade(inv)
         if wielded or not self.vopt("nymph", True):
             return False
