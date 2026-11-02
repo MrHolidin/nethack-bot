@@ -8,8 +8,6 @@ DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "carry_all": False,        # also tools, unworn armor, spellbooks, gems, diggers (kept: owner's decision)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "shop_remark": False,      # A/B: "Welcome again to ..." is a greeting too, and every greeting marks the shop
-                               #      (the first, from the door with a keeper blocking, may see nothing inside)
     "value_model": False,      # A/B: one item value (nhbot.value: est_gold / est_value) decides what to drop when
                                #      over weight (lowest value per weight first)
     # ---- parameters
