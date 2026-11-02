@@ -75,6 +75,8 @@ def prior(kind, space):
     """P(a hidden passage at a candidate), fitted on 1000 games (seeds 62000-62999, search_log): logistic in the
     room space beyond it. Dead ends: 0.04 at space 15, 0.09 at 70, 0.18 at 115, 0.47 at 200; walls: 0.005 up to
     space 50, 0.02 at 90, 0.15 at 150."""
+    if kind == 2:
+        return 0.0                            # corridor sides: not fitted yet
     z = -3.5 + 0.017 * space if kind == 1 else -5.3 + 0.035 * max(0.0, space - 50.0)
     return 1.0 / (1.0 + np.exp(-z))
 
@@ -83,8 +85,11 @@ def remaining(k_mem, under, searched):
     """Map of the remaining probability of a hidden passage at each candidate square (0 elsewhere):
     prior(kind, room space beyond) * (6/7) ** (search turns next to it)."""
     out = np.zeros((ROWS, COLS))
-    for y, x, kind, space_ahead, _, _, _, covered in features(k_mem, under, searched):
-        out[y, x] = max(out[y, x], prior(kind, space_ahead) * MISS ** covered)
+    for f in features(k_mem, under, searched):
+        y, x, kind, space_ahead, covered = f[0], f[1], f[2], f[3], f[7]
+        p = prior(kind, space_ahead)
+        if p > 0:
+            out[y, x] = max(out[y, x], p * MISS ** covered)
     return out
 
 
@@ -105,30 +110,63 @@ def box_sum_float(a):
 
 
 # ---------------------------------------------------------------- data for calibrating the priors
+def corridor_sides(k_mem, under, exclude):
+    """Unseen squares next to a known corridor square (a secret corridor square, a turn of a corridor we lost):
+    [(square, passable neighbours, in line with a corridor, next to a corridor end)]."""
+    unseen = k_mem == G.UNKNOWN
+    corridor = np.isin(under, list(CORRIDOR_GLYPHS))
+    walk = G.PASSABLE[k_mem]
+    ok = lambda y, x: 0 <= y < ROWS and 0 <= x < COLS
+    nb8 = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if dy or dx]
+    npass = lambda y, x: sum(1 for dy, dx in nb8 if ok(y + dy, x + dx) and walk[y + dy, x + dx])
+    out = []
+    for y, x in zip(*np.nonzero(unseen)):
+        y, x = int(y), int(x)
+        if (y, x) in exclude:
+            continue
+        adj = [(y + dy, x + dx, dy, dx) for dy, dx in nb8 if ok(y + dy, x + dx) and corridor[y + dy, x + dx]]
+        if not adj:
+            continue
+        in_line = any(ok(cy + dy, cx + dx) and walk[cy + dy, cx + dx] for cy, cx, dy, dx in adj)
+        end_adj = any(npass(cy, cx) <= 2 for cy, cx, _, _ in adj)
+        out.append(((y, x), npass(y, x), int(in_line), int(end_adj)))
+    return out
+
+
 def features(k_mem, under, searched):
     """Every candidate with what may predict a hidden passage there, and the search turns it has had:
-    [y, x, kind (0 wall, 1 dead end), space ahead, space all around, wall stretch length, unseen squares to the
-    map edge straight ahead, search turns next to it]."""
+    [y, x, kind (0 wall, 1 dead end, 2 corridor side), space ahead, space all around, wall stretch length,
+    unseen squares to the map edge straight ahead, search turns next to it, passable neighbours, in line with a
+    corridor, next to a corridor end]."""
     unseen = (k_mem == G.UNKNOWN)
     r = ROOM_BOX // 2
     room = box_sum(unseen, r) == ROOM_BOX * ROOM_BOX
     room[:r, :] = room[-r:, :] = False
     ry, rx = np.nonzero(room)
     covered = box_sum(searched, 1)
+    walk = G.PASSABLE[k_mem]
+    ok = lambda y, x: 0 <= y < ROWS and 0 <= x < COLS
+    npass = lambda y, x: sum(1 for dy in (-1, 0, 1) for dx in (-1, 0, 1)
+                             if (dy or dx) and ok(y + dy, x + dx) and walk[y + dy, x + dx])
+    space = lambda y, x: np.exp(-np.hypot(ry - y, rx - x) / REACH)
     out = []
+    seen = set()
     for (y, x), d, share in candidates(k_mem, under):
-        vy, vx = ry - y, rx - x
-        w = np.exp(-np.hypot(vy, vx) / REACH)
+        seen.add((y, x))
+        w = space(y, x)
         space_all = float(w.sum())
         if d is not None:
-            space_ahead = float(w[vy * d[0] + vx * d[1] > 0].sum())
+            space_ahead = float(w[(ry - y) * d[0] + (rx - x) * d[1] > 0].sum())
             n, (cy, cx) = 0, (y + d[0], x + d[1])
             while 0 <= cy < ROWS and 0 <= cx < COLS and unseen[cy, cx]:
                 n, cy, cx = n + 1, cy + d[0], cx + d[1]
         else:
             space_ahead, n = space_all, -1
         out.append([y, x, 0 if d is not None else 1, round(space_ahead, 2), round(space_all, 2),
-                    round(1.0 / share), n, int(covered[y, x])])
+                    round(1.0 / share), n, int(covered[y, x]), npass(y, x), -1, -1])
+    for (y, x), n_pass, in_line, end_adj in corridor_sides(k_mem, under, seen):
+        space_all = round(float(space(y, x).sum()), 2)
+        out.append([y, x, 2, space_all, space_all, 0, -1, int(covered[y, x]), n_pass, in_line, end_adj])
     return out
 
 
