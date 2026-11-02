@@ -9,6 +9,11 @@ extra one), per melee attack i of its type (monattacks.ATTACKS):
            thrust; else a d6 guess); cold: none (Valkyries resist); rust / steal / seduce ...: none
   poison   a hit of a poisoning attack poisons 1 in 8: deadly 1 in 30 without poison resistance, else
            rn1(10, 6) more damage 5 in 30
+Our attack comes first in the turn: the monster we attack doesn't act if this hit kills it -- P(hit) by
+uhitm.c find_roll_to_hit (Luck taken as 0) and P(kill | alive) from its HP d(level, 8) against our damage
+dice (dmgval + enchantment + dbon) over the hits we already landed on it.
+Standing on Elbereth (read back) a monster that respects it doesn't melee us -- unless we attack, which
+erases it (mon.c setmangry).
 P(death) = P(total damage >= HP) combined with the instant deaths. Calibration (summary 'danger'): predicted
 mean damage and P(death) against what the next turn did.
 """
@@ -18,6 +23,8 @@ from collections import defaultdict
 import numpy as np
 import nle.nethack as nh
 
+from nhbot.carry import WEAPON_NAME_OF
+from nhbot.items import base_name
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
@@ -67,11 +74,18 @@ def adj_level(base, depth, xl):
 class DangerMixin:
     def danger_init(self):
         self.mon_weapon = {}                     # monster name -> weapon we saw it use
-        self.danger_pending = None               # (turn, hp, mean, p_death)
+        self.danger_pending = None               # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
+        self.our_hits = {}                       # (level key, square) -> our hits on the monster there
+        self.hit_seen = False                    # this tick: a melee hit of ours
+        self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
         self.danger_mean = defaultdict(lambda: [0, 0.0, 0.0])    # bin -> [n, sum predicted, sum actual]
         self.danger_p = defaultdict(lambda: [0, 0.0, 0])         # bin -> [n, sum predicted, deaths]
 
     def danger_msg(self, m):
+        if re.search(r"\bYou (?:hit|smite|strike|bite|kick|butt|sting|touch)\b", m):
+            self.hit_seen = True
+        if re.search(r"\bYou (?:kill|destroy)\b", m) and self.last_attack_target is not None:
+            self.our_hits.pop((self.cur_key, self.last_attack_target), None)
         for mon, weapon in WIELD_RE.findall(m):
             w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon
             if w in WEAPON_DICE:
@@ -120,35 +134,114 @@ class DangerMixin:
         out[:len(b)] += w * b
         return out
 
-    def danger_estimate(self, adjacent):
-        """(mean damage, P(death)) over the next game turn from the adjacent hostiles [(pos, name)]."""
-        total, alive = np.array([1.0]), 1.0
-        for _, name in adjacent:
-            pm = PM_BY_NAME.get(name)
-            if pm is None:
-                continue
-            one, inst = self.monster_turn_pmf(name)
-            k, frac = divmod(pm.mmove, 12)
-            pk = np.array([1.0])
-            for _ in range(k):
-                pk = conv(pk, one)
-            pmf = self._mix(pk, conv(pk, one), frac / 12) if frac else pk
-            total = conv(total, pmf)
-            alive *= (1 - inst) ** (k + frac / 12)
+    def monster_round(self, name):
+        """(damage pmf, P(instant death)) of this monster's actions in one game turn (mcalcmove)."""
+        pm = PM_BY_NAME.get(name)
+        if pm is None:
+            return np.array([1.0]), 0.0
+        one, inst = self.monster_turn_pmf(name)
+        k, frac = divmod(pm.mmove, 12)
+        pk = np.array([1.0])
+        for _ in range(k):
+            pk = conv(pk, one)
+        pmf = self._mix(pk, conv(pk, one), frac / 12) if frac else pk
+        return pmf, 1 - (1 - inst) ** (k + frac / 12)
+
+    # ------------------------------------------------------------ our attack: it may die before it acts
+    def our_weapon(self):
+        it = next((i for i in self.items() if i.wielded), None)
+        if it is None:
+            return None, 0
+        _, ench, name = base_name(it.text)
+        name = WEAPON_NAME_OF.get(name, name)
+        return (name if name in WEAPON_DICE else None), (ench or 0)
+
+    def our_hit_prob(self, name):
+        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit > rnd(20)."""
+        pm = PM_BY_NAME[name]
+        st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
+        abon = -2 if st < 6 else -1 if st < 8 else 0 if st < 17 else 1 if st <= 68 else 2 if st < 118 else 3
+        abon += (1 if xl < 3 else 0) + (-3 if dx < 4 else -2 if dx < 6 else -1 if dx < 8 else 0 if dx < 14 else dx - 14)
+        w, ench = self.our_weapon()
+        tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
+        return min(max(tmp - 1, 0), 20) / 20
+
+    def our_damage_pmf(self, name):
+        """dmgval (small / large dice + enchantment) + dbon, at least 1."""
+        pm = PM_BY_NAME[name]
+        st = self.bl(nh.NLE_BL_STR125)
+        dbon = -1 if st < 6 else 0 if st < 16 else 1 if st < 17 else 2 if st == 18 else 3 if st <= 93 \
+            else 4 if st <= 108 else 5 if st < 118 else 6
+        w, ench = self.our_weapon()
+        d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
+        base = dice_pmf(1, d)
+        out = np.zeros(max(2, d + ench + dbon + 1))
+        for v in range(1, d + 1):
+            out[max(1, v + ench + dbon)] += base[v]
+        return out
+
+    def our_kill_prob(self, name, hits):
+        """P(this attack kills it): it took `hits` hits of ours already and lives; its HP d(level, 8)."""
+        pm = PM_BY_NAME.get(name)
+        if pm is None:
+            return 0.0
+        lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+        hp = dice_pmf(lev, 8) if lev > 0 else dice_pmf(1, 4)
+        one = self.our_damage_pmf(name)
+        dk = np.array([1.0])
+        for _ in range(hits):
+            dk = conv(dk, one)
+        dk1 = conv(dk, one)
+        cdf = lambda a, h: float(a[:h].sum())               # P(D < h)
+        alive = sum(hp[h] * cdf(dk, h) for h in range(len(hp)) if hp[h])
+        if alive <= 0:
+            return 1.0                                      # it should be dead by now: a tougher one
+        dies = sum(hp[h] * (cdf(dk, h) - cdf(dk1, h)) for h in range(len(hp)) if hp[h])
+        return self.our_hit_prob(name) * dies / alive
+
+    def danger_estimate(self, adjacent, target=None):
+        """(mean damage, P(death)) over the next game turn from the adjacent hostiles [(pos, name)]; target: the
+        square we attack first (if it dies, it doesn't act)."""
         hp = self.bl(nh.NLE_BL_HP)
+        return self.danger_combine([self.danger_parts(pos, name) for pos, name in adjacent], target, hp)
+
+    def danger_parts(self, pos, name):
+        pmf, inst = self.monster_round(name)
+        pk = self.our_kill_prob(name, self.our_hits.get((self.cur_key, pos), 0)) if name in PM_BY_NAME else 0.0
+        lv = self.levels.get(self.cur_key)
+        scared = lv is not None and self.pos() in lv.elbereth and self.respects(pos, name)
+        return pos, pmf, inst, pk, scared
+
+    def danger_combine(self, parts, target, hp):
+        total, alive = np.array([1.0]), 1.0
+        for pos, pmf, inst, pk, scared in parts:
+            if scared and target is None:
+                continue                                    # on Elbereth it won't melee us (attacking erases it)
+            if pos == target:
+                pmf = self._mix(pmf, np.array([1.0]), pk)
+                inst *= 1 - pk
+            total = conv(total, pmf)
+            alive *= 1 - inst
         mean = float((np.arange(len(total)) * total).sum())
         p_dmg = float(total[hp:].sum()) if hp < len(total) else 0.0
         return mean, 1 - (1 - p_dmg) * alive
 
     def danger_tick(self, t, hp, adjacent):
-        """Score the last prediction against what happened; make the next one."""
+        """Score the last prediction (with the attack we made since) against what happened; make the next."""
         pend = self.danger_pending
         self.danger_pending = None
-        if pend is not None and t == pend[0] + 1 and hp <= pend[1]:
-            self.danger_score(pend, pend[1] - hp, died=False)
+        if pend is not None:
+            pt, php, parts = pend
+            target = self.last_attack_target if self.attack_turn == pt else None
+            if target is not None and self.hit_seen:
+                key = (self.cur_key, target)
+                self.our_hits[key] = self.our_hits.get(key, 0) + 1
+            if t == pt + 1 and hp <= php:
+                mean, pd = self.danger_combine(parts, target, php)
+                self.danger_score((pt, php, mean, pd), php - hp, died=False)
+        self.hit_seen = False
         if adjacent:
-            mean, pd = self.danger_estimate(adjacent)
-            self.danger_pending = (t, hp, mean, pd)
+            self.danger_pending = (t, hp, [self.danger_parts(pos, name) for pos, name in adjacent])
 
     def danger_score(self, pend, actual, died):
         _, hp0, mean, pd = pend
@@ -161,7 +254,10 @@ class DangerMixin:
 
     def danger_summary(self):
         if self.done and not self.truncated and self.danger_pending is not None:
-            self.danger_score(self.danger_pending, self.danger_pending[1], died=True)
+            pt, php, parts = self.danger_pending
+            target = self.last_attack_target if self.attack_turn == pt else None
+            mean, pd = self.danger_combine(parts, target, php)
+            self.danger_score((pt, php, mean, pd), php, died=True)
             self.danger_pending = None
         return {"mean": {f"{MEAN_EDGES[k]}-{MEAN_EDGES[k + 1]}": [v[0], round(v[1], 1), v[2]]
                          for k, v in sorted(self.danger_mean.items())},
