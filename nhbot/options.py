@@ -39,6 +39,8 @@ DEFAULTS = {
                                #      spore at HP >= 25, else only desperate, not ALWAYS_AVOID (a floating eye
                                #      unless blind) and HP >= 90%; the never-step squares are exactly the rest, so
                                #      the separate desperate floating-eye melee of unblock_step goes
+    "msg_windows": False,      # A/B: zap, kick, wear, take_off, dip, wield and the shop door read the messages of
+                               #      their own action (msgs_since) instead of the last N messages
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

@@ -100,6 +100,8 @@ class ExcaliburMixin:
             return False
         self.dips += 1
         recent = " ".join(t for _, t in list(self.messages)[-6:])
+        if self.opts.msg_windows:
+            recent = " ".join(self.msgs_since(seq0))
         y, x = self.pos()
         if self.audit("dip", recent, seq0, lambda s: "Excalibur" in s or "hand reaches up" in s) or \
                 any("Excalibur" in s for _, _, s in self.inventory()):

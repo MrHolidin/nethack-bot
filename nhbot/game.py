@@ -93,9 +93,10 @@ class GameMixin:
         """pred(used): a decision read from a window of recent messages. Counts the cases where reading only
         the messages since seq0 (with alt_pred, if given) would decide otherwise."""
         a = pred(used)
-        if a != (alt_pred or pred)(" ".join(self.msgs_since(seq0))):
+        b = (alt_pred or pred)(" ".join(self.msgs_since(seq0)))
+        if a != b:
             self.msg_audit["window_" + site] += 1
-        return a
+        return b if self.opts.msg_windows else a
 
     def ask(self, cmd, word):
         """Give a command that asks which item / direction: True if that question came (word in the message).
