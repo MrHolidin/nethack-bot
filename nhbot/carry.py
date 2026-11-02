@@ -246,8 +246,8 @@ class CarryMixin:
             return True
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
-        if self.identify_needed(it):
-            return True                      # jewelry: identify scrolls are kept
+        if self.jewelry_needed(it):
+            return True                      # jewelry: identify scrolls, amulets and rings to identify
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
             if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):

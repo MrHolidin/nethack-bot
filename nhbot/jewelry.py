@@ -1,5 +1,6 @@
 """Amulets and rings (flag jewelry): wear the useful ones we know by name, identify the unknown ones with a scroll
-of identify, buy that scroll in a shop when we have none; identify scrolls are never sold or dropped.
+of identify, buy that scroll in a shop when we have none; identify scrolls and the amulets and rings still to
+identify are needed (carry.needed: never sold or dropped).
 
 Wear (the owner's order; an item still unknown is never put on, nor a known-cursed one):
   amulet  life saving > reflection > ESP > versus poison > magical breathing > unchanging
@@ -22,7 +23,7 @@ from collections import Counter
 import numpy as np
 import nle.nethack as nh
 
-from nhbot.game import MENU_ITEM_RE
+from nhbot.game import MENU_ITEM_RE, PAGE_RE
 from nhbot.items import base_name
 from nhbot.pricemem import appearance
 
@@ -37,7 +38,6 @@ IDENTIFY_RE = re.compile(r"\bscrolls? of identify\b")
 SCROLL_SHOPS = ("general store", "second-hand bookstore", "rare books")
 PRICE_RE = re.compile(r"for sale, (\d+) zorkmids?")
 ID_MENU = "What would you like to identify"
-PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")
 MIN_PRICE = 20                   # the base price: no identify scroll costs less
 
 SCROLL_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
@@ -62,6 +62,17 @@ def wear_rank(it):
     return None
 
 
+def to_identify(ocls, text):
+    """An amulet or ring worth a scroll of identify: an unknown look, or a ring of a charged type we would wear
+    whose charge we don't know."""
+    if ocls not in (nh.AMULET_CLASS, nh.RING_CLASS):
+        return False
+    if appearance(text) is not None:
+        return True
+    m = RING_RE.search(text) if ocls == nh.RING_CLASS else None
+    return m is not None and m.group(1) in CHARGED and base_name(text)[1] is None
+
+
 def wear_name(it):
     m = (AMULET_RE if it.ocls == nh.AMULET_CLASS else RING_RE).search(it.text)
     return m.group(1).replace(" ", "_")
@@ -78,17 +89,7 @@ class JewelryMixin:
     def unknown_jewelry(self):
         """Amulets and rings worth a scroll of identify: an unknown look, or a ring of a charged type we would
         wear whose charge we don't know."""
-        out = []
-        for it in self.items():
-            if it.ocls not in (nh.AMULET_CLASS, nh.RING_CLASS) or "unpaid" in it.text:
-                continue
-            if appearance(it.text) is not None:
-                out.append(it)
-            elif it.ocls == nh.RING_CLASS:
-                m = RING_RE.search(it.text)
-                if m and m.group(1) in CHARGED and base_name(it.text)[1] is None:
-                    out.append(it)
-        return out
+        return [it for it in self.items() if "unpaid" not in it.text and to_identify(it.ocls, it.text)]
 
     def is_identify(self, text):
         if IDENTIFY_RE.search(text):
@@ -106,9 +107,13 @@ class JewelryMixin:
         """Carry unknown jewelry and no scroll to identify it (buying one is worth it)."""
         return self.opts.jewelry and bool(self.unknown_jewelry()) and not self.identify_scrolls()
 
-    def identify_needed(self, it):
-        """carry.needed: identify scrolls are kept (never sold or dropped)."""
-        return self.opts.jewelry and it.ocls == nh.SCROLL_CLASS and self.is_identify(it.text)
+    def jewelry_needed(self, it):
+        """carry.needed (never sold or dropped): identify scrolls, and the amulets and rings still to identify."""
+        if not self.opts.jewelry:
+            return False
+        if it.ocls == nh.SCROLL_CLASS:
+            return self.is_identify(it.text)
+        return to_identify(it.ocls, it.text)            # in the inventory or on the floor (worth_taking)
 
     def buy_wanted(self, stype):
         return self.identify_wanted() and stype in SCROLL_SHOPS and self.bl(nh.NLE_BL_GOLD) >= MIN_PRICE

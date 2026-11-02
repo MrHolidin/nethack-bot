@@ -9,6 +9,7 @@ from nhbot.items import parse_item
 
 MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is on screen
 MENU_ITEM_RE = re.compile(r"^\s*([a-zA-Z]) - (.*)$")
+PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")       # a menu page: "(1 of 2)"
 
 
 class GameOver(Exception):
