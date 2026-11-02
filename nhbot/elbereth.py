@@ -188,7 +188,7 @@ class ElberethMixin:
                     self.elb_state = None
                     return False                       # fight / let tactics handle it
                 visible = self.visible_hostiles(lv)
-                early = not visible and hp >= maxhp * 0.6
+                early = not visible and hp >= maxhp * (self.opts.elb_exit if self.opts.elb_full_rest else 0.6)
                 if hp >= maxhp * self.opts.elb_exit or early:
                     self.elb_exits["healed"] += 1
                     self.elb_state = None

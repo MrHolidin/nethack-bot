@@ -7,7 +7,8 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "flee": False,             # A/B: P(death this turn) > 50%: step away if faster than all, else Elbereth + away
+    "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
+    "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on Elbereth
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
