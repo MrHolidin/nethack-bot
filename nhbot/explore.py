@@ -18,6 +18,7 @@ class ExploreMixin:
         self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
         self.trapped = None              # trap_escape: (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
+        self.door_stats = Counter()
 
     def explore(self, lv):
         self.cur_act = "explore"

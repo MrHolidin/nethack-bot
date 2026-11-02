@@ -11,6 +11,9 @@ DEFAULTS = {
     "trap_escape": False,      # A/B: held in a bear trap / pit / web (from the messages): failed steps are not counted
                                #      against the square; out of a bear trap by diagonal attempts (hack.c trapmove:
                                #      a diagonal one always counts, a straight one 1 in 5), into a square without a monster
+    "door_memory": False,      # A/B: a door stays a door under an item on it (seen as a door once, or the game said
+                               #      "You can't move diagonally into / out of an intact doorway"): no diagonal steps
+                               #      through it, that refusal is not a failed step, the shop marking never takes it
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

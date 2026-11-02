@@ -69,6 +69,8 @@ class Level:
         self.locked = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
+        self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
+        self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
         self.desperate = False
         self.search_turns = 0
         self.turns_here = 0
@@ -97,6 +99,10 @@ class MapMixin:
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
         lv.under[known] = g[known]
+        k = G.KIND[g]
+        lv.door_seen |= known & ((k == G.DOOR_OPEN) | (k == G.DOOR_CLOSED) | (k == G.DOORWAY))
+        lv.door_intact[known & ((k == G.DOOR_OPEN) | (k == G.DOOR_CLOSED))] = True
+        lv.door_intact[known & (k == G.DOORWAY)] = False        # no door / a broken one
         lv.seen |= known & (g != G.STONE_GLYPH)
         y, x = self.pos()
         if self._cur_pos != (y, x):
@@ -105,6 +111,7 @@ class MapMixin:
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
         if not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
                 and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
+                and not (self.opts.door_memory and lv.door_seen[y, x]) \
                 and int(lv.under[y, x]) not in CORRIDOR_GLYPHS:
             # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
             # or an item hid are missing. Standing on such a hole (an item goal there, or the end of a shop
@@ -145,6 +152,8 @@ class MapMixin:
         k = G.KIND[g]
         inside_ok = np.isin(k, [G.FLOOR, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP, G.BOULDER]) & \
             ~np.isin(g, list(corridor))
+        if self.opts.door_memory:
+            inside_ok &= ~lv.door_seen
         seen = set()
         q = deque()
         y, x = door
@@ -201,6 +210,10 @@ class MapMixin:
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
+        if "diagonally into an intact doorway" in m and lv and self.last_move_target:
+            lv.door_seen[self.last_move_target] = lv.door_intact[self.last_move_target] = True
+        if "diagonally out of an intact doorway" in m and lv:
+            lv.door_seen[self.pos()] = lv.door_intact[self.pos()] = True
         for kind, caught, freed in TRAP_MSGS:
             if any(c in m for c in caught) and self.cur_key:
                 if self.trapped is None:

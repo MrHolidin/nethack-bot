@@ -26,6 +26,8 @@ class NavMixin:
         dist[sy, sx] = 0
         pq = [(0, sy, sx)]
         door_like = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED)
+        if self.opts.door_memory:
+            door_like = door_like | lv.door_intact       # an item on a door hides it from k_mem
         monster_here = (k_live == G.MONSTER) | (k_live == G.INVIS)
         while pq:
             d, y, x = heapq.heappop(pq)
@@ -135,8 +137,12 @@ class NavMixin:
             self.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
             self.press("s")
             return
+        seq0 = self.msg_seq
         self.press(key)
         after = (*self.pos(), self.turn())
+        if self.opts.door_memory and "intact doorway" in self.text_since(seq0):
+            self.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
+            return
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
             if self.opts.trap_escape and self.trapped is not None:
                 self.trap_stats["fail_not_counted"] += 1    # held by a trap: the square is not at fault
