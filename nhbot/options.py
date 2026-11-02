@@ -32,6 +32,9 @@ DEFAULTS = {
                                #      read as Elbereth now, with no hostile in view; the nymph Elbereth with the
                                #      usual checks (engravable square, not the failed square, not stairs / levitating /
                                #      blind / stunned / confused) and read back
+    "peaceful_route": False,   # A/B: the first step of a path holds a peaceful monster: take the best path around it
+                               #      when one costs at most peaceful_detour more; wait only when there is none
+    "peaceful_detour": 12,     # peaceful_route: extra path cost allowed for the way around
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

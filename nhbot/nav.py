@@ -96,10 +96,19 @@ class NavMixin:
         k_mem, k_live, passable = grids if grids is not None else self.grids(lv)
         if also is not None:
             passable = passable | also
-        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask, max_cost=max_cost)
+        dist, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask, max_cost=max_cost)
         step = self.first_step(prev, here, reached) if reached is not None else None
         if step is None:
             return "unreachable", None
+        if self.opts.peaceful_route and G.KIND[self.obs["glyphs"][step]] == G.MONSTER \
+                and self.peaceful_now(lv, step):
+            around = passable.copy()          # a peaceful in the way: the way around it, if not much longer
+            around[step] = False
+            dist2, prev2, reached2 = self.dijkstra(lv, k_mem, k_live, around, here, mask, max_cost=max_cost)
+            step2 = self.first_step(prev2, here, reached2) if reached2 is not None else None
+            if step2 is not None and dist2[reached2] <= dist[reached] + self.opts.peaceful_detour:
+                self.peaceful_detours += 1
+                step, reached = step2, reached2
         if act is not None:
             self.cur_act = act
         if chase is not None:
