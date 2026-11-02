@@ -8,6 +8,10 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 
+# Grotto Town (mines.des minetn-5, map (x, y) on screen (y, x + 2)): its down staircase lies behind the locked
+# door at map (50, 6) in every one of its terrain variants; the way to that door has closed doors only
+GROTTO_STAIR_DOOR = (6, 52)
+
 
 def line_clear(k_mem, glyphs, y, x, dy, dx, d):
     """The d - 1 squares between (y, x) and the square d steps away in direction (dy, dx) are passable terrain
@@ -123,7 +127,8 @@ class NavMixin:
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
                 return
-            if self.opts.mines_kick and self.is_grotto(lv) and target not in lv.watch_warned:
+            if self.opts.mines_kick and target == GROTTO_STAIR_DOOR and self.is_grotto(lv) \
+                    and target not in lv.watch_warned:
                 if self.law_nearby():         # dokick.c: the watch minds only a kick one of them can see
                     self.mines_kick_stats["waited"] += 1
                     self.press("s")
