@@ -106,6 +106,8 @@ def parse_armor(s):
             "text": s}
 
 
+BLESSED_RE = re.compile(r"\bblessed\b")
+
 def value(a):
     return a["ac"] + (a["ench"] if a["ench"] is not None else UNKNOWN_ENCH)
 
@@ -165,6 +167,9 @@ class EquipMixin:
             return value(a) > 0.5
         if cur.get("cursed") or a["slot"] in self.cursed_slots:
             return False
+        if self.opts.bless_armor and abs(value(a) - value(cur)) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
+                and not BLESSED_RE.search(cur.get("text", "")):
+            return True                       # as good, and blessed: resists erosion and a curse (bless_armor)
         return value(a) > value(cur) + 0.5
 
     # ---------------------------------------------------------- main hook
