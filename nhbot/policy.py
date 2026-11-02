@@ -255,6 +255,8 @@ class PolicyMixin:
         return not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles)
 
     def step_weapon(self, c):
+        if self.tin_swapped and (c.hostiles or self.visible_hostiles(c.lv)) and self.tin_swap_back():
+            return True                          # tins: the dagger was swapped in to open one; a threat: back
         return not c.hostiles and self.weapon_check()
 
     def step_wands(self, c):
@@ -357,6 +359,8 @@ class PolicyMixin:
             if self.read_good_scroll():
                 return True
             if self.wandid_step(lv):
+                return True
+            if self.tin_step(lv):
                 return True
             if self.equip_step(lv):
                 return True

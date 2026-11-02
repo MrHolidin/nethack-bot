@@ -20,6 +20,7 @@ from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_
 from nhbot.combat import THROWABLE
 from nhbot.equipment import parse_armor
 from nhbot.items import CURSED_RE, base_name
+from nhbot.tins import MAX_TINS
 
 # safe permanent food (no eggs: could be cockatrice; no tins: slow; no unknown corpses)
 SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration", "fortune cookie",
@@ -111,6 +112,8 @@ class PickupMixin:
         if ocls == nh.FOOD_CLASS:
             if typ in SAFE_FOOD_SET and "partly eaten" not in text and food_n < MAX_FOOD:
                 reason = "food"
+            elif self.opts.tins and typ == "tin" and self.tins_carried() < MAX_TINS:
+                reason = "tin"
         elif ocls in CARRY_CLASSES:
             reason = "carry"
         elif ocls == nh.ARMOR_CLASS:
