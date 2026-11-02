@@ -74,6 +74,7 @@ class Level:
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
         self.stairs = np.zeros((ROWS, COLS), dtype=np.int8)     # a staircase seen here: kind UPSTAIR / DOWNSTAIR
+        self.terrain = np.full((ROWS, COLS), G.STONE_GLYPH, dtype=np.int32)   # last dungeon feature seen here
         self.no_diag = np.zeros((ROWS, COLS), dtype=bool)       # the game refused a diagonal step into / out of it
                                                                 # (kept: on the Rogue level a doorway refuses too)
         self.desperate = False
@@ -88,6 +89,11 @@ class Level:
         self.search_goal = None   # square chosen for searching, kept until reached
         self.mapped = False       # a magic mapping scroll was read here
         self.shop_type = None     # from the shopkeeper's greeting
+
+    def set_terrain(self, pos, glyph):
+        """What we learned is at pos now (a dried-up fountain, a staircase that isn't): both layers."""
+        self.under[pos] = glyph
+        self.terrain[pos] = glyph
 
 
 class MapMixin:
@@ -104,6 +110,8 @@ class MapMixin:
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
         lv.under[known] = g[known]
+        feat = known & G.TERRAIN[g]
+        lv.terrain[feat] = g[feat]
         k = G.KIND[g]
         lv.door_seen |= known & ((k == G.DOOR_OPEN) | (k == G.DOOR_CLOSED) | (k == G.DOORWAY))
         lv.door_intact[known & ((k == G.DOOR_OPEN) | (k == G.DOOR_CLOSED))] = True
@@ -118,7 +126,7 @@ class MapMixin:
         lv.visited[y, x] += 1
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
         if not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
-                and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
+                and self.kinds(lv)[y, x] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
                 and not lv.door_seen[y, x] \
                 and int(lv.under[y, x]) not in CORRIDOR_GLYPHS:
             # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
@@ -133,11 +141,31 @@ class MapMixin:
             lv.last_progress = self.turn()
         return lv
 
+    def kinds(self, lv):
+        """Kind of every remembered square. terrain_memory: a trap / staircase / door / water under an item is
+        that feature (the item still shows on the squares nothing special lies under)."""
+        k = G.KIND[lv.under]
+        if self.opts.terrain_memory:
+            tk = G.KIND[lv.terrain]
+            hidden = np.isin(k, G.COVERED_KINDS) & np.isin(tk, G.TERRAIN_KINDS)
+            if hidden.any():
+                # nothing lies on a closed door: an item there means it was opened or broken since we saw it
+                tk = np.where(tk == G.DOOR_CLOSED, G.DOOR_OPEN, tk)
+                k = np.where(hidden, tk, k)
+        return k
+
+    def terrain_glyphs(self, lv):
+        """Remembered glyphs with the terrain layer where we know it (terrain_memory): fountains, altars under
+        items."""
+        if not self.opts.terrain_memory:
+            return lv.under
+        return np.where(lv.terrain != G.STONE_GLYPH, lv.terrain, lv.under)
+
     def kind_grid(self, lv):
         """Terrain kind map from memory, with live monsters/objects overlaid."""
         g = self.obs["glyphs"]
         k_live = G.KIND[g]
-        k_mem = G.KIND[lv.under]
+        k_mem = self.kinds(lv)
         if self.opts.stairs_memory:          # an item on a staircase hides it from lv.under
             hidden = (lv.stairs > 0) & np.isin(k_mem, (G.OBJECT, G.CORPSE, G.GOLD))
             if hidden.any():
@@ -210,7 +238,7 @@ class MapMixin:
             return False
         if not lv.grotto:
             lv.grotto = int(lv.under[1, 3]) == UPSTAIR_GLYPH or any(
-                int(lv.under[p]) == FOUNTAIN_GLYPH for p in ((9, 52), (15, 12), (18, 68)))
+                int(self.terrain_glyphs(lv)[p]) == FOUNTAIN_GLYPH for p in ((9, 52), (15, 12), (18, 68)))
         return lv.grotto
 
     def is_minetown(self, lv):
@@ -218,15 +246,15 @@ class MapMixin:
         filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
-        return bool(lv.shop.any() or np.isin(lv.under, (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
+        return bool(lv.shop.any() or np.isin(self.terrain_glyphs(lv), (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
 
     def stairs_kind_here(self, lv):
-        k = G.KIND[lv.under[self.pos()]]
+        k = self.kinds(lv)[self.pos()]
         return k if k in (G.UPSTAIR, G.DOWNSTAIR) else None
 
     def note_stair_arrival(self, lv, arrived):
         if arrived and self.last_stair_dir:
-            lv.under[self.pos()] = UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH
+            lv.set_terrain(self.pos(), UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH)
         self.last_stair_dir = None
 
     def msg_map(self, m, lv):
@@ -270,7 +298,7 @@ class MapMixin:
             y, x = self.pos()
             for dy, dx in NEIGH:
                 ny, nx = y + dy, x + dx
-                if 0 <= ny < ROWS and 0 <= nx < COLS and G.KIND[lv.under[ny, nx]] == G.DOOR_CLOSED:
+                if 0 <= ny < ROWS and 0 <= nx < COLS and self.kinds(lv)[ny, nx] == G.DOOR_CLOSED:
                     lv.blocked[ny, nx] = True
             lv.cfi = lv.cfi | {self.pos()}
         if ("You can't go up here" in m or "You can't go down here" in m) and lv is not None:
@@ -279,4 +307,4 @@ class MapMixin:
             yy, xx = self.pos()
             lv.stairs[yy, xx] = 0
             if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
-                lv.under[yy, xx] = FLOOR_GLYPH
+                lv.set_terrain((yy, xx), FLOOR_GLYPH)

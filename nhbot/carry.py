@@ -300,7 +300,7 @@ class CarryMixin:
             self.shopping = None
             return False
         y, x = self.pos()
-        k = G.KIND[lv.under]
+        k = self.kinds(lv)
         door = np.isin(k, [G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY])
         near = door.copy()
         for dy in (-1, 0, 1):
@@ -359,7 +359,7 @@ class CarryMixin:
                 self.stash_pending = None
                 return False
             door = sp[1]
-            k = G.KIND[lv.under]
+            k = self.kinds(lv)
             ok = ~lv.shop & ~np.isin(k, [G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY]) & np.isin(k, [G.FLOOR, G.GOLD,
                                                                                             G.OBJECT, G.CORPSE])
             near = np.zeros_like(ok)

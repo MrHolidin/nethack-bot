@@ -115,7 +115,7 @@ class ElberethMixin:
         not levitating / blind / stunned / confused."""
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
-        if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
+        if self.kinds(lv)[self.pos()] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         return not cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF)

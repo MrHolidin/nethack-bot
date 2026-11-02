@@ -238,7 +238,7 @@ class PerceptionMixin:
         """Hostile-looking monsters in a clear straight line: [(dirkey, d, pos, step)]."""
         y, x = self.pos()
         g = self.obs["glyphs"]
-        k_mem = G.KIND[lv.under]
+        k_mem = self.kinds(lv)
         out = []
         for (dy, dx), key in DELTA2KEY.items():
             for i in range(1, max_d + 1):

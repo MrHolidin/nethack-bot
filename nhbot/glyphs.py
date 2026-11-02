@@ -70,6 +70,11 @@ for g in range(N):
     # swallow/explode/zap stay EFFECT
 
 # kinds that hide the terrain under them (don't overwrite memory)
+TERRAIN = np.array([bool(nh.glyph_is_cmap(g)) for g in range(N)])   # dungeon features: floor, walls, doors,
+                                                                      # stairs, traps, fountains, altars ...
+COVERED_KINDS = (OBJECT, CORPSE, GOLD)    # what lies on a square and hides the terrain under it
+TERRAIN_KINDS = (TRAP, UPSTAIR, DOWNSTAIR, DOOR_OPEN, DOOR_CLOSED, DOORWAY, LIQUID)   # worth knowing under an item
+
 TRANSIENT = np.zeros(N, dtype=bool)
 TRANSIENT[(KIND == MONSTER) | (KIND == PET) | (KIND == INVIS) | (KIND == EFFECT)] = True
 

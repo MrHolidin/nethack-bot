@@ -38,7 +38,7 @@ class ExcaliburMixin:
         return self.long_sword() is not None
 
     def excal_step(self, lv):
-        fmask = lv.under == FOUNTAIN_GLYPH
+        fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
         if fmask.any():
             self.fountain_levels.add(lv.key)
         if not self.excal_eligible():
@@ -64,7 +64,8 @@ class ExcaliburMixin:
         dl = lv.key[1]
         targets = [k for k, l in self.levels.items()
                    if k[0] == 0 and dl - self.opts.excal_up <= k[1] < dl and k not in self.excal_skip
-                   and (l.under == FOUNTAIN_GLYPH).any() and not (l.shop.any() and (l.under == FOUNTAIN_GLYPH)[l.shop].all())]
+                   and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH).any()
+                   and not (l.shop.any() and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH)[l.shop].all())]
         if not targets:
             return False
         k_mem = self.grids(lv)[0]
@@ -96,7 +97,7 @@ class ExcaliburMixin:
             self.settle()
             y, x = self.pos()
             if "nothing to dip" in m or "anything to dip" in m or "into" in m:
-                lv.under[y, x] = FLOOR_GLYPH       # no fountain here any more
+                lv.set_terrain((y, x), FLOOR_GLYPH)       # no fountain here any more
             return False
         self.dips += 1
         recent = self.text_since(seq0)
@@ -105,9 +106,9 @@ class ExcaliburMixin:
                 any("Excalibur" in s for _, _, s in self.inventory()):
             self.excalibur = True
             self.excal_turn = self.turn()
-            lv.under[y, x] = FLOOR_GLYPH
+            lv.set_terrain((y, x), FLOOR_GLYPH)
             self.dip_events.append((self.turn(), "excalibur"))
         elif "dries up" in recent or "fountain disappears" in recent or "anything to dip" in recent:
-            lv.under[y, x] = FLOOR_GLYPH
+            lv.set_terrain((y, x), FLOOR_GLYPH)
             self.dip_events.append((self.turn(), "dried"))
         return True

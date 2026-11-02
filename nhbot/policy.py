@@ -141,7 +141,7 @@ class PolicyMixin:
             lv.last_reset = t
             self.resets += 1
         if not lv.desperate and (stall > 1500 or (t - (lv.entered_turn or t) > 2500 and
-                                                 not (G.KIND[lv.under] == G.DOWNSTAIR).any())):
+                                                 not (self.kinds(lv) == G.DOWNSTAIR).any())):
             lv.desperate = True
             self.desperations += 1
         return False
@@ -230,7 +230,7 @@ class PolicyMixin:
     def step_history(self, c):
         lv, y, x, hostiles = c.lv, c.y, c.x, c.hostiles
         vis_n = len(self.visible_hostiles(lv))
-        km = G.KIND[lv.under]
+        km = self.kinds(lv)
         sy, sx = np.nonzero((km == G.UPSTAIR) | (km == G.DOWNSTAIR))
         d_st = int(min((max(abs(a - y), abs(b - x)) for a, b in zip(sy, sx)), default=99))
         st_here = self.stairs_kind_here(lv)

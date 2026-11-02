@@ -93,7 +93,7 @@ class CombatMixin:
             return None
         y, x = self.pos()
         g = self.obs["glyphs"]
-        k_mem = G.KIND[lv.under]
+        k_mem = self.kinds(lv)
         for (ty, tx) in self.avoid_cells:
             dy, dx = ty - y, tx - x
             d = max(abs(dy), abs(dx))
@@ -370,7 +370,7 @@ class CombatMixin:
         """A ray going from us in direction (dy, dx) can't bounce back at us: a closed door closer than
         SAFE_RAY_DIST absorbs it, otherwise no wall or unknown square lies closer than SAFE_RAY_DIST."""
         y, x = self.pos()
-        k_mem = G.KIND[lv.under]
+        k_mem = self.kinds(lv)
         # buzz(): range rn1(7, 7), one per square; a bounce at distance d reaches us after 2d squares
         for i in range(1, SAFE_RAY_DIST):
             yy, xx = y + i * dy, x + i * dx

@@ -186,7 +186,7 @@ class NavMixin:
             ny, nx = y + a, x + b
             if not (0 <= ny < ROWS and 0 <= nx < COLS):
                 continue
-            if G.KIND[g[ny, nx]] in (G.MONSTER, G.PET, G.INVIS) or G.KIND[lv.under[ny, nx]] in (G.LIQUID, G.TRAP):
+            if G.KIND[g[ny, nx]] in (G.MONSTER, G.PET, G.INVIS) or self.kinds(lv)[ny, nx] in (G.LIQUID, G.TRAP):
                 continue
             self.trap_stats["bear_diagonal"] += 1
             self.cur_act = "trap"
