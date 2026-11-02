@@ -80,6 +80,7 @@ class PolicyMixin:
         t, h = self.turn(), self.bl(nh.NLE_BL_HUNGER)
         self.hunger_turns[h0] += t - t0
         self._hunger_at = (t, h)
+        self.nutrition_tick()
         self.tick_seq = self.msg_seq
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"

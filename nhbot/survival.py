@@ -8,10 +8,22 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.carry import HEAL_POTIONS
-from nhbot.consts import DELTA2KEY, WEAK
+from nhbot.consts import DELTA2KEY, FAINTING, HUNGRY, NOT_HUNGRY, SATIATED, WEAK
 from nhbot.goals import GOALS
+from nhbot.items import base_name
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
 
+
+# eat.c newuhs: the status line by u.uhunger
+NUTRITION_BOUNDS = {SATIATED: (1001, 10 ** 6), NOT_HUNGRY: (150, 1000), HUNGRY: (50, 149), WEAK: (1, 49),
+                    FAINTING: (-10 ** 6, 0)}
+# objects.c oc_nutrition of the food we carry and eat
+FOOD_NUTRITION = {"food ration": 800, "cram ration": 600, "lembas wafer": 800, "K-ration": 400, "C-ration": 300,
+                  "fortune cookie": 40, "apple": 50, "orange": 80, "pear": 50, "melon": 100, "banana": 80,
+                  "carrot": 50, "slime mold": 80, "pancake": 200, "cream pie": 100, "candy bar": 100,
+                  "lump of royal jelly": 200, "kelp frond": 30, "eucalyptus leaf": 30, "sprig of wolfsbane": 40,
+                  "clove of garlic": 40, "meatball": 5, "meat stick": 5, "huge chunk of meat": 2000,
+                  "meat ring": 5, "lichen corpse": 200, "lizard corpse": 40, "tripe ration": 200, "egg": 80}
 
 class SurvivalMixin:
     def survival_init(self):
@@ -21,6 +33,8 @@ class SurvivalMixin:
         self.want_enhance = False
         self.enhances = 0
         self.quaffs = 0
+        self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
+        self._nut_at = (0, NOT_HUNGRY)
 
     def pray(self):
         self.cur_act = "pray"
@@ -56,6 +70,22 @@ class SurvivalMixin:
     def edible_now(self, s):
         return not re.search(r"\btins?\b", s) and "corpse" not in s and "egg" not in s
 
+    def nutrition_tick(self):
+        """Estimate u.uhunger: 1 a turn, plus what we ate (nutrition_add); the status line pins it --
+        Satiated > 1000, Not Hungry 150..1000, Hungry 50..149, Weak 1..49, Fainting <= 0 (eat.c newuhs), and
+        a step down sets it to the edge just crossed."""
+        t0, h0 = self._nut_at
+        t, h = self.turn(), self.bl(nh.NLE_BL_HUNGER)
+        n = self.nutrition - max(0, t - t0)
+        if h > h0:                                   # a step down: right at the edge
+            n = {NOT_HUNGRY: 1000, HUNGRY: 149, WEAK: 49, FAINTING: 0}.get(h, n)
+        lo, hi = NUTRITION_BOUNDS.get(h, (-10 ** 6, 10 ** 6))
+        self.nutrition = min(max(n, lo), hi)
+        self._nut_at = (t, h)
+
+    def nutrition_add(self, n):
+        self.nutrition += n
+
     def eat_from_inventory(self):
         for letter, ocls, s in self.inventory():
             if ocls != nh.FOOD_CLASS or not self.edible_now(s):
@@ -69,13 +99,15 @@ class SurvivalMixin:
                 break
             if "what do you want to eat" in self.message().lower():
                 self.press(letter)
+                self.nutrition_add(FOOD_NUTRITION.get(base_name(s)[2], 200))
             else:
                 self.settle()
             return True
         return False
 
-    def corpse_ok(self, name):
-        """Fresh corpse of our own kill: decide from the species' flags."""
+    def corpse_ok(self, name, tin=False):
+        """Fresh corpse of our own kill: decide from the species' flags. tin: the meat of a tin -- eat.c
+        consume_tin skips eatcorpse(), so no poison or acid damage (the intrinsics still come)."""
         if self.lycanthropy:
             kind = self.lyc_kind
             kin = WERE_KIN.get(kind) if kind else set().union(*WERE_KIN.values())
@@ -92,6 +124,8 @@ class SurvivalMixin:
         if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
             return False                      # cannibalism
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
+        if tin:
+            return True
         if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res:
             return True                       # poison resistant: a poisonous corpse is ordinary food
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
@@ -106,6 +140,8 @@ class SurvivalMixin:
             if name and self.corpse_ok(name.group(1)):
                 self.press("y")
                 self.corpses_eaten += 1
+                pm = PM_BY_NAME.get(name.group(1))
+                self.nutrition_add(pm.cnutrit if pm is not None else 100)
                 self.eaten_by[name.group(1)] += 1
                 return True
             self.press("n", expect_prompt=True)

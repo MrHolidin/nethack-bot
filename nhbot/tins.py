@@ -1,7 +1,10 @@
-"""Tins (flag tins): pick them up, and open them with nothing threatening us, the alternate weapon -- a dagger
-or knife, which opens a tin in 3 turns (eat.c: anything else wielded takes up to ~50) -- swapped in with 'x'
-and back after. Opened, the game says what is inside before asking 'Eat it?': spinach always, meat by the
-same rules as a corpse of that monster (survival.corpse_ok; a tin is never rotten).
+"""Tins (flag tins): pick them up, and open them with nothing threatening us: with the alternate weapon if it
+is a dagger or knife (3 turns; swapped in with 'x' and back after), else with what we wield (eat.c: 10 +
+rn2(1 + 500 / (Dex + Str)) turns, ~10-26 for a Valkyrie). Opened, the game says what is inside before asking
+'Eat it?': spinach always, meat by the corpse rules without the poison / acid ones (eat.c consume_tin skips
+eatcorpse(): no poison or acid damage, the intrinsics still come; survival.corpse_ok tin=True).
+Satiated is fine while the estimated nutrition (survival.nutrition) is under SATIATED_MAX, and the contents
+can't take it to 2000 (choking: eat.c lesshungry).
 """
 import re
 from collections import Counter
@@ -14,6 +17,9 @@ from nhbot.monsters import PM_BY_NAME
 
 OPENERS = ("dagger", "knife", "stiletto", "athame", "crysknife")
 MAX_TINS = 4
+SATIATED_MAX = 1500              # open a tin while Satiated only below this estimated nutrition
+CHOKE = 2000
+TIN_NUTRITION = {"spinach": 600}  # meat: up to 500 (pureed), counted as that
 SMELL_RE = re.compile(r"It smells like (?:an? )?([a-zA-Z' -]+?)\.")
 
 
@@ -73,13 +79,12 @@ class TinMixin:
         """No threat in view (the caller checks): open and maybe eat one tin. True if it used the turn."""
         if not self.opts.tins:
             return False
-        if not self.tin_letters() or self.bl(nh.NLE_BL_HUNGER) <= SATIATED \
+        if not self.tin_letters() or (self.bl(nh.NLE_BL_HUNGER) <= SATIATED and self.nutrition >= SATIATED_MAX) \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_HALLU | nh.BL_MASK_CONF | nh.BL_MASK_STUN):
             return self.tin_swap_back()                 # done (or can't now): the main weapon back
         wielded = next((it for it in self.items() if it.wielded), None)
-        if not (wielded is not None and any(w in base_name(wielded.text)[2] for w in OPENERS)):
-            if self.tin_opener() is None:
-                return False
+        if not (wielded is not None and any(w in base_name(wielded.text)[2] for w in OPENERS)) \
+                and self.tin_opener() is not None:
             self.cur_act = "tin"
             self.tin_swapped = True
             self.press("x")
@@ -106,9 +111,15 @@ class TinMixin:
                     ok, what = True, "spinach"
                 elif sm:
                     what = SINGULAR.get(sm.group(1).strip(), sm.group(1).strip())   # "It smells like geckos."
-                    ok = self.corpse_ok(what)
+                    ok = self.corpse_ok(what, tin=True)
                 else:
                     ok, what = False, "?"
+                gain = TIN_NUTRITION.get(what, 500)
+                if ok and self.nutrition + gain >= CHOKE:
+                    ok = False
+                    self.tin_stats["too_full"] += 1
+                if ok:
+                    self.nutrition_add(gain)
                 self.tin_stats["eaten" if ok else "refused"] += 1
                 self.tin_eaten_by[what] += ok
                 self.press("y" if ok else "n")
