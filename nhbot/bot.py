@@ -274,7 +274,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "vault": [self.vault_drops, self.vault_moves],
             "items_first": self.items_first_holds,
-            "loot_holds": self.loot_holds,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits,
             "msg_audit": dict(self.msg_audit),

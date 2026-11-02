@@ -125,8 +125,6 @@ class GameMixin:
             self.raw_step(ord("y"))
         elif m.rstrip().endswith("pay? [yn] (n)") or "pay?" in m:
             self.raw_step(ord("y"))
-        elif "lifting" in m and "continue?" in m and self.lift_ok(msg):
-            self.raw_step(ord("y"))           # a heavy equipment upgrade: take it, shed something else
         elif "possessions identified" in m:
             self.raw_step(ord("q"))
         else:

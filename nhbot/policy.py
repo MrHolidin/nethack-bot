@@ -304,8 +304,6 @@ class PolicyMixin:
         if self.retrieve:
             goals = self.retrieve_goals(c.lv)
             if goals:
-                if self.opts.goal_gate_own and not self.items_gate(c.lv):
-                    return False
                 return self.pursue("retrieve", c.lv, goals, lambda g: self.take_ammo())
         return False
 
@@ -315,11 +313,9 @@ class PolicyMixin:
     def step_eat_corpse(self, c):
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""
         lv, y, x = c.lv, c.y, c.x
-        if c.hunger >= NOT_HUNGRY and self.kills and (self.opts.shop_by_square or not self.merch_risk(lv, (y, x))):
+        if c.hunger >= NOT_HUNGRY and self.kills and not self.merch_risk(lv, (y, x)):
             goals = self.corpse_goals(lv)
             if goals:
-                if self.opts.goal_gate_own and not self.items_gate(lv):
-                    return False
                 return self.pursue("corpse", lv, goals, lambda g: self.eat_corpse_here())
         return False
 
