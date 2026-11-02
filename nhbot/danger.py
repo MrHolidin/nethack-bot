@@ -18,7 +18,7 @@ P(death) = P(total damage >= HP) combined with the instant deaths. Calibration (
 mean damage and P(death) against what the next turn did.
 """
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 
 import numpy as np
 import nle.nethack as nh
@@ -35,6 +35,9 @@ POISON = {"DRST", "DRDX", "DRCO"}
 MAX_D = 400
 MON_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
+FLEE_P = 0.5                     # flee: P(death this turn) above this
+FLEE_TURNS = 30                  # flee: keep trying to get away this long after writing Elbereth
+FLEE_DIST = 3                    # flee: toward a square at least this far (Chebyshev) from every hostile in view
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
 P_EDGES = (0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.01)
 
@@ -78,6 +81,8 @@ class DangerMixin:
         self.our_hits = {}                       # (level key, square) -> our hits on the monster there
         self.hit_seen = False                    # this tick: a melee hit of ours
         self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
+        self.flee_stats = Counter()
+        self.flee_mode = None                    # flee: (level key, until turn) after writing Elbereth
         self.danger_mean = defaultdict(lambda: [0, 0.0, 0.0])    # bin -> [n, sum predicted, sum actual]
         self.danger_p = defaultdict(lambda: [0, 0.0, 0])         # bin -> [n, sum predicted, deaths]
 
@@ -263,3 +268,72 @@ class DangerMixin:
                          for k, v in sorted(self.danger_mean.items())},
                 "p": {f"{P_EDGES[k]}-{P_EDGES[k + 1]}": [v[0], round(v[1], 3), v[2]]
                       for k, v in sorted(self.danger_p.items())}}
+
+    # ------------------------------------------------------------ flee (flag flee)
+    def our_speed(self):
+        """12; a Valkyrie is intrinsically Fast from XL 7 (2 moves in 3 get +6: 16 on average); Burdened 3/4."""
+        sp = 16 if self.bl(nh.NLE_BL_XP) >= 7 else 12
+        return sp * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else sp
+
+    def flee_step(self, lv, hostiles):
+        """flee: P(death this turn) > FLEE_P.
+          faster than every hostile in view: step away along squares that touch none of them;
+          else, if Elbereth would hold them all (elb_blocked: no ranged / Elbereth-ignoring one) and we can
+          write here: write it, then for FLEE_TURNS keep trying to step away the same way, waiting on the
+          square (never attacking: that erases it) while no such path exists.
+        True if it used the turn."""
+        if not self.opts.flee:
+            return False
+        fm = self.flee_mode
+        if fm is not None and (fm[0] != lv.key or self.turn() > fm[1] or not self.visible_hostiles(lv)):
+            self.flee_mode = fm = None
+        if fm is None:
+            if not hostiles:
+                return False
+            target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]       # what melee would hit first
+            if self.danger_estimate(hostiles, target)[1] <= FLEE_P:
+                return False
+            if self.faster_than_all(lv):
+                if self.flee_walk(lv):
+                    self.flee_stats["fled"] += 1
+                    return True
+                self.flee_stats["no_path"] += 1          # hemmed in: Elbereth as for faster ones
+            if self.elb_can_write(lv) and not self.elb_blocked(lv):
+                self.cur_act = "flee"
+                if self.engrave_elbereth():
+                    self.flee_mode = (lv.key, self.turn() + FLEE_TURNS)
+                    self.flee_stats["elbereth"] += 1
+                    return True
+            self.flee_stats["no_escape"] += 1
+            return False
+        if self.flee_walk(lv):                  # on Elbereth: away once a path clear of them opens
+            self.flee_stats["elb_fled"] += 1
+            self.flee_mode = None
+            return True
+        if (self.pos() in lv.elbereth or self.elb_confirm(lv)) and hostiles:
+            self.cur_act = "flee"
+            self.flee_stats["elb_wait"] += 1
+            self.press("s")
+            return True
+        self.flee_mode = None                   # Elbereth gone or nobody next to us: back to normal
+        return False
+
+    def faster_than_all(self, lv):
+        sp = self.our_speed()
+        return all(PM_BY_NAME[n].mmove < sp for _, n in self.visible_hostiles(lv) if n in PM_BY_NAME)
+
+    def flee_walk(self, lv):
+        """One step along squares next to no hostile in view, toward a square FLEE_DIST from all of them."""
+        seen = self.visible_hostiles(lv)
+        if not seen:
+            return False
+        k_mem, k_live, passable = self.grids(lv)
+        near = np.zeros_like(passable)
+        far = np.ones_like(passable)
+        for (y, x), _ in seen:
+            near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
+            far[max(0, y - FLEE_DIST + 1):y + FLEE_DIST, max(0, x - FLEE_DIST + 1):x + FLEE_DIST] = False
+        ok = passable & ~near
+        ok[self.pos()] = True
+        status, _ = self.walk_to(lv, far & ok, max_cost=40, act="flee", grids=(k_mem, k_live, ok))
+        return status == "moved"

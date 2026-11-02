@@ -30,6 +30,7 @@ STEPS = (
     "blind",
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
+    "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
     "elbereth",
     "thieves",
     "weapon",
@@ -243,6 +244,9 @@ class PolicyMixin:
         if len(self.hist) > 40:
             self.hist.popleft()
         return False
+
+    def step_flee(self, c):
+        return self.flee_step(c.lv, c.hostiles)
 
     def step_elbereth(self, c):
         return self.elb_step(c.lv, c.hostiles)
