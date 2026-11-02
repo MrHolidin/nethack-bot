@@ -163,13 +163,16 @@ class GameMixin:
         return self.bl(nh.NLE_BL_Y), self.bl(nh.NLE_BL_X)
 
     def inventory(self):
-        items = []
-        for letter, ocls, s in zip(self.obs["inv_letters"], self.obs["inv_oclasses"],
-                                   self.obs["inv_strs"]):
-            if letter == 0:
-                break
-            items.append((chr(letter), int(ocls), bytes(s).decode("latin1").rstrip("\x00")))
-        return items
+        """(letter, class, text) per inventory line, read once per observation (a read-only tuple)."""
+        if self._inv_at != self.steps:
+            items = []
+            for letter, ocls, s in zip(self.obs["inv_letters"].tolist(), self.obs["inv_oclasses"].tolist(),
+                                       self.obs["inv_strs"]):
+                if letter == 0:
+                    break
+                items.append((chr(letter), ocls, bytes(s).decode("latin1").rstrip("\x00")))
+            self._inv, self._inv_at = tuple(items), self.steps
+        return self._inv
 
     def items(self):
         """The inventory as Items (nhbot.items), parsed once per observation."""

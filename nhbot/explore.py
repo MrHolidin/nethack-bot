@@ -70,7 +70,7 @@ class ExploreMixin:
                     stuff |= m
             stuff[y, x] = False
             if stuff.any():
-                _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff)
+                _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff, want_dist=False)
                 if got is not None and got != start:
                     want_down = False
                     self.items_first_holds += 1

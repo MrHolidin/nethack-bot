@@ -1,6 +1,7 @@
 """Path finding and single steps: Dijkstra over the remembered map, moving (door kicks, peaceful
 monsters in the way, failed moves), walking toward a square or a set of squares."""
 import heapq
+from array import array
 
 import numpy as np
 import nle.nethack as nh
@@ -21,49 +22,97 @@ def line_clear(k_mem, glyphs, y, x, dy, dx, d):
                for i in range(1, d))
 
 
+# Dijkstra runs over flat Python lists of the map padded by an impassable border (list indexing is much faster
+# than numpy scalar indexing); heap entries (cost, flat index) pop in the same order as (cost, y, x)
+_W = COLS + 2
+_N = (ROWS + 2) * _W
+_STEPS = tuple((dy * _W + dx, bool(dy and dx)) for dy, dx in NEIGH)
+_INF = 1 << 30
+_STEP_COST = np.ones(256, dtype=np.int64)           # cost of stepping into a square, by remembered kind
+_STEP_COST[G.TRAP], _STEP_COST[G.BOULDER], _STEP_COST[G.DOOR_CLOSED] = 40, 15, 3
+_LIVE_COST = np.zeros(256, dtype=np.int64)          # extra cost by what is seen there now
+_LIVE_COST[G.MONSTER] = _LIVE_COST[G.INVIS] = 4
+_pad_cost = np.full((ROWS + 2, _W), -1, dtype=np.int64)
+_pad_door = np.zeros((ROWS + 2, _W), dtype=bool)
+_pad_target = np.zeros((ROWS + 2, _W), dtype=bool)
+
+
+class PathPrev:
+    """prev[(y, x)]: the square before (y, x) on its shortest path; a dict-like view of the flat array."""
+    __slots__ = ("a",)
+
+    def __init__(self, a):
+        self.a = a
+
+    def get(self, p, default=None):
+        if p is None:
+            return default
+        j = self.a[(p[0] + 1) * _W + p[1] + 1]
+        return default if j < 0 else (j // _W - 1, j % _W - 1)
+
+    def __getitem__(self, p):
+        r = self.get(p)
+        if r is None:
+            raise KeyError(p)
+        return r
+
+    def __contains__(self, p):
+        return self.get(p) is not None
+
+
 class NavMixin:
-    def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000):
-        INF = 1 << 30
-        dist = np.full((ROWS, COLS), INF, dtype=np.int64)
-        prev = {}
-        sy, sx = start
-        dist[sy, sx] = 0
-        pq = [(0, sy, sx)]
+    def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True):
+        """Shortest paths from start: (dist array or None without want_dist, prev, the first target square
+        reached or None). Stops at the first square of targets_mask popped, or past max_cost."""
+        cost = _STEP_COST[k_mem]
+        cost[(k_live == G.BOULDER) & (k_mem != G.TRAP)] = 15
+        for p in lv.locked:
+            if cost[p] == 3:
+                cost[p] = 12
+        cost += _LIVE_COST[k_live]
+        cost += 5 * lv.fail
+        cost[~passable] = -1
+        _pad_cost[1:-1, 1:-1] = cost
+        cost = _pad_cost.ravel().tolist()
         # an item on a door hides it from k_mem: the doors remembered and the refused diagonals count too
-        door_like = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
-        monster_here = (k_live == G.MONSTER) | (k_live == G.INVIS)
+        _pad_door[1:-1, 1:-1] = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
+        door = _pad_door.ravel().tolist()
+        tm = None
+        if targets_mask is not None:
+            _pad_target[1:-1, 1:-1] = targets_mask
+            tm = _pad_target.ravel().tolist()
+        dist = [_INF] * _N
+        prev = [-1] * _N
+        s = (start[0] + 1) * _W + start[1] + 1
+        dist[s] = 0
+        pq = [(0, s)]
+        pop, push = heapq.heappop, heapq.heappush
+        reached = None
         while pq:
-            d, y, x = heapq.heappop(pq)
-            if d > dist[y, x]:
+            d, i = pop(pq)
+            if d > dist[i]:
                 continue
-            if targets_mask is not None and targets_mask[y, x]:
-                return dist, prev, (y, x)
+            if tm is not None and tm[i]:
+                reached = (i // _W - 1, i % _W - 1)
+                break
             if d > max_cost:
                 break
-            for dy, dx in NEIGH:
-                ny, nx = y + dy, x + dx
-                if not (0 <= ny < ROWS and 0 <= nx < COLS) or not passable[ny, nx]:
+            di = door[i]
+            for off, diag in _STEPS:
+                j = i + off
+                c = cost[j]
+                if c < 0 or (diag and (di or door[j])):
                     continue
-                if dy and dx and (door_like[y, x] or door_like[ny, nx]):
-                    continue
-                c = 1
-                km = k_mem[ny, nx]
-                if km == G.TRAP:
-                    c = 40
-                elif km == G.BOULDER or k_live[ny, nx] == G.BOULDER:
-                    c = 15
-                elif km == G.DOOR_CLOSED:
-                    c = 3 if (ny, nx) not in lv.locked else 12
-                if monster_here[ny, nx]:
-                    c += 4
-                if lv.fail[ny, nx]:
-                    c += 5 * lv.fail[ny, nx]
                 nd = d + c
-                if nd < dist[ny, nx]:
-                    dist[ny, nx] = nd
-                    prev[(ny, nx)] = (y, x)
-                    heapq.heappush(pq, (nd, ny, nx))
-        return dist, prev, None
+                if nd < dist[j]:
+                    dist[j] = nd
+                    prev[j] = i
+                    push(pq, (nd, j))
+        if want_dist:
+            dist = np.frombuffer(array("q", dist), dtype=np.int64).reshape(ROWS + 2, _W)[1:-1, 1:-1]
+        else:
+            dist = None
+        return dist, PathPrev(prev), reached
 
     @staticmethod
     def first_step(prev, start, goal):
@@ -101,7 +150,8 @@ class NavMixin:
         k_mem, k_live, passable = grids if grids is not None else self.grids(lv)
         if also is not None:
             passable = passable | also
-        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask, max_cost=max_cost)
+        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, mask, max_cost=max_cost,
+                                          want_dist=False)
         step = self.first_step(prev, here, reached) if reached is not None else None
         if step is None:
             return "unreachable", None
