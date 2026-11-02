@@ -13,8 +13,8 @@ Identify: a scroll of identify -- by name, or by shop price (20 zm, the only scr
 is read with nothing threatening us while we carry an unknown amulet or ring (or a ring of a charged type whose
 charge we don't know); the menu (invent.c menu_identify: one item, sometimes more) gets those only, amulets
 first (the inventory order), the rest is declined with ESC.
-Buy: on a shop visit (carry.carry_shop_greeted: also started for this, in a shop that sells scrolls) with
-something unknown and no identify scroll: step on the scrolls for sale to read their tags, pick up an identify
+Buy: on a shop visit (carry.carry_shop_greeted: also started for this, in a shop that sells scrolls) with no
+identify scroll: step on the scrolls for sale to read their tags, pick up an identify
 scroll we can pay for, pay.
 """
 import re
@@ -104,8 +104,8 @@ class JewelryMixin:
                 and self.is_identify(it.text)]
 
     def identify_wanted(self):
-        """Carry unknown jewelry and no scroll to identify it (buying one is worth it)."""
-        return self.opts.jewelry and bool(self.unknown_jewelry()) and not self.identify_scrolls()
+        """No scroll of identify on us: buying one is worth it."""
+        return self.opts.jewelry and not self.identify_scrolls()
 
     def jewelry_needed(self, it):
         """carry.needed (never sold or dropped): identify scrolls, and the amulets and rings still to identify."""
