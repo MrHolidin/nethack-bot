@@ -50,7 +50,14 @@ class ShopMixin:
             self.shops_done.add(self.shopping["key"])
             self.shopping = None
             return False
-        return self.carry_sell_step(lv)
+        if self.carry_sell_step(lv):
+            return True
+        if self.shopping is not None and self.shop_buy_step(lv):
+            return True
+        if self.shopping is not None:
+            self.shops_done.add(self.shopping["key"])
+            self.shopping = None
+        return False
 
     def msg_shop(self, m, lv):
         """Price tags, entering a shop, the digger request, the bill."""

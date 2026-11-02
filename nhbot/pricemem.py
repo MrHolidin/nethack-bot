@@ -170,6 +170,7 @@ class PriceMemoryMixin:
     def price_init(self):
         self.price_reads = {}        # appearance key -> {reading id: reading}
         self.price_stats = {"buy": 0, "sell": 0}
+        self.for_sale = {}           # (level key, square) -> {floor text: price} from the tags read there
 
     def _sucker(self):
         return self.sucker()
@@ -199,6 +200,7 @@ class PriceMemoryMixin:
             if m:
                 item, price = m.group(1).strip(), int(m.group(2))
                 self._record(item, "buy", price, ("buy", lk, self.pos(), item, price))
+                self.for_sale.setdefault((lk, self.pos()), {})[item] = price
 
     def price_note_offer(self, msg):
         if "offers only" in msg:

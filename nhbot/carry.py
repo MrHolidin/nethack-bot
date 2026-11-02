@@ -246,6 +246,8 @@ class CarryMixin:
             return True
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
+        if self.identify_needed(it):
+            return True                      # amulets: an identify scroll while an amulet is unknown
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
             if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
@@ -257,7 +259,7 @@ class CarryMixin:
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes() and (buys is ALL or it.ocls in buys)
                 and not self.needed(it) and (lv.key, it.text) not in self.sell_tried
-                and not it.on_body and not it.alternate and not it.quivered]
+                and not it.on_body and not it.alternate and not it.quivered and "unpaid" not in it.text]
 
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
@@ -268,7 +270,7 @@ class CarryMixin:
         return False
 
     def carry_shop_greeted(self, lv, stype):
-        if lv.key in self.shops_done or not self.sellables(lv, stype):
+        if lv.key in self.shops_done or not (self.sellables(lv, stype) or self.buy_wanted(stype)):
             return
         self.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
 
@@ -276,9 +278,7 @@ class CarryMixin:
         stype = self.shopping.get("stype")
         items = self.sellables(lv, stype)
         if not items:
-            self.shops_done.add(lv.key)
-            self.shopping = None
-            return False
+            return False                             # shop_step: buying, or the end of the visit
         y, x = self.pos()
         k = self.kinds(lv)
         door = np.isin(k, [G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY])
