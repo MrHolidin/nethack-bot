@@ -1,5 +1,7 @@
 """Exploring a level and leaving it: frontier and item goals, when to descend, searching for hidden
 passages, the Gnomish Mines (avoid_mines, mines_return), waiting for the pet, magic mapping."""
+from collections import Counter
+
 import numpy as np
 import nle.nethack as nh
 
@@ -14,6 +16,8 @@ class ExploreMixin:
         self.pet_waits = 0
         self.pet_waited_total = 0
         self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
+        self.trapped = None              # trap_escape: (kind, level key, square) while a bear trap / pit / web holds us
+        self.trap_stats = Counter()
 
     def explore(self, lv):
         self.cur_act = "explore"

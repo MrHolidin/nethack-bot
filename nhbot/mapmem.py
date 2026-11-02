@@ -48,6 +48,14 @@ def engraving_says(seen, text, min_exact=6):
 
 CFI_RE = re.compile(r'You read: "([^"]*)"')
 
+# hack.c trapmove / trap.c: held by a trap ("caught" texts, including the repeats while still held) and let go
+TRAP_MSGS = (("bear", ("A bear trap closes on your foot", "You are caught in a bear trap"),
+              ("You finally wriggle free",)),
+             ("pit", ("You fall into a pit", "You land on a set of sharp iron spikes", "You are still in a pit"),
+              ("You crawl to the edge of the pit",)),
+             ("web", ("You stumble into a spider web", "You are stuck to the web"),
+              ("You disentangle yourself", "You tear through", "cuts through the web")))
+
 class Level:
     def __init__(self, key):
         self.key = key
@@ -193,6 +201,14 @@ class MapMixin:
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
+        for kind, caught, freed in TRAP_MSGS:
+            if any(c in m for c in caught) and self.cur_key:
+                if self.trapped is None:
+                    self.trap_stats[kind] += 1
+                    self.trap_stats["_tries"] = 0
+                self.trapped = (kind, self.cur_key, self.pos())
+            elif any(f in m for f in freed):
+                self.trapped = None
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
         if lv and self.last_move_target and any(s in m for s in (

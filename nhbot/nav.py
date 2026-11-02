@@ -114,6 +114,9 @@ class NavMixin:
         self.last_move_target = target
         before = (y, x, self.turn())
         lv = self.level()
+        held = self.opts.trap_escape and self.trap_held(lv)
+        if held and self.trapped[0] == "bear" and self.trap_diagonal(lv, ty - y, tx - x):
+            return
         if target in lv.locked:
             if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
@@ -135,9 +138,42 @@ class NavMixin:
         self.press(key)
         after = (*self.pos(), self.turn())
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
+            if self.opts.trap_escape and self.trapped is not None:
+                self.trap_stats["fail_not_counted"] += 1    # held by a trap: the square is not at fault
+                return
             lv.fail[ty, tx] += 1
             if lv.fail[ty, tx] >= 6:
                 lv.blocked[ty, tx] = True
+
+    def trap_held(self, lv):
+        """trap_escape: still held by the trap the messages told of? Forgotten once we are elsewhere, and after
+        30 attempts (a missed 'free' message must not keep failed steps uncounted for ever)."""
+        if self.trapped is None:
+            return False
+        if self.trapped[1:] != (lv.key, self.pos()) or self.trap_stats["_tries"] >= 30:
+            self.trapped = None
+            self.trap_stats["_tries"] = 0
+            return False
+        self.trap_stats["_tries"] += 1
+        return True
+
+    def trap_diagonal(self, lv, dy, dx):
+        """Out of a bear trap: a diagonal attempt always counts (hack.c trapmove), a straight one 1 in 5. The
+        diagonal nearest the way we want to go, into a square without a monster (that would be an attack) and,
+        in case we are already free, not into water, lava or a trap."""
+        y, x = self.pos()
+        g = self.obs["glyphs"]
+        for a, b in sorted(((a, b) for a in (-1, 1) for b in (-1, 1)), key=lambda d: abs(d[0] - dy) + abs(d[1] - dx)):
+            ny, nx = y + a, x + b
+            if not (0 <= ny < ROWS and 0 <= nx < COLS):
+                continue
+            if G.KIND[g[ny, nx]] in (G.MONSTER, G.PET, G.INVIS) or G.KIND[lv.under[ny, nx]] in (G.LIQUID, G.TRAP):
+                continue
+            self.trap_stats["bear_diagonal"] += 1
+            self.cur_act = "trap"
+            self.press(DELTA2KEY[(a, b)])
+            return True
+        return False
 
     def kick(self, key):
         seq0 = self.msg_seq
