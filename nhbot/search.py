@@ -11,10 +11,10 @@ Facts from NetHack 3.6.6 that the model rests on:
 Candidates (squares that may hide the way on) and their outward side:
   * a straight room-wall square with room floor on one side and nothing seen on the other: a secret door
   * the unseen square that continues a dead-end corridor: a secret corridor square
-Prior of a candidate: P(an unseen room beyond) from the room-sized unseen space beyond it (5x5 boxes of
-never-seen squares, nearer ones weighing more; on the outward side of a wall, all around a dead end since
-corridors turn), shared out along a wall's straight stretch. A wall between two known rooms, or with a known
-corridor behind it, gets nothing. Posterior: prior * (6/7) ** (turns searched next to it).
+Prior of a candidate (prior()): fitted on 1000 games' search_log -- a logistic in the room space beyond it (5x5
+boxes of never-seen squares, nearer ones weighing more; on the outward side of a wall, all around a dead end
+since corridors turn); a dead end is far likelier than a wall square. Posterior: prior * (6/7) ** (turns
+searched next to it).
 """
 import numpy as np
 
@@ -24,7 +24,6 @@ from nhbot.consts import COLS, CORRIDOR_GLYPHS, ROWS
 ROOM_BOX = 5          # an unseen room needs at least this many unseen squares across (walls included)
 REACH = 12.0          # distance scale for the room space beyond a candidate
 MISS = 6.0 / 7.0      # one search turn misses a hidden square next to us
-ROOM_SPACE = 3.0      # room space at which an unseen room beyond is ~63% likely
 
 
 def box_sum(a, r):
@@ -72,28 +71,20 @@ def candidates(k_mem, under):
     return out
 
 
+def prior(kind, space):
+    """P(a hidden passage at a candidate), fitted on 1000 games (seeds 62000-62999, search_log): logistic in the
+    room space beyond it. Dead ends: 0.04 at space 15, 0.09 at 70, 0.18 at 115, 0.47 at 200; walls: 0.005 up to
+    space 50, 0.02 at 90, 0.15 at 150."""
+    z = -3.5 + 0.017 * space if kind == 1 else -5.3 + 0.035 * max(0.0, space - 50.0)
+    return 1.0 / (1.0 + np.exp(-z))
+
+
 def remaining(k_mem, under, searched):
     """Map of the remaining probability of a hidden passage at each candidate square (0 elsewhere):
-    P(an unseen room beyond) * share * (6/7) ** (search turns next to it)."""
-    unseen = (k_mem == G.UNKNOWN)
-    r = ROOM_BOX // 2
-    room = box_sum(unseen, r) == ROOM_BOX * ROOM_BOX
-    room[:r, :] = room[-r:, :] = False
-    ry, rx = np.nonzero(room)
-    covered = box_sum(searched, 1)            # search turns made from a square next to each square
+    prior(kind, room space beyond) * (6/7) ** (search turns next to it)."""
     out = np.zeros((ROWS, COLS))
-    if not len(ry):
-        return out
-    for (y, x), d, share in candidates(k_mem, under):
-        vy, vx = ry - y, rx - x
-        if d is not None:
-            ahead = vy * d[0] + vx * d[1] > 0
-            vy, vx = vy[ahead], vx[ahead]
-        if not len(vy):
-            continue
-        space = float(np.exp(-np.hypot(vy, vx) / REACH).sum())
-        p_room = 1.0 - np.exp(-space / ROOM_SPACE)
-        out[y, x] = max(out[y, x], p_room * share * MISS ** covered[y, x])
+    for y, x, kind, space_ahead, _, _, _, covered in features(k_mem, under, searched):
+        out[y, x] = max(out[y, x], prior(kind, space_ahead) * MISS ** covered)
     return out
 
 
