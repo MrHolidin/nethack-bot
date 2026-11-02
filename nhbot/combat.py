@@ -115,7 +115,9 @@ class CombatMixin:
         self.press(letter, expect_prompt=True)
         if "direction" not in self.message().lower() and self.obs["misc"][0] == 0:
             self.msg_audit["throw_key_without_direction"] += 1
-        if "direction" in self.message().lower() or self.obs["misc"][0] == 0:
+        if self.opts.misc_fixes:
+            self.answer_direction(key)
+        elif "direction" in self.message().lower() or self.obs["misc"][0] == 0:
             self.press(key)
         else:
             self.settle()
@@ -337,7 +339,9 @@ class CombatMixin:
             return False
         self.press(letter, expect_prompt=True)
         m = self.message().lower()
-        if "direction" in m:
+        if self.opts.misc_fixes:
+            self.answer_direction(key)
+        elif "direction" in m:
             self.press(key)
         else:
             self.settle()

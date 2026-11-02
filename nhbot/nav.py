@@ -142,7 +142,9 @@ class NavMixin:
     def kick(self, key):
         seq0 = self.msg_seq
         self.press(4, expect_prompt=True)   # ^D
-        if self.obs["misc"][0] or "direction" in self.message().lower():
+        if self.opts.misc_fixes:
+            self.answer_direction(key)
+        elif self.obs["misc"][0] or "direction" in self.message().lower():
             self.press(key)
         else:
             self.settle()

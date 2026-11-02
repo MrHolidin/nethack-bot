@@ -20,6 +20,10 @@ DEFAULTS = {
     "pray_angry": False,       # A/B: "You feel that <god> is displeased." after our prayer -> god_angry (a prayer
                                #      too soon raises u.ugangr, after which every prayer fails); drops a message
                                #      the game never prints ("You feel that Mitra is angry")
+    "misc_fixes": False,       # A/B: plural good scrolls ("2 scrolls of remove curse") are good; carried lichen /
+                               #      lizard corpses (never rot) are eaten, after other food; tier-4 drops skip what
+                               #      can't come off (welded weapon, cursed armor, worn rings / amulets, refused
+                               #      before); one direction-prompt rule for throw / zap / kick
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

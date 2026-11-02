@@ -39,6 +39,15 @@ class GameMixin:
         self.raw_step(code)
         self.settle(expect_prompt)
 
+    def answer_direction(self, key):
+        """After a command that may ask "In what direction?" (getdir is a yn_function): the direction key if it
+        asked, else settle. True if the key was sent."""
+        if self.obs["misc"][0] and "direction" in self.message().lower():
+            self.press(key)
+            return True
+        self.settle()
+        return False
+
     def settle(self, expect_prompt=False):
         for _ in range(50):
             tty = self.tty_text()
