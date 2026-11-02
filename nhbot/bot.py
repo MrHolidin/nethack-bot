@@ -285,6 +285,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "pickup_stats": dict(self.pickup_stats),
             "trap_stats": {k: v for k, v in self.trap_stats.items() if not k.startswith("_")},
             "door_stats": dict(self.door_stats),
+            "mines_kick_stats": dict(self.mines_kick_stats),
             "hunger_turns": {["satiated", "not_hungry", "hungry", "weak", "fainting", "fainted", "starved"][k] if k < 7 else str(k): v for k, v in sorted(self.hunger_turns.items())},
             "eaten_by": dict(self.eaten_by.most_common(12)),
             "kill_by": dict(self.kill_by.most_common(15)),

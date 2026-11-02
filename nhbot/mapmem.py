@@ -69,6 +69,7 @@ class Level:
         self.locked = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
+        self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
         self.desperate = False
@@ -210,6 +211,12 @@ class MapMixin:
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
+        if "under arrest" in m:
+            self.mines_kick_stats["arrest"] += 1
+        if "stop damaging that door" in m and lv and self.last_move_target:
+            lv.watch_warned.add(self.last_move_target)      # the next kick it sees means arrest
+            lv.blocked[self.last_move_target] = True
+            self.mines_kick_stats["warned"] += 1
         if "diagonally into an intact doorway" in m and lv and self.last_move_target:
             lv.door_seen[self.last_move_target] = lv.door_intact[self.last_move_target] = True
         if "diagonally out of an intact doorway" in m and lv:

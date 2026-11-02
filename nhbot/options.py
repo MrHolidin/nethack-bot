@@ -14,6 +14,9 @@ DEFAULTS = {
     "door_memory": False,      # A/B: a door stays a door under an item on it (seen as a door once, or the game said
                                #      "You can't move diagonally into / out of an intact doorway"): no diagonal steps
                                #      through it, that refusal is not a failed step, the shop marking never takes it
+    "mines_kick": False,       # A/B: a locked door in the Mines (Grotto Town keeps its down staircase behind one) is
+                               #      kicked while no watchman / shopkeeper is in view; with one in view wait (the door is
+                               #      not marked impassable); "Hey, stop damaging that door!" (a watchman saw it): never again
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

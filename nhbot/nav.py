@@ -124,6 +124,14 @@ class NavMixin:
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
                 return
+            if self.opts.mines_kick and lv.key[0] == 2 and target not in lv.watch_warned:
+                if self.law_nearby():         # dokick.c: the watch minds only a kick one of them can see
+                    self.mines_kick_stats["waited"] += 1
+                    self.press("s")
+                    return
+                self.mines_kick_stats["kicks"] += 1
+                self.kick(key)
+                return
             if lv.key[0] == 2 or self.law_nearby():
                 lv.blocked[ty, tx] = True     # never kick doors in the Mines (Minetown watch)
                 return

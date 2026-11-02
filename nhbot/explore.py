@@ -19,6 +19,7 @@ class ExploreMixin:
         self.trapped = None              # trap_escape: (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
         self.door_stats = Counter()
+        self.mines_kick_stats = Counter()
 
     def explore(self, lv):
         self.cur_act = "explore"
