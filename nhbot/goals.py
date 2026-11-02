@@ -41,6 +41,7 @@ class GoalKind:
 GOALS = {
     "gold": GoalKind("gold", "explore", holds_descent=True),
     "pile": GoalKind("pile", "explore", holds_descent=True),
+    "altar": GoalKind("altar", "explore", holds_descent=True),    # altar_test: items of unknown curse status
     "retrieve": GoalKind("retrieve", "own", ttl=60),
     "corpse": GoalKind("corpse", "own", ttl=40, max_dist=8),
     "loot": GoalKind("loot", "own"),
@@ -69,6 +70,8 @@ class GoalsMixin:
     # ------------------------------------------------------------------ explore tier
     def goal_raw(self, kind, lv):
         """Goal squares of a mask kind as the map memory shows them, before any gate (for statistics)."""
+        if kind == "altar":
+            return self.altar_mask(lv)
         if kind == "gold":
             m = G.KIND[lv.under] == G.GOLD
         else:
@@ -162,6 +165,7 @@ class GoalsMixin:
             if ct is not None:
                 pile |= ct & im
         out["pile"] = pile
+        out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
         return out
 
     def goal_summary(self):

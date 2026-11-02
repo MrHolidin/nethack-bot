@@ -364,6 +364,8 @@ class PolicyMixin:
                 return True
             if self.equip_step(lv):
                 return True
+            if self.altar_step(lv):
+                return True
             if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
                 return True
         elif self.items_gate(lv):
