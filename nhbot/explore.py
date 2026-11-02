@@ -6,7 +6,6 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot import search as S
 from nhbot.consts import COLS, NEIGH, ROWS
 from nhbot.goals import GOALS
 
@@ -21,7 +20,6 @@ class ExploreMixin:
         self.trap_stats = Counter()
         self.door_stats = Counter()
         self.mines_kick_stats = Counter()
-        self.search_stats = Counter()
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -139,25 +137,16 @@ class ExploreMixin:
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
-            best = None
-            if self.opts.search_model and not (lv.key[0] == 2 and not self.is_minetown(lv)):
-                best = S.best_spot(S.remaining(k_mem, lv.under, lv.searched), dist, reach, passable)
-                self.search_stats["model" if best else "model_empty"] += 1
-            if best is None:
-                best = np.unravel_index(np.argmax(score), score.shape)
-                if score[best] <= -1e8:
-                    self.press("s")
-                    return
+            best = np.unravel_index(np.argmax(score), score.shape)
+            if score[best] <= -1e8:
+                self.press("s")
+                return
             best = (int(best[0]), int(best[1]))
             lv.search_goal = best
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time
-            t0 = self.turn()
-            if not self.opts.search_model:
-                lv.searched[start] += 10
+            lv.searched[start] += 10
             self.press("1"); self.press("0"); self.press("s")
-            if self.opts.search_model:        # the turns actually searched: a monster in view stops it early
-                lv.searched[start] += max(1, self.turn() - t0)
             return
         step = self.first_step(prev, start, best)
         if step:

@@ -10,7 +10,6 @@ from nhbot import glyphs as G
 from nhbot.carry import CarryMixin
 from nhbot.combat import CombatMixin
 from nhbot.elbereth import ElberethMixin
-from nhbot.search import SearchLogMixin
 from nhbot.equipment import EquipMixin
 from nhbot.excalibur import ExcaliburMixin
 from nhbot.explore import ExploreMixin
@@ -32,7 +31,7 @@ from nhbot.weapons import WeaponsMixin
 
 
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
-          ElberethMixin, SearchLogMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
+          ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
@@ -163,7 +162,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.policy_init()
         self.goals_init()
         self.pickup_init()
-        self.search_log_init()
         self.shops_done = set()
         self.need_pay = False
         self.role = self.race = None
@@ -288,8 +286,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "trap_stats": {k: v for k, v in self.trap_stats.items() if not k.startswith("_")},
             "door_stats": dict(self.door_stats),
             "mines_kick_stats": dict(self.mines_kick_stats),
-            "search_stats": dict(self.search_stats),
-            "search_log": self.search_log,
             "hunger_turns": {["satiated", "not_hungry", "hungry", "weak", "fainting", "fainted", "starved"][k] if k < 7 else str(k): v for k, v in sorted(self.hunger_turns.items())},
             "eaten_by": dict(self.eaten_by.most_common(12)),
             "kill_by": dict(self.kill_by.most_common(15)),

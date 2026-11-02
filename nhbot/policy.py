@@ -71,7 +71,6 @@ class PolicyMixin:
 
     def tick(self):
         lv = self.update_memory()
-        self.search_log_tick(lv)
         self.cur_key = lv.key
         self.last_step = None
         self.chasing = None
