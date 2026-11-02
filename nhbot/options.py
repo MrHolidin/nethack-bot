@@ -8,14 +8,8 @@ DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "carry_all": False,        # also tools, unworn armor, spellbooks, gems, diggers (kept: owner's decision)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "trap_escape": False,      # A/B: held in a bear trap / pit / web (from the messages): failed steps are not counted
-                               #      against the square; out of a bear trap by diagonal attempts (hack.c trapmove:
-                               #      a diagonal one always counts, a straight one 1 in 5), into a square without a monster
-    "squeeze_drop": False,     # A/B: "You are carrying too much to get through" (a diagonal squeeze needs inventory
-                               #      weight <= 600): shed weight as when Burdened (tiers 1-3, nothing worn or wielded),
-                               #      one unit per refusal, instead of marking the square impassable
-    "trap_nofail": False,      # A/B: while a bear trap / pit / web holds us, a failed step is not counted against the
-                               #      square (no cost, never impassable)
+    "trap_escape": False,      # A/B: out of a bear trap by diagonal attempts (hack.c trapmove: a diagonal one always
+                               #      counts, a straight one 1 in 5), into a square without a monster
     "stairs_memory": False,    # A/B: a staircase stays known under an item / corpse on it (as door_memory for doors);
                                #      mines_return lost its up staircase under a corpse and went down and up again
     "mines_return_explore": False,  # A/B: while climbing out of the Mines (mines_return) no staircase down is a way

@@ -251,13 +251,13 @@ class MapMixin:
                 self.trapped = None
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
-        if self.opts.squeeze_drop and lv and self.last_move_target and "You are carrying too much to get through" in m:
-            self.squeeze_pending = (lv.key, self.last_move_target)    # the weight step sheds a unit
+        if lv and self.last_move_target and "You are carrying too much to get through" in m:
+            # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit
+            self.squeeze_pending = (lv.key, self.last_move_target)
         elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",
                 "Perhaps that's why you cannot move past it",
                 "There is a boulder in your way",
-                "You are carrying too much to get through",
                 "You don't have enough room to maneuver")):
             lv.blocked[self.last_move_target] = True
         if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:

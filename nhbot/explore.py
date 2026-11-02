@@ -19,7 +19,7 @@ class ExploreMixin:
         self.trapped = None              # trap_escape: (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
         self.door_stats = Counter()
-        self.squeeze_pending = None       # squeeze_drop: (level key, square) refused for our weight
+        self.squeeze_pending = None       # (level key, square) a diagonal squeeze refused for our weight
         self.squeeze_stats = Counter()
         self.mines_kick_stats = Counter()
 
