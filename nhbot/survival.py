@@ -58,7 +58,7 @@ class SurvivalMixin:
         return gap > self.opts.pray_gap
 
     def edible_now(self, s):
-        if self.opts.misc_fixes and NEVER_ROT_RE.search(s):
+        if self.opts.misc_fixes and self.opts.misc_fixes != "no_corpses" and NEVER_ROT_RE.search(s):
             return True                       # eat.c: lichen and lizard corpses never rot
         return not re.search(r"\btins?\b", s) and "corpse" not in s and "egg" not in s
 

@@ -23,7 +23,8 @@ DEFAULTS = {
     "misc_fixes": False,       # A/B: plural good scrolls ("2 scrolls of remove curse") are good; carried lichen /
                                #      lizard corpses (never rot) are eaten, after other food; tier-4 drops skip what
                                #      can't come off (welded weapon, cursed armor, worn rings / amulets, refused
-                               #      before); one direction-prompt rule for throw / zap / kick
+                               #      before); one direction-prompt rule for throw / zap / kick; "no_corpses": all
+                               #      but the carried-corpse eating
     "ray_rules": False,        # A/B: a ray wand is zapped only if the forward direction can't bounce back (not
                                #      "forward or backward"); only a closed door absorbs (zap.c zap_over_floor),
                                #      open doors / doorways and boulders pass it; range 7..13 -> a wall 7+ away is safe
