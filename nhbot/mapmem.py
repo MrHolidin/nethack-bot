@@ -83,6 +83,7 @@ class Level:
         self.last_progress = 0
         self.last_reset = 0   # downstairs leading into the Gnomish Mines
         self.entered_turn = None
+        self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.elbereth = set()     # positions where we engraved
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
         self.search_goal = None   # square chosen for searching, kept until reached

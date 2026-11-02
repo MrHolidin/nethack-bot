@@ -22,6 +22,8 @@ class ExploreMixin:
         self.squeeze_pending = None       # (level key, square) a diagonal squeeze refused for our weight
         self.squeeze_stats = Counter()
         self.mines_kick_stats = Counter()
+        self.revisit_done = set()        # revisit_up: level keys we climbed back to
+        self.revisit_stats = Counter()
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -75,6 +77,8 @@ class ExploreMixin:
                     want_down = False
                     self.items_first_holds += 1
 
+        if want_down and self.revisit_up(lv, grids):
+            return
         if want_down and self.go_down(lv, grids, downstairs):
             return
 
@@ -83,8 +87,9 @@ class ExploreMixin:
         for m in goals.values():
             targets |= m
         if targets.any():
-            status, _ = self.walk_to(lv, targets, grids=grids,
-                                     chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))
+            status, reached = self.walk_to(lv, targets, grids=grids,
+                                           chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))
+            lv.unexplored = status == "moved" and bool(frontier[reached]) and on_level <= self.opts.descend_after
             if status == "moved":
                 return
             if status == "here":
@@ -106,6 +111,28 @@ class ExploreMixin:
         if self.magic_map_step(lv):
             return
         self.search_mode(lv, grids)
+
+    def revisit_up(self, lv, grids):
+        """revisit_up: done here and about to go down, but the level above (same branch) was never seen (we
+        fell past it) or was left with a frontier still in reach (a hole, a trap door, a teleport): climb back
+        to it first -- once per level. True if it used the turn."""
+        if not self.opts.revisit_up or self.mines_return_on or lv.key[1] <= 1:
+            return False
+        above = (lv.key[0], lv.key[1] - 1)
+        prev = self.levels.get(above)
+        if above in self.revisit_done or (prev is not None and not prev.unexplored):
+            return False
+        up = grids[0] == G.UPSTAIR
+        if up[self.pos()]:
+            self.revisit_done.add(above)
+            self.revisit_stats["never_seen" if prev is None else "unexplored"] += 1
+            self.took_stairs = True
+            self.cur_act = "revisit"
+            self.press("<")
+            return True
+        if up.any() and self.walk_to(lv, up, act="revisit", grids=grids)[0] == "moved":
+            return True
+        return False
 
     def go_down(self, lv, grids, downstairs):
         """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""

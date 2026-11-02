@@ -229,7 +229,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "quaffs": self.quaffs,
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
-            "zaps": self.zaps, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats),
+            "zaps": self.zaps, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "revisit": dict(self.revisit_stats),
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
