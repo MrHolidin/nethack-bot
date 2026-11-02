@@ -10,7 +10,7 @@ est_gold(ocls, text): what a shopkeeper would pay for ONE unit (shk.c set_cost, 
   show by name), times the likelihood of every price a shopkeeper showed for this look (pricemem).
 est_value(item, same): est_gold, +20% for an unidentified type of which we would have a single unit
   (what we may learn or use), VALUE_MAX + est_gold for what we wear / wield, what we need (carry.needed) and
-  safe food up to MAX_FOOD pieces (pickup.food_needed).
+  safe food up to MAX_FOOD pieces (pickup.food_needed), and water (clear potions).
 Decisions divide by the unit weight: drop the lowest value per weight first, pick up from 0.5 gold per weight.
 """
 import re
@@ -29,6 +29,14 @@ UNID_GEM_OFFER = 5.0
 UNID_SHK = 1 - 0.25 * 0.25       # 3/4 from one shopkeeper in 4
 CANCELLED_RE = re.compile(r"\(\d+:-1\)")
 UNID_GEM_RE = re.compile(r"^(?:\w+ )?(?:gem|stone)s?$")
+
+BLANK_PAPER_COST = 60
+
+
+def is_water(ocls, text):
+    """A clear potion: water (holy / unholy / plain). Kept and picked up like what we need (owner's decision)."""
+    return ocls == nh.POTION_CLASS and re.match(r"^clear potions?$", base_name(text)[2]) is not None
+
 
 TYPE_PROB = {}                   # (class, name) -> oc_prob
 for _i in range(nh.NUM_OBJECTS):
@@ -86,6 +94,8 @@ class ValueMixin:
             return UNID_GEM_OFFER
         if ocls == nh.POTION_CLASS and re.match(r"^clear potions?$", t):
             return 0.0 if not re.search(r"\b(blessed|cursed)\b", text) or "uncursed" in text else 100 / div
+        if ocls == nh.SCROLL_CLASS and re.match(r"^unlabeled scrolls?$", t):
+            return BLANK_PAPER_COST / div * UNID_SHK            # the fixed look of blank paper
         post = self.type_posterior(text)
         if post is not None:
             key = appearance(text)
@@ -113,7 +123,7 @@ class ValueMixin:
     def est_value(self, it, same=1):
         """Value of keeping one unit of Item it; same: units of its look we would carry."""
         g = self.est_gold(it.ocls, it.text)
-        if it.on_body or self.needed(it) or self.food_needed(it):
+        if it.on_body or self.needed(it) or self.food_needed(it) or is_water(it.ocls, it.text):
             return VALUE_MAX + g
         if same == 1 and self.is_unknown(it.ocls, it.text):
             g *= UNID_BONUS
