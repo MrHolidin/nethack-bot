@@ -112,7 +112,7 @@ class PickupMixin:
         if ocls == nh.FOOD_CLASS:
             if typ in SAFE_FOOD_SET and "partly eaten" not in text and food_n < MAX_FOOD:
                 reason = "food"
-            elif self.opts.tins and typ == "tin" and self.tins_carried() < MAX_TINS:
+            elif typ == "tin" and self.tins_carried() < MAX_TINS:
                 reason = "tin"
         elif ocls in CARRY_CLASSES:
             reason = "carry"

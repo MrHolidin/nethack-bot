@@ -10,7 +10,6 @@ DEFAULTS = {
     "amulets": False,          # A/B: wear known good amulets (nhbot.amulets order); identify unknown ones with a
                                #      scroll of identify, bought in a shop if we have none
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest)
-    "tins": False,             # A/B: pick up tins; open them with the alternate dagger when calm, eat if safe
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
                                #      it with a reachable frontier (hole, trap door, teleport)
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)

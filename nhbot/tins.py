@@ -1,4 +1,4 @@
-"""Tins (flag tins): pick them up, and open them with nothing threatening us: with the alternate weapon if it
+"""Tins: pick them up, and open them with nothing threatening us: with the alternate weapon if it
 is a dagger or knife (3 turns; swapped in with 'x' and back after), else with what we wield (eat.c: 10 +
 rn2(1 + 500 / (Dex + Str)) turns, ~10-26 for a Valkyrie). Opened, the game says what is inside before asking
 'Eat it?': spinach always, meat by the corpse rules without the poison / acid ones (eat.c consume_tin skips
@@ -138,8 +138,6 @@ class TinMixin:
 
     def tin_step(self, lv):
         """No threat in view (the caller checks): open and maybe eat one tin. True if it used the turn."""
-        if not self.opts.tins:
-            return False
         if not self.tin_letters() or (self.bl(nh.NLE_BL_HUNGER) <= SATIATED and self.nutrition >= SATIATED_MAX) \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_HALLU | nh.BL_MASK_CONF | nh.BL_MASK_STUN):
             return self.tin_swap_back()                 # done (or can't now): the main weapon back
