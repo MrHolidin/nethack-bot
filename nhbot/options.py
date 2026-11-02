@@ -11,6 +11,9 @@ DEFAULTS = {
     "trap_escape": False,      # A/B: held in a bear trap / pit / web (from the messages): failed steps are not counted
                                #      against the square; out of a bear trap by diagonal attempts (hack.c trapmove:
                                #      a diagonal one always counts, a straight one 1 in 5), into a square without a monster
+    "search_model": False,     # A/B: search from the square with the most expected find per turn (search.py: room
+                               #      walls and dead-end corridors with room-sized unseen space beyond, discounted by
+                               #      the searching already done next to them) instead of the wall-count score
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

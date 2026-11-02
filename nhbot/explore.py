@@ -134,12 +134,13 @@ class ExploreMixin:
                 wallish[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         wall_term = cnt * 10.0
         score = np.where(reach & passable, wall_term - lv.searched * 2.0 - np.minimum(dist, 500) * 0.3, -1e9)
+        # dead-end corridors are prime spots
         goal = lv.search_goal
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
             best = None
-            if not (lv.key[0] == 2 and not self.is_minetown(lv)):   # Mines caves have no hidden passages
+            if self.opts.search_model and not (lv.key[0] == 2 and not self.is_minetown(lv)):
                 best = S.best_spot(S.remaining(k_mem, lv.under, lv.searched), dist, reach, passable)
                 self.search_stats["model" if best else "model_empty"] += 1
             if best is None:
@@ -152,8 +153,11 @@ class ExploreMixin:
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time
             t0 = self.turn()
+            if not self.opts.search_model:
+                lv.searched[start] += 10
             self.press("1"); self.press("0"); self.press("s")
-            lv.searched[start] += max(1, self.turn() - t0)   # turns actually searched: a monster in view stops it
+            if self.opts.search_model:        # the turns actually searched: a monster in view stops it early
+                lv.searched[start] += max(1, self.turn() - t0)
             return
         step = self.first_step(prev, start, best)
         if step:
