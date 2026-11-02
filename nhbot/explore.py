@@ -49,6 +49,8 @@ class ExploreMixin:
         if lv.avoid_down and hatch < self.opts.mines_after and self.mines_blocked():
             for p in lv.avoid_down:
                 downstairs[p] = False
+        if self.opts.mines_return_explore and self.mines_return_on and lv.key[0] == 2:
+            downstairs[:] = False             # climbing out of the Mines: explore for the up staircase, never down
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
         if want_down and lv.key[0] == 2 and lv.key[1] >= 4 \
                 and not self.minetown_seen and not self.is_minetown(lv):

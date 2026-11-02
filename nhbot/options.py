@@ -18,6 +18,9 @@ DEFAULTS = {
                                #      square (no cost, never impassable)
     "stairs_memory": False,    # A/B: a staircase stays known under an item / corpse on it (as door_memory for doors);
                                #      mines_return lost its up staircase under a corpse and went down and up again
+    "mines_return_explore": False,  # A/B: while climbing out of the Mines (mines_return) no staircase down is a way
+                               #      on: a level whose up staircase is unknown is explored for it (descend_after
+                               #      counted from the first visit sent us down at once, and back up: a loop)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP
