@@ -28,12 +28,13 @@ from nhbot.shop import ShopMixin
 from nhbot.survival import SurvivalMixin
 from nhbot.thieves import ThievesMixin
 from nhbot.value import ValueMixin
+from nhbot.wandid import WandIdMixin
 from nhbot.weapons import WeaponsMixin
 
 
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
-          CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin):
+          CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
         """role_opts and any other keyword arguments are options (options.py); unknown names raise."""
@@ -161,6 +162,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.scroll_init()
         self.carry_init()
         self.price_init()
+        self.wandid_init()
         self.value_init()
         self.policy_init()
         self.goals_init()
@@ -225,7 +227,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "quaffs": self.quaffs,
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
-            "zaps": self.zaps,
+            "zaps": self.zaps, "wandid": dict(self.wandid_stats),
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,

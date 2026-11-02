@@ -351,6 +351,8 @@ class PolicyMixin:
                 return True
             if self.read_good_scroll():
                 return True
+            if self.wandid_step(lv):
+                return True
             if self.equip_step(lv):
                 return True
             if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):

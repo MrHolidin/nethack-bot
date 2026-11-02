@@ -235,7 +235,7 @@ class CarryMixin:
     # ------------------------------------------------------------ sell
     def needed(self, it):
         c, s = it.ocls, it.text
-        if c == nh.WAND_CLASS and re.search(r"wand of (%s)\b" % "|".join(ATTACK_WANDS), s):
+        if c == nh.WAND_CLASS and self.wand_kind(it) in ATTACK_WANDS:
             return not self.wand_spent(it)   # an empty one is only weight
         if c == nh.POTION_CLASS and any(("potion of " + p) in s or ("potions of " + p) in s for p in HEAL_POTIONS):
             return True

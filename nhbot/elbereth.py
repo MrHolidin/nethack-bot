@@ -17,6 +17,8 @@ from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_N
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
 
+WISH = "blessed +2 gray dragon scale mail"     # AC 9 body armor (equipment.parse_armor knows it)
+
 class ElberethMixin:
     def elbereth_init(self):
         self.elb_state = None        # dict(pos, key, since, last_read, hp_hist)
@@ -32,26 +34,39 @@ class ElberethMixin:
         self.elb_only_c = 0
         self.elb_stats = collections.Counter()   # reads, confirmed rests, nymph engravings
 
-    def engrave_elbereth(self):
+    def engrave(self, stylus, text):
+        """E with stylus ('-': fingers, or an inventory letter) and write text, answering what comes between:
+        'add to the current engraving?' (no), --More--, and the wish a wand of wishing grants. True if the
+        text was written."""
         if not self.ask("E", "write with"):
             return False
-        self.press("-", expect_prompt=True)
-        for _ in range(5):
+        self.press(stylus, expect_prompt=True)
+        for _ in range(8):
             if self.obs["misc"][0]:          # "Do you want to add to the current engraving?"
                 self.press("n", expect_prompt=True)
                 continue
             if "--more--" in self.tty_text().lower():
                 self.raw_step(13)
                 continue
+            if self.obs["misc"][1] and "wish" in self.top_line().lower():
+                for c in WISH:                   # zap.c zapnodir: engraving with a wand of wishing zaps it
+                    self.raw_step(ord(c))
+                self.raw_step(13)
+                continue
             break
         if self.obs["misc"][1]:
-            for c in "Elbereth":
+            for c in text:
                 self.raw_step(ord(c))
             self.press(13)
-            self.elbereths += 1                  # lv.elbereth only once read back (elb_confirm)
             return True
         self.settle()
         return False
+
+    def engrave_elbereth(self):
+        if not self.engrave("-", "Elbereth"):
+            return False
+        self.elbereths += 1                      # lv.elbereth only once read back (elb_confirm)
+        return True
 
     def read_engraving(self):
         """Text of the engraving under us, from the answer to THIS ':' only (older 'You read' lines in the

@@ -67,6 +67,9 @@ class ValueMixin:
             return None
         self.note_known_types()
         cands = [n for n in candidates(key) if (_cls_of(n, key), n) not in self.known_types] or list(candidates(key))
+        engraved = self.wand_engraved.get(key)              # wandid: the engraving test narrowed the types
+        if engraved:
+            cands = [n for n in cands if n in engraved] or cands
         reads = list(self.price_reads.get(key, {}).values())
         for prior in (lambda n: TYPE_PROB.get((_cls_of(n, key), n), 0), lambda n: 1.0):
             post = {}

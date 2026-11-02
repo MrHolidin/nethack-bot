@@ -315,13 +315,10 @@ class CombatMixin:
     def attack_wands(self):
         out = []
         for it in self.items():
-            letter, ocls, s = it.letter, it.ocls, it.text
+            letter, ocls = it.letter, it.ocls
             if ocls != nh.WAND_CLASS or self.wand_spent(it):
                 continue
-            m = re.search(r"wand of ([a-z ]+?)(?: \(|$)", s)
-            if not m:
-                continue
-            kind = m.group(1).strip()
+            kind = self.wand_kind(it)            # by name, or narrowed by an engraving test (wandid)
             if kind in RAY_WANDS or kind in BEAM_WANDS:
                 out.append((letter, kind))
         prio = {"sleep": 0, "striking": 1, "magic missile": 2, "cold": 3, "fire": 4, "lightning": 5}
