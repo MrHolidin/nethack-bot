@@ -81,7 +81,6 @@ def wear_name(it):
 class JewelryMixin:
     def jewelry_init(self):
         self.jewelry_stats = Counter()
-        self.buy_browsed = set()         # (level key, square) of shop squares we stood on to read the tags
         self.pay_fails = 0
         self.jewelry_refused = set()     # letters the game would not put on / take off
 
@@ -263,15 +262,4 @@ class JewelryMixin:
             return True
         if goals.any() and self.walk_to(lv, goals, act="buy")[0] == "moved":
             return True
-        browse = lv.shop & SCROLL_GLYPH[lv.under]
-        for k, p in self.buy_browsed | set(self.for_sale):
-            if k == lv.key:
-                browse[p] = False
-        if browse[here]:
-            self.buy_browsed.add((lv.key, here))
-            self.look_here()                       # a pile: the tags show in the 'Things that are here' window
-            return True
-        if browse.any() and self.walk_to(lv, browse, act="buy_browse")[0] == "moved":
-            self.jewelry_stats["browse_steps"] += 1
-            return True
-        return False
+        return self.browse_step(lv, SCROLL_GLYPH, "buy_browse")

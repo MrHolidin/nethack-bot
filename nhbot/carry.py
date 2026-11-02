@@ -270,7 +270,8 @@ class CarryMixin:
         return False
 
     def carry_shop_greeted(self, lv, stype):
-        if lv.key in self.shops_done or not (self.sellables(lv, stype) or self.buy_wanted(stype)):
+        if lv.key in self.shops_done or not (self.sellables(lv, stype) or self.buy_wanted(stype)
+                                             or self.opts.shop_browse):
             return
         self.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
 

@@ -1,5 +1,9 @@
 """Shop visits: the shared state for a visit (selling in carry.py) and paying."""
 import re
+
+import numpy as np
+import nle.nethack as nh
+
 from nhbot.carry import LEAVE_RE
 
 
@@ -9,12 +13,19 @@ from nhbot.carry import LEAVE_RE
 # first one often comes while we stand in the door seeing nothing inside yet (a keeper blocking for a pick-axe,
 # a wall just repaired), which marked nothing
 SHOP_WELCOME_RE = re.compile(r"Welcome(?: again)? to [A-Z][\w' -]*?(?:'s|s') ([^!]+)!")
+# merchandise: an object glyph other than a boulder / statue (ROCK_CLASS)
+ITEM_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
+for _g in range(nh.MAX_GLYPH):
+    if nh.glyph_is_object(_g) and ord(nh.objclass(nh.glyph_to_obj(_g)).oc_class) != nh.ROCK_CLASS:
+        ITEM_GLYPH[_g] = True
 ARRIVED_RE = re.compile(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize")   # this tick
 
 
 class ShopMixin:
     def shop_init(self):
         self.shopping = None
+        self.shop_browsed = set()        # (level key, square) of shop squares we stood on to read the tags
+        self.browse_stats = {"steps": 0, "looks": 0}
 
     def shop_greeted(self, lv, m):
         mm = SHOP_WELCOME_RE.search(m)
@@ -54,9 +65,29 @@ class ShopMixin:
             return True
         if self.shopping is not None and self.shop_buy_step(lv):
             return True
+        if self.shopping is not None and self.opts.shop_browse and self.browse_step(lv, ITEM_GLYPH, "browse"):
+            return True
         if self.shopping is not None:
             self.shops_done.add(self.shopping["key"])
             self.shopping = None
+        return False
+
+    def browse_step(self, lv, glyph_mask, act):
+        """In a shop: walk onto the shop squares showing an item of glyph_mask whose tag we have not read
+        ('You see here ... (for sale, N zorkmids)' when we step there, ':' on a pile). True if it acted."""
+        here = self.pos()
+        todo = lv.shop & glyph_mask[lv.under]
+        for k, p in self.shop_browsed | set(self.for_sale):
+            if k == lv.key:
+                todo[p] = False
+        if todo[here]:
+            self.shop_browsed.add((lv.key, here))
+            self.look_here()                       # a pile: the tags show in the 'Things that are here' window
+            self.browse_stats["looks"] += 1
+            return True
+        if todo.any() and self.walk_to(lv, todo, act=act)[0] == "moved":
+            self.browse_stats["steps"] += 1
+            return True
         return False
 
     def msg_shop(self, m, lv):
