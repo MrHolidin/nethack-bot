@@ -1,4 +1,4 @@
-"""Where to search for a hidden passage (search_model): the expected find per turn of searching from a square.
+"""Where to search for a hidden passage: the expected find per turn of searching from a square.
 
 Facts from NetHack 3.6.6 that the model rests on:
   * mklev.c makecorridors: rooms are sorted left to right and joined to their neighbours in that order, so a
