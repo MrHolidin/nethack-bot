@@ -8,13 +8,6 @@ DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "carry_all": False,        # also tools, unworn armor, spellbooks, gems, diggers (kept: owner's decision)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "trap_escape": False,      # A/B: out of a bear trap by diagonal attempts (hack.c trapmove: a diagonal one always
-                               #      counts, a straight one 1 in 5), into a square without a monster
-    "stairs_memory": False,    # A/B: a staircase stays known under an item / corpse on it (as door_memory for doors);
-                               #      mines_return lost its up staircase under a corpse and went down and up again
-    "terrain_memory": False,   # A/B: a terrain layer per square (the last dungeon feature seen there) that items and
-                               #      corpses don't overwrite: traps, stairs, doors, water stay known under an item
-                               #      (MapMixin.kinds), fountains and altars too (terrain_glyphs)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

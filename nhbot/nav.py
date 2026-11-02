@@ -169,9 +169,7 @@ class NavMixin:
         self.last_move_target = target
         before = (y, x, self.turn())
         lv = self.level()
-        held = self.trap_held(lv)
-        if held and self.opts.trap_escape and self.trapped[0] == "bear" and self.trap_diagonal(lv, ty - y, tx - x):
-            return
+        self.trap_held(lv)                    # forgets the trap once we are out of it (or after 30 tries)
         if target in lv.locked:
             if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
@@ -225,24 +223,6 @@ class NavMixin:
             return False
         self.trap_stats["_tries"] += 1
         return True
-
-    def trap_diagonal(self, lv, dy, dx):
-        """Out of a bear trap: a diagonal attempt always counts (hack.c trapmove), a straight one 1 in 5. The
-        diagonal nearest the way we want to go, into a square without a monster (that would be an attack) and,
-        in case we are already free, not into water, lava or a trap."""
-        y, x = self.pos()
-        g = self.obs["glyphs"]
-        for a, b in sorted(((a, b) for a in (-1, 1) for b in (-1, 1)), key=lambda d: abs(d[0] - dy) + abs(d[1] - dx)):
-            ny, nx = y + a, x + b
-            if not (0 <= ny < ROWS and 0 <= nx < COLS):
-                continue
-            if G.KIND[g[ny, nx]] in (G.MONSTER, G.PET, G.INVIS) or self.kinds(lv)[ny, nx] in (G.LIQUID, G.TRAP):
-                continue
-            self.trap_stats["bear_diagonal"] += 1
-            self.cur_act = "trap"
-            self.press(DELTA2KEY[(a, b)])
-            return True
-        return False
 
     def kick(self, key):
         seq0 = self.msg_seq
