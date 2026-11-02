@@ -192,7 +192,7 @@ class CarryMixin:
         and diggers (pick-axe, mattock: kept, never sold).
         KEEP THIS FLAG (owner's decision, 2026-11-01): A/B -525 n.s., off by default, but it is the way to carry
         a digger for future vault / digging logic. Do not remove it in cleanups."""
-        return bool(self.opts.carry_all or self.opts.value_model)     # value_model: one logic, take all
+        return bool(self.opts.carry_all)
 
     def carry_classes(self):
         return CARRY_CLASSES + (MORE_CLASSES if self.carry_all_on() else ()) + \

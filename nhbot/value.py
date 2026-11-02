@@ -11,8 +11,8 @@ est_gold(ocls, text): what a shopkeeper would pay for ONE unit (shk.c set_cost, 
 est_value(item, same): est_gold, +20% for an unidentified type of which we would have a single unit
   (what we may learn or use), VALUE_MAX + est_gold for what we wear / wield, what we need (carry.needed) and
   safe food up to MAX_FOOD pieces (pickup.food_needed), and water (clear potions).
-Dropping divides by the unit weight: the lowest value per weight goes first. value_model picks up all that
-carry_all does (the value decides what to drop, not what to take).
+Dropping divides by the unit weight: the lowest value per weight goes first. Picking up is unchanged (the
+value decides what to drop, not what to take).
 """
 import re
 from collections import Counter

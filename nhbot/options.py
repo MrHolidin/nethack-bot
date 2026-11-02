@@ -9,7 +9,7 @@ DEFAULTS = {
     "carry_all": False,        # also tools, unworn armor, spellbooks, gems, diggers (kept: owner's decision)
     "avoid_mines": False,      # True / False / "until_excalibur"
     "value_model": False,      # A/B: one item value (nhbot.value: est_gold / est_value) decides what to drop when
-                               #      over weight (lowest value per weight first); takes all that carry_all takes
+                               #      over weight (lowest value per weight first)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP
