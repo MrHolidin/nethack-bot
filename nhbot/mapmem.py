@@ -73,6 +73,8 @@ class Level:
         self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
+        self.no_diag = np.zeros((ROWS, COLS), dtype=bool)       # the game refused a diagonal step into / out of it
+                                                                # (kept: on the Rogue level a doorway refuses too)
         self.desperate = False
         self.search_turns = 0
         self.turns_here = 0
@@ -229,9 +231,9 @@ class MapMixin:
             lv.blocked[self.last_move_target] = True
             self.mines_kick_stats["warned"] += 1
         if "diagonally into an intact doorway" in m and lv and self.last_move_target:
-            lv.door_seen[self.last_move_target] = lv.door_intact[self.last_move_target] = True
+            lv.door_seen[self.last_move_target] = lv.no_diag[self.last_move_target] = True
         if "diagonally out of an intact doorway" in m and lv:
-            lv.door_seen[self.pos()] = lv.door_intact[self.pos()] = True
+            lv.door_seen[self.pos()] = lv.no_diag[self.pos()] = True
         for kind, caught, freed in TRAP_MSGS:
             if any(c in m for c in caught) and self.cur_key:
                 if self.trapped is None:
