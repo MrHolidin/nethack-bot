@@ -38,7 +38,7 @@ class ExploreMixin:
         frontier = passable & dil & (lv.visited == 0)
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
-        gold = (k_mem == G.GOLD) & passable
+        gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
         for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
