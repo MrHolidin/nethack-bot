@@ -35,6 +35,10 @@ DEFAULTS = {
     "peaceful_route": False,   # A/B: the first step of a path holds a peaceful monster: take the best path around it
                                #      when one costs at most peaceful_detour more; wait only when there is none
     "peaceful_detour": 12,     # peaceful_route: extra path cost allowed for the way around
+    "desperate_rule": False,   # A/B: one rule (may_melee) for hitting a monster we normally never melee: a gas
+                               #      spore at HP >= 25, else only desperate, not ALWAYS_AVOID (a floating eye
+                               #      unless blind) and HP >= 90%; the never-step squares are exactly the rest, so
+                               #      the separate desperate floating-eye melee of unblock_step goes
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

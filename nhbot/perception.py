@@ -193,7 +193,10 @@ class PerceptionMixin:
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(g[yy, xx])
-                    if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
+                    if self.opts.desperate_rule:
+                        if not self.may_melee(lv, name):
+                            self.avoid_cells.append((yy, xx))
+                    elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
                             and not self.spore_ok(name):
                         self.avoid_cells.append((yy, xx))
         for dy, dx in NEIGH:
@@ -204,8 +207,11 @@ class PerceptionMixin:
             k = G.KIND[gg]
             if k == G.MONSTER:
                 name = G.monster_name(gg)
-                if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
-                                                and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
+                if self.opts.desperate_rule:
+                    if not self.may_melee(lv, name):
+                        continue
+                elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
+                                                  and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
                 if self.is_actively_dangerous(lv, (ny, nx)):
@@ -296,6 +302,15 @@ class PerceptionMixin:
         if name in ("cockatrice", "chickatrice") and any(it.wielded for it in self.items()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
         return name in NEVER_MELEE or name in PASSIVE_DMG
+
+    def may_melee(self, lv, name):
+        """Hit it in melee (and step onto its square)? Anything not in never_melee; a gas spore whose
+        explosion can't kill us; when desperate (stuck on the level) and at 90%+ HP, anything that is not
+        ALWAYS_AVOID (a floating eye's gaze paralyses unless we are blind)."""
+        if not self.never_melee(name) or self.spore_ok(name):
+            return True
+        return lv.desperate and name not in self.always_avoid() \
+            and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
