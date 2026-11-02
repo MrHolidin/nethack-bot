@@ -224,7 +224,8 @@ class CarryMixin:
         by_letter = {it.letter: it for it in self.items()}
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
         equipped = lambda l: by_letter[l].on_body
-        free = [x for x in inv if not equipped(x[0]) and by_letter[x[0]].key not in self.cant_drop]
+        free = [x for x in inv if not equipped(x[0]) and by_letter[x[0]].key not in self.cant_drop
+                and not (self.opts.lift_upgrades and self.equip_upgrade(x[2]))]   # about to be worn / wielded
         keys = {}
         for l, c, s, d in free:
             if d["unid"]:

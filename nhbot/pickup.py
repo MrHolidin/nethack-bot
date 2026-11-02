@@ -42,6 +42,8 @@ SAFE_FOOD_SET = set(SAFE_FOOD)
 CLASS_WORDS = {"potion": nh.POTION_CLASS, "scroll": nh.SCROLL_CLASS, "ring": nh.RING_CLASS, "wand": nh.WAND_CLASS,
                "amulet": nh.AMULET_CLASS, "spellbook": nh.SPBOOK_CLASS}
 CLASS_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s?\b")
+# pickup.c lift_object: picking this up would raise our encumbrance -- "<msg> <item>.  Continue?"
+LIFT_RE = re.compile(r"You have (a little trouble|much trouble|extreme difficulty) lifting (.+?)\.\s+Continue\?")
 STOLE_RE = re.compile(r"\b(?:stole|steals) (.+?)[.!](?:\s|$)")
 WANTED_WEAPON_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)   # a remembered weapon worth the walk
 for _g in range(nh.MAX_GLYPH):
@@ -138,6 +140,36 @@ class PickupMixin:
         if reason == "carry" and cap >= 1:
             return None
         return reason
+
+    # ------------------------------------------------------------------ heavy upgrades
+    def equip_upgrade(self, text):
+        """Would we put this on / wield it instead of what we have? Armor (any slot) by the same improves() that
+        decides wearing it; a weapon by the rank weapons.weapon_upgrade wields by."""
+        if CURSED_RE.search(text):
+            return False
+        ocls, _ = floor_kind(text)
+        if ocls == nh.ARMOR_CLASS:
+            a = parse_armor(text)
+            return a is not None and not a["cursed"] and self.improves(a, self.worn_by_slot())
+        if ocls == nh.WEAPON_CLASS:
+            if self.polyd or self.handless():
+                return False
+            cur = next((it for it in self.items() if it.wielded), None)
+            if cur is not None and cur.cursed:
+                return False
+            rank = self.weapon_rank(text)
+            return rank[0] > 0 and (cur is None or rank > self.weapon_rank(cur.text))
+        return False
+
+    def lift_ok(self, msg):
+        """The answer to "You have a little / much trouble lifting X. Continue?": yes for an equipment upgrade
+        (lift_upgrades; the weight step then sheds something else), never for "extreme difficulty"."""
+        m = LIFT_RE.search(msg)
+        if not m:
+            return False
+        ok = m.group(1) != "extreme difficulty" and self.equip_upgrade(m.group(2))
+        self.pickup_stats["lift_upgrade" if ok else "lift_other"] += 1
+        return ok and self.opts.lift_upgrades
 
     # ------------------------------------------------------------------ explore goals: piles worth a walk
     def weapon_glyphs(self):
