@@ -18,6 +18,9 @@ DEFAULTS = {
                                #      locked door is kicked while no watchman / shopkeeper is in view; with one in view
                                #      wait (the door is not marked impassable); "Hey, stop damaging that door!" (a
                                #      watchman saw it): never again
+    "search_model": False,     # A/B: search from the square with the most expected find per turn (search.py: room
+                               #      walls and dead-end corridors with room-sized unseen space beyond, discounted by
+                               #      the searching already done next to them) instead of the wall-count score
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP
