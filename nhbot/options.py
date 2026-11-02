@@ -24,6 +24,9 @@ DEFAULTS = {
                                #      lizard corpses (never rot) are eaten, after other food; tier-4 drops skip what
                                #      can't come off (welded weapon, cursed armor, worn rings / amulets, refused
                                #      before); one direction-prompt rule for throw / zap / kick
+    "ray_rules": False,        # A/B: a ray wand is zapped only if the forward direction can't bounce back (not
+                               #      "forward or backward"); only a closed door absorbs (zap.c zap_over_floor),
+                               #      open doors / doorways and boulders pass it; range 7..13 -> a wall 7+ away is safe
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

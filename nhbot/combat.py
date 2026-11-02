@@ -365,7 +365,10 @@ class CombatMixin:
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
-                if kind in RAY_WANDS and not self.ray_safe(lv, -dy, -dx) and not self.ray_safe(lv, dy, dx):
+                if self.opts.ray_rules:
+                    if kind in RAY_WANDS and not self.ray_safe(lv, dy, dx):
+                        continue
+                elif kind in RAY_WANDS and not self.ray_safe(lv, -dy, -dx) and not self.ray_safe(lv, dy, dx):
                     continue
                 self.cur_act = "fight"
                 self.last_attack_target = pos
@@ -377,15 +380,17 @@ class CombatMixin:
         absorbs it, otherwise no wall, unknown square or boulder lies within SAFE_RAY_DIST."""
         y, x = self.pos()
         k_mem = G.KIND[lv.under]
-        for i in range(1, SAFE_RAY_DIST + 1):
+        rules = self.opts.ray_rules
+        # buzz(): range rn1(7, 7), one per square; a bounce at distance d reaches us after 2d squares
+        for i in range(1, (SAFE_RAY_DIST - 1 if rules else SAFE_RAY_DIST) + 1):
             yy, xx = y + i * dy, x + i * dx
             if not (0 <= yy < ROWS and 0 <= xx < COLS):
                 return False
             k = k_mem[yy, xx]
-            if k in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY):
-                return True                      # doors absorb the ray
-            if k in (G.WALL, G.UNKNOWN, G.BOULDER):
-                return False
+            if k in ((G.DOOR_CLOSED,) if rules else (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)):
+                return True                      # a closed door absorbs the ray (open doors pass it)
+            if k in ((G.WALL, G.UNKNOWN) if rules else (G.WALL, G.UNKNOWN, G.BOULDER)):
+                return False                     # a ray passes over a boulder (buzz bounces on terrain only)
         return True
 
     def msg_combat(self, m):
