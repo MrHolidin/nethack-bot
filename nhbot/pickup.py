@@ -20,7 +20,6 @@ from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_
 from nhbot.combat import THROWABLE
 from nhbot.equipment import parse_armor
 from nhbot.items import CURSED_RE, base_name
-from nhbot.value import PICKUP_MIN
 
 # safe permanent food (no eggs: could be cockatrice; no tins: slow; no unknown corpses)
 SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration", "fortune cookie",
@@ -125,8 +124,6 @@ class PickupMixin:
                 reason = "missile"
             elif typ in WIELD_TYPES:
                 reason = "weapon"
-            elif self.opts.value_model:
-                reason = "carry"                         # if worth it: below
             else:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
@@ -139,8 +136,6 @@ class PickupMixin:
             if ocls == nh.SPBOOK_CLASS or not (typ == "gray stone" or typ in THROW_STONE_TYPES):
                 reason = "carry"
         if reason == "carry" and cap >= 1:
-            return None
-        if reason == "carry" and self.opts.value_model and self.floor_value_per_weight(ocls, text) < PICKUP_MIN:
             return None
         return reason
 

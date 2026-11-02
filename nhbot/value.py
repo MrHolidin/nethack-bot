@@ -11,7 +11,8 @@ est_gold(ocls, text): what a shopkeeper would pay for ONE unit (shk.c set_cost, 
 est_value(item, same): est_gold, +20% for an unidentified type of which we would have a single unit
   (what we may learn or use), VALUE_MAX + est_gold for what we wear / wield, what we need (carry.needed) and
   safe food up to MAX_FOOD pieces (pickup.food_needed), and water (clear potions).
-Decisions divide by the unit weight: drop the lowest value per weight first, pick up from 0.5 gold per weight.
+Dropping divides by the unit weight: the lowest value per weight goes first. value_model picks up all that
+carry_all does (the value decides what to drop, not what to take).
 """
 import re
 from collections import Counter
@@ -19,12 +20,11 @@ from collections import Counter
 import nle.nethack as nh
 
 from nhbot.carry import RANDOM_CLASSES, describe
-from nhbot.items import base_name, parse_item
+from nhbot.items import base_name
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
 VALUE_MAX = 1_000_000.0
 UNID_BONUS = 1.2
-PICKUP_MIN = 0.5                 # gold per weight unit worth picking up (was: weapons costing >= their weight)
 UNID_GEM_OFFER = 5.0
 UNID_SHK = 1 - 0.25 * 0.25       # 3/4 from one shopkeeper in 4
 CANCELLED_RE = re.compile(r"\(\d+:-1\)")
@@ -140,10 +140,3 @@ class ValueMixin:
 
     def value_per_weight(self, it, same=1):
         return self.est_value(it, same) / describe(it.ocls, it.text)["wt"]
-
-    def floor_value_per_weight(self, ocls, text):
-        """Value per weight of one unit of a floor item if we took it."""
-        it = parse_item("?", ocls, text)
-        k = appearance(text)
-        same = (self.carried_by_look()[k] if k is not None else 0) + base_name(text)[0]
-        return self.value_per_weight(it, same)
