@@ -100,7 +100,9 @@ class CombatMixin:
             if d == 0 or d > 6 or not (dy == 0 or dx == 0 or abs(dy) == abs(dx)):
                 continue
             name = G.monster_name(g[ty, tx])
-            if name not in (NEVER_MELEE_T if self.opts.monster_lists else RANGED_TARGETS):
+            ranged = NEVER_MELEE_T if self.opts.monster_lists and self.opts.monster_lists != "keep_ranged" \
+                else RANGED_TARGETS
+            if name not in ranged:
                 continue
             if name == "gas spore" and d < 3:
                 continue

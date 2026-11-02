@@ -47,7 +47,8 @@ DEFAULTS = {
                                #      table (passive-only, explodes, passive stoning / paralysis) instead of the hand
                                #      lists (ochre jelly, which engulfs, leaves them; acid blob, yellow / red mold join
                                #      the ranged targets; brown / green mold may be hit when desperate); worth_special
-                               #      by mon_dpt (the focus damage model) instead of the level proxy est_dmg
+                               #      by mon_dpt (the focus damage model) instead of the level proxy est_dmg;
+                               #      "keep_ranged": all that, but the ranged targets stay the old hand list
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp
