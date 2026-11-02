@@ -27,6 +27,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.equipment import parse_armor
 from nhbot.items import base_name
+from nhbot.pricemem import appearance
 
 CARRY_CLASSES = (nh.WAND_CLASS, nh.RING_CLASS, nh.AMULET_CLASS, nh.SCROLL_CLASS, nh.POTION_CLASS)
 RANDOM_CLASSES = CARRY_CLASSES + (nh.SPBOOK_CLASS,)
@@ -221,6 +222,8 @@ class CarryMixin:
         """Encumbered (or force): drop one unit following the tiers (up to max_tier). True if it used the turn."""
         if self.bl(nh.NLE_BL_CAP) < 1 and not force:
             return False
+        if self.opts.value_model:
+            return self.value_drop_step(max_tier)
         by_letter = {it.letter: it for it in self.items()}
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
         equipped = lambda l: by_letter[l].on_body
@@ -251,6 +254,30 @@ class CarryMixin:
             self.carry_stats["dropped"][4] += 1
             return True
         return False
+
+    def value_drop_step(self, max_tier):
+        """value_model: drop one unit of the item of lowest value per weight (what we wear / wield / need comes
+        last, being worth VALUE_MAX); max_tier < 4: nothing on the body."""
+        inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.cant_drop
+               and (max_tier >= 4 or not it.on_body)]
+        if not inv:
+            return False
+        looks = self.carried_by_look()
+        same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
+        it = min(inv, key=lambda it: self.value_per_weight(it, same(it)))
+        if it.on_body:
+            if it.ocls == nh.ARMOR_CLASS and it.worn:
+                a = parse_armor(it.text) or {"slot": None}
+                a["letter"] = it.letter
+                if not self.take_off(a):
+                    return False
+            self.drop_units(it.letter)
+            self.carry_stats["dropped"][4] += 1
+            return True
+        d = describe(it.ocls, it.text)
+        self.drop_units(it.letter, 1 if d["qty"] > 1 else None)
+        self.carry_stats["dropped"][2 if self.is_unknown(it.ocls, it.text) else 3] += 1
+        return True
 
     # ------------------------------------------------------------ sell
     def needed(self, it):
