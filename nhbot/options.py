@@ -12,9 +12,6 @@ DEFAULTS = {
                                #      counts, a straight one 1 in 5), into a square without a monster
     "stairs_memory": False,    # A/B: a staircase stays known under an item / corpse on it (as door_memory for doors);
                                #      mines_return lost its up staircase under a corpse and went down and up again
-    "mines_return_explore": False,  # A/B: while climbing out of the Mines (mines_return) no staircase down is a way
-                               #      on: a level whose up staircase is unknown is explored for it (descend_after
-                               #      counted from the first visit sent us down at once, and back up: a loop)
     "terrain_memory": False,   # A/B: a terrain layer per square (the last dungeon feature seen there) that items and
                                #      corpses don't overwrite: traps, stairs, doors, water stay known under an item
                                #      (MapMixin.kinds), fountains and altars too (terrain_glyphs)
