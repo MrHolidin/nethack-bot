@@ -25,6 +25,7 @@ import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
 from nhbot.items import base_name
+from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
@@ -83,6 +84,7 @@ class DangerMixin:
         self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
         self.flee_stats = Counter()
         self.flee_mode = None                    # flee: (level key, give-up turn) while getting away
+        self.flee_arrive = None                  # flee 'stairs': (level key we left, turn) just after climbing
         self.danger_mean = defaultdict(lambda: [0, 0.0, 0.0])    # bin -> [n, sum predicted, sum actual]
         self.danger_p = defaultdict(lambda: [0, 0.0, 0])         # bin -> [n, sum predicted, deaths]
 
@@ -286,6 +288,8 @@ class DangerMixin:
         True if it used the turn."""
         if not self.opts.flee:
             return False
+        if self.flee_arrive is not None and self.flee_arrive_step(lv, hostiles):
+            return True
         fm = self.flee_mode
         if fm is not None and (fm[0] != lv.key or self.turn() > fm[1]):
             self.flee_stats["timeout" if fm[0] == lv.key else "left_level"] += 1
@@ -297,7 +301,7 @@ class DangerMixin:
             if self.danger_estimate(hostiles, target)[1] <= FLEE_P:
                 return False
             self.flee_stats["start"] += 1
-            if self.faster_than_all(lv) and self.flee_walk(lv):
+            if self.faster_than_all(lv) and (self.flee_up(lv) or self.flee_walk(lv)):
                 self.flee_stats["ran"] += 1
                 self.flee_mode = (lv.key, self.turn() + FLEE_TURNS)
                 return True
@@ -308,6 +312,8 @@ class DangerMixin:
                 return True
             self.flee_stats["no_escape"] += 1
             return False
+        if self.flee_up(lv):
+            return True
         if self.flee_safe(lv):
             self.flee_mode = None
             self.flee_stats["safe"] += 1
@@ -326,6 +332,63 @@ class DangerMixin:
         self.flee_stats["gave_up"] += 1
         self.flee_mode = None
         return False
+
+    def flee_up(self, lv):
+        """flee 'stairs': toward the up staircase along squares next to no hostile in view; on it, climb (and
+        then rest next to it on the level above: flee_arrive_step). True if it used the turn."""
+        if self.opts.flee != "stairs" or self.bl(nh.NLE_BL_DEPTH) <= 1:      # Dlvl 1 up: out of the dungeon
+            return False
+        k_mem, k_live, ok = self.flee_grids(lv)
+        up = k_mem == G.UPSTAIR
+        if not up.any():
+            return False
+        if up[self.pos()]:
+            self.flee_stats["climb"] += 1
+            self.flee_mode = None
+            self.flee_arrive = (lv.key, self.turn())
+            self.cur_act = "flee"
+            self.took_stairs = True
+            self.press("<")
+            return True
+        if self.walk_to(lv, up, max_cost=80, act="flee", grids=(k_mem, k_live, ok | up))[0] == "moved":
+            self.flee_stats["to_stairs"] += 1
+            return True
+        return False
+
+    def flee_arrive_step(self, lv, hostiles):
+        """Just climbed away: step off the staircase (Elbereth can't be written on stairs), then write it and
+        rest on it (elb_state)."""
+        came, t0 = self.flee_arrive
+        if lv.key == came or self.turn() > t0 + 10:
+            self.flee_arrive = None if self.turn() > t0 + 10 else self.flee_arrive
+            return False
+        if self.stairs_kind_here(lv) is not None:
+            k_mem, k_live, ok = self.flee_grids(lv)
+            y, x = self.pos()
+            nb = np.zeros_like(ok)
+            nb[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
+            nb &= ok & (k_mem == G.FLOOR)
+            nb[y, x] = False
+            if nb.any() and self.walk_to(lv, nb, max_cost=10, act="flee", grids=(k_mem, k_live, ok))[0] == "moved":
+                return True
+            self.flee_arrive = None
+            return False
+        self.flee_arrive = None
+        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_exit and self.elb_can_write(lv) \
+                and not self.elb_blocked(lv):
+            self.flee_stats["rest_above"] += 1
+            return self.elb_write(lv)
+        return False
+
+    def flee_grids(self, lv):
+        """(k_mem, k_live, passable squares next to no hostile in view; ours included)."""
+        k_mem, k_live, passable = self.grids(lv)
+        near = np.zeros_like(passable)
+        for (y, x), _ in self.visible_hostiles(lv):
+            near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
+        ok = passable & ~near
+        ok[self.pos()] = True
+        return k_mem, k_live, ok
 
     def flee_safe(self, lv):
         """No hostile in view within FLEE_DIST - 1 squares."""

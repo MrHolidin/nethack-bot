@@ -8,7 +8,8 @@ DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
-    "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on Elbereth
+    "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
+                               #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
