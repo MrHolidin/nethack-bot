@@ -6,6 +6,10 @@ from nhbot.carry import LEAVE_RE
 # shk.c: "Welcome to Asidonhopo's general store!" -- a name ending in s takes only the apostrophe
 # ("Kinojevis' general store"); those shops used to go unmarked (nothing sold there)
 SHOP_WELCOME_RE = re.compile(r"Welcome to [A-Z][\w' -]*?(?:'s|s') ([^!]+)!")
+# shop_remark: a later visit says "Welcome again to ..." (shk.c u_entered_shop); every greeting marks the shop
+# again -- the first one often comes while we stand in the door seeing nothing inside yet (a keeper blocking
+# for a pick-axe), which marked nothing
+SHOP_WELCOME_AGAIN_RE = re.compile(r"Welcome(?: again)? to [A-Z][\w' -]*?(?:'s|s') ([^!]+)!")
 ARRIVED_RE = re.compile(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize")   # this tick
 
 
@@ -13,8 +17,11 @@ class ShopMixin:
     def shop_init(self):
         self.shopping = None
 
+    def welcome_re(self):
+        return SHOP_WELCOME_AGAIN_RE if self.opts.shop_remark else SHOP_WELCOME_RE
+
     def shop_greeted(self, lv, m):
-        mm = SHOP_WELCOME_RE.search(m)
+        mm = self.welcome_re().search(m)
         if not mm:
             return
         stype = mm.group(1)
@@ -55,7 +62,7 @@ class ShopMixin:
             self.price_note_text(m)
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
-        if lv and SHOP_WELCOME_RE.search(m) and not ARRIVED_RE.search(self.text_since(self.tick_seq)):
+        if lv and self.welcome_re().search(m) and not ARRIVED_RE.search(self.text_since(self.tick_seq)):
             # shop entrance: mark the shop from the door -- after falling in through a trap door we are
             # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())
