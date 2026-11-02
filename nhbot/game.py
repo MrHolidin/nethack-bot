@@ -39,15 +39,6 @@ class GameMixin:
         self.raw_step(code)
         self.settle(expect_prompt)
 
-    def answer_direction(self, key):
-        """After a command that may ask "In what direction?" (getdir is a yn_function): the direction key if it
-        asked, else settle. True if the key was sent."""
-        if self.obs["misc"][0] and "direction" in self.message().lower():
-            self.press(key)
-            return True
-        self.settle()
-        return False
-
     def settle(self, expect_prompt=False):
         for _ in range(50):
             tty = self.tty_text()
@@ -89,14 +80,9 @@ class GameMixin:
         n = min(self.msg_seq - seq0, len(self.messages))
         return [t for _, t in list(self.messages)[len(self.messages) - n:]] if n else []
 
-    def audit(self, site, used, seq0, pred, alt_pred=None):
-        """pred(used): a decision read from a window of recent messages. Counts the cases where reading only
-        the messages since seq0 (with alt_pred, if given) would decide otherwise."""
-        a = pred(used)
-        b = (alt_pred or pred)(" ".join(self.msgs_since(seq0)))
-        if a != b:
-            self.msg_audit["window_" + site] += 1
-        return b if self.opts.msg_windows else a
+    def text_since(self, seq0):
+        """The messages logged since the log counter was seq0, as one string: what one action answered."""
+        return " ".join(self.msgs_since(seq0))
 
     def ask(self, cmd, word):
         """Give a command that asks which item / direction: True if that question came (word in the message).

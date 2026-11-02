@@ -12,8 +12,6 @@ from nhbot.consts import DELTA2KEY, WEAK
 from nhbot.goals import GOALS
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
 
-NEVER_ROT_RE = re.compile(r"\b(?:lichen|lizard) corpses?\b")   # eat.c: these never rot
-
 
 class SurvivalMixin:
     def survival_init(self):
@@ -47,9 +45,7 @@ class SurvivalMixin:
             return False
         t = self.turn()
         if self.last_pray is None:
-            if self.opts.pray_rules:
-                return t > 100        # every caller is in major trouble: u.ublesscnt = 300 - (moves - 1) <= 200
-            return t > 300 or (hunger_emergency and t > 100)
+            return t > 100            # every caller is in major trouble: u.ublesscnt = 300 - (moves - 1) <= 200
         gap = t - self.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
@@ -58,15 +54,10 @@ class SurvivalMixin:
         return gap > self.opts.pray_gap
 
     def edible_now(self, s):
-        if self.opts.misc_fixes and self.opts.misc_fixes != "no_corpses" and NEVER_ROT_RE.search(s):
-            return True                       # eat.c: lichen and lizard corpses never rot
         return not re.search(r"\btins?\b", s) and "corpse" not in s and "egg" not in s
 
     def eat_from_inventory(self):
-        inv = self.inventory()
-        if self.opts.misc_fixes:              # a lizard corpse last, a lichen corpse before it
-            inv = sorted(inv, key=lambda t: ("lizard corpse" in t[2], "lichen corpse" in t[2]))
-        for letter, ocls, s in inv:
+        for letter, ocls, s in self.inventory():
             if ocls != nh.FOOD_CLASS or not self.edible_now(s):
                 continue
             self.press("e", expect_prompt=True)
@@ -78,8 +69,6 @@ class SurvivalMixin:
                 break
             if "what do you want to eat" in self.message().lower():
                 self.press(letter)
-                if self.opts.misc_fixes and NEVER_ROT_RE.search(s):
-                    self.eaten_by["carried " + NEVER_ROT_RE.search(s).group(0)] += 1
             else:
                 self.settle()
             return True
@@ -225,14 +214,12 @@ class SurvivalMixin:
             self.skill_msgs += 1
             self.want_enhance = True
         recent = self.last_pray is not None and self.turn() - self.last_pray <= 5
-        if "You feel that" in m and ("displeased" in m or self.opts.pray_angry and "bummed" in m):
+        if "You feel that" in m and ("displeased" in m or "bummed" in m):
             self.pray_failed += 1
-            if self.opts.pray_angry and recent:
+            if recent:
                 self.god_angry = True     # pray.c angrygods case 0-1; p_type 0 (too soon) also did u.ugangr++
-        angry = ("Thou hast angered me", "Thou must relearn", "You feel guilty", "Then die, mortal", "Thou durst")
-        if not self.opts.pray_angry:
-            angry += ("You feel that Mitra is angry",)
-        if recent and any(p in m for p in angry):
+        if recent and any(p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
+                                           "Then die, mortal", "Thou durst")):
             self.god_angry = True
         if "drop that gold" in m or "drop that money" in m:
             self.vault_drop = True

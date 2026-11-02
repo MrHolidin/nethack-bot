@@ -63,7 +63,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self._grids_key, self._grids = None, None
         self.tick_no = 0
         self.peaceful_waits = 0
-        self.peaceful_detours = 0
         self._cur_pos = self.prev_pos = None
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn
         self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
@@ -278,7 +277,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "loot_holds": self.loot_holds,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits,
-            "peaceful_detours": self.peaceful_detours,
             "msg_audit": dict(self.msg_audit),
             "farlooks": self.farlooks,
             "peaceful_hits": dict(self.peaceful_hits),

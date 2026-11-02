@@ -14,45 +14,8 @@ DEFAULTS = {
     "loot_holds_descent": False,   # A/B: a reachable stolen-items square on this level holds the stairs down
     "lift_upgrades": False,    # A/B: "trouble lifting X. Continue?" -> yes when X is an equipment upgrade (armor in
                                #      any slot, a better weapon); the weight step keeps it and drops something else
-    "pray_rules": False,       # A/B: prayer timing by the game's rules: the first prayer in major trouble from turn
-                               #      101 (u.ublesscnt starts at 300, major trouble needs <= 200); low HP by
-                               #      critically_low_hp (hp <= 5 or hp * 5/6/7/8/9 by XL rank <= min(maxhp, 15 * XL))
-    "pray_angry": False,       # A/B: "You feel that <god> is displeased." after our prayer -> god_angry (a prayer
-                               #      too soon raises u.ugangr, after which every prayer fails); drops a message
-                               #      the game never prints ("You feel that Mitra is angry")
-    "misc_fixes": False,       # A/B: plural good scrolls ("2 scrolls of remove curse") are good; carried lichen /
-                               #      lizard corpses (never rot) are eaten, after other food; tier-4 drops skip what
-                               #      can't come off (welded weapon, cursed armor, worn rings / amulets, refused
-                               #      before); one direction-prompt rule for throw / zap / kick; "no_corpses": all
-                               #      but the carried-corpse eating
-    "ray_rules": False,        # A/B: a ray wand is zapped only if the forward direction can't bounce back (not
-                               #      "forward or backward"); only a closed door absorbs (zap.c zap_over_floor),
-                               #      open doors / doorways and boulders pass it; range 7..13 -> a wall 7+ away is safe
-    "elb_consistent": False,   # A/B: a square counts as Elbereth (lv.elbereth) only once read back as "Elbereth"
-                               #      (forgotten when a read shows otherwise); rest_on_elbereth only on a square
-                               #      read as Elbereth now, with no hostile in view; the nymph Elbereth with the
-                               #      usual checks (engravable square, not the failed square, not stairs / levitating /
-                               #      blind / stunned / confused) and read back
-    "peaceful_route": False,   # A/B: the first step of a path holds a peaceful monster: take the best path around it
-                               #      when one costs at most peaceful_detour more; wait only when there is none
-    "peaceful_detour": 12,     # peaceful_route: extra path cost allowed for the way around
-    "desperate_rule": False,   # A/B: one rule (may_melee) for hitting a monster we normally never melee: a gas
-                               #      spore at HP >= 25, else only desperate, not ALWAYS_AVOID (a floating eye
-                               #      unless blind) and HP >= 90%; the never-step squares are exactly the rest, so
-                               #      the separate desperate floating-eye melee of unblock_step goes;
-                               #      "unblock": the same rule, and unblock_step may still melee a blocking floating
-                               #      eye when desperate (may_melee blocking=True), at 90%+ HP like everything else
-    "msg_windows": False,      # A/B: zap, kick, wear, take_off, dip, wield and the shop door read the messages of
-                               #      their own action (msgs_since) instead of the last N messages
-    "monster_lists": False,    # A/B: never-melee / always-avoid / ranged-target / stunned-wait monsters from the attack
-                               #      table (passive-only, explodes, passive stoning / paralysis) instead of the hand
-                               #      lists (ochre jelly, which engulfs, leaves them; acid blob, yellow / red mold join
-                               #      the ranged targets; brown / green mold may be hit when desperate); worth_special
-                               #      by mon_dpt (the focus damage model) instead of the level proxy est_dmg;
-                               #      "keep_ranged": all that, but the ranged targets stay the old hand list
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
-    "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp
     "pray_gap": 1000,          # turns since the last prayer before praying for HP
     "hunger_gap": 500,         # ... before praying when Weak
     "faint_wait": 200,         # turns Fainting before the emergency prayer

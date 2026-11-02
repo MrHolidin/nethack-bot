@@ -41,16 +41,6 @@ PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 PASSIVE_DMG = {nh.permonst(i).mname for i in range(nh.NUMMONS)
                if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i])}
 
-# monster_lists: the melee lists from the attack table (monst.c) instead of by hand
-PASSIVE_ONLY = PASSIVE_DMG                      # can't hurt us unless we hit them (molds, jellies, acid blob, eye)
-EXPLODES = {nh.permonst(i).mname for i in range(nh.NUMMONS) if any(a[0] == "BOOM" for a in ATTACKS[i])}
-_PASSIVE_AD = lambda ads: {nh.permonst(i).mname for i in range(nh.NUMMONS)
-                           if any(a[0] == "NONE" and a[1] in ads for a in ATTACKS[i])}
-PETRIFIES = _PASSIVE_AD({"STON"})               # touching it bare-handed (cockatrice, chickatrice)
-PARALYSES = _PASSIVE_AD({"PLYS"})               # floating eye (its gaze: not while we are blind), gelatinous cube
-NEVER_MELEE_T = PASSIVE_ONLY | EXPLODES | PETRIFIES
-ALWAYS_AVOID_T = EXPLODES | PETRIFIES | PARALYSES      # even when desperate (a gas spore: see spore_ok)
-
 
 THIEVES = ("water nymph", "wood nymph", "mountain nymph", "monkey")
 

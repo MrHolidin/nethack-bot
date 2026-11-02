@@ -1,26 +1,26 @@
 {
  "61000": {
-  "score": 5358.0,
-  "turns": 7669,
-  "max_depth": 10,
-  "xl": 7,
+  "score": 5589.0,
+  "turns": 21215,
+  "max_depth": 7,
+  "xl": 6,
   "last_msgs": [
-   "You hit the warg!",
-   "You hit the warg!  The hill orc swings his dwarvish mattock.",
-   "The hill orc hits!  The warg bites!",
-   "The hill orc hits!  The warg bites!",
-   "You hit the warg!",
-   "You hit the warg!",
-   "You miss the warg.  The warg bites!",
-   "You miss the warg.  The warg bites!",
-   "You miss the warg.  The hill orc swings his dwarvish mattock.",
-   "The hill orc hits!"
+   "You regain consciousness.",
+   "You can hear again.  You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
+   "You can hear again.  You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
+   "You can hear again.  You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
+   "You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
+   "You can hear again.  You stop searching.  You faint from lack of food."
   ],
   "truncated": false,
-  "steps": 10038,
-  "keys": 10038,
-  "keyhash": "155c6b7c6dbb898f",
-  "secs": 10.7
+  "steps": 22088,
+  "keys": 22088,
+  "keyhash": "bf07c02826a116f5",
+  "secs": 17.3
  },
  "61001": {
   "score": 4478.0,
@@ -43,99 +43,99 @@
   "steps": 4225,
   "keys": 4225,
   "keyhash": "15abf8847602830b",
-  "secs": 7.3
+  "secs": 8.1
  },
  "61002": {
-  "score": 55737.0,
-  "turns": 10971,
-  "max_depth": 22,
-  "xl": 11,
+  "score": 9694.0,
+  "turns": 6026,
+  "max_depth": 11,
+  "xl": 8,
   "last_msgs": [
-   "You kill the frost giant!  The frost giant hits!",
-   "The frost giant hits!  The frost giant hits!",
-   "The frost giant hits!  The frost giant hits!",
-   "You hit the frost giant!  The frost giant hits!  The frost giant hits!",
-   "The frost giant reads a scroll of teleportation!",
-   "A mysterious force prevents the frost giant from teleporting!",
-   "A mysterious force prevents the frost giant from teleporting!",
-   "You kill the frost giant!",
-   "You kill the frost giant!",
-   "You hit the frost giant!  The frost giant hits!  The frost giant hits!"
+   "You can move again.  It steals an uncursed +3 small shield!",
+   "You can move again.  It steals an uncursed +3 small shield!",
+   "You hit it.  You hear a nearby zap.  The magic missile hits you!",
+   "You hit it.  You hear a nearby zap.  The magic missile hits you!",
+   "You feel more confident in your weapon skills.  You kill it!",
+   "You hear a nearby zap.  The magic missile hits you!  It misses!",
+   "It just misses!",
+   "You are now most skilled in long sword.",
+   "You kill it!  It hits!  It hits!  You hear a nearby zap.  It kicks!",
+   "It bites!  You hear a nearby zap.  The magic missile hits you!"
   ],
   "truncated": false,
-  "steps": 13193,
-  "keys": 13193,
-  "keyhash": "7342b4c706eb42ff",
-  "secs": 22.1
+  "steps": 6570,
+  "keys": 6570,
+  "keyhash": "402e44a2f282da05",
+  "secs": 9.9
  },
  "61003": {
-  "score": 460.0,
-  "turns": 2896,
+  "score": 454.0,
+  "turns": 3045,
   "max_depth": 3,
-  "xl": 3,
+  "xl": 4,
   "last_msgs": [
-   "The large kobold misses!  You regain consciousness.",
-   "You hit the large kobold.  The large kobold misses!",
-   "You faint from lack of food.  The large kobold hits!",
-   "The large kobold misses!  The large kobold misses!",
-   "The large kobold misses!  The large kobold hits!",
-   "The large kobold misses!  The large kobold hits!",
+   "The cave spider bites!  The cave spider bites!  The cave spider bites!",
    "You regain consciousness.",
-   "You regain consciousness.",
-   "You faint from lack of food.  The large kobold misses!",
-   "The large kobold hits!  The large kobold hits!"
+   "What do you want to write with? [- ajk or ?*]",
+   "You write in the dust with your fingertip.",
+   "What do you want to write in the dust here?",
+   "The cave spider bites!  You can hear again.",
+   "You faint from lack of food.  The cave spider misses!",
+   "The cave spider misses!  The cave spider bites!",
+   "The cave spider bites!  The cave spider bites!  The cave spider bites!",
+   "The cave spider bites!"
   ],
   "truncated": false,
-  "steps": 2367,
-  "keys": 2367,
-  "keyhash": "1b564b1f163c41e7",
-  "secs": 5.3
+  "steps": 2656,
+  "keys": 2656,
+  "keyhash": "aec66a92e0b0580d",
+  "secs": 5.1
  },
  "61004": {
-  "score": 2108.0,
-  "turns": 2862,
-  "max_depth": 7,
-  "xl": 6,
+  "score": 7208.0,
+  "turns": 5657,
+  "max_depth": 11,
+  "xl": 8,
   "last_msgs": [
-   "You hear the footsteps of a guard on patrol.",
-   "You kill the Woodland-elf!",
-   "You kill the Woodland-elf!",
+   "You kill the giant spider!",
+   "The ettin mummy hits!  The ettin mummy hits!",
+   "The ettin mummy hits!  The ettin mummy hits!",
+   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!",
+   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!",
+   "You destroy the ettin mummy!",
+   "You destroy the ettin mummy!",
    "You stop searching.",
    "You stop searching.",
-   "You hit the Woodland-elf!",
-   "The Woodland-elf swings his elven broadsword.  The Woodland-elf hits!",
-   "The Woodland-elf swings his elven broadsword.  The Woodland-elf hits!",
-   "You miss the Woodland-elf.  The runed dagger hits the Woodland-elf!",
-   "The Woodland-elf swings his elven broadsword.  The Woodland-elf hits!"
+   "You hit the leocrotta!  The leocrotta hits!  The leocrotta bites!"
   ],
   "truncated": false,
-  "steps": 3155,
-  "keys": 3155,
-  "keyhash": "8f0c467ad93fd7fd",
-  "secs": 3.9
+  "steps": 7463,
+  "keys": 7463,
+  "keyhash": "b2acd23bdd9998b9",
+  "secs": 8.7
  },
  "61005": {
-  "score": 2287.0,
-  "turns": 3648,
+  "score": 2554.0,
+  "turns": 3041,
   "max_depth": 7,
   "xl": 6,
   "last_msgs": [
-   "You feel much better.",
-   "You hit the giant bat!  The giant bat bites!  The raven bites!",
-   "The raven blinds you!  It bites!  It bites!",
-   "The raven blinds you!  It bites!  It bites!",
-   "You miss it.  It bites!  It bites!  It just misses!  It bites!",
-   "It misses!  It bites!  It bites!",
-   "It misses!  It bites!  It bites!",
-   "You kill it!  It bites!  It misses!  It bites!",
-   "You kill it!  It bites!  It misses!  It bites!",
-   "You miss it.  It bites!  It bites!  It bites!"
+   "The plains centaur hits!  The plains centaur kicks!",
+   "You hit the plains centaur.  The yellow light explodes!",
+   "You are blinded by a blast of light!  It hits!  It kicks!  It bites!",
+   "You are blinded by a blast of light!  It hits!  It kicks!  It bites!",
+   "You hit it.  It hits!  It kicks!  It bites!  You hear crashing rock.",
+   "You hit it.  It hits!  It kicks!  It bites!  You hear crashing rock.",
+   "You hit it.  It hits!  It kicks!  It is missed.  It misses.  It bites!",
+   "It hits!  You hear someone muttering an incantation.",
+   "It hits!  You hear someone muttering an incantation.",
+   "You miss it.  It hits!"
   ],
   "truncated": false,
-  "steps": 5649,
-  "keys": 5649,
-  "keyhash": "3579a2e5c1fb8a09",
-  "secs": 4.8
+  "steps": 4181,
+  "keys": 4181,
+  "keyhash": "edbd040cab01194f",
+  "secs": 5.7
  },
  "61006": {
   "score": 684.0,
@@ -158,7 +158,7 @@
   "steps": 1701,
   "keys": 1701,
   "keyhash": "510e1506541f3c1f",
-  "secs": 2.4
+  "secs": 2.3
  },
  "61007": {
   "score": 3650.0,
@@ -181,53 +181,53 @@
   "steps": 5654,
   "keys": 5654,
   "keyhash": "6f611eb13c3b2b5a",
-  "secs": 7.2
+  "secs": 7.1
  },
  "61008": {
-  "score": 13318.0,
-  "turns": 13875,
-  "max_depth": 11,
-  "xl": 9,
+  "score": 61137.0,
+  "turns": 19254,
+  "max_depth": 26,
+  "xl": 11,
   "last_msgs": [
-   "The jaguar hits!  The jaguar hits!  The jaguar misses!",
-   "The jaguar hits!  The jaguar hits!  The jaguar bites!",
-   "The gelatinous cube touches you!  The jaguar misses!  The jaguar hits!",
-   "The jaguar misses!  The gelatinous cube touches you!  The jaguar hits!",
-   "The jaguar misses!  The jaguar bites!",
-   "The gelatinous cube touches you!  The jaguar hits!  The jaguar misses!",
-   "The jaguar bites!  The jaguar hits!  The jaguar hits!",
-   "The jaguar misses!  The gelatinous cube touches you!  The jaguar hits!",
-   "The jaguar misses!  The jaguar bites!  The jaguar hits!",
-   "The jaguar hits!"
+   "The mountain centaur kicks!  The mountain centaur misses!",
+   "The mountain centaur swings her crossbow.  The mountain centaur hits!",
+   "The mountain centaur kicks!  The mountain centaur kicks!",
+   "The mountain centaur kicks!  The mountain centaur kicks!",
+   "You hit the mountain centaur!  The rock troll hits!",
+   "The rock troll hits!  The rock troll bites!",
+   "The mountain centaur swings her crossbow.  The mountain centaur hits!",
+   "The mountain centaur kicks!  The mountain centaur kicks!",
+   "The mountain centaur swings her crossbow.  The mountain centaur hits!",
+   "The mountain centaur kicks!  The mountain centaur kicks!"
   ],
   "truncated": false,
-  "steps": 16688,
-  "keys": 16688,
-  "keyhash": "2feaf21e6313768f",
-  "secs": 26.8
+  "steps": 23969,
+  "keys": 23969,
+  "keyhash": "52a81c39874cc9f3",
+  "secs": 42.9
  },
  "61009": {
-  "score": 5960.0,
-  "turns": 4323,
-  "max_depth": 6,
-  "xl": 8,
+  "score": 2511.0,
+  "turns": 6321,
+  "max_depth": 7,
+  "xl": 6,
   "last_msgs": [
-   "The yeti hits!  The yeti misses!  The yeti bites!  The iguana bites!",
-   "The yeti hits!  The yeti hits!  The yeti bites!",
-   "The yeti hits!  The yeti hits!  The yeti bites!",
-   "You hit the yeti!  The yeti misses!  The yeti just misses!",
-   "The yeti bites!  The ogre picks up some gold.  The iguana bites!",
-   "The yeti bites!  The ogre picks up some gold.  The iguana bites!",
-   "You miss the yeti.  The yeti misses!  The yeti hits!  The yeti bites!",
-   "The iguana just misses!  The leprechaun picks up some gold.",
-   "The iguana just misses!  The leprechaun picks up some gold.",
-   "You hit the yeti!  The yeti hits!  The yeti hits!"
+   "Something is written here in the dust.  You read: \"Elbereth\".",
+   "You hit the Woodland-elf.  The Woodland-elf hits!",
+   "You hit the Woodland-elf.  The Woodland-elf hits!",
+   "You hit the Woodland-elf.  The Woodland-elf misses!",
+   "You hit the Woodland-elf.  The Woodland-elf misses!",
+   "You hit the Woodland-elf!  The Woodland-elf misses!",
+   "You hit the Woodland-elf!  The Woodland-elf misses!",
+   "You miss the Woodland-elf.  The Woodland-elf hits!",
+   "You miss the Woodland-elf.  The Woodland-elf hits!",
+   "You hit the Woodland-elf.  The Woodland-elf hits!"
   ],
   "truncated": false,
-  "steps": 3729,
-  "keys": 3729,
-  "keyhash": "af2f3c269e8c34a0",
-  "secs": 4.1
+  "steps": 5721,
+  "keys": 5721,
+  "keyhash": "e4b930e7957da639",
+  "secs": 6.9
  },
  "61010": {
   "score": 11614.0,
@@ -247,56 +247,56 @@
    "The gray unicorn kicks!  The gray unicorn butts!"
   ],
   "truncated": false,
-  "steps": 6688,
-  "keys": 6688,
-  "keyhash": "adc1ac3e34cfbeca",
-  "secs": 9.6
+  "steps": 6698,
+  "keys": 6698,
+  "keyhash": "4579ab5fcb1ca46f",
+  "secs": 10.3
  },
  "61011": {
-  "score": 2193.0,
-  "turns": 3974,
-  "max_depth": 6,
-  "xl": 6,
+  "score": 14220.0,
+  "turns": 11596,
+  "max_depth": 11,
+  "xl": 9,
   "last_msgs": [
-   "You hit it.  It misses!  It hits!",
-   "You hit it.  It misses!",
-   "You hit it.  It misses!",
-   "You kill it!  You murderer!  It hits!",
-   "You kill it!  You murderer!  It hits!",
-   "You hit it.  It hits!",
-   "You hit it.  It hits!",
-   "You hit it.",
-   "You hit it.",
-   "You kill it!  You murderer!  You hear a mumbled curse."
+   "What do you want to throw? [prsLMQSU-X or ?*]",
+   "In what direction?",
+   "The horse kicks!  The horse bites!  The horse kicks!  The horse bites!",
+   "What do you want to throw? [prsLQSU-X or ?*]",
+   "In what direction?",
+   "The horse kicks!  The horse bites!  The horse kicks!",
+   "The horse misses!",
+   "What do you want to throw? [prsLSU-X or ?*]",
+   "In what direction?",
+   "The horse kicks!"
   ],
   "truncated": false,
-  "steps": 4340,
-  "keys": 4340,
-  "keyhash": "85957f0ba6d99daa",
-  "secs": 8.7
+  "steps": 18236,
+  "keys": 18236,
+  "keyhash": "fb0e540e510f0264",
+  "secs": 36.9
  },
  "61012": {
   "score": 8162.0,
-  "turns": 7826,
+  "turns": 7825,
   "max_depth": 10,
   "xl": 8,
   "last_msgs": [
-   "Something is written here in the dust.  You read: \"El|ere?h\".",
-   "You see no objects here.",
-   "You see no objects here.",
-   "You stop searching.  The homunculus bites!",
-   "You stop searching.  The homunculus bites!",
+   "The homunculus bites!",
+   "You hit the homunculus.  The homunculus bites!",
+   "You hit the homunculus.  The homunculus bites!",
    "You hit the homunculus!",
    "You hit the homunculus!",
-   "You hit the homunculus!  The homunculus bites!",
-   "You are put to sleep by the homunculus!  The homunculus bites!",
-   "The homunculus bites!  The mumak butts!"
+   "You miss the homunculus.  The homunculus bites!",
+   "You miss the homunculus.  The homunculus bites!",
+   "You hit the mumak.",
+   "You hit the mumak.",
+   "You hit the mumak!  The homunculus bites!  The mumak butts!"
   ],
   "truncated": false,
-  "steps": 8752,
-  "keys": 8752,
-  "keyhash": "88a2062465cce796",
-  "secs": 24.3
+  "steps": 8754,
+  "keys": 8754,
+  "keyhash": "d0d027ab87ad2d23",
+  "secs": 31.0
  },
  "61013": {
   "score": 2277.0,
@@ -319,53 +319,53 @@
   "steps": 3200,
   "keys": 3200,
   "keyhash": "3caf8dacd4caceea",
-  "secs": 4.0
+  "secs": 4.8
  },
  "61014": {
-  "score": 1730.0,
-  "turns": 3954,
-  "max_depth": 5,
-  "xl": 6,
+  "score": 4318.0,
+  "turns": 5858,
+  "max_depth": 7,
+  "xl": 7,
   "last_msgs": [
-   "\"Thou art arrogant, mortal.\"  \"Thou must relearn thy lessons!\"",
-   "You feel foolish!  Farvel level 6.",
-   "You feel foolish!  Farvel level 6.",
-   "You miss the giant ant.  The giant ant bites!",
-   "You miss the giant ant.  The giant ant bites!",
-   "You hit the giant ant!  The giant ant misses!  The giant ant misses!",
-   "You hit the giant ant!  The giant ant misses!  The giant ant misses!",
-   "You miss the giant ant.  The giant ant misses!",
-   "You miss the giant ant.  The giant ant misses!",
-   "You kill the giant ant!  Welcome back to experience level 6."
+   "The housecat bites!  The housecat turns into a kobold mummy!",
+   "You hit the master mind flayer.  The master mind flayer hits!",
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head.",
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head.",
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head.",
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head."
   ],
   "truncated": false,
-  "steps": 4430,
-  "keys": 4430,
-  "keyhash": "bd589941b0d24029",
-  "secs": 3.9
+  "steps": 6457,
+  "keys": 6457,
+  "keyhash": "47bbda4e9e2a49f3",
+  "secs": 7.4
  },
  "61015": {
-  "score": 1954.0,
-  "turns": 4560,
-  "max_depth": 8,
-  "xl": 6,
+  "score": 1602.0,
+  "turns": 3717,
+  "max_depth": 9,
+  "xl": 5,
   "last_msgs": [
-   "The raven turns to flee.",
-   "Something is written here in the dust.  You read: \"Elbereth\".",
-   "You see no objects here.",
-   "You are momentarily blinded by a flash of light!",
-   "You hear a deafening roar!",
-   "You feel an unseen monster!  It bites!  It hits!  It bites!",
-   "You feel an unseen monster!  It bites!  It hits!  It bites!",
-   "You hit it.  It bites!  It hits!  It bites!  It bites!",
-   "You hit it.  It bites!  It hits!  It bites!  It bites!",
-   "You miss it.  It bites!"
+   "You see here a white gem.",
+   "You see here a white potion.",
+   "You see here a white potion.",
+   "u - a white potion.",
+   "You faint from lack of food.  The giant spider bites!",
+   "The giant spider bites!  The giant spider bites!",
+   "The giant spider bites!  The giant spider bites!",
+   "The giant spider bites!  The giant spider bites!",
+   "The giant spider's bite was poisoned!",
+   "Valkyrie, your life force is running out."
   ],
   "truncated": false,
-  "steps": 6898,
-  "keys": 6898,
-  "keyhash": "24e16330bb14d4f3",
-  "secs": 6.1
+  "steps": 5621,
+  "keys": 5621,
+  "keyhash": "776ce4f960945f96",
+  "secs": 5.9
  },
  "61016": {
   "score": 954.0,
@@ -388,7 +388,7 @@
   "steps": 1986,
   "keys": 1986,
   "keyhash": "06576ff8d115cb88",
-  "secs": 2.4
+  "secs": 2.8
  },
  "61017": {
   "score": 5316.0,
@@ -411,30 +411,30 @@
   "steps": 5398,
   "keys": 5398,
   "keyhash": "05316bbb576d1d85",
-  "secs": 6.2
+  "secs": 7.3
  },
  "61018": {
-  "score": 23562.0,
-  "turns": 7490,
-  "max_depth": 18,
+  "score": 36973.0,
+  "turns": 14055,
+  "max_depth": 15,
   "xl": 10,
   "last_msgs": [
-   "You kill the garter snake!",
-   "You descend the stairs.",
-   "You descend the stairs.",
-   "You again sense the Norn pleading for help.",
-   "The quasit hits!  The quasit misses!  The quasit bites!",
-   "The quasit hits!  The quasit misses!  The quasit bites!",
-   "You hit the quasit.  The quasit hits!  The quasit misses!",
-   "The quasit misses!",
-   "The quasit misses!",
-   "You hit the quasit!  The quasit hits!  The quasit hits!"
+   "The vampire bat bites!  The vampire bat bites!  The cobra bites!",
+   "The vampire bat bites!  The vampire bat bites!  The cobra bites!",
+   "You hit the fire elemental!  The vampire bat bites!",
+   "The vampire bat bites!  The cobra bites!  The fire elemental hits!",
+   "You're on fire!",
+   "You're on fire!",
+   "You hit the fire elemental!  You are suddenly very hot!",
+   "You hit the fire elemental!  You are suddenly very hot!",
+   "You kill the fire elemental!  The vampire bat bites!",
+   "The vampire bat bites!  The cobra bites!"
   ],
   "truncated": false,
-  "steps": 8808,
-  "keys": 8808,
-  "keyhash": "8a7f3d83306a9a39",
-  "secs": 13.0
+  "steps": 12013,
+  "keys": 12013,
+  "keyhash": "6fc04f63df2d92c2",
+  "secs": 16.7
  },
  "61019": {
   "score": 2128.0,
@@ -457,30 +457,30 @@
   "steps": 5019,
   "keys": 5019,
   "keyhash": "9f7558f6fbf2e89c",
-  "secs": 5.4
+  "secs": 5.9
  },
  "61020": {
-  "score": 2499.0,
-  "turns": 3423,
+  "score": 1204.0,
+  "turns": 3078,
   "max_depth": 7,
-  "xl": 6,
+  "xl": 5,
   "last_msgs": [
-   "You feel much better.",
-   "You are now more skilled in long sword.",
-   "You kill it!  It bites!  It stings!  It misses!  It stings!",
-   "You hear some noises.  It bites!  It stings!  Its sting was poisoned!",
-   "It bites!  It misses!",
-   "It bites!  It misses!",
-   "You hit it.  It bites!  It stings!  It bites!  It misses!  It misses!",
-   "It misses!",
-   "It misses!",
-   "You kill it!  It bites!  It bites!  It stings!"
+   "The hill orc hits!  The giant ant bites!  The giant ant bites!",
+   "The hill orc hits!  The giant ant bites!  The giant ant bites!",
+   "You hit the hill orc.  The hill orc swings his scimitar.",
+   "The hill orc misses!  The giant ant misses!",
+   "The hill orc misses!  The giant ant misses!",
+   "You miss the hill orc.  The hill orc swings his scimitar.",
+   "The hill orc hits!  The giant ant misses!  The giant ant misses!",
+   "The hill orc hits!  The giant ant misses!  The giant ant misses!",
+   "You miss the hill orc.  The hill orc swings his scimitar.",
+   "The hill orc hits!  The giant ant misses!  The giant ant bites!"
   ],
   "truncated": false,
-  "steps": 3818,
-  "keys": 3818,
-  "keyhash": "9bce0b923c8e6dbc",
-  "secs": 4.3
+  "steps": 3852,
+  "keys": 3852,
+  "keyhash": "c4de9e22d5ba0d21",
+  "secs": 3.9
  },
  "61021": {
   "score": 9269.0,
@@ -503,30 +503,30 @@
   "steps": 14783,
   "keys": 14783,
   "keyhash": "10bc7f1329821367",
-  "secs": 52.2
+  "secs": 57.4
  },
  "61022": {
-  "score": 2627.0,
-  "turns": 6497,
+  "score": 2595.0,
+  "turns": 6491,
   "max_depth": 7,
   "xl": 6,
   "last_msgs": [
-   "The magic missile hits you!  The magic missile bounces!",
-   "The magic missile bounces!",
+   "You miss the Elvenking.  The bugbear hits!",
+   "The kobold thrusts his orcish dagger.  The kobold misses!",
    "The Elvenking zaps a wand of magic missile!",
    "The magic missile hits you!  The magic missile bounces!",
+   "The magic missile hits you!  The magic missile hits the Elvenking!",
+   "The magic missile hits you!  The magic missile hits the Elvenking!",
+   "You miss the Elvenking.  The bugbear hits!",
+   "The Elvenking zaps a wand of magic missile!",
    "The magic missile hits you!  The magic missile bounces!",
-   "You hit the Elvenking!  The Elvenking zaps a wand of magic missile!",
-   "The magic missile hits you!  The magic missile bounces!",
-   "The magic missile bounces!  The Elvenking swings his mace.",
-   "The Elvenking hits!  The Elvenking swings his mace.",
-   "The Elvenking hits!"
+   "The magic missile hits you!"
   ],
   "truncated": false,
-  "steps": 6376,
-  "keys": 6376,
-  "keyhash": "b9dc998c9bec51f7",
-  "secs": 8.0
+  "steps": 6364,
+  "keys": 6364,
+  "keyhash": "9404ea7f2b487fc5",
+  "secs": 8.5
  },
  "61023": {
   "score": 5076.0,
@@ -549,7 +549,7 @@
   "steps": 4351,
   "keys": 4351,
   "keyhash": "5bdd3684d18fd86f",
-  "secs": 10.5
+  "secs": 11.0
  },
  "61024": {
   "score": 8308.0,
@@ -569,10 +569,10 @@
    "The Woodland-elf hits!"
   ],
   "truncated": false,
-  "steps": 8550,
-  "keys": 8550,
-  "keyhash": "9ea107ac8db41733",
-  "secs": 12.4
+  "steps": 8552,
+  "keys": 8552,
+  "keyhash": "088e74dbc70a0f2f",
+  "secs": 13.0
  },
  "61025": {
   "score": 454.0,
@@ -595,7 +595,7 @@
   "steps": 1513,
   "keys": 1513,
   "keyhash": "71b1b369b9e04379",
-  "secs": 1.5
+  "secs": 1.7
  },
  "61026": {
   "score": 431.0,
@@ -621,27 +621,27 @@
   "secs": 3.0
  },
  "61027": {
-  "score": 8149.0,
-  "turns": 6782,
+  "score": 12637.0,
+  "turns": 10531,
   "max_depth": 11,
-  "xl": 7,
+  "xl": 9,
   "last_msgs": [
-   "You hit the gold golem!  The gold golem hits!  The gold golem hits!",
-   "You miss the gold golem.",
-   "You miss the gold golem.",
-   "You hit the gold golem!  The gold golem hits!  The gold golem hits!",
-   "You hit the gold golem!  The gold golem hits!  The gold golem hits!",
-   "You destroy the gold golem!",
-   "You destroy the gold golem!",
-   "You stop searching.",
-   "You stop searching.",
-   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!"
+   "You are being crushed.",
+   "You kill the owlbear!  Welcome to experience level 9.",
+   "There is an open door here.  You see here an owlbear corpse.",
+   "There is an open door here.  You see here an owlbear corpse.",
+   "You hit the homunculus.  The homunculus bites!",
+   "You hit the homunculus.  The homunculus bites!",
+   "You hit the homunculus!",
+   "You hit the homunculus!",
+   "You miss the homunculus.  The homunculus just misses!",
+   "The gargoyle hits!  The gargoyle hits!  The gargoyle bites!"
   ],
   "truncated": false,
-  "steps": 9266,
-  "keys": 9266,
-  "keyhash": "636a438beb96e4e9",
-  "secs": 6.3
+  "steps": 15835,
+  "keys": 15835,
+  "keyhash": "04acf09b91ee5785",
+  "secs": 21.5
  },
  "61028": {
   "score": 17522.0,
@@ -664,7 +664,7 @@
   "steps": 11734,
   "keys": 11734,
   "keyhash": "0277d219e0a7c76f",
-  "secs": 20.8
+  "secs": 26.0
  },
  "61029": {
   "score": 4026.0,
@@ -687,7 +687,7 @@
   "steps": 5040,
   "keys": 5040,
   "keyhash": "a9d4631b3427b816",
-  "secs": 5.5
+  "secs": 6.7
  },
  "61030": {
   "score": 3331.0,
@@ -710,7 +710,7 @@
   "steps": 4873,
   "keys": 4873,
   "keyhash": "9d90142d0a2b02c0",
-  "secs": 8.8
+  "secs": 10.5
  },
  "61031": {
   "score": 30157.0,
@@ -733,6 +733,6 @@
   "steps": 12656,
   "keys": 12656,
   "keyhash": "dd9e457664e41ec0",
-  "secs": 16.0
+  "secs": 18.9
  }
 }

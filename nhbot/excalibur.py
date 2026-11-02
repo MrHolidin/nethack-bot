@@ -99,11 +99,9 @@ class ExcaliburMixin:
                 lv.under[y, x] = FLOOR_GLYPH       # no fountain here any more
             return False
         self.dips += 1
-        recent = " ".join(t for _, t in list(self.messages)[-6:])
-        if self.opts.msg_windows:
-            recent = " ".join(self.msgs_since(seq0))
+        recent = self.text_since(seq0)
         y, x = self.pos()
-        if self.audit("dip", recent, seq0, lambda s: "Excalibur" in s or "hand reaches up" in s) or \
+        if "Excalibur" in recent or "hand reaches up" in recent or \
                 any("Excalibur" in s for _, _, s in self.inventory()):
             self.excalibur = True
             self.excal_turn = self.turn()

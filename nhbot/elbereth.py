@@ -30,10 +30,9 @@ class ElberethMixin:
         self.elb_fail = 0
         self.elb_rewrites = 0
         self.elb_only_c = 0
-        self.elb_stats = collections.Counter()   # elb_consistent: confirmed rests, nymph engravings
+        self.elb_stats = collections.Counter()   # reads, confirmed rests, nymph engravings
 
     def engrave_elbereth(self):
-        lv = self.level()
         if not self.ask("E", "write with"):
             return False
         self.press("-", expect_prompt=True)
@@ -49,9 +48,7 @@ class ElberethMixin:
             for c in "Elbereth":
                 self.raw_step(ord(c))
             self.press(13)
-            if not self.opts.elb_consistent:
-                lv.elbereth.add(self.pos())      # elb_consistent: only once read back (elb_confirm)
-            self.elbereths += 1
+            self.elbereths += 1                  # lv.elbereth only once read back (elb_confirm)
             return True
         self.settle()
         return False
@@ -124,23 +121,18 @@ class ElberethMixin:
         return not cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF)
 
     def elb_confirm(self, lv):
-        """Read the engraving under us; elb_consistent: lv.elbereth follows what it says. True if Elbereth."""
+        """Read the engraving under us; lv.elbereth follows what it says. True if Elbereth."""
         ok = self.read_engraving() == "Elbereth"
         self.elb_stats["read_ok" if ok else "read_not"] += 1
-        if self.opts.elb_consistent:
-            if ok:
-                lv.elbereth.add(self.pos())
-            else:
-                lv.elbereth.discard(self.pos())
+        if ok:
+            lv.elbereth.add(self.pos())
+        else:
+            lv.elbereth.discard(self.pos())
         return ok
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
-            return False
-        if self.can_pray():
-            return False
-        if not self.elb_can_write(lv):
+        if self.can_pray() or not self.elb_can_write(lv):
             return False
         y, x = self.pos()
         near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]

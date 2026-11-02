@@ -13,7 +13,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_squares
 from nhbot.mapmem import Level
-from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PASSIVE_ONLY, PM_BY_NAME
+from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 from nhbot.items import CURSED_RE
 from nhbot.pickup import MISSILE_TYPES, floor_kind
 
@@ -159,11 +159,7 @@ class PolicyMixin:
 
     def step_pray(self, c):
         hp, maxhp, hunger, t = c.hp, c.maxhp, c.hunger, c.t
-        if self.opts.pray_rules:
-            low = self.critically_low_hp(hp, maxhp)
-        else:
-            low = hp <= 5 or hp * 7 <= maxhp or hp * self.opts.pray_div <= maxhp
-        if low and self.can_pray():
+        if self.critically_low_hp(hp, maxhp) and self.can_pray():
             self.pray(); return True
         if hunger >= FAINTING:
             if self.faint_since is None:
@@ -199,8 +195,7 @@ class PolicyMixin:
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
-            passive = PASSIVE_ONLY if self.opts.monster_lists else PASSIVE_MOLDS
-            if not c.hostiles or all(n in passive for _, n in c.hostiles):
+            if not c.hostiles or all(n in PASSIVE_MOLDS for _, n in c.hostiles):
                 self.stun_waits += 1
                 self.press("s")
                 return True
@@ -265,20 +260,14 @@ class PolicyMixin:
         return not self.hallu_blind_ranged() and self.hunt_step(c.lv)
 
     def step_rest_on_elbereth(self, c):
-        if self.opts.elb_consistent:
-            if (c.y, c.x) not in c.lv.elbereth or c.hp * 2 >= c.maxhp or self.visible_hostiles(c.lv) \
-                    or not self.elb_confirm(c.lv):
-                return False
-            self.elb_stats["rest_confirmed"] += 1
-            self.cur_act = "rest"
-            self.press("2"); self.press("0"); self.press("s")
-            return True
-        if (c.y, c.x) in c.lv.elbereth and c.hp * 2 < c.maxhp:
-            self.elb_stats["rest_unchecked"] += 1
-            self.cur_act = "rest"
-            self.press("2"); self.press("0"); self.press("s")
-            return True
-        return False
+        """Hurt, on a square read as Elbereth just now, no hostile in view: rest."""
+        if (c.y, c.x) not in c.lv.elbereth or c.hp * 2 >= c.maxhp or self.visible_hostiles(c.lv) \
+                or not self.elb_confirm(c.lv):
+            return False
+        self.elb_stats["rest_confirmed"] += 1
+        self.cur_act = "rest"
+        self.press("2"); self.press("0"); self.press("s")
+        return True
 
     def step_throw_at_blocker(self, c):
         """Ranged attacks on things we refuse to melee."""

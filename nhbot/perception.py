@@ -11,9 +11,7 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.monattacks import ATTACKS
-from nhbot.focus import mon_dpt
-from nhbot.monsters import (ALWAYS_AVOID, ALWAYS_AVOID_T, NEVER_MELEE, NEVER_MELEE_T, PASSIVE_DMG, PM_BY_NAME,
-                            THIEVES, permonst_of)
+from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES, permonst_of
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
 # (gas spore), the Oracle, a long worm's tail. No monster without one can move (mmove 0 for all that can't).
@@ -195,10 +193,7 @@ class PerceptionMixin:
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(g[yy, xx])
-                    if self.opts.desperate_rule:
-                        if not self.may_melee(lv, name):
-                            self.avoid_cells.append((yy, xx))
-                    elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
+                    if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
                             and not self.spore_ok(name):
                         self.avoid_cells.append((yy, xx))
         for dy, dx in NEIGH:
@@ -209,11 +204,8 @@ class PerceptionMixin:
             k = G.KIND[gg]
             if k == G.MONSTER:
                 name = G.monster_name(gg)
-                if self.opts.desperate_rule:
-                    if not self.may_melee(lv, name):
-                        continue
-                elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
-                                                  and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
+                if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
+                                                and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
                 if self.is_actively_dangerous(lv, (ny, nx)):
@@ -294,11 +286,8 @@ class PerceptionMixin:
                    for yy, xx in zip(ys, xs))
 
     def always_avoid(self):
-        blind = int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND
-        if self.opts.monster_lists:
-            return ALWAYS_AVOID_T - {"floating eye"} if blind else ALWAYS_AVOID_T
         s = ALWAYS_AVOID
-        if not blind:
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
         return s
 
@@ -306,22 +295,7 @@ class PerceptionMixin:
         """Don't hit what has only a passive attack (it never hurts us otherwise); desperate (stuck) still may."""
         if name in ("cockatrice", "chickatrice") and any(it.wielded for it in self.items()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
-        if self.opts.monster_lists:
-            return name in NEVER_MELEE_T
         return name in NEVER_MELEE or name in PASSIVE_DMG
-
-    def may_melee(self, lv, name, blocking=False):
-        """Hit it in melee (and step onto its square)? Anything not in never_melee; a gas spore whose
-        explosion can't kill us; when desperate (stuck on the level) and at 90%+ HP, anything that is not
-        ALWAYS_AVOID (a floating eye's gaze paralyses unless we are blind). desperate_rule "unblock": a floating
-        eye that is all that separates us from the rest of the level (blocking) too."""
-        if not self.never_melee(name) or self.spore_ok(name):
-            return True
-        avoid = self.always_avoid()
-        if blocking and self.opts.desperate_rule == "unblock":
-            avoid = avoid - {"floating eye"}
-        return lv.desperate and name not in avoid \
-            and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
@@ -343,8 +317,6 @@ class PerceptionMixin:
         pm = permonst_of(g)
         if pm is None or name == "invisible":
             return 3.0
-        if self.opts.monster_lists:
-            return mon_dpt(nh.glyph_to_mon(int(g)), self.bl(nh.NLE_BL_AC))
         lvl = pm.mlevel
         ac = self.bl(nh.NLE_BL_AC)
         hit = min(max((10 + ac + lvl - 1) / 20.0, 0.05), 1.0)

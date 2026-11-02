@@ -205,8 +205,8 @@ class EquipMixin:
                 self.polyd = True             # a form we failed to notice; cleared by "You return to ... form"
             return
         self.press(a["letter"])
-        msgs = " ".join(m for _, m in list(self.messages)[-4:])
-        if self.audit("wear", msgs, seq0, lambda s: "two-handed" in s):
+        msgs = self.text_since(seq0)
+        if "two-handed" in msgs:
             self.no_shield = True
         now = [x for x in self.armor_inventory() if x["letter"] == a["letter"]]
         if not (now and now[0]["worn"]):
@@ -221,8 +221,8 @@ class EquipMixin:
         seq0 = self.msg_seq
         if self.ask("T", "what do you want to take off"):
             self.press(a["letter"])
-        msgs = " ".join(m for _, m in list(self.messages)[-4:])
-        if self.audit("take_off", msgs, seq0, lambda s: "cursed" in s and "You can't" in s):
+        msgs = self.text_since(seq0)
+        if "cursed" in msgs and "You can't" in msgs:
             self.cursed_slots.add(a["slot"])
             return False
         still = [x for x in self.armor_inventory() if x["letter"] == a["letter"] and x["worn"]]

@@ -214,9 +214,8 @@ class CarryMixin:
             for c in str(n):
                 self.raw_step(ord(c))
         self.press(letter)
-        refused = ("cannot drop", "welded to your") if self.opts.misc_fixes else ("cannot drop",)
-        if any(r in t for t in self.msgs_since(seq0) for r in refused) and item is not None:
-            self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"; a welded weapon
+        if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
+            self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
 
     def carry_drop_step(self):
         """Encumbered: drop one unit following the four tiers. True if it used the turn."""
@@ -242,19 +241,12 @@ class CarryMixin:
                 self.carry_stats["dropped"][tier] += 1
                 return True
         worn = [x for x in inv if equipped(x[0])]
-        if self.opts.misc_fixes:              # only what can come off: no worn rings / amulets (do.c canletgo),
-            worn = [x for x in worn if by_letter[x[0]].key not in self.cant_drop     # nothing refused before
-                    and (x[1] != nh.ARMOR_CLASS or (parse_armor(x[2]) or {}).get("slot") not in self.cursed_slots)
-                    and not ((by_letter[x[0]].worn or by_letter[x[0]].ring_on) and x[1] != nh.ARMOR_CLASS)
-                    and not by_letter[x[0]].cursed]
         if worn:
             l, c, s, d = min(worn, key=lambda x: (x[3]["cost"] or 0) / x[3]["wt"])
             if c == nh.ARMOR_CLASS and by_letter[l].worn:
                 a = parse_armor(s) or {"slot": None}
                 a["letter"] = l
                 if not self.take_off(a):
-                    if self.opts.misc_fixes:
-                        self.cant_drop.add(by_letter[l].key)    # cursed, or under a cloak: not again
                     return False
             self.drop_units(l)
             self.carry_stats["dropped"][4] += 1

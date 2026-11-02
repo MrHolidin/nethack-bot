@@ -6,6 +6,7 @@ from nhbot.carry import LEAVE_RE
 # shk.c: "Welcome to Asidonhopo's general store!" -- a name ending in s takes only the apostrophe
 # ("Kinojevis' general store"); those shops used to go unmarked (nothing sold there)
 SHOP_WELCOME_RE = re.compile(r"Welcome to [A-Z][\w' -]*?(?:'s|s') ([^!]+)!")
+ARRIVED_RE = re.compile(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize")   # this tick
 
 
 class ShopMixin:
@@ -54,11 +55,7 @@ class ShopMixin:
             self.price_note_text(m)
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
-        if lv and SHOP_WELCOME_RE.search(m) and not self.audit(
-                "shop_door", " ".join(mm for _, mm in list(self.messages)[-6:]), self.tick_seq,
-                lambda s: any(k in s for k in ("trap door", "fall through", "hole", "teleport", "wrenching",
-                                               "You materialize")),
-                lambda s: bool(re.search(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize", s))):
+        if lv and SHOP_WELCOME_RE.search(m) and not ARRIVED_RE.search(self.text_since(self.tick_seq)):
             # shop entrance: mark the shop from the door -- after falling in through a trap door we are
             # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())

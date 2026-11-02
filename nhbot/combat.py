@@ -10,7 +10,7 @@ from nhbot import glyphs as G
 from nhbot.items import WAND_SPENT_RE
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
 from nhbot.goals import GOALS
-from nhbot.monsters import NEVER_MELEE_T, RANGED_TARGETS
+from nhbot.monsters import RANGED_TARGETS
 from nhbot.nav import line_clear
 
 
@@ -29,7 +29,7 @@ RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bou
 BEAM_WANDS = ("striking",)                                            # no bounce
 
 
-SAFE_RAY_DIST = 7          # ray range is 7..13: a wall >= 7 away can't bounce it back onto us
+SAFE_RAY_DIST = 7          # ray range is rn1(7, 7) = 7..13: a wall >= 7 away can't bounce it back onto us
 
 
 # mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
@@ -100,9 +100,7 @@ class CombatMixin:
             if d == 0 or d > 6 or not (dy == 0 or dx == 0 or abs(dy) == abs(dx)):
                 continue
             name = G.monster_name(g[ty, tx])
-            ranged = NEVER_MELEE_T if self.opts.monster_lists and self.opts.monster_lists != "keep_ranged" \
-                else RANGED_TARGETS
-            if name not in ranged:
+            if name not in RANGED_TARGETS:
                 continue
             if name == "gas spore" and d < 3:
                 continue
@@ -117,9 +115,7 @@ class CombatMixin:
         self.press(letter, expect_prompt=True)
         if "direction" not in self.message().lower() and self.obs["misc"][0] == 0:
             self.msg_audit["throw_key_without_direction"] += 1
-        if self.opts.misc_fixes:
-            self.answer_direction(key)
-        elif "direction" in self.message().lower() or self.obs["misc"][0] == 0:
+        if "direction" in self.message().lower() or self.obs["misc"][0] == 0:
             self.press(key)
         else:
             self.settle()
@@ -220,11 +216,7 @@ class CombatMixin:
                 self.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
-            if self.opts.desperate_rule == "unblock":
-                gamble = d == 1 and self.may_melee(lv, name, blocking=True)
-            else:
-                gamble = d == 1 and name == "floating eye" and lv.desperate and not self.opts.desperate_rule
-            if gamble:
+            if d == 1 and name == "floating eye" and lv.desperate:
                 self.unblock_melee += 1
                 self.attack(blocker)
                 return True
@@ -345,14 +337,12 @@ class CombatMixin:
             return False
         self.press(letter, expect_prompt=True)
         m = self.message().lower()
-        if self.opts.misc_fixes:
-            self.answer_direction(key)
-        elif "direction" in m:
+        if "direction" in m:
             self.press(key)
         else:
             self.settle()
-        msgs = " ".join(t for _, t in list(self.messages)[-3:])
-        if self.audit("zap", msgs, seq0, lambda s: "Nothing happens" in s or "You wrest" in s):
+        msgs = self.text_since(seq0)
+        if "Nothing happens" in msgs or "You wrest" in msgs:
             self.empty_wands.add(wand.key)
         self.zaps += 1
         return True
@@ -371,10 +361,7 @@ class CombatMixin:
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
-                if self.opts.ray_rules:
-                    if kind in RAY_WANDS and not self.ray_safe(lv, dy, dx):
-                        continue
-                elif kind in RAY_WANDS and not self.ray_safe(lv, -dy, -dx) and not self.ray_safe(lv, dy, dx):
+                if kind in RAY_WANDS and not self.ray_safe(lv, dy, dx):
                     continue
                 self.cur_act = "fight"
                 self.last_attack_target = pos
@@ -382,20 +369,19 @@ class CombatMixin:
         return False
 
     def ray_safe(self, lv, dy, dx):
-        """A ray going from us in direction (dy, dx) can't bounce back at us: a door within SAFE_RAY_DIST
-        absorbs it, otherwise no wall, unknown square or boulder lies within SAFE_RAY_DIST."""
+        """A ray going from us in direction (dy, dx) can't bounce back at us: a closed door closer than
+        SAFE_RAY_DIST absorbs it, otherwise no wall or unknown square lies closer than SAFE_RAY_DIST."""
         y, x = self.pos()
         k_mem = G.KIND[lv.under]
-        rules = self.opts.ray_rules
         # buzz(): range rn1(7, 7), one per square; a bounce at distance d reaches us after 2d squares
-        for i in range(1, (SAFE_RAY_DIST - 1 if rules else SAFE_RAY_DIST) + 1):
+        for i in range(1, SAFE_RAY_DIST):
             yy, xx = y + i * dy, x + i * dx
             if not (0 <= yy < ROWS and 0 <= xx < COLS):
                 return False
             k = k_mem[yy, xx]
-            if k in ((G.DOOR_CLOSED,) if rules else (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY)):
+            if k == G.DOOR_CLOSED:
                 return True                      # a closed door absorbs the ray (open doors pass it)
-            if k in ((G.WALL, G.UNKNOWN) if rules else (G.WALL, G.UNKNOWN, G.BOULDER)):
+            if k in (G.WALL, G.UNKNOWN):
                 return False                     # a ray passes over a boulder (buzz bounces on terrain only)
         return True
 
