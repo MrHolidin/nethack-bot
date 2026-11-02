@@ -7,8 +7,6 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "jewelry": False,          # A/B: wear known useful amulets / rings (nhbot.jewelry order); identify unknown ones
-                               #      with a scroll of identify (never sold), bought in a shop if we have none
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
     "pickup_pages": False,     # A/B: the pick-up menu is paged: what we want on every page (else the first only)

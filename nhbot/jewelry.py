@@ -1,4 +1,4 @@
-"""Amulets and rings (flag jewelry): wear the useful ones we know by name, identify the unknown ones with a scroll
+"""Amulets and rings: wear the useful ones we know by name, identify the unknown ones with a scroll
 of identify, buy that scroll in a shop when we have none; identify scrolls and the amulets and rings still to
 identify are needed (carry.needed: never sold or dropped).
 
@@ -104,12 +104,10 @@ class JewelryMixin:
 
     def identify_wanted(self):
         """No scroll of identify on us: buying one is worth it."""
-        return self.opts.jewelry and not self.identify_scrolls()
+        return not self.identify_scrolls()
 
     def jewelry_needed(self, it):
         """carry.needed (never sold or dropped): identify scrolls, and the amulets and rings still to identify."""
-        if not self.opts.jewelry:
-            return False
         if it.ocls == nh.SCROLL_CLASS:
             return self.is_identify(it.text)
         return to_identify(it.ocls, it.text)            # in the inventory or on the floor (worth_taking)
@@ -120,7 +118,7 @@ class JewelryMixin:
     # ------------------------------------------------------------ wear
     def jewelry_wear_step(self, lv):
         """No threat in view: put on the best amulet / rings we know (taking off a worse one). True if it acted."""
-        if not self.opts.jewelry or self.polyd or self.handless():
+        if self.polyd or self.handless():
             return False
         items = self.items()
         for ocls, slots in ((nh.AMULET_CLASS, 1), (nh.RING_CLASS, 2)):
@@ -176,8 +174,6 @@ class JewelryMixin:
     # ------------------------------------------------------------ identify
     def jewelry_id_step(self, lv):
         """No threat in view: read an identify scroll on unknown jewelry. True if it used the turn."""
-        if not self.opts.jewelry:
-            return False
         unknown = {it.letter for it in self.unknown_jewelry()}
         if not unknown:
             return False
@@ -224,8 +220,6 @@ class JewelryMixin:
     def shop_buy_step(self, lv):
         """On a shop visit (shop.shop_step, after selling): pay for what we picked up, else go for an identify
         scroll for sale, else read the tags of the scrolls not looked at yet. True if it acted."""
-        if not self.opts.jewelry:
-            return False
         unpaid = [it for it in self.items() if "unpaid" in it.text]
         if unpaid:
             self.cur_act = "buy"
