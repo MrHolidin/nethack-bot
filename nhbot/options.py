@@ -11,6 +11,11 @@ DEFAULTS = {
     "trap_escape": False,      # A/B: held in a bear trap / pit / web (from the messages): failed steps are not counted
                                #      against the square; out of a bear trap by diagonal attempts (hack.c trapmove:
                                #      a diagonal one always counts, a straight one 1 in 5), into a square without a monster
+    "squeeze_drop": False,     # A/B: "You are carrying too much to get through" (a diagonal squeeze needs inventory
+                               #      weight <= 600): shed weight as when Burdened (tiers 1-3, nothing worn or wielded),
+                               #      one unit per refusal, instead of marking the square impassable
+    "trap_nofail": False,      # A/B: while a bear trap / pit / web holds us, a failed step is not counted against the
+                               #      square (no cost, never impassable)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

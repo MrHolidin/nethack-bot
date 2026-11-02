@@ -243,7 +243,9 @@ class MapMixin:
                 self.trapped = None
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
-        if lv and self.last_move_target and any(s in m for s in (
+        if self.opts.squeeze_drop and lv and self.last_move_target and "You are carrying too much to get through" in m:
+            self.squeeze_pending = (lv.key, self.last_move_target)    # the weight step sheds a unit
+        elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",
                 "Perhaps that's why you cannot move past it",
                 "There is a boulder in your way",

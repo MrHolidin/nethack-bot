@@ -119,8 +119,8 @@ class NavMixin:
         self.last_move_target = target
         before = (y, x, self.turn())
         lv = self.level()
-        held = self.opts.trap_escape and self.trap_held(lv)
-        if held and self.trapped[0] == "bear" and self.trap_diagonal(lv, ty - y, tx - x):
+        held = (self.opts.trap_escape or self.opts.trap_nofail) and self.trap_held(lv)
+        if held and self.opts.trap_escape and self.trapped[0] == "bear" and self.trap_diagonal(lv, ty - y, tx - x):
             return
         if target in lv.locked:
             if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
@@ -157,7 +157,7 @@ class NavMixin:
             self.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
             return                                         # (a second refusal is counted: no loop without time)
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
-            if self.opts.trap_escape and self.trapped is not None:
+            if (self.opts.trap_escape or self.opts.trap_nofail) and self.trapped is not None:
                 self.trap_stats["fail_not_counted"] += 1    # held by a trap: the square is not at fault
                 return
             lv.fail[ty, tx] += 1

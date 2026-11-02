@@ -217,9 +217,9 @@ class CarryMixin:
         if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
             self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
 
-    def carry_drop_step(self):
-        """Encumbered: drop one unit following the four tiers. True if it used the turn."""
-        if self.bl(nh.NLE_BL_CAP) < 1:
+    def carry_drop_step(self, force=False, max_tier=4):
+        """Encumbered (or force): drop one unit following the tiers (up to max_tier). True if it used the turn."""
+        if self.bl(nh.NLE_BL_CAP) < 1 and not force:
             return False
         by_letter = {it.letter: it for it in self.items()}
         inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
@@ -239,7 +239,7 @@ class CarryMixin:
                 self.drop_units(l, 1 if d["qty"] > 1 else None)
                 self.carry_stats["dropped"][tier] += 1
                 return True
-        worn = [x for x in inv if equipped(x[0])]
+        worn = [x for x in inv if equipped(x[0])] if max_tier >= 4 else []
         if worn:
             l, c, s, d = min(worn, key=lambda x: (x[3]["cost"] or 0) / x[3]["wt"])
             if c == nh.ARMOR_CLASS and by_letter[l].worn:

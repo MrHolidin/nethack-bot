@@ -181,6 +181,15 @@ class PolicyMixin:
         return False
 
     def step_weight(self, c):
+        if self.squeeze_pending is not None:
+            key, target = self.squeeze_pending
+            self.squeeze_pending = None
+            if key == c.lv.key:
+                if self.carry_drop_step(force=True, max_tier=3):
+                    self.squeeze_stats["dropped"] += 1
+                    return True
+                self.squeeze_stats["nothing_to_drop"] += 1
+                c.lv.blocked[target] = True   # nothing left to shed: the squeeze stays shut
         return self.carry_drop_step()
 
     # ------------------------------------------------------------------ monsters around
