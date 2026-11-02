@@ -31,6 +31,13 @@ class SurvivalMixin:
             self.raw_step(ord(c))
         self.press(13)
 
+    def critically_low_hp(self, hp, maxhp):
+        """pray.c critically_low_hp: major trouble TROUBLE_HIT (not polymorphed)."""
+        xl = self.bl(nh.NLE_BL_XP)
+        rank = 0 if xl <= 2 else (xl + 2) // 4                 # botl.c xlev_to_rank
+        div = 5 if rank <= 1 else 6 if rank <= 3 else 7 if rank <= 5 else 8 if rank <= 7 else 9
+        return hp <= 5 or hp * div <= min(maxhp, 15 * xl)
+
     def can_pray(self, hunger_emergency=None, weak=False):
         # Weak/Fainting is major trouble (timeout <= 200 suffices); 500 turns after a prayer is ~88% safe.
         # A/B (1000 games): +273 [-1, +553], deaths while fainted 108 -> 76
@@ -38,6 +45,8 @@ class SurvivalMixin:
             return False
         t = self.turn()
         if self.last_pray is None:
+            if self.opts.pray_rules:
+                return t > 100        # every caller is in major trouble: u.ublesscnt = 300 - (moves - 1) <= 200
             return t > 300 or (hunger_emergency and t > 100)
         gap = t - self.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
@@ -206,11 +215,15 @@ class SurvivalMixin:
         if "more confident in your" in m:
             self.skill_msgs += 1
             self.want_enhance = True
-        if "You feel that" in m and "displeased" in m:
+        recent = self.last_pray is not None and self.turn() - self.last_pray <= 5
+        if "You feel that" in m and ("displeased" in m or self.opts.pray_angry and "bummed" in m):
             self.pray_failed += 1
-        if self.last_pray is not None and self.turn() - self.last_pray <= 5 and any(
-                p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
-                                 "Then die, mortal", "Thou durst", "You feel that Mitra is angry")):
+            if self.opts.pray_angry and recent:
+                self.god_angry = True     # pray.c angrygods case 0-1; p_type 0 (too soon) also did u.ugangr++
+        angry = ("Thou hast angered me", "Thou must relearn", "You feel guilty", "Then die, mortal", "Thou durst")
+        if not self.opts.pray_angry:
+            angry += ("You feel that Mitra is angry",)
+        if recent and any(p in m for p in angry):
             self.god_angry = True
         if "drop that gold" in m or "drop that money" in m:
             self.vault_drop = True

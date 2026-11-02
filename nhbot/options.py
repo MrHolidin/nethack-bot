@@ -14,6 +14,12 @@ DEFAULTS = {
     "loot_holds_descent": False,   # A/B: a reachable stolen-items square on this level holds the stairs down
     "lift_upgrades": False,    # A/B: "trouble lifting X. Continue?" -> yes when X is an equipment upgrade (armor in
                                #      any slot, a better weapon); the weight step keeps it and drops something else
+    "pray_rules": False,       # A/B: prayer timing by the game's rules: the first prayer in major trouble from turn
+                               #      101 (u.ublesscnt starts at 300, major trouble needs <= 200); low HP by
+                               #      critically_low_hp (hp <= 5 or hp * 5/6/7/8/9 by XL rank <= min(maxhp, 15 * XL))
+    "pray_angry": False,       # A/B: "You feel that <god> is displeased." after our prayer -> god_angry (a prayer
+                               #      too soon raises u.ugangr, after which every prayer fails); drops a message
+                               #      the game never prints ("You feel that Mitra is angry")
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

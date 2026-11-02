@@ -159,8 +159,11 @@ class PolicyMixin:
 
     def step_pray(self, c):
         hp, maxhp, hunger, t = c.hp, c.maxhp, c.hunger, c.t
-        low = hp <= 5 or hp * 7 <= maxhp
-        if (low or hp * self.opts.pray_div <= maxhp) and self.can_pray():
+        if self.opts.pray_rules:
+            low = self.critically_low_hp(hp, maxhp)
+        else:
+            low = hp <= 5 or hp * 7 <= maxhp or hp * self.opts.pray_div <= maxhp
+        if low and self.can_pray():
             self.pray(); return True
         if hunger >= FAINTING:
             if self.faint_since is None:
