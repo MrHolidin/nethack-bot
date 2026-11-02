@@ -69,6 +69,7 @@ class Level:
         self.locked = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
+        self.grotto = False        # Grotto Town (is_grotto)
         self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
@@ -192,6 +193,16 @@ class MapMixin:
                 if 0 <= ny < ROWS and 0 <= nx < COLS and (ny, nx) not in seen and ok[ny, nx]:
                     seen.add((ny, nx)); q.append((ny, nx))
         return seen
+
+    def is_grotto(self, lv):
+        """Grotto Town (mines.des minetn-5, a fixed 76x21 map centred: map (x, y) is screen (y, x + 2)): its up
+        staircase at map (1, 1) or one of its fountains at map (50, 9), (10, 15), (66, 18)."""
+        if lv.key[0] != 2:
+            return False
+        if not lv.grotto:
+            lv.grotto = int(lv.under[1, 3]) == UPSTAIR_GLYPH or any(
+                int(lv.under[p]) == FOUNTAIN_GLYPH for p in ((9, 52), (15, 12), (18, 68)))
+        return lv.grotto
 
     def is_minetown(self, lv):
         """A Mines level with an altar, a fountain or a shop: Minetown (every variant has a temple altar;
