@@ -11,10 +11,6 @@ DEFAULTS = {
     "trap_escape": False,      # A/B: held in a bear trap / pit / web (from the messages): failed steps are not counted
                                #      against the square; out of a bear trap by diagonal attempts (hack.c trapmove:
                                #      a diagonal one always counts, a straight one 1 in 5), into a square without a monster
-    "mines_kick": False,       # A/B: in Grotto Town (minetn-5: its down staircase is always behind the locked door at
-                               #      map (50, 6)) that door is kicked while no watchman / shopkeeper is in view; with one in view
-                               #      wait (the door is not marked impassable); "Hey, stop damaging that door!" (a
-                               #      watchman saw it): never again
     "search_model": False,     # A/B: search from the square with the most expected find per turn (search.py: room
                                #      walls and dead-end corridors with room-sized unseen space beyond, discounted by
                                #      the searching already done next to them) instead of the wall-count score

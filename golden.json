@@ -20,7 +20,7 @@
   "steps": 4894,
   "keys": 4894,
   "keyhash": "16ab72f7799db345",
-  "secs": 7.2
+  "secs": 7.7
  },
  "61001": {
   "score": 4478.0,
@@ -43,7 +43,7 @@
   "steps": 4225,
   "keys": 4225,
   "keyhash": "15abf8847602830b",
-  "secs": 7.0
+  "secs": 8.2
  },
  "61002": {
   "score": 13593.0,
@@ -66,7 +66,7 @@
   "steps": 7805,
   "keys": 7805,
   "keyhash": "ebe0ae42b1bb98af",
-  "secs": 13.1
+  "secs": 15.2
  },
  "61003": {
   "score": 2566.0,
@@ -89,7 +89,7 @@
   "steps": 13355,
   "keys": 13355,
   "keyhash": "b38513af1d751ec7",
-  "secs": 12.6
+  "secs": 13.9
  },
  "61004": {
   "score": 2079.0,
@@ -112,7 +112,7 @@
   "steps": 2141,
   "keys": 2141,
   "keyhash": "509cfa5e0fe74f69",
-  "secs": 3.5
+  "secs": 2.8
  },
  "61005": {
   "score": 2554.0,
@@ -135,7 +135,7 @@
   "steps": 4181,
   "keys": 4181,
   "keyhash": "edbd040cab01194f",
-  "secs": 5.6
+  "secs": 4.8
  },
  "61006": {
   "score": 684.0,
@@ -158,7 +158,7 @@
   "steps": 1701,
   "keys": 1701,
   "keyhash": "510e1506541f3c1f",
-  "secs": 2.5
+  "secs": 2.3
  },
  "61007": {
   "score": 3650.0,
@@ -181,7 +181,7 @@
   "steps": 5654,
   "keys": 5654,
   "keyhash": "6f611eb13c3b2b5a",
-  "secs": 7.8
+  "secs": 7.1
  },
  "61008": {
   "score": 7397.0,
@@ -204,7 +204,7 @@
   "steps": 10805,
   "keys": 10805,
   "keyhash": "ef71f9e209892eb5",
-  "secs": 23.1
+  "secs": 19.5
  },
  "61009": {
   "score": 2836.0,
@@ -227,7 +227,7 @@
   "steps": 4246,
   "keys": 4246,
   "keyhash": "f9757a177b72257f",
-  "secs": 5.5
+  "secs": 5.4
  },
  "61010": {
   "score": 11371.0,
@@ -250,7 +250,7 @@
   "steps": 7194,
   "keys": 7194,
   "keyhash": "066fa688cc435678",
-  "secs": 10.1
+  "secs": 10.4
  },
  "61011": {
   "score": 9573.0,
@@ -273,7 +273,7 @@
   "steps": 9891,
   "keys": 9891,
   "keyhash": "9b46095bf841e144",
-  "secs": 23.4
+  "secs": 21.9
  },
  "61012": {
   "score": 8162.0,
@@ -296,7 +296,7 @@
   "steps": 8754,
   "keys": 8754,
   "keyhash": "d0d027ab87ad2d23",
-  "secs": 26.9
+  "secs": 25.4
  },
  "61013": {
   "score": 2277.0,
@@ -319,7 +319,7 @@
   "steps": 3200,
   "keys": 3200,
   "keyhash": "3caf8dacd4caceea",
-  "secs": 3.9
+  "secs": 4.2
  },
  "61014": {
   "score": 4318.0,
@@ -342,7 +342,7 @@
   "steps": 6457,
   "keys": 6457,
   "keyhash": "47bbda4e9e2a49f3",
-  "secs": 7.6
+  "secs": 6.7
  },
  "61015": {
   "score": 1602.0,
@@ -388,7 +388,7 @@
   "steps": 1986,
   "keys": 1986,
   "keyhash": "06576ff8d115cb88",
-  "secs": 2.1
+  "secs": 2.3
  },
  "61017": {
   "score": 16214.0,
@@ -411,7 +411,7 @@
   "steps": 8501,
   "keys": 8501,
   "keyhash": "1580f08d00bac4a7",
-  "secs": 12.9
+  "secs": 12.6
  },
  "61018": {
   "score": 8277.0,
@@ -434,7 +434,7 @@
   "steps": 7124,
   "keys": 7124,
   "keyhash": "5386fed783c6ba34",
-  "secs": 10.4
+  "secs": 10.5
  },
  "61019": {
   "score": 2848.0,
@@ -457,7 +457,7 @@
   "steps": 4848,
   "keys": 4848,
   "keyhash": "b839ed95dcb84811",
-  "secs": 7.2
+  "secs": 7.0
  },
  "61020": {
   "score": 1377.0,
@@ -480,30 +480,30 @@
   "steps": 3341,
   "keys": 3341,
   "keyhash": "933e463b2c4ee777",
-  "secs": 4.8
+  "secs": 4.5
  },
  "61021": {
-  "score": 9269.0,
-  "turns": 10139,
-  "max_depth": 7,
-  "xl": 8,
+  "score": 16339.0,
+  "turns": 15598,
+  "max_depth": 13,
+  "xl": 9,
   "last_msgs": [
-   "The rothe bites!",
-   "You kill the Uruk-hai!",
-   "You kill the Uruk-hai!",
-   "You kill the rothe!",
-   "Things that are here:",
-   "You kill the red naga hatchling!",
-   "The Uruk-hai wields an orcish bow!  The Uruk-hai throws a shuriken!",
-   "You are hit by a shuriken!",
-   "The Uruk-hai shoots 2 poisoned orcish arrows!",
-   "You are hit by the 1st poisoned orcish arrow."
+   "You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
+   "You see here 2 white potions.  You faint from lack of food.",
+   "You regain consciousness.",
+   "There are several objects here.",
+   "There are several objects here.",
+   "You can hear again.  You stop searching.",
+   "You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
+   "You see here 2 white potions.  You faint from lack of food."
   ],
   "truncated": false,
-  "steps": 14783,
-  "keys": 14783,
-  "keyhash": "10bc7f1329821367",
-  "secs": 56.5
+  "steps": 14341,
+  "keys": 14341,
+  "keyhash": "69f89a06f5fa0e3a",
+  "secs": 20.3
  },
  "61022": {
   "score": 5840.0,
@@ -526,30 +526,30 @@
   "steps": 5053,
   "keys": 5053,
   "keyhash": "33c90af89271edf5",
-  "secs": 8.6
+  "secs": 9.1
  },
  "61023": {
-  "score": 5076.0,
-  "turns": 3850,
-  "max_depth": 8,
-  "xl": 7,
+  "score": 34594.0,
+  "turns": 13749,
+  "max_depth": 13,
+  "xl": 10,
   "last_msgs": [
-   "What do you want to throw? [$abrsuxzE or ?*]",
+   "What do you want to throw? [$afrsuxzT or ?*]",
    "In what direction?",
-   "The dagger hits the wood nymph.  The ettin misses!  The ettin misses!",
-   "The dagger hits the wood nymph.  The ettin misses!  The ettin misses!",
-   "You hit the wood nymph!  The wood nymph pretends to be friendly.",
-   "The wood nymph charms you.  You gladly start removing your helm.",
-   "The ettin hits!  The ettin hits!  You can move again.",
-   "The wood nymph steals a +0 dwarvish iron helm!",
-   "The wood nymph steals a +0 dwarvish iron helm!",
-   "You hit the ettin!  The ettin hits!  The ettin hits!"
+   "The orcish dagger hits the floating eye.",
+   "What do you want to throw? [$afrsuxzT or ?*]",
+   "In what direction?",
+   "You kill the floating eye!  The killer bee misses!",
+   "You kill the floating eye!  The killer bee misses!",
+   "You kill the killer bee!  It hits!",
+   "You kill the killer bee!  It hits!",
+   "You hit the fire ant!  It hits!  The fire ant bites!"
   ],
   "truncated": false,
-  "steps": 4351,
-  "keys": 4351,
-  "keyhash": "5bdd3684d18fd86f",
-  "secs": 10.6
+  "steps": 18918,
+  "keys": 18918,
+  "keyhash": "5c2d6caf5b524e26",
+  "secs": 49.9
  },
  "61024": {
   "score": 8308.0,
@@ -572,7 +572,7 @@
   "steps": 8552,
   "keys": 8552,
   "keyhash": "088e74dbc70a0f2f",
-  "secs": 12.8
+  "secs": 13.1
  },
  "61025": {
   "score": 57400.0,
@@ -595,7 +595,7 @@
   "steps": 20982,
   "keys": 20982,
   "keyhash": "bfe47cecfe53b4c6",
-  "secs": 28.1
+  "secs": 29.1
  },
  "61026": {
   "score": 431.0,
@@ -618,7 +618,7 @@
   "steps": 2116,
   "keys": 2116,
   "keyhash": "abc6760b8180d57c",
-  "secs": 3.3
+  "secs": 3.1
  },
  "61027": {
   "score": 12753.0,
@@ -641,7 +641,7 @@
   "steps": 13928,
   "keys": 13928,
   "keyhash": "ebb0ada738c63d49",
-  "secs": 18.9
+  "secs": 21.4
  },
  "61028": {
   "score": 17522.0,
@@ -664,7 +664,7 @@
   "steps": 11734,
   "keys": 11734,
   "keyhash": "0277d219e0a7c76f",
-  "secs": 21.4
+  "secs": 24.1
  },
  "61029": {
   "score": 4026.0,
@@ -687,7 +687,7 @@
   "steps": 5040,
   "keys": 5040,
   "keyhash": "a9d4631b3427b816",
-  "secs": 5.8
+  "secs": 6.4
  },
  "61030": {
   "score": 3331.0,
@@ -710,7 +710,7 @@
   "steps": 4873,
   "keys": 4873,
   "keyhash": "9d90142d0a2b02c0",
-  "secs": 9.1
+  "secs": 9.6
  },
  "61031": {
   "score": 950.0,
@@ -733,6 +733,6 @@
   "steps": 2695,
   "keys": 2695,
   "keyhash": "40254237147d6477",
-  "secs": 4.4
+  "secs": 5.0
  }
 }
