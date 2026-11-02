@@ -125,6 +125,7 @@ class ExploreMixin:
         up = grids[0] == G.UPSTAIR
         if up[self.pos()]:
             self.revisit_done.add(above)
+            lv.unexplored = False             # done here too
             self.revisit_stats["never_seen" if prev is None else "unexplored"] += 1
             self.took_stairs = True
             self.cur_act = "revisit"
@@ -142,6 +143,7 @@ class ExploreMixin:
                 self.press("s")
                 return True
             self.descents += 1
+            lv.unexplored = False             # left on purpose: done here
             self.mines_return_descents += self.mines_return_on
             self.took_stairs = True
             self.press(">")
