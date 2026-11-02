@@ -117,7 +117,7 @@ class PickupMixin:
             a = parse_armor(text)
             if a is not None and not a["cursed"] and self.improves(a, worn if worn is not None else self.worn_by_slot()):
                 reason = "armor"
-            elif self.carry_all_on() and not cursed:
+            elif not cursed:
                 reason = "carry"
         elif ocls == nh.WEAPON_CLASS and not cursed and typ not in AMMO_TYPES:
             if typ in MISSILE_TYPES:
@@ -128,16 +128,14 @@ class PickupMixin:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
                     reason = "carry"                     # worth >= 1 zorkmid per weight unit
-        elif ocls == nh.TOOL_CLASS and self.carry_all_on():
+        elif ocls == nh.TOOL_CLASS:
             no_tools = NO_TOOLS - {"pick-axe"}
             if typ not in no_tools:
                 reason = "carry"
-        elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS) and self.carry_all_on():
+        elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS):
             if ocls == nh.SPBOOK_CLASS or not (typ == "gray stone" or typ in THROW_STONE_TYPES):
                 reason = "carry"
-        if reason == "carry" and self.opts.value_model:
-            return reason if self.worth_taking(ocls, text) else None
-        if reason == "carry" and cap >= 1:
+        if reason == "carry" and not self.worth_taking(ocls, text):
             return None
         return reason
 
@@ -148,14 +146,10 @@ class PickupMixin:
     def carry_glyph(self, g):
         """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
         makes the step that inspects it (and so removes the goal) run."""
-        return bool(CARRY_GLYPH[g] or (self.carry_all_on() and MORE_GLYPH[g])
-                    or (self.weapon_glyphs()[g]) or (self.carry_all_on() and ALL_GLYPH[g]))
+        return bool(CARRY_GLYPH[g] or MORE_GLYPH[g] or self.weapon_glyphs()[g] or ALL_GLYPH[g])
 
     def carry_targets(self, lv):
-        glyphs = CARRY_GLYPH | MORE_GLYPH if self.carry_all_on() else CARRY_GLYPH
-        glyphs = glyphs | self.weapon_glyphs()
-        if self.carry_all_on():
-            glyphs = glyphs | ALL_GLYPH
+        glyphs = CARRY_GLYPH | MORE_GLYPH | self.weapon_glyphs() | ALL_GLYPH
         mask = glyphs[lv.under] & ~lv.shop
         for p in self.goal_closed_set("pile", lv.key):
             mask[p] = False
@@ -178,7 +172,7 @@ class PickupMixin:
 
     # ------------------------------------------------------------------ what to take
     def food_needed(self, it):
-        """value_model: safe food is kept like what we need, while we carry no more than MAX_FOOD pieces."""
+        """Safe food is kept like what we need, while we carry no more than MAX_FOOD pieces."""
         return it.ocls == nh.FOOD_CLASS and floor_kind(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
 
     def food_count(self):

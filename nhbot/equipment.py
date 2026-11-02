@@ -180,12 +180,7 @@ class EquipMixin:
             best = max(cands, key=lambda a: value(a) - (value(worn[a["slot"]]) if a["slot"] in worn else 0))
             self.wear(best, worn)
             return True
-        # 2) drop carried armor we will never wear (weight)
-        junk = [] if self.carry_all_on() else [a for a in inv if not a["worn"]]
-        if junk:
-            self.drop_letter(junk[0]["letter"])
-            return True
-        return False
+        return False                  # armor we won't wear is carried for selling (the value decides drops)
 
     # ---------------------------------------------------------- actions
     def wear(self, a, worn):

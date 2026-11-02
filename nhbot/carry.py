@@ -1,15 +1,11 @@
-"""Carry valuables, never be Burdened, sell what we don't use (flag carry).
+"""Carry valuables, never be Burdened, sell what we don't use.
 
-Pick up: wands, rings, amulets, scrolls, potions (light and worth gold; gold on hand is score 1:1).
-carry_all: also tools (not chests, boxes, traps) and armor we won't wear (kept for selling instead of dropped at
-once), spellbooks, gems/glass and diggers.
+Pick up: wands, rings, amulets, scrolls, potions, tools (not chests, boxes, traps), armor we won't wear,
+spellbooks, gems/glass and diggers -- whatever fits without Burdened, or is worth more per weight than what
+would go to make room (nhbot.value.worth_taking).
 
 Never Burdened (Burdened costs a quarter of our speed). When the status shows any encumbrance, drop one
-unit per turn, in this order:
-  1. duplicated unidentified items (same appearance in two slots, or a stack), heaviest first
-  2. other unidentified items, heaviest first
-  3. anything not worn / wielded, lowest price per weight first
-  4. worn / wielded
+unit per turn: the lowest value per weight first (nhbot.value: worn / wielded, needed, food and water last).
 A square we dropped something on is remembered: no going back to pick it up.
 
 Sell: in a shop that buys the class (general store: everything), drop each item we have no use for deep
@@ -79,7 +75,7 @@ for _i in range(nh.NUM_OBJECTS):
         WEAPON_NAME_OF.setdefault(nh.OBJ_DESCR(_oc), nh.OBJ_NAME(_oc))
 KEEP_WEAPONS = ("dagger", "knife", "dart", "shuriken", "javelin", "spear")   # bot.THROWABLE: thrown, kept
 NO_TOOLS = {"pick-axe", "chest", "large box", "ice box", "beartrap", "land mine"}
-# carry_all: also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks), and diggers
+# also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks), and diggers
 DIGGER_WORDS = ("pick-axe", "dwarvish mattock", "broad pick")
 LEAVE_RE = re.compile(r"[Ll]eave (?:your|the) .*outside")
 NO_GEMS = {"gray stone", "rock", "luckstone", "loadstone", "touchstone", "flint stone"}
@@ -187,17 +183,8 @@ class CarryMixin:
         self.selling_item = (None, "")   # (class, text) of the item on offer
         self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
 
-    def carry_all_on(self):
-        """carry_all: pick up everything worth carrying -- carry_more (tools, armor) plus spellbooks, gems/glass
-        and diggers (pick-axe, mattock: kept, never sold).
-        KEEP THIS FLAG (owner's decision, 2026-11-01): A/B -525 n.s., off by default, but it is the way to carry
-        a digger for future vault / digging logic. Do not remove it in cleanups."""
-        return bool(self.opts.carry_all)
-
     def carry_classes(self):
-        return CARRY_CLASSES + (MORE_CLASSES if self.carry_all_on() else ()) + \
-            (nh.WEAPON_CLASS,) + \
-            ((nh.SPBOOK_CLASS, nh.GEM_CLASS) if self.carry_all_on() else ())
+        return CARRY_CLASSES + MORE_CLASSES + (nh.WEAPON_CLASS, nh.SPBOOK_CLASS, nh.GEM_CLASS)
 
     # ------------------------------------------------------------ pick up
     # ------------------------------------------------------------ never Burdened
@@ -219,45 +206,11 @@ class CarryMixin:
             self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
 
     def carry_drop_step(self, force=False, max_tier=4):
-        """Encumbered (or force): drop one unit following the tiers (up to max_tier). True if it used the turn."""
+        """Encumbered (or force): drop one unit of the item of lowest value per weight (nhbot.value: what we
+        wear / wield / need comes last, being worth VALUE_MAX); max_tier < 4: nothing on the body. True if it
+        used the turn."""
         if self.bl(nh.NLE_BL_CAP) < 1 and not force:
             return False
-        if self.opts.value_model:
-            return self.value_drop_step(max_tier)
-        by_letter = {it.letter: it for it in self.items()}
-        inv = [(l, c, s, describe(c, s)) for l, c, s in self.inventory() if c != nh.COIN_CLASS]
-        equipped = lambda l: by_letter[l].on_body
-        free = [x for x in inv if not equipped(x[0]) and by_letter[x[0]].key not in self.cant_drop]
-        keys = {}
-        for l, c, s, d in free:
-            if d["unid"]:
-                keys[d["key"]] = keys.get(d["key"], 0) + d["qty"]
-        tier1 = [x for x in free if x[3]["unid"] and keys[x[3]["key"]] > 1]
-        tier2 = [x for x in free if x[3]["unid"]]
-        tier3 = [x for x in free if not x[3]["unid"]]
-        for tier, items, key in ((1, tier1, lambda x: -x[3]["wt"]), (2, tier2, lambda x: -x[3]["wt"]),
-                                 (3, tier3, lambda x: (x[3]["cost"] or 0) / x[3]["wt"])):
-            if items:
-                l, c, s, d = min(items, key=key)
-                self.drop_units(l, 1 if d["qty"] > 1 else None)
-                self.carry_stats["dropped"][tier] += 1
-                return True
-        worn = [x for x in inv if equipped(x[0])] if max_tier >= 4 else []
-        if worn:
-            l, c, s, d = min(worn, key=lambda x: (x[3]["cost"] or 0) / x[3]["wt"])
-            if c == nh.ARMOR_CLASS and by_letter[l].worn:
-                a = parse_armor(s) or {"slot": None}
-                a["letter"] = l
-                if not self.take_off(a):
-                    return False
-            self.drop_units(l)
-            self.carry_stats["dropped"][4] += 1
-            return True
-        return False
-
-    def value_drop_step(self, max_tier):
-        """value_model: drop one unit of the item of lowest value per weight (what we wear / wield / need comes
-        last, being worth VALUE_MAX); max_tier < 4: nothing on the body."""
         inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.cant_drop
                and (max_tier >= 4 or not it.on_body)]
         if not inv:
@@ -291,7 +244,7 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS):
             return True
-        if self.carry_all_on() and any(w in s for w in DIGGER_WORDS):
+        if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
@@ -362,7 +315,7 @@ class CarryMixin:
         self.shopping = None
         return False
 
-    # ------------------------------------------------------------ carry_all: diggers and shops
+    # ------------------------------------------------------------ diggers and shops
     def digger_letters(self):
         return [it.letter for it in self.items() if any(w in it.text for w in DIGGER_WORDS) and not it.held]
 

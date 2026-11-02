@@ -1,4 +1,4 @@
-"""Item value (flag value_model): what an item is worth to us, in gold.
+"""Item value: what an item is worth to us, in gold.
 
 est_gold(ocls, text): what a shopkeeper would pay for ONE unit (shk.c set_cost, NetHack 3.6.6):
   offer = getprice / 2 (/ 3 with a visible dunce cap or shirt: sucker); an unidentified type gets 3/4 from one
@@ -157,7 +157,7 @@ class ValueMixin:
         return wt
 
     def worth_taking(self, ocls, text):
-        """value_model: take a floor stack if it fits without Burdened, or if it is worth more per weight than
+        """Take a floor stack if it fits without Burdened, or if it is worth more per weight than
         the cheapest things (off the body) we would drop to make room for it -- the order carry_drop_step drops
         in, so we never pick up what the drop step would put straight back down."""
         d = describe(ocls, text)
