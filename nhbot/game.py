@@ -231,6 +231,7 @@ class GameMixin:
         self.msg_combat(m)
         self.msg_peace(m, lv)
         self.msg_map(m, lv)
+        self.search_log_msg(m, lv)
         self.msg_shop(m, lv)
         self.msg_thieves(m)
         if "You die" in m or "You starve" in m:

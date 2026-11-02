@@ -111,3 +111,71 @@ def best_spot(rem, dist, reach, passable, block=10):
 def box_sum_float(a):
     p = np.pad(a, 1)
     return sum(p[1 + dy:1 + dy + ROWS, 1 + dx:1 + dx + COLS] for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+
+
+# ---------------------------------------------------------------- data for calibrating the priors
+def features(k_mem, under, searched):
+    """Every candidate with what may predict a hidden passage there, and the search turns it has had:
+    [y, x, kind (0 wall, 1 dead end), space ahead, space all around, wall stretch length, unseen squares to the
+    map edge straight ahead, search turns next to it]."""
+    unseen = (k_mem == G.UNKNOWN)
+    r = ROOM_BOX // 2
+    room = box_sum(unseen, r) == ROOM_BOX * ROOM_BOX
+    room[:r, :] = room[-r:, :] = False
+    ry, rx = np.nonzero(room)
+    covered = box_sum(searched, 1)
+    out = []
+    for (y, x), d, share in candidates(k_mem, under):
+        vy, vx = ry - y, rx - x
+        w = np.exp(-np.hypot(vy, vx) / REACH)
+        space_all = float(w.sum())
+        if d is not None:
+            space_ahead = float(w[vy * d[0] + vx * d[1] > 0].sum())
+            n, (cy, cx) = 0, (y + d[0], x + d[1])
+            while 0 <= cy < ROWS and 0 <= cx < COLS and unseen[cy, cx]:
+                n, cy, cx = n + 1, cy + d[0], cx + d[1]
+        else:
+            space_ahead, n = space_all, -1
+        out.append([y, x, 0 if d is not None else 1, round(space_ahead, 2), round(space_all, 2),
+                    round(1.0 / share), n, int(covered[y, x])])
+    return out
+
+
+class SearchLogMixin:
+    """search_log: per level, the candidates that were searched next to (and the one a 'You find a hidden ...'
+    revealed) with their features -- the data for fitting the candidate priors. Observation only."""
+
+    def search_log_init(self):
+        self.search_log = []
+        self._find_pending = None
+        self._log_key = None
+
+    def search_log_msg(self, m, lv):
+        if lv is not None and lv.key[0] == 0 and ("You find a hidden passage" in m or "You find a hidden door" in m):
+            k_mem = G.KIND[lv.under]
+            self._find_pending = (self.turn(), self.pos(), lv.key, k_mem.copy(), features(k_mem, lv.under, lv.searched))
+
+    def search_log_tick(self, lv):
+        if self._find_pending is not None:
+            t, (py, px), key, k_old, feats = self._find_pending
+            self._find_pending = None
+            if key == lv.key:
+                k_new = G.KIND[lv.under]
+                found = [(y, x) for y in range(py - 1, py + 2) for x in range(px - 1, px + 2)
+                         if 0 <= y < ROWS and 0 <= x < COLS and k_old[y, x] in (G.WALL, G.UNKNOWN)
+                         and k_new[y, x] not in (G.WALL, G.UNKNOWN)]
+                walk = G.PASSABLE[k_old]
+                info = [[y, x, int(k_old[y, x] == G.WALL),
+                         int(sum(walk[y + a, x + b] for a in (-1, 0, 1) for b in (-1, 0, 1)
+                                 if (a or b) and 0 <= y + a < ROWS and 0 <= x + b < COLS))] for y, x in found]
+                self.search_log.append({"key": list(key), "t": t, "found": found, "found_info": info,
+                                        "c": [f + [int((f[0], f[1]) in found)] for f in feats
+                                              if f[7] > 0 or (f[0], f[1]) in found]})
+        if self._log_key is not None and self._log_key != lv.key:
+            old = self.levels.get(self._log_key)
+            if old is not None and self._log_key[0] == 0 and old.searched.any():
+                feats = features(G.KIND[old.under], old.under, old.searched)
+                rows = [f + [0] for f in feats if f[7] > 0]
+                if rows:
+                    self.search_log.append({"key": list(self._log_key), "t": self.turn(), "found": [], "c": rows})
+        self._log_key = lv.key
