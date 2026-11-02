@@ -50,6 +50,7 @@ class WandIdMixin:
     def wandid_init(self):
         self.wand_engraved = {}          # appearance key -> frozenset of the types the engraving test left
         self.wandid_stats = Counter()
+        self.wandid_refused = set()      # (level key, square) where the game refused an engraving
 
     def wand_kind(self, it):
         """The type of a wand: by name, or what the engraving test narrowed it to (sleep or death: 'sleep',
@@ -79,13 +80,16 @@ class WandIdMixin:
             return False
         it, key = self.wand_to_test()
         if it is None or not self.elb_can_write(lv) or lv.shop[self.pos()] \
+                or (lv.key, self.pos()) in self.wandid_refused \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU \
                 or self.bl(nh.NLE_BL_HP) < TEST_HP * self.bl(nh.NLE_BL_HPMAX):
             return False
         self.cur_act = "wandid"
         if not self.read_engraving():
             self.wandid_stats["dust_first"] += 1
-            self.engrave("-", "x")               # something to vanish / change
+            if not self.engrave("-", "x"):       # something to vanish / change
+                self.wandid_refused.add((lv.key, self.pos()))   # "You can't write on the fountain!" (no time)
+                self.wandid_stats["refused"] += 1
             return True
         seq0 = self.msg_seq
         self.wandid_stats["tests"] += 1
