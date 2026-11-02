@@ -218,7 +218,11 @@ class CombatMixin:
                 self.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
-            if d == 1 and name == "floating eye" and lv.desperate and not self.opts.desperate_rule:
+            if self.opts.desperate_rule == "unblock":
+                gamble = d == 1 and self.may_melee(lv, name, blocking=True)
+            else:
+                gamble = d == 1 and name == "floating eye" and lv.desperate and not self.opts.desperate_rule
+            if gamble:
                 self.unblock_melee += 1
                 self.attack(blocker)
                 return True

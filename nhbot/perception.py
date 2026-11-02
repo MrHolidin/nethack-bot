@@ -310,13 +310,17 @@ class PerceptionMixin:
             return name in NEVER_MELEE_T
         return name in NEVER_MELEE or name in PASSIVE_DMG
 
-    def may_melee(self, lv, name):
+    def may_melee(self, lv, name, blocking=False):
         """Hit it in melee (and step onto its square)? Anything not in never_melee; a gas spore whose
         explosion can't kill us; when desperate (stuck on the level) and at 90%+ HP, anything that is not
-        ALWAYS_AVOID (a floating eye's gaze paralyses unless we are blind)."""
+        ALWAYS_AVOID (a floating eye's gaze paralyses unless we are blind). desperate_rule "unblock": a floating
+        eye that is all that separates us from the rest of the level (blocking) too."""
         if not self.never_melee(name) or self.spore_ok(name):
             return True
-        return lv.desperate and name not in self.always_avoid() \
+        avoid = self.always_avoid()
+        if blocking and self.opts.desperate_rule == "unblock":
+            avoid = avoid - {"floating eye"}
+        return lv.desperate and name not in avoid \
             and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9
 
     def spore_ok(self, name):

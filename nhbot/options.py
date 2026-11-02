@@ -38,7 +38,9 @@ DEFAULTS = {
     "desperate_rule": False,   # A/B: one rule (may_melee) for hitting a monster we normally never melee: a gas
                                #      spore at HP >= 25, else only desperate, not ALWAYS_AVOID (a floating eye
                                #      unless blind) and HP >= 90%; the never-step squares are exactly the rest, so
-                               #      the separate desperate floating-eye melee of unblock_step goes
+                               #      the separate desperate floating-eye melee of unblock_step goes;
+                               #      "unblock": the same rule, and unblock_step may still melee a blocking floating
+                               #      eye when desperate (may_melee blocking=True), at 90%+ HP like everything else
     "msg_windows": False,      # A/B: zap, kick, wear, take_off, dip, wield and the shop door read the messages of
                                #      their own action (msgs_since) instead of the last N messages
     "monster_lists": False,    # A/B: never-melee / always-avoid / ranged-target / stunned-wait monsters from the attack
