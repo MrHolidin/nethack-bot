@@ -239,6 +239,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "carry": dict(self.carry_stats),
             "stash": dict(self.stash_stats),
             "elb_only_c": self.elb_only_c,
+            "elb_stats": dict(self.elb_stats),
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "deadly_prayers": self.deadly_prayers,

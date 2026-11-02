@@ -264,7 +264,16 @@ class PolicyMixin:
         return not self.hallu_blind_ranged() and self.hunt_step(c.lv)
 
     def step_rest_on_elbereth(self, c):
+        if self.opts.elb_consistent:
+            if (c.y, c.x) not in c.lv.elbereth or c.hp * 2 >= c.maxhp or self.visible_hostiles(c.lv) \
+                    or not self.elb_confirm(c.lv):
+                return False
+            self.elb_stats["rest_confirmed"] += 1
+            self.cur_act = "rest"
+            self.press("2"); self.press("0"); self.press("s")
+            return True
         if (c.y, c.x) in c.lv.elbereth and c.hp * 2 < c.maxhp:
+            self.elb_stats["rest_unchecked"] += 1
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return True

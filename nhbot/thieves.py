@@ -88,8 +88,23 @@ class ThievesMixin:
         # 2c) no way to shoot: stand on Elbereth (nymphs respect it and won't steal in melee)
         if not have_shot and (y, x) not in lv.elbereth:
             close = [t for t in th if max(abs(t[0][0] - y), abs(t[0][1] - x)) <= 4]
-            if close and G.KIND[lv.under[y, x]] not in (G.UPSTAIR, G.DOWNSTAIR) and self.nymph_elbs < 30:
+            if self.opts.elb_consistent:
+                if close and self.nymph_elbs < 30 and self.elb_can_write(lv):
+                    self.nymph_elbs += 1
+                    self.cur_act = "fight"
+                    if not self.engrave_elbereth():
+                        self.elb_fail += 1
+                        self.elb_fail_at = (lv.key, self.pos(), self.turn())
+                        self.elb_stats["nymph_fail"] += 1
+                    elif not self.elb_confirm(lv):
+                        self.elb_misspelled += 1
+                        self.elb_stats["nymph_misspelled"] += 1
+                    else:
+                        self.elb_stats["nymph_ok"] += 1
+                    return True
+            elif close and G.KIND[lv.under[y, x]] not in (G.UPSTAIR, G.DOWNSTAIR) and self.nymph_elbs < 30:
                 self.nymph_elbs += 1
+                self.elb_stats["nymph_unchecked"] += 1
                 self.cur_act = "fight"
                 self.engrave_elbereth()
                 return True

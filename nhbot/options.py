@@ -27,6 +27,11 @@ DEFAULTS = {
     "ray_rules": False,        # A/B: a ray wand is zapped only if the forward direction can't bounce back (not
                                #      "forward or backward"); only a closed door absorbs (zap.c zap_over_floor),
                                #      open doors / doorways and boulders pass it; range 7..13 -> a wall 7+ away is safe
+    "elb_consistent": False,   # A/B: a square counts as Elbereth (lv.elbereth) only once read back as "Elbereth"
+                               #      (forgotten when a read shows otherwise); rest_on_elbereth only on a square
+                               #      read as Elbereth now, with no hostile in view; the nymph Elbereth with the
+                               #      usual checks (engravable square, not the failed square, not stairs / levitating /
+                               #      blind / stunned / confused) and read back
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_div": 7,             # pray for HP when hp * pray_div <= maxhp

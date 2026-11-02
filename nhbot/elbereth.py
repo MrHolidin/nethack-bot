@@ -30,6 +30,7 @@ class ElberethMixin:
         self.elb_fail = 0
         self.elb_rewrites = 0
         self.elb_only_c = 0
+        self.elb_stats = collections.Counter()   # elb_consistent: confirmed rests, nymph engravings
 
     def engrave_elbereth(self):
         lv = self.level()
@@ -48,7 +49,8 @@ class ElberethMixin:
             for c in "Elbereth":
                 self.raw_step(ord(c))
             self.press(13)
-            lv.elbereth.add(self.pos())
+            if not self.opts.elb_consistent:
+                lv.elbereth.add(self.pos())      # elb_consistent: only once read back (elb_confirm)
             self.elbereths += 1
             return True
         self.settle()
@@ -111,15 +113,34 @@ class ElberethMixin:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
         return bool(bl)
 
+    def elb_can_write(self, lv):
+        """Engraving is possible here and now: square, hands, not the square that just failed, not stairs,
+        not levitating / blind / stunned / confused."""
+        if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
+            return False
+        if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
+            return False
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        return not cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF)
+
+    def elb_confirm(self, lv):
+        """Read the engraving under us; elb_consistent: lv.elbereth follows what it says. True if Elbereth."""
+        ok = self.read_engraving() == "Elbereth"
+        self.elb_stats["read_ok" if ok else "read_not"] += 1
+        if self.opts.elb_consistent:
+            if ok:
+                lv.elbereth.add(self.pos())
+            else:
+                lv.elbereth.discard(self.pos())
+        return ok
+
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
         if self.can_pray():
             return False
-        if G.KIND[lv.under[self.pos()]] in (G.UPSTAIR, G.DOWNSTAIR):
-            return False
-        if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF):
+        if not self.elb_can_write(lv):
             return False
         y, x = self.pos()
         near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]
@@ -146,7 +167,7 @@ class ElberethMixin:
                 # adjacent check it every turn (reading is free); a hit through a smudged one means rewrite
                 if hostiles and not bad:
                     st["last_read"] = self.turn()
-                    if self.read_engraving() != "Elbereth":
+                    if not self.elb_confirm(lv):
                         if self.elb_blocked(lv):
                             self.elb_exits["blocked"] += 1
                             self.elb_state = None
@@ -171,7 +192,7 @@ class ElberethMixin:
                     return False
                 if self.turn() - st["last_read"] >= 4:
                     st["last_read"] = self.turn()
-                    if self.read_engraving() != "Elbereth":
+                    if not self.elb_confirm(lv):
                         if self.elb_blocked(lv):
                             self.elb_exits["blocked"] += 1
                             self.elb_state = None
@@ -198,7 +219,7 @@ class ElberethMixin:
                 self.elb_fail_at = (lv.key, self.pos(), self.turn())
                 self.elb_state = None
                 return False
-            if self.read_engraving() == "Elbereth":
+            if self.elb_confirm(lv):
                 self.elb_state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
                                   "last_read": self.turn(), "hp_hist": [self.bl(nh.NLE_BL_HP)]}
                 self.cur_act = "rest"
