@@ -11,8 +11,8 @@ est_gold(ocls, text): what a shopkeeper would pay for ONE unit (shk.c set_cost, 
 est_value(item, same): est_gold, +20% for an unidentified type of which we would have a single unit
   (what we may learn or use), VALUE_MAX + est_gold for what we wear / wield, what we need (carry.needed) and
   safe food up to MAX_FOOD pieces (pickup.food_needed), and water (clear potions).
-Dropping divides by the unit weight: the lowest value per weight goes first. Picking up is unchanged (the
-value decides what to drop, not what to take).
+Dropping divides by the unit weight: the lowest value per weight goes first. Picking up uses the same order
+(worth_taking): what fits without Burdened, or what is worth more per weight than what would go to make room.
 """
 import re
 from collections import Counter
@@ -20,7 +20,7 @@ from collections import Counter
 import nle.nethack as nh
 
 from nhbot.carry import RANDOM_CLASSES, describe
-from nhbot.items import base_name
+from nhbot.items import base_name, parse_item
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
 VALUE_MAX = 1_000_000.0
@@ -140,3 +140,44 @@ class ValueMixin:
 
     def value_per_weight(self, it, same=1):
         return self.est_value(it, same) / describe(it.ocls, it.text)["wt"]
+
+    # ------------------------------------------------------------ the same comparison for picking up
+    def weight_capacity(self):
+        """hack.c weight_cap: 25 * (Str + Con) + 50, at most 1000; carrying more is Burdened."""
+        return min(25 * (self.bl(nh.NLE_BL_STR25) + self.bl(nh.NLE_BL_CON)) + 50, 1000)
+
+    def inventory_weight(self):
+        wt = 0
+        for it in self.items():
+            if it.ocls == nh.COIN_CLASS:
+                wt += (base_name(it.text)[0] + 50) // 100           # invent.c: 100 coins weigh 1
+            else:
+                d = describe(it.ocls, it.text)
+                wt += d["wt"] * d["qty"]
+        return wt
+
+    def worth_taking(self, ocls, text):
+        """value_model: take a floor stack if it fits without Burdened, or if it is worth more per weight than
+        the cheapest things (off the body) we would drop to make room for it -- the order carry_drop_step drops
+        in, so we never pick up what the drop step would put straight back down."""
+        d = describe(ocls, text)
+        wt = d["wt"] * d["qty"]
+        free = self.weight_capacity() - self.inventory_weight()
+        if wt <= free:
+            return True
+        looks = self.carried_by_look()
+        k = appearance(text)
+        vpw = self.value_per_weight(parse_item("?", ocls, text), (looks[k] if k is not None else 0) + d["qty"])
+        same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
+        need = wt - free
+        drop = sorted(((self.value_per_weight(it, same(it)), it) for it in self.items()
+                       if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.cant_drop),
+                      key=lambda x: x[0])
+        for v, it in drop:
+            if v >= vpw:
+                return False
+            dd = describe(it.ocls, it.text)
+            need -= dd["wt"] * dd["qty"]
+            if need <= 0:
+                return True
+        return False

@@ -135,6 +135,8 @@ class PickupMixin:
         elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS) and self.carry_all_on():
             if ocls == nh.SPBOOK_CLASS or not (typ == "gray stone" or typ in THROW_STONE_TYPES):
                 reason = "carry"
+        if reason == "carry" and self.opts.value_model:
+            return reason if self.worth_taking(ocls, text) else None
         if reason == "carry" and cap >= 1:
             return None
         return reason
