@@ -152,8 +152,12 @@ class ExploreMixin:
             lv.search_goal = best
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time
-            lv.searched[start] += 10
+            t0 = self.turn()
+            if not self.opts.search_model:
+                lv.searched[start] += 10
             self.press("1"); self.press("0"); self.press("s")
+            if self.opts.search_model:        # the turns actually searched: a monster in view stops it early
+                lv.searched[start] += max(1, self.turn() - t0)
             return
         step = self.first_step(prev, start, best)
         if step:
