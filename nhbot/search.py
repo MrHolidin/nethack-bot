@@ -71,25 +71,31 @@ def candidates(k_mem, under):
     return out
 
 
-def prior(kind, space):
-    """P(a hidden passage at a candidate), fitted on 1000 games (seeds 62000-62999, search_log): logistic in the
-    room space beyond it. Dead ends: 0.04 at space 15, 0.09 at 70, 0.18 at 115, 0.47 at 200; walls: 0.005 up to
-    space 50, 0.02 at 90, 0.15 at 150."""
-    if kind == 2:
-        return 0.0                            # corridor sides: not fitted yet
-    z = -3.5 + 0.017 * space if kind == 1 else -5.3 + 0.035 * max(0.0, space - 50.0)
+def prior(f):
+    """P(a hidden passage at a candidate) from its feature row (features()): logistic fits by maximum likelihood
+    (P(found) = prior * (1 - (6/7)^search turns)) on the search_log of 1000 games, seeds 63000-63999. A dead end
+    is the likeliest (0.04 with no room space beyond, 0.3 with a lot); a wall square 0.005 rising past space 50;
+    a corridor side 0.0002-0.1: one passable neighbour in line with a corridor end (a dead end we did not
+    recognise) ~0.1, two passable neighbours ~0.01, more ~0.001."""
+    kind, space = f[2], f[3]
+    if kind == 1:
+        z = -3.395 + 1.499 * space / 100
+    elif kind == 0:
+        z = -5.403 + 3.223 * max(0.0, space - 50.0) / 100 + 0.51 * (f[6] >= 12)
+    else:
+        line_end = f[9] == 1 and f[10] == 1   # in line with a corridor that ends next to it
+        z = -8.746 + 1.969 * space / 100 + 2.494 * (f[8] == 2) + 3.931 * (f[8] == 1 and line_end) \
+            - 0.761 * (f[8] == 2 and line_end)
     return 1.0 / (1.0 + np.exp(-z))
 
 
 def remaining(k_mem, under, searched):
     """Map of the remaining probability of a hidden passage at each candidate square (0 elsewhere):
-    prior(kind, room space beyond) * (6/7) ** (search turns next to it)."""
+    prior(features) * (6/7) ** (search turns next to it)."""
     out = np.zeros((ROWS, COLS))
     for f in features(k_mem, under, searched):
-        y, x, kind, space_ahead, covered = f[0], f[1], f[2], f[3], f[7]
-        p = prior(kind, space_ahead)
-        if p > 0:
-            out[y, x] = max(out[y, x], p * MISS ** covered)
+        y, x, covered = f[0], f[1], f[7]
+        out[y, x] = max(out[y, x], prior(f) * MISS ** covered)
     return out
 
 
