@@ -28,9 +28,8 @@ SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration
              "clove of garlic", "meatball", "meat stick", "huge chunk of meat", "meat ring",
              "lichen corpse", "lizard corpse")
 MAX_FOOD = 6
-AMMO_WORDS = re.compile(r"\b(darts?|daggers?|knives|knife|shuriken|spears?|javelins?|arrows?|crossbow bolts?)\b")
 
-# ---------------------------------------------------------------- pickup_v2: item kinds by type, not substring
+# ---------------------------------------------------------------- item kinds by type, not substring
 _WEAPONS = {nh.OBJ_NAME(nh.objclass(i)) for i in range(nh.NUM_OBJECTS)
             if ord(nh.objclass(i).oc_class) == nh.WEAPON_CLASS and nh.OBJ_NAME(nh.objclass(i))}
 MISSILE_TYPES = {n for n in _WEAPONS if any(w in n for w in THROWABLE)} - {"crysknife"}   # what we throw
@@ -88,19 +87,16 @@ def floor_kind(text):
 class PickupMixin:
     def pickup_init(self):
         self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
-        self.pickup_stats = Counter()  # pickup_v2: why things were taken / refused
+        self.pickup_stats = Counter()  # why things were taken / refused
         self._take_state = None        # (food count, encumbrance) frozen while one pickup is judged
 
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
-        """Could what lies at pos be merchandise? On a shop square; and unless shop_by_square, whenever a
-        shopkeeper is in view. pickup_v2: a shopkeeper in view counts only while no shop on this level is
-        marked (the marked squares are the better answer)."""
-        if self.opts.pickup_v2:
-            return bool(lv.shop[pos]) or (self.shopkeeper_in_view() and not lv.shop.any())
-        return bool(lv.shop[pos]) or (not self.opts.shop_by_square and self.shopkeeper_in_view())
+        """Could what lies at pos be merchandise? On a shop square; a shopkeeper in view counts only while no
+        shop on this level is marked (the marked squares are the better answer)."""
+        return bool(lv.shop[pos]) or (self.shopkeeper_in_view() and not lv.shop.any())
 
-    # ------------------------------------------------------------------ pickup_v2: one rule what to take
+    # ------------------------------------------------------------------ one rule what to take
     def take_reason(self, text, worn=None):
         """Why we'd take this floor item: "armor" (an upgrade), "missile", "weapon" (a wield candidate), "food",
         "carry" (worth carrying to sell / use); None: leave it. Never merchandise, known-cursed armor / weapons,
@@ -145,7 +141,7 @@ class PickupMixin:
 
     # ------------------------------------------------------------------ explore goals: piles worth a walk
     def weapon_glyphs(self):
-        return WANTED_WEAPON_GLYPH if self.opts.pickup_v2 else WEAPON_GLYPH
+        return WANTED_WEAPON_GLYPH
 
     def carry_glyph(self, g):
         """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
@@ -179,48 +175,8 @@ class PickupMixin:
                     and not lv.shop[y, x])
 
     # ------------------------------------------------------------------ what to take
-    def carry_wanted(self, n):
-        """A floor item (look_here text) to take: one of the carried classes, not merchandise."""
-        if "for sale" in n:
-            return None
-        if re.search(r"\b(potion|scroll|ring|wand|amulet)s?\b", n) and "corpse" not in n:
-            return re.sub(r"^(a|an|the|\d+)\s+", "", n).strip()
-        if "corpse" not in n:
-            core = base_name(n)[2]
-            one = " ".join(singular(w) for w in core.split(" "))
-            if (core in WEAPON_NAME_OF or one in WEAPON_NAME_OF) and " cursed" not in " " + n:
-                return core
-        if self.carry_all_on():
-            a = parse_armor(n)
-            if a is not None:
-                return a["name"]
-            core = base_name(n)[2]
-            one = " ".join(singular(w) for w in core.split(" "))
-            no_tools = NO_TOOLS - {"pick-axe"} if self.carry_all_on() else NO_TOOLS
-            if (core in TOOL_WORDS or one in TOOL_WORDS) and core not in no_tools and one not in no_tools:
-                return core
-        if self.carry_all_on() and "corpse" not in n:
-            core = base_name(n)[2]
-            one = " ".join(singular(w) for w in core.split(" "))
-            if "spellbook" in core:
-                return core
-            if "gray stone" in core:
-                return None
-            if one.endswith(" gem") or "glass" in one or one in GEM_NAMES or core in GEM_NAMES:
-                return core
-        return None
-
     def food_count(self):
         return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
-
-    def food_wanted(self, name):
-        if self.food_count() >= MAX_FOOD:
-            return False
-        if "egg" in name or re.search(r"\btins?\b", name):
-            return False
-        if "partly eaten" in name:
-            return False
-        return any(f in name for f in SAFE_FOOD)
 
     # ------------------------------------------------------------------ the paths
     def armor_pickup_here(self, lv):
@@ -229,57 +185,34 @@ class PickupMixin:
         # never take merchandise (a lone item is picked up without a menu, so filter here)
         names = [n for n in names if "for sale" not in n]
         worn = self.worn_by_slot()
-        if self.opts.pickup_v2:
-            reasons = [self.take_reason(n, worn) for n in names]
-            if not any(reasons):
-                return False
-            for r in reasons:
-                if r:
-                    self.pickup_stats[r] += 1
-                    self.carry_stats["picked"] += r in ("carry", "missile", "weapon")
-                    self.food_picked += r == "food"
-            self.take_here(lambda t: self.take_reason(t, worn) is not None, "pile")
-            self.equip_events.append((self.turn(), "pickup", ",".join(n for n, r in zip(names, reasons) if r)))
-            return True
-        want = []
-        for n in names:
-            a = parse_armor(n)
-            if a and self.improves(a, worn):
-                want.append(a["name"])
-            elif self.carry_wanted(n):
-                want.append(self.carry_wanted(n))
-                self.carry_stats["picked"] += 1
-            elif self.food_wanted(n):
-                fm = next((f for f in SAFE_FOOD if f in n), None)
-                if fm is None:
-                    continue
-                want.append(fm)
-                self.food_picked += 1
-        if not want:
+        reasons = [self.take_reason(n, worn) for n in names]
+        if not any(reasons):
             return False
-        self.pickup_matching(want)
-        self.equip_events.append((self.turn(), "pickup", ",".join(want)))
+        for r in reasons:
+            if r:
+                self.pickup_stats[r] += 1
+                self.carry_stats["picked"] += r in ("carry", "missile", "weapon")
+                self.food_picked += r == "food"
+        self.take_here(lambda t: self.take_reason(t, worn) is not None, "pile")
+        self.equip_events.append((self.turn(), "pickup", ",".join(n for n, r in zip(names, reasons) if r)))
         return True
 
     def pickup_all(self):
         if self.merch_risk(self.level(), self.pos()):
             self.msg_audit["loot_pickup_merch_risk"] += 1
-        if self.opts.pickup_v2:
-            # what the thief took from us, and whatever else is worth taking; never merchandise (a thief that
-            # dies in a shop leaves its haul for sale)
-            def want(t):
-                if "for sale" in t:
-                    return False
-                if base_name(t)[2] in self.stolen_names:
-                    self.pickup_stats["loot_stolen"] += 1
-                    return True
-                return self.take_reason(t) is not None
-            self.take_here(want, "loot")
-            return
-        self.pickup(lambda t: "corpse" not in t and "boulder" not in t, "loot")
+        # what the thief took from us, and whatever else is worth taking; never merchandise (a thief that dies in
+        # a shop leaves its haul for sale)
+        def want(t):
+            if "for sale" in t:
+                return False
+            if base_name(t)[2] in self.stolen_names:
+                self.pickup_stats["loot_stolen"] += 1
+                return True
+            return self.take_reason(t) is not None
+        self.take_here(want, "loot")
 
     def take_ammo(self):
-        """pickup_v2 ammo / retrieve: our missiles (and the stones we throw) here."""
+        """Ammo / retrieve: our missiles (and the stones we throw) here."""
         def want(t):
             if "for sale" in t or CURSED_RE.search(t):
                 return False
@@ -289,7 +222,7 @@ class PickupMixin:
             self.take_here(want, "ammo")
 
     def take_here(self, want, site):
-        """pickup_v2: pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it
+        """Pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it
         straight back down if want rejects it."""
         seq0 = self.msg_seq
         self._take_state = (self.food_count(), self.bl(nh.NLE_BL_CAP))    # judged as before the pickup
