@@ -73,6 +73,7 @@ class Level:
         self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
+        self.stairs = np.zeros((ROWS, COLS), dtype=np.int8)     # a staircase seen here: kind UPSTAIR / DOWNSTAIR
         self.no_diag = np.zeros((ROWS, COLS), dtype=bool)       # the game refused a diagonal step into / out of it
                                                                 # (kept: on the Rogue level a doorway refuses too)
         self.desperate = False
@@ -107,6 +108,9 @@ class MapMixin:
         lv.door_seen |= known & ((k == G.DOOR_OPEN) | (k == G.DOOR_CLOSED) | (k == G.DOORWAY))
         lv.door_intact[known & ((k == G.DOOR_OPEN) | (k == G.DOOR_CLOSED))] = True
         lv.door_intact[known & (k == G.DOORWAY)] = False        # no door / a broken one
+        st = known & ((k == G.UPSTAIR) | (k == G.DOWNSTAIR))
+        lv.stairs[st] = k[st]
+        lv.stairs[known & ~st & ~np.isin(k, (G.OBJECT, G.CORPSE, G.GOLD))] = 0   # terrain seen: no stairs
         lv.seen |= known & (g != G.STONE_GLYPH)
         y, x = self.pos()
         if self._cur_pos != (y, x):
@@ -134,6 +138,10 @@ class MapMixin:
         g = self.obs["glyphs"]
         k_live = G.KIND[g]
         k_mem = G.KIND[lv.under]
+        if self.opts.stairs_memory:          # an item on a staircase hides it from lv.under
+            hidden = (lv.stairs > 0) & np.isin(k_mem, (G.OBJECT, G.CORPSE, G.GOLD))
+            if hidden.any():
+                k_mem = np.where(hidden, lv.stairs, k_mem)
         return k_mem, k_live
 
     def passable_grid(self, lv, k_mem, k_live):
@@ -269,5 +277,6 @@ class MapMixin:
             # we remembered a staircase that isn't here (arriving next to stairs a monster stood on marks the
             # wrong square); the refusal costs no time, so pressing again looped to the step cap
             yy, xx = self.pos()
+            lv.stairs[yy, xx] = 0
             if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
                 lv.under[yy, xx] = FLOOR_GLYPH

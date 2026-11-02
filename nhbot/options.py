@@ -16,6 +16,8 @@ DEFAULTS = {
                                #      one unit per refusal, instead of marking the square impassable
     "trap_nofail": False,      # A/B: while a bear trap / pit / web holds us, a failed step is not counted against the
                                #      square (no cost, never impassable)
+    "stairs_memory": False,    # A/B: a staircase stays known under an item / corpse on it (as door_memory for doors);
+                               #      mines_return lost its up staircase under a corpse and went down and up again
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP
