@@ -25,9 +25,8 @@ class NavMixin:
         sy, sx = start
         dist[sy, sx] = 0
         pq = [(0, sy, sx)]
-        door_like = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED)
-        if self.opts.door_memory:
-            door_like = door_like | lv.door_intact | lv.no_diag   # an item on a door hides it from k_mem
+        # an item on a door hides it from k_mem: the doors remembered and the refused diagonals count too
+        door_like = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
         monster_here = (k_live == G.MONSTER) | (k_live == G.INVIS)
         while pq:
             d, y, x = heapq.heappop(pq)
@@ -149,7 +148,7 @@ class NavMixin:
         known = lv.no_diag[ty, tx] or lv.no_diag[y, x]
         self.press(key)
         after = (*self.pos(), self.turn())
-        if self.opts.door_memory and "intact doorway" in self.text_since(seq0) and not known:
+        if "intact doorway" in self.text_since(seq0) and not known:
             self.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
             return                                         # (a second refusal is counted: no loop without time)
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):

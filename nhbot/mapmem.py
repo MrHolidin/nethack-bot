@@ -115,7 +115,7 @@ class MapMixin:
         lv.near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
         if not lv.shop[y, x] and lv.shop[max(0, y - 1):y + 2, max(0, x - 1):x + 2].any() \
                 and G.KIND[lv.under[y, x]] not in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) \
-                and not (self.opts.door_memory and lv.door_seen[y, x]) \
+                and not lv.door_seen[y, x] \
                 and int(lv.under[y, x]) not in CORRIDOR_GLYPHS:
             # mark_shop floods from the door over what was visible at the greeting: squares the shopkeeper
             # or an item hid are missing. Standing on such a hole (an item goal there, or the end of a shop
@@ -156,8 +156,7 @@ class MapMixin:
         k = G.KIND[g]
         inside_ok = np.isin(k, [G.FLOOR, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP, G.BOULDER]) & \
             ~np.isin(g, list(corridor))
-        if self.opts.door_memory:
-            inside_ok &= ~lv.door_seen
+        inside_ok &= ~lv.door_seen                  # a door under an item is not shop floor
         seen = set()
         q = deque()
         y, x = door

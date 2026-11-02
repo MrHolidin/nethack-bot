@@ -11,9 +11,6 @@ DEFAULTS = {
     "trap_escape": False,      # A/B: held in a bear trap / pit / web (from the messages): failed steps are not counted
                                #      against the square; out of a bear trap by diagonal attempts (hack.c trapmove:
                                #      a diagonal one always counts, a straight one 1 in 5), into a square without a monster
-    "door_memory": False,      # A/B: a door stays a door under an item on it (seen as a door once, or the game said
-                               #      "You can't move diagonally into / out of an intact doorway"): no diagonal steps
-                               #      through it, that refusal is not a failed step, the shop marking never takes it
     "mines_kick": False,       # A/B: in Grotto Town (minetn-5: its down staircase is always behind a locked door) a
                                #      locked door is kicked while no watchman / shopkeeper is in view; with one in view
                                #      wait (the door is not marked impassable); "Hey, stop damaging that door!" (a
