@@ -167,9 +167,9 @@ class EquipMixin:
             return value(a) > 0.5
         if cur.get("cursed") or a["slot"] in self.cursed_slots:
             return False
-        if self.opts.bless_armor and abs(value(a) - value(cur)) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
+        if abs(value(a) - value(cur)) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
                 and not BLESSED_RE.search(cur.get("text", "")):
-            return True                       # as good, and blessed: resists erosion and a curse (bless_armor)
+            return True                       # as good, and blessed: resists erosion and a curse (altar test)
         return value(a) > value(cur) + 0.5
 
     # ---------------------------------------------------------- main hook

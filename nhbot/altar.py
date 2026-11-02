@@ -1,4 +1,4 @@
-"""Altar BUC test (flag altar_test): carrying items whose curse status we don't know, an altar on the level is
+"""Altar BUC test: carrying items whose curse status we don't know, an altar on the level is
 an explore goal (goals 'altar'); standing on it with nothing threatening us, drop them one by one -- the game
 flashes black for a cursed item, amber for a blessed one, nothing for an uncursed one, and marks each known
 (pray.c doaltarobj; not while blind) -- then pick them all back up. Items on the body are left alone.
@@ -36,7 +36,7 @@ class AltarMixin:
     def altar_mask(self, lv):
         """Altar squares to walk to: something to test, or our things lying on one."""
         alt = self.terrain_glyphs(lv) == ALTAR_GLYPH
-        if not self.opts.altar_test or not alt.any():
+        if not alt.any():
             return alt & False
         dropped = self.altar_dropped
         if dropped is not None and dropped[0] == lv.key:
@@ -48,7 +48,7 @@ class AltarMixin:
     def altar_step(self, lv):
         """On an altar, nothing threatening us (the caller checks): drop one untested item, or pick them all
         back up when none is left. True if it used the turn."""
-        if not self.opts.altar_test or self.terrain_glyphs(lv)[self.pos()] != ALTAR_GLYPH \
+        if self.terrain_glyphs(lv)[self.pos()] != ALTAR_GLYPH \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_LEV | nh.BL_MASK_HALLU):
             return False
         here = (lv.key, self.pos())

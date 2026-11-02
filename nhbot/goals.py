@@ -41,7 +41,7 @@ class GoalKind:
 GOALS = {
     "gold": GoalKind("gold", "explore", holds_descent=True),
     "pile": GoalKind("pile", "explore", holds_descent=True),
-    "altar": GoalKind("altar", "explore", holds_descent=True),    # altar_test: items of unknown curse status
+    "altar": GoalKind("altar", "explore", holds_descent=True),    # items of unknown curse status (nhbot.altar)
     "retrieve": GoalKind("retrieve", "own", ttl=60),
     "corpse": GoalKind("corpse", "own", ttl=40, max_dist=8),
     "loot": GoalKind("loot", "own"),

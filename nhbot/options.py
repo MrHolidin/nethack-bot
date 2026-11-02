@@ -7,8 +7,6 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "bless_armor": False,      # A/B: swap worn armor for a blessed piece just as good (known from altar_test)
-    "altar_test": False,       # A/B: an altar is a goal while we carry items of unknown curse status: drop, read, take
     "tins": False,             # A/B: pick up tins; open them with the alternate dagger when calm, eat if safe
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
                                #      it with a reachable frontier (hole, trap door, teleport)
