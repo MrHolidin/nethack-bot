@@ -7,8 +7,8 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "amulets": False,          # A/B: wear known good amulets (nhbot.amulets order); identify unknown ones with a
-                               #      scroll of identify, bought in a shop if we have none
+    "jewelry": False,          # A/B: wear known useful amulets / rings (nhbot.jewelry order); identify unknown ones
+                               #      with a scroll of identify (never sold), bought in a shop if we have none
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest)
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
                                #      it with a reachable frontier (hole, trap door, teleport)

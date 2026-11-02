@@ -363,7 +363,7 @@ class PolicyMixin:
                 return True
             if self.read_good_scroll():
                 return True
-            if self.amulet_id_step(lv):
+            if self.jewelry_id_step(lv):
                 return True
             if self.wandid_step(lv):
                 return True
@@ -373,7 +373,7 @@ class PolicyMixin:
                 return True
             if self.equip_step(lv):
                 return True
-            if self.amulet_wear_step(lv):
+            if self.jewelry_wear_step(lv):
                 return True
             if self.altar_step(lv):
                 return True
