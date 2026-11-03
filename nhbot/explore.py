@@ -9,7 +9,7 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, NEIGH, ROWS, WEAK
 from nhbot.goals import GOALS
 
-REST_DESCEND_HP = 0.95      # rest_descend: rest on the down staircase below this fraction of max HP
+REST_DESCEND_HP = 0.95      # rest on the down staircase below this fraction of max HP
 REST_DESCEND_MAX = 600      # ... at most this many turns a level
 
 
@@ -27,7 +27,7 @@ class ExploreMixin:
         self.mines_kick_stats = Counter()
         self.revisit_done = set()        # revisit_up: level keys we climbed back to
         self.revisit_stats = Counter()
-        self.descent_rest = Counter()    # rest_descend: level key -> turns rested on its down staircase
+        self.descent_rest = Counter()    # level key -> turns rested on its down staircase
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -171,11 +171,9 @@ class ExploreMixin:
         return self.walk_to(lv, downstairs, chase="downstairs", grids=grids)[0] == "moved"
 
     def rest_before_descent(self, lv):
-        """rest_descend: on the down staircase below REST_DESCEND_HP of max HP, nothing in view, not Weak:
-        search (20s, the game stops it when something shows up) -- at most REST_DESCEND_MAX turns a level.
-        True if it used the turn."""
-        if not self.opts.rest_descend:
-            return False
+        """On the down staircase below REST_DESCEND_HP of max HP, nothing in view, not Weak: search (20s, the
+        game stops it when something shows up) -- at most REST_DESCEND_MAX turns a level. True if it used the
+        turn. (A/B rest_descend: +1416 [+390, +2448] over 1000 games.)"""
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if hp >= maxhp * REST_DESCEND_HP or self.bl(nh.NLE_BL_HUNGER) >= WEAK or self.visible_hostiles(lv) \
                 or self.descent_rest[lv.key] >= REST_DESCEND_MAX:
