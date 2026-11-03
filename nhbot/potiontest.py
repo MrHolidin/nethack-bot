@@ -39,8 +39,8 @@ class PotionTestMixin:
     def quaff_test_step(self, lv):
         """No threat in view (the caller checks): stand on Elbereth, then drink one potion of the 100 group.
         True if it used the turn."""
-        if not self.opts.quaff_test:
-            return False
+        if not (self.opts.quaff_test or (self.opts.quaff_test_horn and self.have_horn())):
+            return False                      # quaff_test_horn: confusion / hallucination the horn cures
         it, key = self.potion_to_test()
         if it is None or (lv.key, self.pos()) in self.quaff_refused or not self.elb_can_write(lv):
             return False

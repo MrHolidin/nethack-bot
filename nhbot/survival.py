@@ -128,11 +128,12 @@ class SurvivalMixin:
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
-        if name in ("bat", "giant bat", "vampire bat"):
+        horn = self.opts.horn_corpses and self.have_horn()     # its stun / food poisoning the horn cures
+        if name in ("bat", "giant bat", "vampire bat") and not horn:
             return False                      # eat.c: bat corpses stun for 30 (giant bat 60) turns
         f1, f2 = pm.mflags1, pm.mflags2
-        if f2 & (M2_UNDEAD | M2_WERE | M2_SHAPESHIFTER):
-            return False
+        if f2 & (M2_WERE | M2_SHAPESHIFTER) or (f2 & M2_UNDEAD and not horn):
+            return False                      # undead: a zombie's / mummy's corpse is made old -- often tainted
         if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
             return False                      # cannibalism
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
@@ -184,6 +185,11 @@ class SurvivalMixin:
 
     def horn_is_bad(self, it):
         return it.letter in self.horn_bad or (self.opts.unihorn and it.cursed)
+
+    def have_horn(self):
+        """unihorn: a unicorn horn we would apply is on us."""
+        return self.opts.unihorn and any(it.ocls == nh.TOOL_CLASS and "unicorn horn" in it.text
+                                         and not self.horn_is_bad(it) for it in self.items())
 
     def unihorn_step(self, troubles):
         """unihorn: apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us; the caller decides

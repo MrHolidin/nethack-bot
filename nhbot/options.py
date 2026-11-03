@@ -22,6 +22,9 @@ DEFAULTS = {
                                #      hallucinating (nothing next to us); a horn that harms us is cursed: dropped
                                #      from use, sold (nhbot.survival)
     "unihorn_fight": False,    # A/B, with unihorn: blind or stunned, the horn is applied with something next to us too
+    "quaff_test_horn": False,  # A/B, with unihorn: quaff_test while we carry a unicorn horn we would apply
+    "horn_corpses": False,     # A/B, with unihorn: carrying such a horn, bat corpses (stun) and undead kills' corpses
+                               #      (made old: food poisoning) are eaten too (survival.corpse_ok)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
