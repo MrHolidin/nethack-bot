@@ -71,8 +71,11 @@ class VaultMixin:
     # ------------------------------------------------------------------ where we are
     def vault_room(self, lv):
         """The squares of the closed room of at most 4 squares we stand in (a vault), or None."""
-        k = self.kinds(lv)
         start = self.pos()
+        for r in self.known_vaults.get(lv.key, ()):
+            if start in r:
+                return r                                  # dig_through dug its way in: no longer closed
+        k = self.kinds(lv)
         room, todo = {start}, [start]
         while todo:
             y, x = todo.pop()

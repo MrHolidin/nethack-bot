@@ -55,6 +55,7 @@ STEPS = (
     "rest",
     "gold_here",
     "vault_seek",        # vault_dig: a vault hint read here and a digger -- into its niche (nhbot.vault)
+    "tunnel_vault",      # dig_through: a vault seen on the map -- dig into it (nhbot.tunnel)
     "explore",
 )
 
@@ -284,8 +285,8 @@ class PolicyMixin:
             return False                         # tins: slippery fingers, whatever we wield now slips too
         if self.tin_swapped and (c.hostiles or self.visible_hostiles(c.lv)) and self.tin_swap_back():
             return True                          # tins: the dagger was swapped in to open one; a threat: back
-        if self.vault_digging():
-            return False                         # vault_dig: the digger stays in hand until we are out
+        if self.vault_digging() or self.tunnel_active():
+            return False                         # vault_dig / dig_through: the digger stays in hand meanwhile
         return not c.hostiles and self.tin_slipped is None and self.weapon_check()
 
     def step_wands(self, c):
@@ -306,6 +307,9 @@ class PolicyMixin:
 
     def step_vault_seek(self, c):
         return self.vault_seek_step(c.lv, c.hostiles)
+
+    def step_tunnel_vault(self, c):
+        return self.tunnel_vault_step(c.lv, c.hostiles)
 
     def step_ambush(self, c):
         return self.ambush_step(c.lv, c.hostiles)

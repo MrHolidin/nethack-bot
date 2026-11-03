@@ -34,6 +34,7 @@ from nhbot.tins import TinMixin
 from nhbot.altar import AltarMixin
 from nhbot.ambush import AmbushMixin
 from nhbot.vault import VaultMixin
+from nhbot.tunnel import TunnelMixin
 from nhbot.potiontest import PotionTestMixin
 from nhbot.jewelry import JewelryMixin
 from nhbot.gift import GiftMixin
@@ -44,7 +45,7 @@ from nhbot.wishing import WishMixin
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
-          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, AmbushMixin, VaultMixin):
+          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, AmbushMixin, VaultMixin, TunnelMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
         """role_opts and any other keyword arguments are options (options.py); unknown names raise."""
@@ -182,6 +183,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.wishing_init()
         self.ambush_init()
         self.vault_init()
+        self.tunnel_init()
         self.value_init()
         self.policy_init()
         self.goals_init()
@@ -249,7 +251,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "quaffs": self.quaffs, "unihorn": dict(self.horn_stats),
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
-            "zaps": self.zaps, "wishes": self.wishes, "wishing": dict(self.wish_stats), "ray_risk": {"counts": dict(self.ray_risk_stats), "log": self.ray_risk_log}, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "descent_rest": sum(self.descent_rest.values()), "ambush": dict(self.ambush_stats), "vault_dig": dict(self.vault_stats), "revisit": dict(self.revisit_stats), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),
+            "zaps": self.zaps, "wishes": self.wishes, "wishing": dict(self.wish_stats), "ray_risk": {"counts": dict(self.ray_risk_stats), "log": self.ray_risk_log}, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "descent_rest": sum(self.descent_rest.values()), "ambush": dict(self.ambush_stats), "vault_dig": dict(self.vault_stats), "tunnel": dict(self.tunnel_stats), "revisit": dict(self.revisit_stats), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),
             "thefts": self.thefts,
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,

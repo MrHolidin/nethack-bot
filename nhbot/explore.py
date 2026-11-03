@@ -128,6 +128,9 @@ class ExploreMixin:
         # nothing left: map the level if we can, else search for hidden passages
         if self.magic_map_step(lv):
             return
+        # dig_through: with a digger, dig toward the way down or the part of the level we know nothing of
+        if self.tunnel_stuck_step(lv):
+            return
         self.search_mode(lv, grids)
 
     def revisit_up(self, lv, grids):
