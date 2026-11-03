@@ -10,8 +10,8 @@ import re
 
 import nle.nethack as nh
 
-GOOD_NAMES = ("scroll of enchant armor", "scroll of enchant weapon", "scroll of remove curse")
 GOOD_TYPES = {"enchant armor", "enchant weapon", "remove curse"}
+GOOD_RE = re.compile(r"\bscrolls? of (?:enchant armor|enchant weapon|remove curse)\b")    # a stack: "3 scrolls of"
 
 
 def cha_factor(cha):
@@ -40,8 +40,8 @@ class ScrollMixin:
         return shirt and not over
 
     def scroll_is_good(self, s):
-        """Identified as one of GOOD_NAMES, or every type its shop prices allow is one of them."""
-        if any(n in s for n in GOOD_NAMES):
+        """Identified as one of GOOD_TYPES, or every type its shop prices allow is one of them."""
+        if GOOD_RE.search(s):
             return True
         post = self.price_of_text(s) if "labeled" in s else None
         return bool(post) and set(post) <= GOOD_TYPES
