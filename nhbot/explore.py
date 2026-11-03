@@ -113,6 +113,12 @@ class ExploreMixin:
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
         if self.unblock_step(lv, grids, frontier | downstairs):
             return
+        # mines_no_search: the Mines' cave levels (mkmap) have no secret doors or corridors -- no way on found:
+        # leave the Mines instead of searching
+        if self.opts.mines_no_search and lv.key[0] == 2 and not self.mines_return_on:
+            self.mines_return_start(lv, "no_way")
+            if self.mines_return_step(lv, grids):
+                return
         # nothing left: map the level if we can, else search for hidden passages
         if self.magic_map_step(lv):
             return
