@@ -21,6 +21,7 @@ DEFAULTS = {
     "unihorn": False,          # A/B: apply a unicorn horn when sick (always) or blind / confused / stunned /
                                #      hallucinating (nothing next to us); a horn that harms us is cursed: dropped
                                #      from use, sold (nhbot.survival)
+    "unihorn_fight": False,    # A/B, with unihorn: blind or stunned, the horn is applied with something next to us too
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

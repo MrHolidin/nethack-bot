@@ -27,7 +27,8 @@ STEPS = (
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
     "weight",            # never Burdened (carry), shed weight when Strained
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
-    "unihorn",           # unihorn: blind / confused / stunned / hallucinating, nothing next to us
+    "unihorn",           # unihorn: blind / confused / stunned / hallucinating, nothing next to us (unihorn_fight:
+                         #   blind / stunned with something next to us too)
     "stunned",
     "vault_guard",
     "blind",
@@ -211,7 +212,11 @@ class PolicyMixin:
         return self.unihorn_step(HORN_SICK)
 
     def step_unihorn(self, c):
-        return not c.hostiles and self.unihorn_step(HORN_FIXES)
+        if not c.hostiles:
+            self.horn_fight_stop = False
+            return self.unihorn_step(HORN_FIXES)
+        return self.opts.unihorn_fight and not self.horn_fight_stop and \
+            self.unihorn_step(nh.BL_MASK_BLIND | nh.BL_MASK_STUN)
 
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""
