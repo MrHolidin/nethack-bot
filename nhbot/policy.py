@@ -41,6 +41,7 @@ STEPS = (
     "weapon",
     "wands",
     "melee",
+    "ambush",            # door_ambush: a group coming at us -> wait beside an entrance of their room (nhbot.ambush)
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
@@ -93,6 +94,7 @@ class PolicyMixin:
         y, x = self.pos()
         c = Tick(lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP), maxhp=self.bl(nh.NLE_BL_HPMAX),
                  hunger=self.bl(nh.NLE_BL_HUNGER))
+        self.threat_track(lv)
         for name, step in self.steps_by_name[1:]:
             if step(c):
                 self.last_step = name
@@ -294,6 +296,9 @@ class PolicyMixin:
             target = self.focus_target(c.hostiles, target)
         self.attack(target)
         return True
+
+    def step_ambush(self, c):
+        return self.ambush_step(c.lv, c.hostiles)
 
     def step_hunt_shooter(self, c):
         return not self.hallu_blind_ranged() and self.hunt_step(c.lv)

@@ -33,6 +33,8 @@ DEFAULTS = {
                                #      win_prob) instead of HP < elb_hp
     "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
                                #      message (combat.RTHREAT_RE), else it doesn't
+    "door_ambush": False,      # A/B: more than 2 hostiles coming at us and none next to us: wait beside an entrance
+                               #      of their room, behind its wall (nhbot.ambush)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
