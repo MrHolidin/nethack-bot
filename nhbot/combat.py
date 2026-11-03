@@ -10,8 +10,10 @@ from nhbot import glyphs as G
 from nhbot.items import WAND_SPENT_RE
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
 from nhbot.goals import GOALS
-from nhbot.monsters import RANGED_TARGETS
+from nhbot.monsters import RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
+from nhbot.pricemem import appearance
+from nhbot.rays import TERRAIN_CODE, our_protection, ray_harm, self_hit_prob
 
 
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
@@ -57,6 +59,8 @@ class CombatMixin:
     def combat_init(self):
         self.kill_by = Counter()       # our kills, by kind
         self.zaps = 0
+        self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
+        self.ray_risk_log = []
         self.empty_wands = set()       # Item.key of wands that said "Nothing happens" / "You wrest"
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
@@ -357,12 +361,46 @@ class CombatMixin:
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
-                if kind in RAY_WANDS and not self.ray_safe(lv, dy, dx):
+                safe = kind not in RAY_WANDS or self.ray_safe(lv, dy, dx)
+                if kind in RAY_WANDS:
+                    self.ray_risk_note(lv, (dy, dx), d, kind, letter, safe)
+                if not safe:
                     continue
                 self.cur_act = "fight"
                 self.last_attack_target = pos
                 return self.zap(letter, key)
         return False
+
+    def ray_risk(self, lv, step, kind, letter):
+        """(P(our ray of `kind` fired along `step` comes back and hits us), what that hit would do) -- nhbot.rays.
+        A wand the engraving test left as sleep-or-death is judged as death."""
+        y, x = self.pos()
+        g = self.obs["glyphs"]
+        terrain = TERRAIN_CODE[self.terrain_glyphs(lv)]
+        mons = {}
+        for (my, mx) in zip(*np.nonzero((G.KIND[g] == G.MONSTER) | (G.KIND[g] == G.PET))):
+            pm = permonst_of(g[my, mx])
+            if pm is not None and (my, mx) != (y, x):
+                mons[(int(my), int(mx))] = (pm.ac, G.monster_name(int(g[my, mx])))
+        p = self_hit_prob(terrain, (y, x), step, mons, self.bl(nh.NLE_BL_AC), kind,
+                          mines=bool(lv.key and lv.key[0] == 2))
+        it = next((i for i in self.items() if i.letter == letter), None)
+        maybe_death = it is not None and "wand of" not in it.text and \
+            self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
+        worn = [i.text for i in self.items() if i.on_body]
+        harm = ray_harm("death" if maybe_death else kind, our_protection(self.role, self.race, worn),
+                        self.bl(nh.NLE_BL_HP))
+        return p, harm
+
+    def ray_risk_note(self, lv, step, d, kind, letter, safe):
+        """Statistics only: the risk of a ray we fire (safe) or ray_safe holds back."""
+        p, harm = self.ray_risk(lv, step, kind, letter)
+        ev = "zap" if safe else "held"
+        bucket = "0" if p == 0 else "<5%" if p < 0.05 else "<20%" if p < 0.2 else "<50%" if p < 0.5 else ">=50%"
+        self.ray_risk_stats[f"{ev} p{bucket}"] += 1
+        self.ray_risk_stats[f"{ev} {harm['verdict']}"] += 1
+        if len(self.ray_risk_log) < 40:
+            self.ray_risk_log.append((self.turn(), ev, kind, d, round(p, 3), harm["verdict"]))
 
     def ray_safe(self, lv, dy, dx):
         """A ray going from us in direction (dy, dx) can't bounce back at us: a closed door closer than
