@@ -90,6 +90,11 @@ class GameMixin:
         Otherwise whatever came instead is cleared and False; the message is in self.asked either way."""
         self.press(cmd, expect_prompt=True)
         self.asked = self.message().lower()
+        if self.opts.fountain_decline and self.obs["misc"][0] and self.asked.startswith("drink from the"):
+            # on a fountain or sink q asks about it first; the item question follows a no (answering the y/n
+            # with the item letter declined it, then the item question was escaped: no potion, every tick)
+            self.raw_step(ord("n"))
+            self.asked = self.message().lower()
         if word in self.asked and self.obs["misc"][0]:
             return True
         if word in self.asked:
