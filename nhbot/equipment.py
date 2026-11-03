@@ -112,6 +112,12 @@ def value(a):
     return a["ac"] + (a["ench"] if a["ench"] is not None else UNKNOWN_ENCH)
 
 
+def enchant_risk(a):
+    """read.c seffects: enchant armor evaporates the piece it lands on with probability (spe-1)/spe when spe
+    is above 3 (elven armor: above 5; unidentified elven armor counts as plain -- the stricter limit)."""
+    return a["ench"] is not None and a["ench"] > (5 if "elven" in a["name"] else 3)
+
+
 class EquipMixin:
     """Mixed into Bot. Needs: press, raw_step, settle, inventory, obs, messages, tty_text, ..."""
 
@@ -186,6 +192,24 @@ class EquipMixin:
             self.wear(best, worn)
             return True
         return False                  # armor we won't wear is carried for selling (the value decides drops)
+
+    def strip_for_enchant(self):
+        """enchant_strip, before reading enchant armor (no threat in view): the scroll lands on a random worn piece
+        (wear.c some_armor), so the pieces it could evaporate come off first, one per call; equip_step puts them
+        back on afterwards. "ready": read now; "acted": a piece came off (the turn is used); "wait": not now --
+        nothing safe would be left to enchant, or a risky piece can't come off (cursed, a suit under a cloak)."""
+        worn = [a for a in self.armor_inventory() if a["worn"]]
+        risky = [a for a in worn if enchant_risk(a)]
+        if not risky:
+            return "ready" if worn else "wait"
+        if len(risky) == len(worn):
+            return "wait"
+        if any(a["cursed"] or a["slot"] in self.cursed_slots or (a["slot"] == SUIT and any(w["slot"] == CLOAK for w in worn))
+               for a in risky):
+            return "wait"
+        self.cur_act = "enchant_strip"
+        self.take_off(risky[0])
+        return "acted"
 
     # ---------------------------------------------------------- actions
     def wear(self, a, worn):

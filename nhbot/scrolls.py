@@ -57,7 +57,14 @@ class ScrollMixin:
             if c != nh.SCROLL_CLASS or not self.scroll_is_good(s):
                 continue
             maybe_armor = "enchant armor" in s or "labeled" in s
-            if maybe_armor and worn_ench and max(worn_ench) >= 4 and "remove curse" not in s:
+            if maybe_armor and self.opts.enchant_strip:
+                ready = self.strip_for_enchant()
+                if ready == "acted":
+                    self.scroll_stats["stripped"] = self.scroll_stats.get("stripped", 0) + 1
+                    return True
+                if ready == "wait":
+                    continue
+            elif maybe_armor and worn_ench and max(worn_ench) >= 4 and "remove curse" not in s:
                 continue              # enchant armor on a +4 piece may evaporate it
             if "enchant weapon" in s and not any(it.wielded for it in self.items()):
                 continue
