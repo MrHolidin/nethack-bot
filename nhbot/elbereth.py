@@ -145,23 +145,23 @@ class ElberethMixin:
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if not self.elb_can_write(lv):
-            return False
-        if self.can_pray() and not self.opts.elb_with_prayer:
-            # a ready prayer is the way out instead of Elbereth -- elb_pdeath: only when this turn may well
-            # kill us (danger.py P(death) above ELB_PDEATH), else Elbereth as without a prayer
-            if not self.opts.elb_pdeath or not hostiles:
-                return False
-            target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
-            if self.danger_estimate(hostiles, target)[1] > ELB_PDEATH:
-                return False
+        if (self.can_pray() and not self.opts.elb_with_prayer) or not self.elb_can_write(lv):
+            return False                  # elb_with_prayer: Elbereth even while a prayer is ready
         y, x = self.pos()
         near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]
         threats = hostiles + [t for t in near if t not in hostiles]
         if not threats:
             return False
         swarm = sum(1 for _, n in threats if n in SWARMERS)
-        if not (hp < maxhp * self.opts.elb_hp or swarm >= 2):
+        if self.opts.elb_pdeath:
+            # elb_pdeath: the trigger is P(death this turn) from the adjacent ones (danger.py), not HP < elb_hp
+            p = 0.0
+            if hostiles:
+                target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
+                p = self.danger_estimate(hostiles, target)[1]
+            if not (p > ELB_PDEATH or swarm >= 2):
+                return False
+        elif not (hp < maxhp * self.opts.elb_hp or swarm >= 2):
             return False
         return not self.elb_blocked(lv)
 
