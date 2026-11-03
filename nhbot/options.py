@@ -28,6 +28,7 @@ DEFAULTS = {
     "nymph_wands": False,      # A/B: attack wands at thieves in line (sleep first); a ray only when P(it comes back
                                #      and hits us) < 10% (nhbot.rays)
     "elb_with_prayer": False,  # A/B: write Elbereth below elb_hp even while a prayer is available (else not)
+    "elb_pdeath": False,       # A/B: a ready prayer stops Elbereth (below elb_hp) only when P(death this turn) > 50%
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
