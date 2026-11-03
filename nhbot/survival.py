@@ -42,6 +42,7 @@ class SurvivalMixin:
         self.quaffs = 0
         self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
         self.horn_bad = set()          # unihorn: letters of horns that harmed us (cursed): not applied, sold
+        self.horn_nothing = 0          # unihorn: the conditions a horn said "Nothing happens." to
         self.horn_stats = Counter()
         self._nut_at = (0, NOT_HUNGRY)
 
@@ -189,8 +190,10 @@ class SurvivalMixin:
         if not self.opts.unihorn or self.polyd or self.handless():
             return False
         before = int(self.last_bl[nh.NLE_BL_CONDITION])
-        if not before & troubles:
-            return False
+        if not before & HORN_FIXES:
+            self.horn_nothing = 0
+        if not before & troubles or before & HORN_FIXES == self.horn_nothing:
+            return False              # nothing to fix, or nothing the horn can fix (goop on the face: u.ucreamed)
         horn = next((it for it in self.items() if it.ocls == nh.TOOL_CLASS and "unicorn horn" in it.text
                      and not self.horn_is_bad(it)), None)
         if horn is None:
@@ -202,6 +205,9 @@ class SurvivalMixin:
         self.press(horn.letter)
         after = int(self.bl(nh.NLE_BL_CONDITION))
         self.horn_stats["applied"] += 1
+        if "Nothing happens" in self.text_since(seq0):
+            self.horn_nothing = before & HORN_FIXES     # apply.c: no trouble it can fix; until the conditions change
+            self.horn_stats["nothing"] += 1
         if before & ~after & HORN_FIXES:
             self.horn_stats["fixed"] += 1
         if after & ~before & HORN_HARM or ATTR_LOSS_RE.search(self.text_since(seq0)):
