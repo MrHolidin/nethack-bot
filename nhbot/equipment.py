@@ -107,6 +107,7 @@ def parse_armor(s):
 
 
 BLESSED_RE = re.compile(r"\bblessed\b")
+KNOWN_SAFE_RE = re.compile(r"\b(?:uncursed|blessed)\b")   # objnam.c: armor known not cursed always says so
 
 # A wish (wand of wishing, a djinni from a lamp or a smoky potion, a water demon from a fountain): armor, the first
 # of these we don't carry yet -- what the gift experiment found worth most to the bot (AC above all), one per slot.
@@ -202,7 +203,8 @@ class EquipMixin:
         inv = self.armor_inventory()
         worn = self.worn_by_slot(inv)
         # 1) wear something better we already carry
-        cands = [a for a in inv if not a["worn"] and self.improves(a, worn)]
+        cands = [a for a in inv if not a["worn"] and self.improves(a, worn)
+                 and (not self.opts.wear_known or KNOWN_SAFE_RE.search(a.get("text", "")))]   # wear_known
         if cands:
             best = max(cands, key=lambda a: value(a) - (value(worn[a["slot"]]) if a["slot"] in worn else 0))
             self.wear(best, worn)
