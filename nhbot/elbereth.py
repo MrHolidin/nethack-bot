@@ -15,6 +15,7 @@ from nhbot.elb_rules import M1_NOHANDS
 from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
 
 ELB_PDEATH = 0.5                   # elb_pdeath
+ELB_PWIN = 0.5                     # elb_pwin
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
 
@@ -153,7 +154,11 @@ class ElberethMixin:
         if not threats:
             return False
         swarm = sum(1 for _, n in threats if n in SWARMERS)
-        if self.opts.elb_pdeath:
+        if self.opts.elb_pwin:
+            # elb_pwin: the trigger is P(we win the fight to the end) below ELB_PWIN (danger.win_prob)
+            if not (hostiles and self.win_prob(hostiles) < ELB_PWIN or swarm >= 2):
+                return False
+        elif self.opts.elb_pdeath:
             # elb_pdeath: the trigger is P(death this turn) from the adjacent ones (danger.py), not HP < elb_hp
             p = 0.0
             if hostiles:

@@ -37,6 +37,7 @@ MAX_D = 400
 MON_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
 FLEE_P = 0.5                     # flee: P(death this turn) above this
+WIN_SIMS = 200                   # win_prob: sampled fights
 FLEE_TURNS = 100                 # flee: give up getting away after this long
 FLEE_DIST = 3                    # flee: toward a square at least this far (Chebyshev) from every hostile in view
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
@@ -80,6 +81,7 @@ class DangerMixin:
         self.mon_weapon = {}                     # monster name -> weapon we saw it use
         self.danger_pending = None               # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.our_hits = {}                       # (level key, square) -> our hits on the monster there
+        self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
         self.hit_seen = False                    # this tick: a melee hit of ours
         self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
         self.flee_stats = Counter()
@@ -270,6 +272,65 @@ class DangerMixin:
                          for k, v in sorted(self.danger_mean.items())},
                 "p": {f"{P_EDGES[k]}-{P_EDGES[k + 1]}": [v[0], round(v[1], 3), v[2]]
                       for k, v in sorted(self.danger_p.items())}}
+
+    # ------------------------------------------------------------ the fight to the end
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40):
+        """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
+        each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
+        then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
+        d(level, 8), minus what our hits on it so far took, drawn again while that would leave it dead. Others
+        joining the fight are not counted; a fight still on after max_turns counts as won."""
+        if not adjacent:
+            return 1.0
+        rng = self.win_rng
+        hp0 = self.bl(nh.NLE_BL_HP)
+        mons = []
+        for pos, name in sorted(adjacent, key=lambda t: self.mon_level(t[0])):
+            pm = PM_BY_NAME.get(name)
+            if pm is None:
+                continue
+            lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+            rnd_pmf, inst = self.monster_round(name)
+            mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
+                         self.our_hits.get((self.cur_key, pos), 0)))
+        if not mons:
+            return 1.0
+        sp = self.our_speed()
+        k, frac = divmod(sp, 12)
+        wins = 0
+        for _ in range(sims):
+            hps = []
+            for lev, _, dmg, _, _, hits in mons:
+                for _try in range(20):
+                    h = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
+                    if hits:
+                        h -= int(rng.choice(len(dmg), size=hits, p=dmg).sum())
+                    if h > 0:
+                        break
+                hps.append(max(h, 1))
+            hp, alive = hp0, list(range(len(mons)))
+            for _turn in range(max_turns):
+                acts = k + (1 if frac and rng.random() < frac / 12 else 0)
+                for _a in range(acts):
+                    if not alive:
+                        break
+                    j = alive[0]
+                    if rng.random() < mons[j][1]:
+                        hps[j] -= int(rng.choice(len(mons[j][2]), p=mons[j][2]))
+                        if hps[j] <= 0:
+                            alive.pop(0)
+                if not alive:
+                    break
+                for j in alive:
+                    if rng.random() < mons[j][4]:
+                        hp = 0
+                        break
+                    hp -= int(rng.choice(len(mons[j][3]), p=mons[j][3]))
+                if hp <= 0:
+                    break
+            if hp > 0:
+                wins += 1
+        return wins / sims
 
     # ------------------------------------------------------------ flee (flag flee)
     def our_speed(self):
