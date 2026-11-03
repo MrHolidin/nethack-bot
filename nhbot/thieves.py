@@ -1,6 +1,12 @@
 """Nymphs and monkeys steal and teleport: shoot them from range, melee them first, after a theft
-hunt them and loot the square they die on."""
+hunt them and loot the square they die on.
+
+nymph_wands: a thief in a clear line (next to us too) gets an attack wand first -- sleep first (attack_wands
+order) -- a ray only when our own ray would come back and hit us with probability below NYMPH_RAY_RISK
+(nhbot.rays); a target a sleep ray hit is not zapped again for SLEPT_TURNS (it sleeps ~6d25 turns).
+"""
 import re
+from collections import Counter
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, ROWS, ray_squares
@@ -8,6 +14,10 @@ from nhbot.monsters import THIEVES
 from nhbot.items import base_name
 from nhbot.nav import line_clear
 from nhbot.pickup import STOLE_RE
+from nhbot.combat import RAY_WANDS
+
+NYMPH_RAY_RISK = 0.10
+SLEPT_TURNS = 30
 
 
 class ThievesMixin:
@@ -23,6 +33,8 @@ class ThievesMixin:
         self._theft_turn = None
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
+        self.nymph_slept = {}          # nymph_wands: (level key, pos) -> turn a sleep ray hit a thief there
+        self.nymph_zap_stats = Counter()
 
     # ================================================================== nymphs
     def msg_thieves(self, m):
@@ -54,7 +66,40 @@ class ThievesMixin:
             self.loot_key, self.loot_sq = self.were_drop
             self.were_drop = None
 
+    def nymph_zap(self, lv):
+        """nymph_wands: zap a thief in a clear line within 7. True if we zapped."""
+        if not self.opts.nymph_wands:
+            return False
+        wands = self.attack_wands()
+        if not wands:
+            return False
+        t = self.turn()
+        for key, d, pos, step, name in self.line_targets(lv, max_d=7):
+            if name not in THIEVES or self.peaceful_now(lv, pos, far=True):
+                continue
+            for letter, kind in wands:
+                if kind == "sleep" and t - self.nymph_slept.get((lv.key, pos), -10 ** 6) < SLEPT_TURNS:
+                    continue                     # asleep already: melee / missiles finish it
+                if kind in RAY_WANDS:
+                    p, _ = self.ray_risk(lv, step, kind, letter)
+                    if p >= NYMPH_RAY_RISK:
+                        self.nymph_zap_stats["held_risk"] += 1
+                        continue
+                self.cur_act = "fight"
+                self.last_attack_target = pos
+                seq0 = self.msg_seq
+                if not self.zap(letter, key):
+                    return False
+                self.nymph_zap_stats["zaps_" + kind] += 1
+                if kind == "sleep" and re.search(r"sleep ray hits the (?:\w+ )?(?:nymph|monkey)", self.text_since(seq0)):
+                    self.nymph_slept[(lv.key, pos)] = t
+                    self.nymph_zap_stats["slept"] += 1
+                return True
+        return False
+
     def nymph_step(self, lv, hostiles):
+        if self.nymph_zap(lv):
+            return True
         y, x = self.pos()
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
         adj = [(p, n) for p, n in hostiles if n in THIEVES]

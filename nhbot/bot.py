@@ -268,7 +268,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "deadly_prayers": self.deadly_prayers,
             "pray_failed": self.pray_failed,
             "stun_waits": self.stun_waits,
-            "nymph_kills": self.nymph_kills,
+            "nymph_kills": self.nymph_kills, "nymph_zaps": dict(self.nymph_zap_stats),
             "loot_pickups": self.loot_pickups,
             "rewields": self.rewields,
             "excalibur": self.excal_turn,
