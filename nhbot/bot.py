@@ -240,7 +240,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "kills": self.kill_count,
             "skill_msgs": self.skill_msgs,
             "enhances": self.enhances,
-            "quaffs": self.quaffs,
+            "quaffs": self.quaffs, "unihorn": dict(self.horn_stats),
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
             "zaps": self.zaps, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "revisit": dict(self.revisit_stats), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),

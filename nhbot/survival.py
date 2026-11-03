@@ -14,6 +14,13 @@ from nhbot.items import base_name
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
 
 
+# apply.c use_unicorn_horn: what an uncursed / blessed horn can fix (deafness left alone: harmless to us), and a
+# cursed one's harm -- one of these conditions, or an attribute lost (attrib.c adjattrib: "You feel weak!", ...)
+HORN_SICK = nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
+HORN_FIXES = HORN_SICK | nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU
+HORN_HARM = HORN_FIXES | nh.BL_MASK_DEAF
+ATTR_LOSS_RE = re.compile(r"You feel (?:weak|stupid|foolish|clumsy|fragile|repulsive)!")
+
 # eat.c newuhs: the status line by u.uhunger
 NUTRITION_BOUNDS = {SATIATED: (1001, 10 ** 6), NOT_HUNGRY: (150, 1000), HUNGRY: (50, 149), WEAK: (1, 49),
                     FAINTING: (-10 ** 6, 0)}
@@ -34,6 +41,8 @@ class SurvivalMixin:
         self.enhances = 0
         self.quaffs = 0
         self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
+        self.horn_bad = set()          # unihorn: letters of horns that harmed us (cursed): not applied, sold
+        self.horn_stats = Counter()
         self._nut_at = (0, NOT_HUNGRY)
 
     def pray(self):
@@ -169,6 +178,36 @@ class SurvivalMixin:
                 cands.append((d, pos))
         cands.sort(key=lambda c: c[0])           # stable: the first of equally near ones, as before
         return [p for _, p in cands]
+
+    def horn_is_bad(self, it):
+        return it.letter in self.horn_bad or (self.opts.unihorn and it.cursed)
+
+    def unihorn_step(self, troubles):
+        """unihorn: apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us; the caller decides
+        when (sickness: always, ahead of a prayer; the rest: nothing next to us). A horn that brings a new
+        condition or takes an attribute is cursed: never applied again, and no longer kept (sold). True if acted."""
+        if not self.opts.unihorn or self.polyd or self.handless():
+            return False
+        before = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if not before & troubles:
+            return False
+        horn = next((it for it in self.items() if it.ocls == nh.TOOL_CLASS and "unicorn horn" in it.text
+                     and not self.horn_is_bad(it)), None)
+        if horn is None:
+            return False
+        self.cur_act = "unihorn"
+        seq0 = self.msg_seq
+        if not self.ask("a", "apply"):
+            return False
+        self.press(horn.letter)
+        after = int(self.bl(nh.NLE_BL_CONDITION))
+        self.horn_stats["applied"] += 1
+        if before & ~after & HORN_FIXES:
+            self.horn_stats["fixed"] += 1
+        if after & ~before & HORN_HARM or ATTR_LOSS_RE.search(self.text_since(seq0)):
+            self.horn_bad.add(horn.letter)
+            self.horn_stats["bad"] += 1
+        return True
 
     def heal_step(self, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)

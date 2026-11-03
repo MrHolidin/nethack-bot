@@ -16,15 +16,18 @@ from nhbot.mapmem import Level
 from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 from nhbot.items import CURSED_RE
 from nhbot.pickup import MISSILE_TYPES, floor_kind
+from nhbot.survival import HORN_FIXES, HORN_SICK
 
 
 STEPS = (
     "level_arrival",     # bounce off the Mines staircase (avoid_mines); Mines-return bookkeeping
     "progress",          # no-time loop guard; forget obstacles / go desperate on a stalled level
     "engulfed",
+    "unihorn_sick",      # unihorn: food poisoning / illness -- the horn before a prayer
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
     "weight",            # never Burdened (carry), shed weight when Strained
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
+    "unihorn",           # unihorn: blind / confused / stunned / hallucinating, nothing next to us
     "stunned",
     "vault_guard",
     "blind",
@@ -203,6 +206,12 @@ class PolicyMixin:
         hostiles = self.hallu_attackers(c.lv, hostiles)
         c.hostiles = hostiles
         return False
+
+    def step_unihorn_sick(self, c):
+        return self.unihorn_step(HORN_SICK)
+
+    def step_unihorn(self, c):
+        return not c.hostiles and self.unihorn_step(HORN_FIXES)
 
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""

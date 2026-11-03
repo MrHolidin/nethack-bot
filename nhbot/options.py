@@ -22,6 +22,9 @@ DEFAULTS = {
                                #      no reading while one is worn); not while nothing else is worn (nhbot.equipment)
     "regen_hp": False,         # A/B: ring of regeneration worn only below full HP; put on / taken off with nothing
                                #      next to us (nhbot.jewelry regen_step)
+    "unihorn": False,          # A/B: apply a unicorn horn when sick (always) or blind / confused / stunned /
+                               #      hallucinating (nothing next to us); a horn that harms us is cursed: dropped
+                               #      from use, sold (nhbot.survival)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
