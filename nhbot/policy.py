@@ -274,6 +274,8 @@ class PolicyMixin:
         return not c.hostiles and self.regen_step()
 
     def step_weapon(self, c):
+        if self.rub_back is not None:            # a lamp wielded to rub it: the weapon back once a threat shows
+            return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.rub_rewield()
         if self.tin_glib():
             return False                         # tins: slippery fingers, whatever we wield now slips too
         if self.tin_swapped and (c.hostiles or self.visible_hostiles(c.lv)) and self.tin_swap_back():
@@ -375,9 +377,11 @@ class PolicyMixin:
                 return True
             if self.shop_step(lv):
                 return True
-            if self.excal_step(lv):
+            if self.excal_step(lv) or self.fountain_wish_step(lv):
                 return True
             if self.loot_step(lv):
+                return True
+            if self.wishwand_step() or self.lamp_step():
                 return True
             if self.read_good_scroll():
                 return True

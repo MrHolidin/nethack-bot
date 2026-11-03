@@ -85,22 +85,9 @@ class ExcaliburMixin:
         if not it:
             return False
         self.cur_act = "excal"
-        seq0 = self.msg_seq
-        self.raw_step(228)                       # M-d: #dip
-        if "dip" not in self.message().lower():
-            self.settle(); return False
-        self.raw_step(ord(it[0]))
-        m = self.message().lower()
-        if "fountain" in m and self.obs["misc"][0]:
-            self.press("y")
-        else:
-            self.settle()
-            y, x = self.pos()
-            if "nothing to dip" in m or "anything to dip" in m or "into" in m:
-                lv.set_terrain((y, x), FLOOR_GLYPH)       # no fountain here any more
+        recent = self.dip_into_fountain(lv, it[0])
+        if recent is None:
             return False
-        self.dips += 1
-        recent = self.text_since(seq0)
         y, x = self.pos()
         if "Excalibur" in recent or "hand reaches up" in recent or \
                 any("Excalibur" in s for _, _, s in self.inventory()):
@@ -108,7 +95,61 @@ class ExcaliburMixin:
             self.excal_turn = self.turn()
             lv.set_terrain((y, x), FLOOR_GLYPH)
             self.dip_events.append((self.turn(), "excalibur"))
-        elif "dries up" in recent or "fountain disappears" in recent or "anything to dip" in recent:
+        elif self.fountain_gone(recent):
             lv.set_terrain((y, x), FLOOR_GLYPH)
             self.dip_events.append((self.turn(), "dried"))
         return True
+
+    @staticmethod
+    def fountain_gone(recent):
+        return "dries up" in recent or "fountain disappears" in recent or "anything to dip" in recent
+
+    def dip_into_fountain(self, lv, letter):
+        """#dip an inventory item into the fountain we stand on. The messages since, or None if no dip
+        happened (no fountain here any more: forgotten)."""
+        seq0 = self.msg_seq
+        self.raw_step(228)                       # M-d: #dip
+        if "dip" not in self.message().lower():
+            self.settle(); return None
+        self.raw_step(ord(letter))
+        m = self.message().lower()
+        if "fountain" in m and self.obs["misc"][0]:
+            self.press("y")
+        else:
+            self.settle()
+            if "nothing to dip" in m or "anything to dip" in m or "into" in m:
+                lv.set_terrain(self.pos(), FLOOR_GLYPH)       # no fountain here any more
+            return None
+        self.dips += 1
+        return self.text_since(seq0)
+
+    def fountain_wish_step(self, lv):
+        """fountain_wish (no threat in view, the caller checks): Excalibur in hand at full HP, dip it into a
+        fountain of this level -- fountain.c dipfountain: 1/30 a water demon, a wish at (20 - depth)%, else
+        hostile (M2_HOSTILE). Not in the Mines (Minetown's watch), not a shop's. True if it used the turn."""
+        if not (self.opts.fountain_wish and self.excalibur) or lv.key[0] == 2:
+            return False
+        exc = next((it for it in self.items() if "Excalibur" in it.text and it.wielded), None)
+        if exc is None or self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX):
+            return False
+        fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
+        if lv.shop.any():
+            fmask &= ~lv.shop
+        if not fmask.any() or lv.key in self.excal_skip:
+            return False
+        self.cur_act = "fountain_wish"
+        y, x = self.pos()
+        if fmask[y, x]:
+            recent = self.dip_into_fountain(lv, exc.letter)
+            if recent is None:
+                return False
+            if "water demon" in recent:
+                self.dip_events.append((self.turn(), "wish" if "grants you a wish" in recent else "demon"))
+            if self.fountain_gone(recent):
+                lv.set_terrain((y, x), FLOOR_GLYPH)
+                self.dip_events.append((self.turn(), "dried"))
+            return True
+        if self.walk_to(lv, fmask, max_cost=self.opts.excal_cost, act="fountain_wish", also=fmask)[0] == "moved":
+            return True
+        self.excal_skip.add(lv.key)
+        return False

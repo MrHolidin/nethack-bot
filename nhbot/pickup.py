@@ -22,6 +22,7 @@ from nhbot.equipment import parse_armor
 from nhbot.game import MENU_ITEM_RE, PAGE_RE
 from nhbot.items import CURSED_RE, base_name
 from nhbot.tins import MAX_TINS
+from nhbot.wishing import LAMP_NAMES
 
 # safe permanent food (no eggs: could be cockatrice; no tins: slow; no unknown corpses)
 SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration", "fortune cookie",
@@ -134,6 +135,8 @@ class PickupMixin:
                     reason = "carry"                     # worth >= 1 zorkmid per weight unit
         elif ocls == nh.TOOL_CLASS:
             no_tools = NO_TOOLS - {"pick-axe"}
+            if typ in LAMP_NAMES and not cursed:
+                return "lamp"                            # maybe a magic lamp: rubbed (nhbot.wishing)
             if typ not in no_tools:
                 reason = "carry"
         elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS):

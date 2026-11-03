@@ -19,6 +19,8 @@ DEFAULTS = {
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
     "unihorn_fight": False,    # A/B: blind or stunned, the horn is applied with something next to us too
     "quaff_test_horn": False,  # A/B: quaff_test while we carry a unicorn horn we would apply
+    "smoky_quaff": False,      # A/B: drink smoky potions for their djinni (on Elbereth, calm; nhbot.potiontest)
+    "fountain_wish": False,    # A/B: Excalibur in hand, dip it into fountains for a water demon's wish
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

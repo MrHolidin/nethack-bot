@@ -246,6 +246,8 @@ class CarryMixin:
             return True                      # a horn that harmed us is cursed: sold
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
+        if self.wish_needed(it):
+            return True                      # a lamp to rub, a wand of wishing (nhbot.wishing)
         if self.jewelry_needed(it):
             return True                      # jewelry: identify scrolls, amulets and rings to identify
         if c == nh.WEAPON_CLASS:
