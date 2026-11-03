@@ -19,8 +19,6 @@ DEFAULTS = {
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
     "unihorn_fight": False,    # A/B: blind or stunned, the horn is applied with something next to us too
     "quaff_test_horn": False,  # A/B: quaff_test while we carry a unicorn horn we would apply
-    "altar_one": False,        # A/B: altar test: each item picked back up right after its drop (else all dropped,
-                               #      then all picked up)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

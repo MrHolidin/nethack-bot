@@ -1,7 +1,8 @@
 """Altar BUC test: carrying items whose curse status we don't know, an altar on the level is
-an explore goal (goals 'altar'); standing on it with nothing threatening us, drop them one by one -- the game
+an explore goal (goals 'altar'); standing on it with nothing threatening us, drop them one at a time -- the game
 flashes black for a cursed item, amber for a blessed one, nothing for an uncursed one, and marks each known
-(pray.c doaltarobj; not while blind) -- then pick them all back up. Items on the body are left alone.
+(pray.c doaltarobj; not while blind) -- each picked back up right after its flash (all dropped first left
+a pile whose pick-up menu ran to several pages, and things on the altar for monsters to take). Items on the body are left alone.
 Each item is tested once (by name and enchantment: with implicit_uncursed an uncursed item may still show no
 status word afterwards).
 """
@@ -46,15 +47,14 @@ class AltarMixin:
         return alt if self.altar_untested() else alt & False
 
     def altar_step(self, lv):
-        """On an altar, nothing threatening us (the caller checks): drop one untested item, or pick them all
-        back up when none is left. True if it used the turn."""
+        """On an altar, nothing threatening us (the caller checks): pick back up what we dropped, else drop the
+        next untested item. True if it used the turn."""
         if self.terrain_glyphs(lv)[self.pos()] != ALTAR_GLYPH \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_LEV | nh.BL_MASK_HALLU):
             return False
         here = (lv.key, self.pos())
-        back = self.altar_dropped is not None and self.altar_dropped[:2] == here
-        if back and self.opts.altar_one:
-            return self.altar_pick_back()     # altar_one: each item back up right after its flash
+        if self.altar_dropped is not None and self.altar_dropped[:2] == here:
+            return self.altar_pick_back()
         untested = self.altar_untested()
         if untested:
             it = untested[0]
@@ -69,8 +69,6 @@ class AltarMixin:
                 self.altar_dropped = (lv.key, self.pos(), set())
             self.altar_dropped[2].add(buc_key(it.text))
             return True
-        if back:
-            return self.altar_pick_back()
         return False
 
     def altar_pick_back(self):
