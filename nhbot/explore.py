@@ -42,14 +42,6 @@ class ExploreMixin:
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
-        if self.opts.squeeze_last and lv.squeeze_refused:
-            # too heavy to squeeze here: squeezes only when nothing else is left -- no way down and no frontier
-            # reachable without one; climbing out of the Mines, no way up
-            lv.squeeze_ok = False
-            way = (k_mem == G.UPSTAIR) if self.mines_return_on and lv.key[0] == 2 else \
-                frontier | (k_mem == G.DOWNSTAIR)
-            _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, way, want_dist=False)
-            lv.squeeze_ok = got is None
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
@@ -127,9 +119,6 @@ class ExploreMixin:
                 return
         # nothing left: map the level if we can, else search for hidden passages
         if self.magic_map_step(lv):
-            return
-        # dig_through: with a digger, dig toward the way down or the part of the level we know nothing of
-        if self.tunnel_stuck_step(lv):
             return
         self.search_mode(lv, grids)
 

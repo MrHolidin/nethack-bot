@@ -20,7 +20,6 @@ HORN_SICK = nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
 HORN_FIXES = HORN_SICK | nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU
 HORN_HARM = HORN_FIXES | nh.BL_MASK_DEAF
 ATTR_LOSS_RE = re.compile(r"You feel (?:weak|stupid|foolish|clumsy|fragile|repulsive)!")
-HORN_CURED_RE = re.compile(r"You can see again|You feel (?:a bit )?steadier|You feel less confused")
 
 # eat.c newuhs: the status line by u.uhunger
 NUTRITION_BOUNDS = {SATIATED: (1001, 10 ** 6), NOT_HUNGRY: (150, 1000), HUNGRY: (50, 149), WEAK: (1, 49),
@@ -44,7 +43,6 @@ class SurvivalMixin:
         self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
         self.horn_bad = set()          # letters of unicorn horns that harmed us (cursed): not applied, sold
         self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
-        self.horn_fight_stop = False   # unihorn_fight: cured and at once inflicted again (a raven): fight instead
         self.horn_stats = Counter()
         self._nut_at = (0, NOT_HUNGRY)
 
@@ -219,9 +217,6 @@ class SurvivalMixin:
         if before & ~after & HORN_FIXES:
             self.horn_stats["fixed"] += 1
         msgs = self.text_since(seq0)
-        if before & after & troubles and HORN_CURED_RE.search(msgs):
-            self.horn_fight_stop = True                 # cured, then the attacker did it again in the same turn
-            self.horn_stats["reinflicted"] += 1
         if after & ~before & HORN_HARM or ATTR_LOSS_RE.search(msgs):
             self.horn_bad.add(horn.letter)
             self.horn_stats["bad"] += 1

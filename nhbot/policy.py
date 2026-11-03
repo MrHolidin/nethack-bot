@@ -27,8 +27,7 @@ STEPS = (
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
     "weight",            # never Burdened (carry), shed weight when Strained
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
-    "unihorn",           # blind / confused / stunned / hallucinating, nothing next to us: the horn (unihorn_fight:
-                         #   blind / stunned with something next to us too)
+    "unihorn",           # blind / confused / stunned / hallucinating, nothing next to us: the horn
     "stunned",
     "vault_guard",
     "blind",
@@ -41,8 +40,6 @@ STEPS = (
     "weapon",
     "wands",
     "melee",
-    "vault_escape",      # vault_dig: in a vault with a digger -- its gold, then dig down (nhbot.vault)
-    "ambush",            # door_ambush: a group coming at us -> wait beside an entrance of their room (nhbot.ambush)
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
@@ -54,8 +51,6 @@ STEPS = (
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
     "rest",
     "gold_here",
-    "vault_seek",        # vault_dig: a vault hint read here and a digger -- into its niche (nhbot.vault)
-    "tunnel_vault",      # dig_through: a vault seen on the map -- dig into it (nhbot.tunnel)
     "explore",
 )
 
@@ -97,7 +92,6 @@ class PolicyMixin:
         y, x = self.pos()
         c = Tick(lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP), maxhp=self.bl(nh.NLE_BL_HPMAX),
                  hunger=self.bl(nh.NLE_BL_HUNGER))
-        self.threat_track(lv)
         for name, step in self.steps_by_name[1:]:
             if step(c):
                 self.last_step = name
@@ -217,11 +211,7 @@ class PolicyMixin:
         return self.unihorn_step(HORN_SICK)
 
     def step_unihorn(self, c):
-        if not c.hostiles:
-            self.horn_fight_stop = False
-            return self.unihorn_step(HORN_FIXES)
-        return self.opts.unihorn_fight and not self.horn_fight_stop and \
-            self.unihorn_step(nh.BL_MASK_BLIND | nh.BL_MASK_STUN)
+        return not c.hostiles and self.unihorn_step(HORN_FIXES)
 
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""
@@ -285,8 +275,6 @@ class PolicyMixin:
             return False                         # tins: slippery fingers, whatever we wield now slips too
         if self.tin_swapped and (c.hostiles or self.visible_hostiles(c.lv)) and self.tin_swap_back():
             return True                          # tins: the dagger was swapped in to open one; a threat: back
-        if self.vault_digging() or self.tunnel_active():
-            return False                         # vault_dig / dig_through: the digger stays in hand meanwhile
         return not c.hostiles and self.tin_slipped is None and self.weapon_check()
 
     def step_wands(self, c):
@@ -301,18 +289,6 @@ class PolicyMixin:
             target = self.focus_target(c.hostiles, target)
         self.attack(target)
         return True
-
-    def step_vault_escape(self, c):
-        return self.vault_escape_step(c.lv, c.hostiles)
-
-    def step_vault_seek(self, c):
-        return self.vault_seek_step(c.lv, c.hostiles)
-
-    def step_tunnel_vault(self, c):
-        return self.tunnel_vault_step(c.lv, c.hostiles)
-
-    def step_ambush(self, c):
-        return self.ambush_step(c.lv, c.hostiles)
 
     def step_hunt_shooter(self, c):
         return not self.hallu_blind_ranged() and self.hunt_step(c.lv)

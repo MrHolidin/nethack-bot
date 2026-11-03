@@ -5,11 +5,7 @@ turns uncursed). Healing, extra healing, confusion, hallucination and sleeping n
 restore ability does not (potion.c peffects: unkn; the 'Call a ... potion' prompt is escaped by settle).
 Each appearance is drunk once.
 
-smoky_quaff: a smoky potion -- whatever its type -- releases a djinni at 1/13 (potion.c dodrink: 1/(13 + 2 *
-djinni so far); a wish 20% uncursed, 80% blessed, 5% cursed); every smoky one is drunk the same way, the type
-it turns out to be remembered (still smoky) and drunk again only if harmless or a horn cures it.
 """
-import re
 from collections import Counter
 
 import nle.nethack as nh
@@ -17,10 +13,6 @@ import nle.nethack as nh
 from nhbot.pricemem import OBJ, _INDEX, _cls_of, appearance
 
 TEST_PRICE = 100
-SMOKY_OK = {"healing", "extra healing", "full healing", "gain level", "gain energy", "gain ability",
-            "restore ability", "see invisible", "fruit juice", "water", "monster detection", "object detection",
-            "enlightenment", "speed", "sleeping"}                # sleeping: on Elbereth
-SMOKY_HORN = {"confusion", "hallucination", "blindness", "booze", "sickness"}   # what a horn takes away
 EFFECTS = (("much better", "extra healing"), ("feel better", "healing"), ("where am i", "confusion"),
            ("trippy", "confusion"), ("cosmic", "hallucination"), ("fall asleep", "sleeping"), ("yawn", "sleeping"),
            ("makes you feel", "restore ability"))     # statistics only: the first message that matches
@@ -32,26 +24,13 @@ class PotionTestMixin:
         self.quaff_refused = set()       # (level key, square) where Elbereth would not stay written
         self.quaff_tries = Counter()     # (level key, square) -> Elbereth engravings for a test there
         self.quaff_stats = Counter()
-        self.smoky_types = set()         # smoky_quaff: types that turned out to have the smoky look
-
-    def smoky(self, it):
-        """smoky_quaff: a potion with the smoky look we would drink for its djinni."""
-        if "smoky" in it.text:
-            return True
-        m = re.search(r"\bpotions? of ([a-z ]+?)(?: \(| called| named|$)", it.text)
-        if not m or m.group(1) not in self.smoky_types:
-            return False
-        return m.group(1) in SMOKY_OK or (m.group(1) in SMOKY_HORN and self.have_horn())
 
     def potion_to_test(self):
-        by_price = self.opts.quaff_test or (self.opts.quaff_test_horn and self.have_horn())
         for it in self.items():
             if it.ocls != nh.POTION_CLASS or "unpaid" in it.text:
                 continue
-            if self.opts.smoky_quaff and self.smoky(it):
-                return it, None
             key = appearance(it.text)
-            if not by_price or key is None or key in self.quaff_tested:
+            if key is None or key in self.quaff_tested:
                 continue
             post = self.type_posterior(it.text)
             if post and all(OBJ[_INDEX[(_cls_of(n, key), n)]][3] == TEST_PRICE for n in post):
@@ -61,8 +40,8 @@ class PotionTestMixin:
     def quaff_test_step(self, lv):
         """No threat in view (the caller checks): stand on Elbereth, then drink one potion of the 100 group.
         True if it used the turn."""
-        if not (self.opts.quaff_test or self.opts.smoky_quaff or (self.opts.quaff_test_horn and self.have_horn())):
-            return False                      # quaff_test_horn: confusion / hallucination the horn cures
+        if not self.opts.quaff_test:
+            return False
         it, key = self.potion_to_test()
         if it is None or (lv.key, self.pos()) in self.quaff_refused or not self.elb_can_write(lv):
             return False
@@ -79,8 +58,7 @@ class PotionTestMixin:
                 self.quaff_refused.add(here)
             return True
         self.cur_act = "quaff_test"
-        if key is not None:
-            self.quaff_tested.add(key)
+        self.quaff_tested.add(key)
         seq0 = self.msg_seq
         if not self.ask("q", "drink"):
             self.quaff_stats["no_prompt"] += 1
@@ -88,15 +66,6 @@ class PotionTestMixin:
         self.press(it.letter)
         msgs = self.text_since(seq0).lower()
         what = next((n for s, n in EFFECTS if s in msgs), "unknown")
-        if key is None:                                  # smoky
-            self.quaff_stats["smoky"] += 1
-            if "djinni" in msgs or "acrid fumes" in msgs:
-                self.quaff_stats["smoky_djinni"] += 1
-            if "smoky" in it.text:                       # what the rest of the stack (or a later one) reads as
-                rest = next((i for i in self.items() if i.letter == it.letter and i.ocls == nh.POTION_CLASS), None)
-                m = re.search(r"\bpotions? of ([a-z ]+?)(?: \(| called| named|$)", rest.text) if rest else None
-                if m:
-                    self.smoky_types.add(m.group(1))
         self.quaff_stats["drunk"] += 1
         self.quaff_stats["got_" + what.replace(" ", "_")] += 1
         return True

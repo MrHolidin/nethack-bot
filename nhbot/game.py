@@ -67,9 +67,7 @@ class GameMixin:
                     self.answer_wish()                      # a djinni, a water demon, a wand of wishing
                     continue
                 if "who are you" in (msg + self.top_line()).lower():
-                    # our real name (lawful: lying costs alignment) -- or, digging out of a vault, the name that
-                    # sends the guard away (nhbot.vault)
-                    for c in ("Croesus" if self.croesus_ok() else "Agent"):
+                    for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
                     self.raw_step(13)
                     continue
@@ -119,8 +117,6 @@ class GameMixin:
             self.raw_step(ord("y"))
         elif "still climb" in m:
             self.raw_step(ord("n"))
-        elif "trouble lifting" in m and "gold piece" in m and self.vault_digging():
-            self.raw_step(ord("y"))           # vault_dig: Burdened by the vault's gold, we are digging down anyway
         elif "continue eating" in m:
             self.raw_step(ord("n"))
         elif "stop eating" in m:
@@ -245,6 +241,5 @@ class GameMixin:
         self.msg_map(m, lv)
         self.msg_shop(m, lv)
         self.msg_thieves(m)
-        self.msg_vault(m)
         if "You die" in m or "You starve" in m:
             self.death_msgs = [mm for _, mm in list(self.messages)[-8:]]

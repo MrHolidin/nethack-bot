@@ -14,7 +14,6 @@ from nhbot.consts import NO_ENGRAVE_CMAP
 from nhbot.elb_rules import M1_NOHANDS
 from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
 
-ELB_PDEATH = 0.5                   # elb_pdeath
 ELB_PWIN = 0.5                     # elb_pwin
 ELB_SHOT_TURNS = 10                # elb_shot_seen: a weapon user blocks only this soon after a missile
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
@@ -148,29 +147,24 @@ class ElberethMixin:
         return ok
 
     def elb_wanted(self, lv, hostiles):
-        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if (self.can_pray() and not self.opts.elb_with_prayer) or not self.elb_can_write(lv):
-            return False                  # elb_with_prayer: Elbereth even while a prayer is ready
+        """Write Elbereth now: a hostile next to us or within 3 squares, and either two swarmers among them or
+        we are hurt -- below elb_hp of max HP (elb_pwin: P(we win the fight with the adjacent ones) below
+        ELB_PWIN) -- and we can write here and nothing in view ignores it (elb_blocked). A prayer in reserve
+        doesn't hold it back (A/B elb_with_prayer: the prayer stays for when Elbereth can't help)."""
+        if not self.elb_can_write(lv):
+            return False
         y, x = self.pos()
         near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]
         threats = hostiles + [t for t in near if t not in hostiles]
         if not threats:
             return False
-        swarm = sum(1 for _, n in threats if n in SWARMERS)
-        if self.opts.elb_pwin:
-            # elb_pwin: the trigger is P(we win the fight to the end) below ELB_PWIN (danger.win_prob)
-            if not (hostiles and self.win_prob(hostiles) < ELB_PWIN or swarm >= 2):
+        if sum(1 for _, n in threats if n in SWARMERS) < 2:
+            if self.opts.elb_pwin:
+                hurt = bool(hostiles) and self.win_prob(hostiles) < ELB_PWIN
+            else:
+                hurt = self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_hp
+            if not hurt:
                 return False
-        elif self.opts.elb_pdeath:
-            # elb_pdeath: the trigger is P(death this turn) from the adjacent ones (danger.py), not HP < elb_hp
-            p = 0.0
-            if hostiles:
-                target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]
-                p = self.danger_estimate(hostiles, target)[1]
-            if not (p > ELB_PDEATH or swarm >= 2):
-                return False
-        elif not (hp < maxhp * self.opts.elb_hp or swarm >= 2):
-            return False
         return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
