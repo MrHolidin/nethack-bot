@@ -62,6 +62,10 @@ def wear_rank(it):
     return None
 
 
+def is_regen(it):
+    return it.ocls == nh.RING_CLASS and bool(re.search(r"\brings? of regeneration\b", it.text))
+
+
 def to_identify(ocls, text):
     """An amulet or ring worth a scroll of identify: an unknown look, or a ring of a charged type we would wear
     whose charge we don't know."""
@@ -110,6 +114,8 @@ class JewelryMixin:
         """carry.needed (never sold or dropped): identify scrolls, and the amulets and rings still to identify."""
         if it.ocls == nh.SCROLL_CLASS:
             return self.is_identify(it.text)
+        if self.opts.regen_hp and is_regen(it):
+            return True                                 # regen_hp: off at full HP, still ours
         return to_identify(it.ocls, it.text)            # in the inventory or on the floor (worth_taking)
 
     def buy_wanted(self, stype):
@@ -125,12 +131,14 @@ class JewelryMixin:
             on = [it for it in items if it.ocls == ocls and (it.worn or it.ring_on)]
             cands = [(wear_rank(it), it) for it in items
                      if it.ocls == ocls and not it.on_body and not it.cursed and "unpaid" not in it.text
-                     and wear_rank(it) is not None and it.letter not in self.jewelry_refused]
+                     and wear_rank(it) is not None and it.letter not in self.jewelry_refused
+                     and not (self.opts.regen_hp and is_regen(it))]          # regen_hp: regen_step's ring
             if not cands:
                 continue
             rank, best = min(cands, key=lambda c: c[0])
             if len(on) >= slots:
-                free = [it for it in on if not it.cursed and it.letter not in self.jewelry_refused]
+                free = [it for it in on if not it.cursed and it.letter not in self.jewelry_refused
+                        and not (self.opts.regen_hp and is_regen(it))]
                 if not free:
                     continue
                 worst = max(free, key=lambda it: 99 if wear_rank(it) is None else wear_rank(it))
@@ -141,16 +149,37 @@ class JewelryMixin:
             return self.jewelry_put_on(best)
         return False
 
+    def regen_step(self):
+        """regen_hp (nothing next to us -- the caller checks): a ring of regeneration is on only while HP is below
+        the maximum -- it costs a nutrition point every other turn (eat.c gethungry) and does nothing at full HP.
+        Put on into a free ring finger, taken off at full HP. True if it acted."""
+        if not self.opts.regen_hp or self.polyd or self.handless():
+            return False
+        rings = [it for it in self.items() if it.ocls == nh.RING_CLASS]
+        regen = [it for it in rings if is_regen(it) and it.letter not in self.jewelry_refused]
+        if not regen:
+            return False
+        full = self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX)
+        on = [it for it in regen if it.ring_on]
+        if full and on:
+            self.jewelry_stats["regen_off"] += 1
+            return self.jewelry_remove(on[0])
+        if not full and not on and sum(it.ring_on for it in rings) < 2:
+            off = [it for it in regen if not it.cursed and "unpaid" not in it.text]
+            if off:
+                self.jewelry_stats["regen_on"] += 1
+                return self.jewelry_put_on(off[0])
+        return False
+
     def jewelry_remove(self, it):
         self.cur_act = "jewelry"
-        seq0 = self.msg_seq
         self.press("R", expect_prompt=True)
         if self.obs["misc"][0] and "remove" in self.message().lower():
             self.press(it.letter)
         else:
             self.settle()
-        if "cursed" in self.text_since(seq0) or any(i.letter == it.letter and i.on_body for i in self.items()):
-            self.jewelry_refused.add(it.letter)        # cursed: stays on
+        if any(i.letter == it.letter and i.on_body for i in self.items()):
+            self.jewelry_refused.add(it.letter)        # cursed: stays on ("You remove an uncursed ring" said cursed)
         self.jewelry_stats["removed"] += 1
         return True
 

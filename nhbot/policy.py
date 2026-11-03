@@ -33,6 +33,7 @@ STEPS = (
     "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
     "elbereth",
     "thieves",
+    "regen",             # regen_hp: ring of regeneration on below full HP, off at full (nothing next to us)
     "weapon",
     "wands",
     "melee",
@@ -254,6 +255,9 @@ class PolicyMixin:
 
     def step_thieves(self, c):
         return not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles)
+
+    def step_regen(self, c):
+        return not c.hostiles and self.regen_step()
 
     def step_weapon(self, c):
         if self.tin_glib():

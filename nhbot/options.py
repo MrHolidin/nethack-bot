@@ -20,6 +20,8 @@ DEFAULTS = {
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
     "enchant_strip": False,    # A/B: before reading enchant armor, take off the worn pieces it could evaporate (else
                                #      no reading while one is worn); not while nothing else is worn (nhbot.equipment)
+    "regen_hp": False,         # A/B: ring of regeneration worn only below full HP; put on / taken off with nothing
+                               #      next to us (nhbot.jewelry regen_step)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
