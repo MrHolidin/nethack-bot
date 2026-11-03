@@ -11,20 +11,14 @@ DEFAULTS = {
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
-    "pickup_pages": False,     # A/B: the pick-up menu is paged: what we want on every page (else the first only)
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest)
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
                                #      it with a reachable frontier (hole, trap door, teleport)
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
     "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
-    "unihorn": False,          # A/B: apply a unicorn horn when sick (always) or blind / confused / stunned /
-                               #      hallucinating (nothing next to us); a horn that harms us is cursed: dropped
-                               #      from use, sold (nhbot.survival)
-    "unihorn_fight": False,    # A/B, with unihorn: blind or stunned, the horn is applied with something next to us too
-    "quaff_test_horn": False,  # A/B, with unihorn: quaff_test while we carry a unicorn horn we would apply
-    "horn_corpses": False,     # A/B, with unihorn: carrying such a horn, bat corpses (stun) and undead kills' corpses
-                               #      (made old: food poisoning) are eaten too (survival.corpse_ok)
+    "unihorn_fight": False,    # A/B: blind or stunned, the horn is applied with something next to us too
+    "quaff_test_horn": False,  # A/B: quaff_test while we carry a unicorn horn we would apply
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

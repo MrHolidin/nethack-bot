@@ -269,9 +269,9 @@ class PickupMixin:
                     self.raw_step(ord(letter))
                     n += 1
             page = PAGE_RE.search(self.tty_text())
-            if not (self.opts.pickup_pages and page and int(page.group(1)) < int(page.group(2))):
+            if not (page and int(page.group(1)) < int(page.group(2))):
                 break
-            self.raw_step(ord(">"))                  # pickup_pages: the next page (no header there)
+            self.raw_step(ord(">"))                  # the next page (no header there)
             items = [(m.group(1), m.group(2)) for l in self.tty_text().split("\n")
                      for m in [MENU_ITEM_RE.match(l.strip())] if m]
         self.raw_step(13 if n else 27)

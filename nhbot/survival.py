@@ -42,8 +42,8 @@ class SurvivalMixin:
         self.enhances = 0
         self.quaffs = 0
         self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
-        self.horn_bad = set()          # unihorn: letters of horns that harmed us (cursed): not applied, sold
-        self.horn_nothing = 0          # unihorn: the conditions a horn said "Nothing happens." to
+        self.horn_bad = set()          # letters of unicorn horns that harmed us (cursed): not applied, sold
+        self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
         self.horn_fight_stop = False   # unihorn_fight: cured and at once inflicted again (a raven): fight instead
         self.horn_stats = Counter()
         self._nut_at = (0, NOT_HUNGRY)
@@ -128,7 +128,7 @@ class SurvivalMixin:
         pm = PM_BY_NAME.get(name)
         if pm is None or name in NEVER_EAT:
             return False
-        horn = self.opts.horn_corpses and self.have_horn()     # its stun / food poisoning the horn cures
+        horn = self.have_horn()               # a horn cures their stun / food poisoning
         if name in ("bat", "giant bat", "vampire bat") and not horn:
             return False                      # eat.c: bat corpses stun for 30 (giant bat 60) turns
         f1, f2 = pm.mflags1, pm.mflags2
@@ -184,18 +184,18 @@ class SurvivalMixin:
         return [p for _, p in cands]
 
     def horn_is_bad(self, it):
-        return it.letter in self.horn_bad or (self.opts.unihorn and it.cursed)
+        return it.letter in self.horn_bad or it.cursed
 
     def have_horn(self):
-        """unihorn: a unicorn horn we would apply is on us."""
-        return self.opts.unihorn and any(it.ocls == nh.TOOL_CLASS and "unicorn horn" in it.text
+        """A unicorn horn we would apply is on us."""
+        return any(it.ocls == nh.TOOL_CLASS and "unicorn horn" in it.text
                                          and not self.horn_is_bad(it) for it in self.items())
 
     def unihorn_step(self, troubles):
-        """unihorn: apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us; the caller decides
+        """Apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us; the caller decides
         when (sickness: always, ahead of a prayer; the rest: nothing next to us). A horn that brings a new
         condition or takes an attribute is cursed: never applied again, and no longer kept (sold). True if acted."""
-        if not self.opts.unihorn or self.polyd or self.handless():
+        if self.polyd or self.handless():
             return False
         before = int(self.last_bl[nh.NLE_BL_CONDITION])
         if not before & HORN_FIXES:

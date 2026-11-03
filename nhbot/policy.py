@@ -23,11 +23,11 @@ STEPS = (
     "level_arrival",     # bounce off the Mines staircase (avoid_mines); Mines-return bookkeeping
     "progress",          # no-time loop guard; forget obstacles / go desperate on a stalled level
     "engulfed",
-    "unihorn_sick",      # unihorn: food poisoning / illness -- the horn before a prayer
+    "unihorn_sick",      # food poisoning / illness: a unicorn horn before a prayer
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
     "weight",            # never Burdened (carry), shed weight when Strained
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
-    "unihorn",           # unihorn: blind / confused / stunned / hallucinating, nothing next to us (unihorn_fight:
+    "unihorn",           # blind / confused / stunned / hallucinating, nothing next to us: the horn (unihorn_fight:
                          #   blind / stunned with something next to us too)
     "stunned",
     "vault_guard",

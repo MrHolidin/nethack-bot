@@ -243,7 +243,7 @@ class CarryMixin:
                 and self.scroll_is_good(s):
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS) and not self.horn_is_bad(it):
-            return True                      # a horn that harmed us (unihorn) is cursed: sold
+            return True                      # a horn that harmed us is cursed: sold
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if self.jewelry_needed(it):
