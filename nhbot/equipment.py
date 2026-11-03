@@ -194,7 +194,7 @@ class EquipMixin:
         return False                  # armor we won't wear is carried for selling (the value decides drops)
 
     def strip_for_enchant(self):
-        """enchant_strip, before reading enchant armor (no threat in view): the scroll lands on a random worn piece
+        """Before reading enchant armor (no threat in view): the scroll lands on a random worn piece
         (wear.c some_armor), so the pieces it could evaporate come off first, one per call; equip_step puts them
         back on afterwards. "ready": read now; "acted": a piece came off (the turn is used); "wait": not now --
         nothing safe would be left to enchant, or a risky piece can't come off (cursed, a suit under a cloak)."""

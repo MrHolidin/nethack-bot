@@ -36,7 +36,7 @@ STEPS = (
     "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
     "elbereth",
     "thieves",
-    "regen",             # regen_hp: ring of regeneration on below full HP, off at full (nothing next to us)
+    "regen",             # ring of regeneration on below full HP, off at full (nothing next to us)
     "weapon",
     "wands",
     "melee",

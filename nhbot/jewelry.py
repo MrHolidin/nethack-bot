@@ -114,8 +114,8 @@ class JewelryMixin:
         """carry.needed (never sold or dropped): identify scrolls, and the amulets and rings still to identify."""
         if it.ocls == nh.SCROLL_CLASS:
             return self.is_identify(it.text)
-        if self.opts.regen_hp and is_regen(it):
-            return True                                 # regen_hp: off at full HP, still ours
+        if is_regen(it):
+            return True                                 # off at full HP (regen_step), still ours
         return to_identify(it.ocls, it.text)            # in the inventory or on the floor (worth_taking)
 
     def buy_wanted(self, stype):
@@ -132,13 +132,13 @@ class JewelryMixin:
             cands = [(wear_rank(it), it) for it in items
                      if it.ocls == ocls and not it.on_body and not it.cursed and "unpaid" not in it.text
                      and wear_rank(it) is not None and it.letter not in self.jewelry_refused
-                     and not (self.opts.regen_hp and is_regen(it))]          # regen_hp: regen_step's ring
+                     and not is_regen(it)]                                  # regen_step's ring
             if not cands:
                 continue
             rank, best = min(cands, key=lambda c: c[0])
             if len(on) >= slots:
                 free = [it for it in on if not it.cursed and it.letter not in self.jewelry_refused
-                        and not (self.opts.regen_hp and is_regen(it))]
+                        and not is_regen(it)]
                 if not free:
                     continue
                 worst = max(free, key=lambda it: 99 if wear_rank(it) is None else wear_rank(it))
@@ -150,10 +150,10 @@ class JewelryMixin:
         return False
 
     def regen_step(self):
-        """regen_hp (nothing next to us -- the caller checks): a ring of regeneration is on only while HP is below
+        """Nothing next to us (the caller checks): a ring of regeneration is on only while HP is below
         the maximum -- it costs a nutrition point every other turn (eat.c gethungry) and does nothing at full HP.
         Put on into a free ring finger, taken off at full HP. True if it acted."""
-        if not self.opts.regen_hp or self.polyd or self.handless():
+        if self.polyd or self.handless():
             return False
         rings = [it for it in self.items() if it.ocls == nh.RING_CLASS]
         regen = [it for it in rings if is_regen(it) and it.letter not in self.jewelry_refused]

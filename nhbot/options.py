@@ -18,10 +18,6 @@ DEFAULTS = {
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
     "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
-    "enchant_strip": False,    # A/B: before reading enchant armor, take off the worn pieces it could evaporate (else
-                               #      no reading while one is worn); not while nothing else is worn (nhbot.equipment)
-    "regen_hp": False,         # A/B: ring of regeneration worn only below full HP; put on / taken off with nothing
-                               #      next to us (nhbot.jewelry regen_step)
     "unihorn": False,          # A/B: apply a unicorn horn when sick (always) or blind / confused / stunned /
                                #      hallucinating (nothing next to us); a horn that harms us is cursed: dropped
                                #      from use, sold (nhbot.survival)

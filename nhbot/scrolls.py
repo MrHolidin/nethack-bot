@@ -4,7 +4,8 @@ A scroll's appearance ("scroll labeled ZELGO MER") is random per game, its base 
 (objects.c). Shop prices narrow an appearance down to the types with that base price (pricemem.py).
 
 Read rule: an appearance whose possible types are all enchant weapon, enchant armor or remove curse -- never
-harmful -- is read (and not sold). Everything else stays unread.
+harmful -- is read (and not sold). Everything else stays unread. Before enchant armor, the worn pieces it could
+evaporate come off (equipment.strip_for_enchant) and are worn again after.
 """
 import re
 
@@ -51,21 +52,17 @@ class ScrollMixin:
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False              # confused remove curse / enchant armor do other things
         inv = self.inventory()
-        worn_ench = [int(m.group(1)) for it in self.items() if it.ocls == nh.ARMOR_CLASS and it.worn
-                     for m in [re.search(r"([+-]\d+) ", it.text)] if m]
         for letter, c, s in inv:
             if c != nh.SCROLL_CLASS or not self.scroll_is_good(s):
                 continue
             maybe_armor = "enchant armor" in s or "labeled" in s
-            if maybe_armor and self.opts.enchant_strip:
-                ready = self.strip_for_enchant()
+            if maybe_armor:
+                ready = self.strip_for_enchant()      # the pieces it could evaporate come off first
                 if ready == "acted":
                     self.scroll_stats["stripped"] = self.scroll_stats.get("stripped", 0) + 1
                     return True
                 if ready == "wait":
                     continue
-            elif maybe_armor and worn_ench and max(worn_ench) >= 4 and "remove curse" not in s:
-                continue              # enchant armor on a +4 piece may evaporate it
             if "enchant weapon" in s and not any(it.wielded for it in self.items()):
                 continue
             if not self.ask("r", "read"):
