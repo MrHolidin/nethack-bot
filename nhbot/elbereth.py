@@ -17,7 +17,6 @@ from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_N
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
 
-WISH = "blessed +2 gray dragon scale mail"     # AC 9 body armor (equipment.parse_armor knows it)
 
 class ElberethMixin:
     def elbereth_init(self):
@@ -49,9 +48,7 @@ class ElberethMixin:
                 self.raw_step(13)
                 continue
             if self.obs["misc"][1] and "wish" in self.top_line().lower():
-                for c in WISH:                   # zap.c zapnodir: engraving with a wand of wishing zaps it
-                    self.raw_step(ord(c))
-                self.raw_step(13)
+                self.answer_wish()               # zap.c zapnodir: engraving with a wand of wishing zaps it
                 continue
             break
         if self.obs["misc"][1]:

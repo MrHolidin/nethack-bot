@@ -108,6 +108,12 @@ def parse_armor(s):
 
 BLESSED_RE = re.compile(r"\bblessed\b")
 
+# A wish (wand of wishing, a djinni from a lamp or a smoky potion, a water demon from a fountain): armor, the first
+# of these we don't carry yet -- what the gift experiment found worth most to the bot (AC above all), one per slot.
+# zap.c makewish / readobjnam: a wished +2 stays +2 with probability 4/5 (else +0).
+ARMOR_WISHES = ("blessed +2 gray dragon scale mail", "blessed +2 gauntlets of power", "blessed +2 speed boots",
+                "blessed +2 shield of reflection", "blessed +2 cloak of protection", "blessed +2 dwarvish iron helm")
+
 def value(a):
     return a["ac"] + (a["ench"] if a["ench"] is not None else UNKNOWN_ENCH)
 
@@ -128,14 +134,24 @@ class EquipMixin:
         self.wear_failed = set()
         self.equip_events = []        # (turn, action, name)
         self.start_ac = None
+        self.wishes = []              # (turn, what we asked for, what came)
+        self.armor_called = {}        # appearance -> type, for armor we wished for ("fencing gloves" -> power)
         self.food_picked = 0
 
     # ---------------------------------------------------------- inventory view
+    def armor_true_text(self, s):
+        """Inventory text with the appearance of a type we know (wished for) replaced by the type's name."""
+        for look, name in self.armor_called.items():
+            if look in s:
+                return s.replace(look, name)
+        return s
+
     def armor_inventory(self):
         out = []
         for letter, ocls, s in self.inventory():
             if ocls != nh.ARMOR_CLASS:
                 continue
+            s = self.armor_true_text(s)
             a = parse_armor(s)
             if a is None:
                 # unknown/unsafe armor: track worn status only
@@ -210,6 +226,21 @@ class EquipMixin:
         self.cur_act = "enchant_strip"
         self.take_off(risky[0])
         return "acted"
+
+    def answer_wish(self):
+        """The "For what do you wish?" line is open: ask for the first armor of ARMOR_WISHES we don't carry."""
+        have = " | ".join(self.armor_true_text(it.text) for it in self.items())
+        want = next((w for w in ARMOR_WISHES if w.split(" ", 2)[2] not in have), ARMOR_WISHES[0])
+        for c in want:
+            self.raw_step(ord(c))
+        self.raw_step(13)
+        got = re.match(r"([a-zA-Z]) - (.+?)\.(?:\s|$)", self.message().strip() + " ")
+        if got:
+            look = re.sub(r"^(pair|set) of ", "", base_name(got.group(2))[2])
+            real = want.split(" ", 2)[2]
+            if look != real and look not in ARMOR:
+                self.armor_called[look] = real          # the game shows its appearance: we know what it is
+        self.wishes.append((self.turn(), want, got.group(2) if got else self.message()[:60]))
 
     # ---------------------------------------------------------- actions
     def wear(self, a, worn):

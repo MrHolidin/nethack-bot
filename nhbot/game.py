@@ -63,6 +63,9 @@ class GameMixin:
                 continue
             if misc[1]:      # getlin
                 self.log_msg(msg)
+                if "for what do you wish" in (msg + self.top_line()).lower():
+                    self.answer_wish()                      # a djinni, a water demon, a wand of wishing
+                    continue
                 if "who are you" in (msg + self.top_line()).lower():
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
