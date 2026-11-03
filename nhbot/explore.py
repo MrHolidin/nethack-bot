@@ -40,10 +40,11 @@ class ExploreMixin:
         frontier = passable & dil & (lv.visited == 0)
         if self.opts.squeeze_last and lv.squeeze_refused:
             # too heavy to squeeze here: squeezes only when nothing else is left -- no way down and no frontier
-            # reachable without one
+            # reachable without one; climbing out of the Mines, no way up
             lv.squeeze_ok = False
-            _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, frontier | (k_mem == G.DOWNSTAIR),
-                                      want_dist=False)
+            way = (k_mem == G.UPSTAIR) if self.mines_return_on and lv.key[0] == 2 else \
+                frontier | (k_mem == G.DOWNSTAIR)
+            _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, way, want_dist=False)
             lv.squeeze_ok = got is None
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
