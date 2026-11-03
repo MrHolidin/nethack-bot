@@ -144,8 +144,8 @@ class ElberethMixin:
 
     def elb_wanted(self, lv, hostiles):
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if self.can_pray() or not self.elb_can_write(lv):
-            return False
+        if (self.can_pray() and not self.opts.elb_with_prayer) or not self.elb_can_write(lv):
+            return False                  # elb_with_prayer: Elbereth below elb_hp even while a prayer is ready
         y, x = self.pos()
         near = [(p, n) for p, n in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= 3]
         threats = hostiles + [t for t in near if t not in hostiles]
