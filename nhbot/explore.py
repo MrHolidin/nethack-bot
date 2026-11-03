@@ -38,8 +38,9 @@ class ExploreMixin:
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
-        if self.opts.squeeze_last:
-            # squeezes only when nothing else is left: no way down and no frontier reachable without one
+        if self.opts.squeeze_last and lv.squeeze_refused:
+            # too heavy to squeeze here: squeezes only when nothing else is left -- no way down and no frontier
+            # reachable without one
             lv.squeeze_ok = False
             _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, frontier | (k_mem == G.DOWNSTAIR),
                                       want_dist=False)

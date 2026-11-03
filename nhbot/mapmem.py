@@ -66,8 +66,8 @@ class Level:
         self.near = np.zeros((ROWS, COLS), dtype=bool)
         self.searched = np.zeros((ROWS, COLS), dtype=np.int32)
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)
-        self.squeeze_refused = False  # squeeze_reach: a diagonal squeeze here was refused for our weight
-        self.squeeze_ok = False       # squeeze_last: squeezes allowed here (set by explore)
+        self.squeeze_refused = False  # squeeze_last / squeeze_reach: a diagonal squeeze here was refused for our weight
+        self.squeeze_ok = False       # squeeze_last: squeezes allowed here even when too heavy (set by explore)
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
         self.locked = set()
         self.avoid_down = set()
@@ -275,6 +275,12 @@ class MapMixin:
             # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit --
             # squeeze_reach: only when no other way leads there (dijkstra prices squeezes at SQUEEZE_COST)
             self.squeeze_stats["refused"] += 1
+            if self.opts.squeeze_last:
+                first = not lv.squeeze_refused
+                lv.squeeze_refused = True
+                if first or not lv.squeeze_ok:
+                    self.squeeze_stats["held"] += 1      # explore re-decides with squeezes shut first
+                    return
             if self.opts.squeeze_reach:
                 lv.squeeze_refused = True
                 k_mem, k_live, passable = self.grids(lv)

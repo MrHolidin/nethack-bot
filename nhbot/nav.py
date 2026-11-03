@@ -84,8 +84,8 @@ class NavMixin:
             _pad_target[1:-1, 1:-1] = targets_mask
             tm = _pad_target.ravel().tolist()
         rock, squeeze_cost = None, 0
-        if self.opts.squeeze_last and not lv.squeeze_ok:
-            squeeze_cost = -1                    # squeeze_last: no squeezes (explore decides when they open)
+        if self.opts.squeeze_last and lv.squeeze_refused and not lv.squeeze_ok:
+            squeeze_cost = -1                    # squeeze_last: too heavy to squeeze here -- none (explore decides)
         elif lv.squeeze_refused and self.opts.squeeze_reach:
             squeeze_cost = SQUEEZE_COST
         if squeeze_cost:
