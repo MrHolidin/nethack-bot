@@ -38,6 +38,12 @@ class ExploreMixin:
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
+        if self.opts.squeeze_last:
+            # squeezes only when nothing else is left: no way down and no frontier reachable without one
+            lv.squeeze_ok = False
+            _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, frontier | (k_mem == G.DOWNSTAIR),
+                                      want_dist=False)
+            lv.squeeze_ok = got is None
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it

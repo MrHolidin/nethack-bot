@@ -83,10 +83,14 @@ class NavMixin:
         if targets_mask is not None:
             _pad_target[1:-1, 1:-1] = targets_mask
             tm = _pad_target.ravel().tolist()
-        rock = None
-        if lv.squeeze_refused and self.opts.squeeze_reach:
+        rock, squeeze_cost = None, 0
+        if self.opts.squeeze_last and not lv.squeeze_ok:
+            squeeze_cost = -1                    # squeeze_last: no squeezes (explore decides when they open)
+        elif lv.squeeze_refused and self.opts.squeeze_reach:
+            squeeze_cost = SQUEEZE_COST
+        if squeeze_cost:
             # hack.c test_move: a diagonal step between two rock squares (or boulders) is a squeeze -- refused
-            # above 600 weight; only the way when there is no other
+            # above 600 weight
             _pad_rock[1:-1, 1:-1] = (k_mem == G.WALL) | (k_mem == G.UNKNOWN) | (k_mem == G.BOULDER) | \
                 (k_live == G.BOULDER)
             rock = _pad_rock.ravel().tolist()
@@ -114,7 +118,9 @@ class NavMixin:
                     continue
                 nd = d + c
                 if diag and rock is not None and rock[i + oy] and rock[i + ox]:
-                    nd += SQUEEZE_COST
+                    if squeeze_cost < 0:
+                        continue
+                    nd += squeeze_cost
                 if nd < dist[j]:
                     dist[j] = nd
                     prev[j] = i

@@ -67,6 +67,7 @@ class Level:
         self.searched = np.zeros((ROWS, COLS), dtype=np.int32)
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)
         self.squeeze_refused = False  # squeeze_reach: a diagonal squeeze here was refused for our weight
+        self.squeeze_ok = False       # squeeze_last: squeezes allowed here (set by explore)
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
         self.locked = set()
         self.avoid_down = set()
