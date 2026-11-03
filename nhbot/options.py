@@ -21,6 +21,8 @@ DEFAULTS = {
     "quaff_test_horn": False,  # A/B: quaff_test while we carry a unicorn horn we would apply
     "smoky_quaff": False,      # A/B: drink smoky potions for their djinni (on Elbereth, calm; nhbot.potiontest)
     "fountain_wish": False,    # A/B: Excalibur in hand, dip it into fountains for a water demon's wish
+    "squeeze_reach": False,    # A/B: once a diagonal squeeze was refused for our weight, squeezes on that level cost
+                               #      SQUEEZE_COST in paths, and items are shed for one only when no other way exists
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

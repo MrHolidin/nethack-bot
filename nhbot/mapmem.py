@@ -7,6 +7,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
+from nhbot.nav import SQUEEZE_COST
 from nhbot.consts import ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FLOOR_GLYPH, FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
 
 
@@ -65,6 +66,7 @@ class Level:
         self.near = np.zeros((ROWS, COLS), dtype=bool)
         self.searched = np.zeros((ROWS, COLS), dtype=np.int32)
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)
+        self.squeeze_refused = False  # squeeze_reach: a diagonal squeeze here was refused for our weight
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
         self.locked = set()
         self.avoid_down = set()
@@ -269,7 +271,18 @@ class MapMixin:
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
         if lv and self.last_move_target and "You are carrying too much to get through" in m:
-            # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit
+            # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit --
+            # squeeze_reach: only when no other way leads there (dijkstra prices squeezes at SQUEEZE_COST)
+            self.squeeze_stats["refused"] += 1
+            if self.opts.squeeze_reach:
+                lv.squeeze_refused = True
+                k_mem, k_live, passable = self.grids(lv)
+                tgt = np.zeros((ROWS, COLS), dtype=bool)
+                tgt[self.last_move_target] = True
+                dist, _, reached = self.dijkstra(lv, k_mem, k_live, passable, self.pos(), tgt)
+                if reached is not None and dist[reached] < SQUEEZE_COST:
+                    self.squeeze_stats["detour"] += 1
+                    return
             self.squeeze_pending = (lv.key, self.last_move_target)
         elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",

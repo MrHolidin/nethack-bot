@@ -26,7 +26,8 @@ def line_clear(k_mem, glyphs, y, x, dy, dx, d):
 # than numpy scalar indexing); heap entries (cost, flat index) pop in the same order as (cost, y, x)
 _W = COLS + 2
 _N = (ROWS + 2) * _W
-_STEPS = tuple((dy * _W + dx, bool(dy and dx)) for dy, dx in NEIGH)
+_STEPS = tuple((dy * _W + dx, bool(dy and dx), dy * _W, dx) for dy, dx in NEIGH)   # + the two orthogonal steps
+SQUEEZE_COST = 1000           # squeeze_reach: a diagonal between two rock squares, once our weight was refused
 _INF = 1 << 30
 _STEP_COST = np.ones(256, dtype=np.int64)           # cost of stepping into a square, by remembered kind
 _STEP_COST[G.TRAP], _STEP_COST[G.BOULDER], _STEP_COST[G.DOOR_CLOSED] = 40, 15, 3
@@ -35,6 +36,7 @@ _LIVE_COST[G.MONSTER] = _LIVE_COST[G.INVIS] = 4
 _pad_cost = np.full((ROWS + 2, _W), -1, dtype=np.int64)
 _pad_door = np.zeros((ROWS + 2, _W), dtype=bool)
 _pad_target = np.zeros((ROWS + 2, _W), dtype=bool)
+_pad_rock = np.ones((ROWS + 2, _W), dtype=bool)
 
 
 class PathPrev:
@@ -81,6 +83,13 @@ class NavMixin:
         if targets_mask is not None:
             _pad_target[1:-1, 1:-1] = targets_mask
             tm = _pad_target.ravel().tolist()
+        rock = None
+        if lv.squeeze_refused and self.opts.squeeze_reach:
+            # hack.c test_move: a diagonal step between two rock squares (or boulders) is a squeeze -- refused
+            # above 600 weight; only the way when there is no other
+            _pad_rock[1:-1, 1:-1] = (k_mem == G.WALL) | (k_mem == G.UNKNOWN) | (k_mem == G.BOULDER) | \
+                (k_live == G.BOULDER)
+            rock = _pad_rock.ravel().tolist()
         dist = [_INF] * _N
         prev = [-1] * _N
         s = (start[0] + 1) * _W + start[1] + 1
@@ -98,12 +107,14 @@ class NavMixin:
             if d > max_cost:
                 break
             di = door[i]
-            for off, diag in _STEPS:
+            for off, diag, oy, ox in _STEPS:
                 j = i + off
                 c = cost[j]
                 if c < 0 or (diag and (di or door[j])):
                     continue
                 nd = d + c
+                if diag and rock is not None and rock[i + oy] and rock[i + ox]:
+                    nd += SQUEEZE_COST
                 if nd < dist[j]:
                     dist[j] = nd
                     prev[j] = i
