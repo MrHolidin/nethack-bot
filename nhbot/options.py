@@ -25,8 +25,6 @@ DEFAULTS = {
                                #      SQUEEZE_COST in paths, and items are shed for one only when no other way exists
     "squeeze_last": False,     # A/B: once a squeeze was refused for our weight on a level, diagonal squeezes there only
                                #      while neither the way down nor any frontier is reachable without one
-    "mines_no_search": False,  # A/B: in the Mines, nothing left to explore and no way down reached: leave the Mines
-                               #      (mines_return) instead of searching for hidden passages
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
