@@ -52,6 +52,9 @@ class AltarMixin:
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_LEV | nh.BL_MASK_HALLU):
             return False
         here = (lv.key, self.pos())
+        back = self.altar_dropped is not None and self.altar_dropped[:2] == here
+        if back and self.opts.altar_one:
+            return self.altar_pick_back()     # altar_one: each item back up right after its flash
         untested = self.altar_untested()
         if untested:
             it = untested[0]
@@ -66,11 +69,14 @@ class AltarMixin:
                 self.altar_dropped = (lv.key, self.pos(), set())
             self.altar_dropped[2].add(buc_key(it.text))
             return True
-        if self.altar_dropped is not None and self.altar_dropped[:2] == here:
-            keys = self.altar_dropped[2]
-            self.altar_dropped = None
-            self.cur_act = "altar"
-            self.pickup(lambda t: "for sale" not in t and buc_key(t) in keys, "altar")
-            self.altar_stats["picked_back"] += 1
-            return True
+        if back:
+            return self.altar_pick_back()
         return False
+
+    def altar_pick_back(self):
+        keys = self.altar_dropped[2]
+        self.altar_dropped = None
+        self.cur_act = "altar"
+        self.pickup(lambda t: "for sale" not in t and buc_key(t) in keys, "altar")
+        self.altar_stats["picked_back"] += 1
+        return True
