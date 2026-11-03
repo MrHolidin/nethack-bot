@@ -36,6 +36,7 @@ DEFAULTS = {
     "door_ambush": False,      # A/B: more than 2 hostiles coming at us and none next to us: wait beside an entrance
                                #      of their room, behind its wall (nhbot.ambush)
     "wear_known": False,       # A/B: put on only armor known to be uncursed or blessed (an altar, the start kit, a wish)
+    "vault_dig": False,        # A/B: with a digger, into a vault by its hint, its gold, dig down (nhbot.vault)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

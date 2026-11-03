@@ -41,6 +41,7 @@ STEPS = (
     "weapon",
     "wands",
     "melee",
+    "vault_escape",      # vault_dig: in a vault with a digger -- its gold, then dig down (nhbot.vault)
     "ambush",            # door_ambush: a group coming at us -> wait beside an entrance of their room (nhbot.ambush)
     "hunt_shooter",
     "rest_on_elbereth",
@@ -53,6 +54,7 @@ STEPS = (
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
     "rest",
     "gold_here",
+    "vault_seek",        # vault_dig: a vault hint read here and a digger -- into its niche (nhbot.vault)
     "explore",
 )
 
@@ -282,6 +284,8 @@ class PolicyMixin:
             return False                         # tins: slippery fingers, whatever we wield now slips too
         if self.tin_swapped and (c.hostiles or self.visible_hostiles(c.lv)) and self.tin_swap_back():
             return True                          # tins: the dagger was swapped in to open one; a threat: back
+        if self.vault_digging():
+            return False                         # vault_dig: the digger stays in hand until we are out
         return not c.hostiles and self.tin_slipped is None and self.weapon_check()
 
     def step_wands(self, c):
@@ -296,6 +300,12 @@ class PolicyMixin:
             target = self.focus_target(c.hostiles, target)
         self.attack(target)
         return True
+
+    def step_vault_escape(self, c):
+        return self.vault_escape_step(c.lv, c.hostiles)
+
+    def step_vault_seek(self, c):
+        return self.vault_seek_step(c.lv, c.hostiles)
 
     def step_ambush(self, c):
         return self.ambush_step(c.lv, c.hostiles)
