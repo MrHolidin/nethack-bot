@@ -16,6 +16,7 @@ from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_N
 
 ELB_PDEATH = 0.5                   # elb_pdeath
 ELB_PWIN = 0.5                     # elb_pwin
+ELB_SHOT_TURNS = 10                # elb_shot_seen: a weapon user blocks only this soon after a missile
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
 
@@ -117,7 +118,9 @@ class ElberethMixin:
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
         glyphs, me = self.obs["glyphs"], self.pos()
         pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
-        bl = ELB.blockers(glyphs, me, pp, lv.key[0])
+        # elb_shot_seen: a weapon user counts only if something was thrown / shot / zapped lately (combat.py)
+        quiet = self.opts.elb_shot_seen and self.turn() - self.last_shot_turn > ELB_SHOT_TURNS
+        bl = ELB.blockers(glyphs, me, pp, lv.key[0], weapons_ok=quiet)
         if bl and not ELB.blockers(glyphs, me, pp, lv.key[0], optimistic=True):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         if bl:

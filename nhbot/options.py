@@ -31,6 +31,8 @@ DEFAULTS = {
     "elb_pdeath": False,       # A/B: write Elbereth when P(death this turn) > 50% (danger.py) instead of HP < elb_hp
     "elb_pwin": False,         # A/B: write Elbereth when P(we win the fight with the adjacent ones) < 50% (danger.py
                                #      win_prob) instead of HP < elb_hp
+    "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
+                               #      message (combat.RTHREAT_RE), else it doesn't
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
