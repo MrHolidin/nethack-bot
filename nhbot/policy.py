@@ -86,6 +86,8 @@ class PolicyMixin:
         self._hunger_at = (t, h)
         self.nutrition_tick()
         self.tick_seq = self.msg_seq
+        if self.opts.wand_ev:
+            self.threat_track()                  # threats.py: who is coming for us
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return

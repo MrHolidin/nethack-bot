@@ -279,7 +279,7 @@ class DangerMixin:
                       for k, v in sorted(self.danger_p.items())}}
 
     # ------------------------------------------------------------ the fight to the end
-    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None):
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None):
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
@@ -290,7 +290,10 @@ class DangerMixin:
         (damage to us, turns we sleep) that plays the zap out (combat.zap_opening): alive_at(pos) tells whether a
         monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
         Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
-        with and one without the opening see the same monster HP and the same later rolls."""
+        with and one without the opening see the same monster HP and the same later rolls.
+        approach (wand_ev): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
+        mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
+        only hit monsters next to us (none there: we wait)."""
         if self.opts.track_sleep and self.cur_key is not None and self.cur_key in self.levels:
             adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
@@ -305,7 +308,7 @@ class DangerMixin:
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
             mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
-                         self.our_hits.get((self.cur_key, pos), 0), pos))
+                         self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove))
         if not mons:
             return 1.0
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
@@ -315,7 +318,7 @@ class DangerMixin:
         wins = 0
         for _ in range(sims):
             hps = []
-            for lev, _, dmg, _, _, hits, _ in mons:
+            for lev, _, dmg, _, _, hits, _, _, _ in mons:
                 for _try in range(20):
                     h = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -324,6 +327,10 @@ class DangerMixin:
                         break
                 hps.append(max(h, 1))
             hp, alive, asleep = hp0, list(range(len(mons))), 0
+            if approach is not None:
+                if self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns) > 0:
+                    wins += 1
+                continue
             for _turn in range(max_turns):
                 acts = k + (1 if frac and rng.random() < frac / 12 else 0)
                 for _a in range(acts):
@@ -368,6 +375,57 @@ class DangerMixin:
             if hp > 0:
                 wins += 1
         return wins / sims
+
+    def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns):
+        """One sampled fight of win_prob with approach (see there): our HP at its end (<= 0: lost)."""
+        left = [approach.get(m[6], 0) for m in mons]
+        alive, asleep = list(range(len(mons))), 0
+        k, frac = divmod(self.our_speed(), 12)
+        for _turn in range(max_turns):
+            acts = k + (1 if frac and rng.random() < frac / 12 else 0)
+            for _a in range(acts):
+                if not alive:
+                    break
+                ready = [j for j in alive if left[j] == 0]
+                j = ready[0] if ready else None
+                hit = j is not None and rng.random() < mons[j][1]
+                d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
+                if opening is not None and _turn == 0 and _a == 0:
+                    def alive_at(pos):
+                        return pos in index and index[pos] in alive
+
+                    def apply(pos, dmg):
+                        jj = index[pos]
+                        if dmg is None:
+                            alive.remove(jj)
+                        else:
+                            hps[jj] -= dmg
+                            if hps[jj] <= 0:
+                                alive.remove(jj)
+                    lost, asleep = opening(zrng, alive_at, apply)
+                    hp -= lost
+                    continue
+                if asleep > 0 or not hit:
+                    continue
+                hps[j] -= d
+                if hps[j] <= 0:
+                    alive.remove(j)
+            if not alive or hp <= 0:
+                break
+            asleep -= 1
+            for j in list(alive):
+                (one, inst), speed = mons[j][7], mons[j][8]
+                mk, mf = divmod(speed, 12)
+                moves = mk + (1 if mf and rng.random() < mf / 12 else 0)
+                walk = min(moves, left[j])
+                left[j] -= walk
+                for _m in range(moves - walk):
+                    if rng.random() < inst:
+                        return 0
+                    hp -= int(rng.choice(len(one), p=one))
+                if hp <= 0:
+                    return hp
+        return hp
 
     # ------------------------------------------------------------ flee (flag flee)
     def our_speed(self):
