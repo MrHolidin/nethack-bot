@@ -102,6 +102,47 @@ def self_hit_prob(terrain, start, step, monsters, our_ac, kind, mines=False):
     return min(total, 1.0)
 
 
+def ray_walk(terrain, start, step, kind, rng, hit, mines=False):
+    """One ray of ours sampled the way buzz() runs it (the rules above, each random branch drawn with `rng`).
+    hit(pos) is called at every square the ray enters (our own square included): None when nothing is there,
+    else (the ray hit it -- range -= 2, it reflects -- the ray turns straight back)."""
+    y, x = start
+    dy, dx = step
+    r = int(rng.integers(RANGES.start, RANGES.stop))
+    while r > 0:
+        r -= 1
+        ly, lx = y, x
+        y, x = y + dy, x + dx
+        if (terrain[y][x] if _isok(y, x) else STONE) != STONE:
+            got = hit((y, x))
+            if got is not None and got[0]:
+                r -= 2
+                if got[1]:
+                    dy, dx = -dy, -dx
+        nxt = _bounce_or_go(terrain, ly, lx, y, x, dy, dx, r, 1.0, kind, mines)
+        if len(nxt) > 1:
+            w = np.array([b[5] for b in nxt])
+            nxt = [nxt[int(rng.choice(len(nxt), p=w / w.sum()))]]
+        y, x, dy, dx, r = nxt[0][:5]
+
+
+def beam_walk(terrain, start, step, rng, hit):
+    """A wand of striking, bhit(): range rn1(8, 6), one per square and 3 more for each monster on the way (hit or
+    missed); it stops at a wall, rock or a closed door and never comes back. hit(pos) as for ray_walk."""
+    y, x = start
+    dy, dx = step
+    r = int(rng.integers(6, 14))
+    while r > 0:
+        r -= 1
+        y, x = y + dy, x + dx
+        if not _isok(y, x):
+            return
+        if hit((y, x)) is not None:
+            r -= 3
+        if terrain[y][x] in (WALL, STONE, CLOSED):
+            return
+
+
 def _bounce_or_go(terrain, ly, lx, y, x, dy, dx, rng, w, kind, mines):
     c = terrain[y][x] if _isok(y, x) else STONE
     if c != STONE:

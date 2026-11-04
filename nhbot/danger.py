@@ -286,10 +286,11 @@ class DangerMixin:
         d(level, 8), minus what our hits on it so far took, drawn again while that would leave it dead. Others
         joining the fight are not counted; a fight still on after max_turns counts as won. adjacent: (pos, name);
         pos None for a monster that isn't there yet (the water demon a dip may bring).
-        opening (wand_ev): (pos, P(the zap takes effect), damage pmf or None) -- our first action is a zap at the
-        monster at pos instead of a melee hit: with that P it takes the damage (None: it falls asleep and is out
-        of the fight). Its draws come from a generator of their own and the melee draws of that action are still
-        made, so a fight with and one without the opening see the same monster HP and the same later rolls."""
+        opening (wand_ev): our first action is a zap instead of a melee hit -- a function (rng, alive_at, apply) ->
+        (damage to us, turns we sleep) that plays the zap out (combat.zap_opening): alive_at(pos) tells whether a
+        monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
+        Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
+        with and one without the opening see the same monster HP and the same later rolls."""
         if self.opts.track_sleep and self.cur_key is not None and self.cur_key in self.levels:
             adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
@@ -307,10 +308,8 @@ class DangerMixin:
                          self.our_hits.get((self.cur_key, pos), 0), pos))
         if not mons:
             return 1.0
-        zj = None
-        if opening is not None:
-            zj = next((j for j, m in enumerate(mons) if m[6] == opening[0]), None)
-            zrng = self.opening_rng
+        index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
+        zrng = self.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
         wins = 0
@@ -324,7 +323,7 @@ class DangerMixin:
                     if h > 0:
                         break
                 hps.append(max(h, 1))
-            hp, alive = hp0, list(range(len(mons)))
+            hp, alive, asleep = hp0, list(range(len(mons))), 0
             for _turn in range(max_turns):
                 acts = k + (1 if frac and rng.random() < frac / 12 else 0)
                 for _a in range(acts):
@@ -333,20 +332,31 @@ class DangerMixin:
                     j = alive[0]
                     hit = rng.random() < mons[j][1]
                     d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
-                    if zj is not None and _turn == 0 and _a == 0:
-                        if zj in alive and zrng.random() < opening[1]:
-                            if opening[2] is None:
-                                alive.remove(zj)                 # asleep: out of the fight
+                    if opening is not None and _turn == 0 and _a == 0:
+                        def alive_at(pos):
+                            return pos in index and index[pos] in alive
+
+                        def apply(pos, dmg):
+                            jj = index[pos]
+                            if dmg is None:
+                                alive.remove(jj)                 # asleep: out of the fight
                             else:
-                                hps[zj] -= int(zrng.choice(len(opening[2]), p=opening[2]))
-                                if hps[zj] <= 0:
-                                    alive.remove(zj)
+                                hps[jj] -= dmg
+                                if hps[jj] <= 0:
+                                    alive.remove(jj)
+                        lost, asleep = opening(zrng, alive_at, apply)
+                        hp -= lost
                         continue
+                    if asleep > 0:
+                        continue                         # our own ray put us to sleep
                     if hit:
                         hps[j] -= d
                         if hps[j] <= 0:
                             alive.pop(0)
                 if not alive:
+                    break
+                asleep -= 1
+                if hp <= 0:
                     break
                 for j in alive:
                     if rng.random() < mons[j][4]:

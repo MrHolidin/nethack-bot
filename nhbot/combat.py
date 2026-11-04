@@ -15,7 +15,8 @@ from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
-from nhbot.rays import TERRAIN_CODE, our_protection, ray_harm, self_hit_prob
+from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, our_protection, ray_harm, ray_walk,
+                        self_hit_prob, zap_hit_prob)
 
 
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
@@ -76,16 +77,6 @@ def wand_resisted(kind, name):
     return False
 
 
-def zap_hit_prob(ac):
-    """zap.c zap_hit for a wand's ray (no spell bonus): chance = rn2(20); 0: rnd(10) < AC; else
-    3 - chance < AC_VALUE(AC), AC_VALUE of a negative AC being -rnd(-AC)."""
-    p = max(0, min(10, ac - 1)) / 10 / 20
-    acs = [ac] if ac >= 0 else [-k for k in range(1, -ac + 1)]
-    for chance in range(1, 20):
-        p += sum(3 - chance < a for a in acs) / len(acs) / 20
-    return p
-
-
 def halved(pmf, w, rounding_up):
     """The damage pmf when, with probability w, it is halved (resist: (d + 1) / 2; a ray: d / 2)."""
     out = np.zeros(len(pmf))
@@ -96,11 +87,12 @@ def halved(pmf, w, rounding_up):
 
 
 def wand_effect(kind, name, depth, xl):
-    """wand_ev: (P(our zap of this attack wand takes effect on a monster of this kind), damage pmf; None for
-    sleep: it falls asleep). zap.c: striking (bhitm) hits when rnd(20) < 10 + AC, 2d12; a ray (buzz/zhitm)
-    hits by zap_hit, magic missile 2d6, fire / cold / lightning 6d6 (fire +7 on a cold resistant one, cold
-    +6d3 on a fire resistant one); resist() -- rn2(100 + 12 - level) < its magic resistance (mr) -- halves
-    the damage and stops a sleep. Its AC and level are those of its kind (armor and growth unseen)."""
+    """wand_ev: what our attack wand does to a monster of this kind it reaches -- (P(an effect), damage pmf; None for
+    sleep: it falls asleep). zap.c: striking (bhitm) hits when rnd(20) < 10 + AC, 2d12; a ray's hit is rolled on
+    the way (zap_hit, rays.ray_walk) and then does magic missile 2d6, fire / cold / lightning 6d6 (fire +7 on a
+    cold resistant one, cold +6d3 on a fire resistant one); resist() -- rn2(100 + 12 - level) < its magic
+    resistance (mr) -- halves the damage and stops a sleep. AC and level are those of its kind (armor and growth
+    unseen); an unknown kind: nothing."""
     pm = PM_BY_NAME.get(name)
     if pm is None or wand_resisted(kind, name):
         return 0.0, None
@@ -108,15 +100,14 @@ def wand_effect(kind, name, depth, xl):
     p_res = min(pm.mr, n) / n
     if kind == "striking":
         return max(0, min(20, 9 + pm.ac)) / 20, halved(dice_pmf(2, 12), p_res, True)
-    p = zap_hit_prob(pm.ac)
     if kind == "sleep":
-        return p * (1 - p_res), None
-    dmg = dice_pmf(2 if kind == "magic missile" else 6, 6)
+        return 1 - p_res, None
+    dmg = dice_pmf(RAY_DICE[kind][0], 6)
     if kind == "fire" and pm.mresists & MR_BIT["cold"]:
         dmg = np.concatenate([np.zeros(7), dmg])
     if kind == "cold" and pm.mresists & MR_BIT["fire"]:
         dmg = np.convolve(dmg, dice_pmf(6, 3))
-    return p, halved(dmg, p_res, False)
+    return 1.0, halved(dmg, p_res, False)
 
 
 class CombatMixin:
@@ -466,6 +457,8 @@ class CombatMixin:
             p_back = None
             if kind not in RAY_WANDS:
                 safe = True
+            elif self.opts.wand_ev:
+                safe = True                      # the ray coming back is in the P(win) of the zap (zap_opening)
             elif self.opts.wand_pwin:
                 p_back, harm = self.ray_risk(lv, (dy, dx), kind, letter)
                 safe = p_back < WAND_RAY_RISK  # wand_pwin: P(our ray comes back and hits us) (nhbot.rays)
@@ -500,9 +493,10 @@ class CombatMixin:
 
     def wand_ev_pairs(self, hostiles, targets, wands):
         """wand_ev: (target, wand letter, kind) worth a zap, best first. One fight for every choice: the adjacent
-        hostiles and every target in line. Fighting on (win_prob) against each zap as our next action (win_prob with
-        the opening: its chance to take effect and its damage, wand_effect), all from the same draws (the RNG state
-        restored). A zap only when that fight is at most wand_pwin, and only one that beats fighting on."""
+        hostiles and every target in line. Fighting on (win_prob) against each zap -- a direction and a wand -- as
+        our next action, played out in full (zap_opening: every monster on the way, the ray coming back at us), all
+        from the same draws (the RNG state restored). A zap only when that fight is at most wand_pwin, and only one
+        that beats fighting on."""
         fight = list(hostiles) + [(t[2], t[4]) for t in targets if (t[2], t[4]) not in hostiles]
         if not targets:
             return []
@@ -510,21 +504,87 @@ class CombatMixin:
         p_fight = self.win_prob(fight)
         if p_fight > self.opts.wand_pwin:
             return []
-        depth, xl = self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP)
+        lv = self.level()
         out, seen = [], {}
         for t in targets:
             for letter, kind in wands:
-                if (t[2], kind) not in seen:
-                    p_eff, dmg = wand_effect(kind, t[4], depth, xl)
+                if (t[3], kind) not in seen:
                     self.win_rng.bit_generator.state = state
-                    seen[(t[2], kind)] = self.win_prob(fight, opening=(t[2], p_eff, dmg)) if p_eff > 0 else 0.0
-                p = seen[(t[2], kind)]
+                    seen[(t[3], kind)] = self.win_prob(fight, opening=self.zap_opening(lv, t[3], kind, letter, fight))
+                p = seen[(t[3], kind)]
                 if p > p_fight:
                     out.append((p, (t[0], t[1], t[2], t[3], t[4], p_fight, p - p_fight), letter, kind))
         if not out:
             self.zap_stats["held_ev"] += 1
         out.sort(key=lambda e: -e[0])
         return [(tt, letter, kind) for _, tt, letter, kind in out]
+
+    def zap_opening(self, lv, step, kind, letter, fight):
+        """win_prob's opening for zapping this wand in direction step: the beam (striking) or ray walked square by
+        square over the map we remember (rays.beam_walk / ray_walk); each monster in view on the way is hit by its
+        AC (striking: in wand_effect) -- range lost, a reflecting dragon turning the ray back -- and a monster of the
+        fight takes the effect (wand_effect); our own square: zap_hit by our AC, then reflection, resistance or
+        the ray's damage (6d6, magic missile 2d6) / d(6, 25) turns asleep (zap.c zhitu). Monsters out of view,
+        destroyed items and blindness are not counted. fight: the (pos, name) of win_prob's fight."""
+        y0, x0 = self.pos()
+        fight_pos = {pos for pos, _ in fight}
+        g = self.obs["glyphs"]
+        depth, xl = self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP)
+        mons = {}
+        for (my, mx) in zip(*np.nonzero((G.KIND[g] == G.MONSTER) | (G.KIND[g] == G.PET))):
+            pm = permonst_of(g[my, mx])
+            if pm is not None and (my, mx) != (y0, x0):
+                name = G.monster_name(int(g[my, mx]))
+                p_eff, dmg = wand_effect(kind, name, depth, xl)
+                mons[(int(my), int(mx))] = (zap_hit_prob(pm.ac), any(r in name for r in REFLECTORS), p_eff, dmg)
+        terrain = TERRAIN_CODE[self.terrain_glyphs(lv)]
+        mines = bool(lv.key and lv.key[0] == 2)
+        it = next((i for i in self.items() if i.letter == letter), None)
+        maybe_death = it is not None and "wand of" not in it.text and \
+            self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
+        prot = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body])
+        our_p = zap_hit_prob(self.bl(nh.NLE_BL_AC))
+        reflect = "reflection" in prot
+        resisted = RAY_RESIST.get("death" if maybe_death else kind) in prot
+        our_dmg = dice_pmf(RAY_DICE[kind][0], 6) if kind in RAY_DICE and not resisted else None
+
+        def opening(rng, alive_at, apply):
+            got = {"dmg": 0, "sleep": 0}
+
+            def hit(pos):
+                if pos == (y0, x0):
+                    if kind == "striking" or rng.random() >= our_p:
+                        return (False, False)
+                    if reflect:
+                        return (True, True)
+                    if maybe_death and not resisted:
+                        got["dmg"] += 10 ** 4                 # judged as death (ray_risk does the same)
+                    elif kind == "sleep" and not resisted:
+                        got["sleep"] += int(rng.integers(1, 26, size=6).sum())
+                    elif our_dmg is not None:
+                        got["dmg"] += int(rng.choice(len(our_dmg), p=our_dmg))
+                    return (True, False)
+                m = mons.get(pos)
+                if m is None or (pos in fight_pos and not alive_at(pos)):
+                    return None
+                p_hit, refl, p_eff, dmg = m
+                if kind == "striking":
+                    p_hit, refl = 1.0, False                  # bhitm: its own roll, in p_eff
+                if rng.random() >= p_hit:
+                    return (False, False)
+                if refl:
+                    return (True, True)
+                if pos in fight_pos and rng.random() < p_eff:
+                    apply(pos, None if dmg is None else int(rng.choice(len(dmg), p=dmg)))
+                return (True, False)
+
+            if kind == "striking":
+                beam_walk(terrain, (y0, x0), step, rng, hit)
+            else:
+                ray_walk(terrain, (y0, x0), step, kind, rng, hit, mines)
+            return got["dmg"], got["sleep"]
+
+        return opening
 
     def wand_pwin_targets(self, hostiles, targets):
         """wand_pwin (a threshold): the targets in line worth a charge, best first. A target is worth one
