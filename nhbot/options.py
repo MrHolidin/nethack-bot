@@ -29,7 +29,6 @@ DEFAULTS = {
                                #      kicks) and take what we would take from the floor (nhbot.boxes)
     "box_dagger_any": False,   # A/B (with open_boxes): force a lock with any dagger we carry (known uncursed first),
                                #      not only the alternate weapon (nhbot.boxes.box_opener)
-    "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

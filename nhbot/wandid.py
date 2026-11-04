@@ -1,5 +1,6 @@
-"""Wand identification by engraving (flag wand_engrave): with nothing threatening us, write in the dust with an
-unidentified wand and read what the game says (engrave.c doengrave, NetHack 3.6.6). One charge per test.
+"""Wand identification by engraving: with nothing threatening us, write in the dust with an unidentified wand and
+read what the game says (engrave.c doengrave, NetHack 3.6.6). One charge per test. (A/B wand_engrave over base_i:
+score +456 [-871, +1799], max_depth +0.1 [-0.1, +0.4].)
 
 A dust engraving must already lie on the square: teleportation, cancellation and make invisible show only by
 making it vanish, polymorph by changing it. So we write "x" with a finger first, then engrave "x" with the wand
@@ -76,8 +77,6 @@ class WandIdMixin:
 
     def wandid_step(self, lv):
         """No threat in view (the caller checks): test one unidentified wand. True if it used the turn."""
-        if not self.opts.wand_engrave:
-            return False
         it, key = self.wand_to_test()
         if it is None or not self.elb_can_write(lv) or lv.shop[self.pos()] \
                 or (lv.key, self.pos()) in self.wandid_refused \
