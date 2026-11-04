@@ -273,9 +273,11 @@ class PolicyMixin:
             return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.rub_rewield()
         if self.tin_glib():
             return False                         # tins: slippery fingers, whatever we wield now slips too
-        if self.tin_swapped and (c.hostiles or self.visible_hostiles(c.lv)) and self.tin_swap_back():
-            return True                          # tins: the dagger was swapped in to open one; a threat: back
-        return not c.hostiles and self.tin_slipped is None and self.weapon_check()
+        if self.swapped_for and (c.hostiles or self.visible_hostiles(c.lv)) and self.swap_back():
+            return True                          # the dagger was swapped in for a tin / a box; a threat: back
+        # not while the dagger is swapped in for a tin / a box: wielding the main weapon then would make the job use
+        # it (a long sword forcing a lock can break) and the later swap_back put the dagger in our hands
+        return not c.hostiles and self.tin_slipped is None and self.swapped_for is None and self.weapon_check()
 
     def step_wands(self, c):
         return not self.hallu_blind_ranged() and self.wand_step(c.lv, c.hostiles)
@@ -395,6 +397,8 @@ class PolicyMixin:
             if self.jewelry_wear_step(lv):
                 return True
             if self.altar_step(lv):
+                return True
+            if self.box_step(lv):
                 return True
             if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
                 return True

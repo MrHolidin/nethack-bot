@@ -7,6 +7,7 @@ from collections import Counter, deque
 import nle.nethack as nh
 
 from nhbot import glyphs as G
+from nhbot.boxes import BoxMixin
 from nhbot.carry import CarryMixin
 from nhbot.combat import CombatMixin
 from nhbot.elbereth import ElberethMixin
@@ -44,7 +45,7 @@ MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS,
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
-          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin):
+          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
         """role_opts and any other keyword arguments are options (options.py); unknown names raise."""
@@ -180,6 +181,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.gift_init()
         self.potiontest_init()
         self.jewelry_init()
+        self.box_init()
         self.wishing_init()
         self.value_init()
         self.policy_init()
@@ -268,7 +270,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": self.elb_fail,
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
-            "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
+            "boxes": dict(self.box_stats), "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
             "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 

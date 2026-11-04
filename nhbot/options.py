@@ -25,6 +25,8 @@ DEFAULTS = {
                                #      win_prob) instead of HP < elb_hp
     "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
                                #      message (combat.RTHREAT_RE), else it doesn't
+    "open_boxes": False,       # A/B: walk to boxes and chests, open them (the alternate dagger forces a lock, else
+                               #      kicks) and take what we would take from the floor (nhbot.boxes)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

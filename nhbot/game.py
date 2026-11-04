@@ -222,6 +222,26 @@ class GameMixin:
                 out.append((m.group(1), m.group(2)))
         return out
 
+    def menu_pick(self, header, want):
+        """A pick-any item menu headed header is on screen: select every entry want(text) accepts, page by page
+        (pages after the first have no header), then confirm -- or ESC with nothing selected. Returns how many
+        were selected."""
+        n = 0
+        items = self.menu_items(self.tty_text(), header)
+        for _ in range(20):
+            for letter, text in items:
+                if want(text):
+                    self.raw_step(ord(letter))
+                    n += 1
+            page = PAGE_RE.search(self.tty_text())
+            if not (page and int(page.group(1)) < int(page.group(2))):
+                break
+            self.raw_step(ord(">"))                  # the next page (no header there)
+            items = [(m.group(1), m.group(2)) for l in self.tty_text().split("\n")
+                     for m in [MENU_ITEM_RE.match(l.strip())] if m]
+        self.raw_step(13 if n else 27)
+        return n
+
     def describe_at(self, pos):
         """Farlook (';' with autodescribe) at any square: the cursor goes there by single steps, by 8 with
         the capital keys; next to us this is ";" and one direction key."""

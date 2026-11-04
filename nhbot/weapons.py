@@ -6,12 +6,37 @@ import nle.nethack as nh
 
 from nhbot.items import base_name, erosion
 
+OPENERS = ("dagger", "knife", "stiletto", "athame", "crysknife")   # opens tins, forces locks (a blade we can lose)
+
 
 class WeaponsMixin:
     def weapons_init(self):
         self.main_weapon = None
         self.rewields = 0
         self._wield_tried = set()      # wield candidates already tried
+        self.swapped_for = None        # "tin" / "box": the alternate dagger swapped in ('x') for that job
+
+    def dagger_alternate(self):
+        """The alternate weapon, if it is a dagger / knife (not known cursed); else None."""
+        alt = next((it for it in self.items() if it.alternate), None)
+        if alt is None or alt.cursed or not any(w in base_name(alt.text)[2] for w in OPENERS):
+            return None
+        return alt
+
+    def swap_in(self, job):
+        """'x': the alternate dagger into our hands for job (swap_back undoes it)."""
+        self.swapped_for = job
+        self.cur_act = job
+        self.press("x")
+
+    def swap_back(self, job=None):
+        """'x' back to the main weapon after a swap_in (for job, or any). True if it used the turn."""
+        if self.swapped_for is None or (job is not None and self.swapped_for != job):
+            return False
+        self.cur_act = self.swapped_for
+        self.swapped_for = None
+        self.press("x")
+        return True
 
     def wield(self, letter):
         if self.ask("w", "wield"):

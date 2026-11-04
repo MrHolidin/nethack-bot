@@ -19,7 +19,6 @@ from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_
                          TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, singular)
 from nhbot.combat import THROWABLE
 from nhbot.equipment import parse_armor
-from nhbot.game import MENU_ITEM_RE, PAGE_RE
 from nhbot.items import CURSED_RE, base_name
 from nhbot.tins import MAX_TINS
 from nhbot.wishing import LAMP_NAMES
@@ -264,20 +263,7 @@ class PickupMixin:
             return "lone"
         if re.search(r"\(1 of \d+\)", tty):
             self.msg_audit["pickup_multipage_" + site] += 1
-        n = 0
-        items = self.menu_items(tty, "Pick up what?")
-        for _ in range(20):
-            for letter, text in items:
-                if want(text):
-                    self.raw_step(ord(letter))
-                    n += 1
-            page = PAGE_RE.search(self.tty_text())
-            if not (page and int(page.group(1)) < int(page.group(2))):
-                break
-            self.raw_step(ord(">"))                  # the next page (no header there)
-            items = [(m.group(1), m.group(2)) for l in self.tty_text().split("\n")
-                     for m in [MENU_ITEM_RE.match(l.strip())] if m]
-        self.raw_step(13 if n else 27)
+        self.menu_pick("Pick up what?", want)
         self.settle()
         return "menu"
 

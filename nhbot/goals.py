@@ -5,7 +5,7 @@ it, whether it holds us on the level (items_first). Two tiers:
 
   explore  the goal joins the exploration frontier: explore() walks to the nearest of frontier + goals, and
            another step consumes it when we stand on it. Its walk mask must use the same gate as the
-           consuming step (else we walk to a square where nothing happens). gold, pile.
+           consuming step (else we walk to a square where nothing happens). gold, pile, altar, box.
   own      a policy step of its own walks to it and consumes it, at its place in STEPS.
            retrieve (our thrown missiles), corpse (fresh corpse of our kill), loot (stolen items).
 
@@ -42,6 +42,7 @@ GOALS = {
     "gold": GoalKind("gold", "explore", holds_descent=True),
     "pile": GoalKind("pile", "explore", holds_descent=True),
     "altar": GoalKind("altar", "explore", holds_descent=True),    # items of unknown curse status (nhbot.altar)
+    "box": GoalKind("box", "explore", holds_descent=True),        # boxes and chests to open (nhbot.boxes)
     "retrieve": GoalKind("retrieve", "own", ttl=60),
     "corpse": GoalKind("corpse", "own", ttl=40, max_dist=8),
     "loot": GoalKind("loot", "own"),
@@ -72,6 +73,8 @@ class GoalsMixin:
         """Goal squares of a mask kind as the map memory shows them, before any gate (for statistics)."""
         if kind == "altar":
             return self.altar_mask(lv)
+        if kind == "box":
+            return self.box_targets(lv)
         if kind == "gold":
             m = G.KIND[lv.under] == G.GOLD
         else:
@@ -166,6 +169,9 @@ class GoalsMixin:
                 pile |= ct & im
         out["pile"] = pile
         out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
+        # boxes: opened by housekeeping, so only with no hostile in view (its gate)
+        box = self.box_targets(lv)
+        out["box"] = box & passable if box.any() and not self.view_threats(lv) else np.zeros_like(gold)
         return out
 
     def goal_summary(self):

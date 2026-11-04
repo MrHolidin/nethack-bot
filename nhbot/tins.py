@@ -22,8 +22,8 @@ import nle.nethack as nh
 from nhbot.consts import SATIATED
 from nhbot.items import base_name
 from nhbot.monsters import PM_BY_NAME
+from nhbot.weapons import OPENERS
 
-OPENERS = ("dagger", "knife", "stiletto", "athame", "crysknife")
 MAX_TINS = 4
 SATIATED_MAX = 1500              # open a tin while Satiated only below this estimated nutrition
 CHOKE = 2000
@@ -64,7 +64,6 @@ for _n in PM_BY_NAME:
 
 class TinMixin:
     def tins_init(self):
-        self.tin_swapped = False         # we swapped the alternate weapon in to open a tin
         self.tin_stats = Counter()
         self.tin_eaten_by = Counter()
         self.tin_glib_until = -1         # turn: our fingers are slippery until then
@@ -92,12 +91,12 @@ class TinMixin:
                 return False
             self.tin_stats["rewielded"] += 1
             self.cur_act = "tin"
-            self.wield(mine.letter)                     # the swapped state again: tin_swap_back still applies
+            self.wield(mine.letter)                     # the swapped state again: swap_back still applies
             return True
         if key != lv.key or self.turn() > t0 + RECOVER_TURNS:
             self.tin_slipped = None
             self.tin_stats["slip_lost"] += 1
-            return self.tin_swap_back()
+            return self.swap_back("tin")
         if self.pos() != sq:
             mask = np.zeros(lv.under.shape, dtype=bool)
             mask[sq] = True
@@ -105,7 +104,7 @@ class TinMixin:
                 return True
             self.tin_slipped = None
             self.tin_stats["slip_lost"] += 1
-            return self.tin_swap_back()
+            return self.swap_back("tin")
         self.cur_act = "tin"
         self.pickup(lambda t: base_name(t)[2] == name and "for sale" not in t, "tin")
         if not any(base_name(it.text)[2] == name for it in self.items()):
@@ -120,33 +119,15 @@ class TinMixin:
         return sum(base_name(it.text)[0] for it in self.items()
                    if it.ocls == nh.FOOD_CLASS and re.search(r"\btins?\b", it.text))
 
-    def tin_opener(self):
-        """The alternate weapon, if it is a dagger / knife (not known cursed); else None."""
-        alt = next((it for it in self.items() if it.alternate), None)
-        if alt is None or alt.cursed or not any(w in base_name(alt.text)[2] for w in OPENERS):
-            return None
-        return alt
-
-    def tin_swap_back(self):
-        """Back to the main weapon (done with tins, or a threat in view). True if it used the turn."""
-        if not self.tin_swapped:
-            return False
-        self.tin_swapped = False
-        self.cur_act = "tin"
-        self.press("x")
-        return True
-
     def tin_step(self, lv):
         """No threat in view (the caller checks): open and maybe eat one tin. True if it used the turn."""
         if not self.tin_letters() or (self.bl(nh.NLE_BL_HUNGER) <= SATIATED and self.nutrition >= SATIATED_MAX) \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_HALLU | nh.BL_MASK_CONF | nh.BL_MASK_STUN):
-            return self.tin_swap_back()                 # done (or can't now): the main weapon back
+            return self.swap_back("tin")                 # done (or can't now): the main weapon back
         wielded = next((it for it in self.items() if it.wielded), None)
         if not (wielded is not None and any(w in base_name(wielded.text)[2] for w in OPENERS)) \
-                and self.tin_opener() is not None:
-            self.cur_act = "tin"
-            self.tin_swapped = True
-            self.press("x")
+                and self.dagger_alternate() is not None:
+            self.swap_in("tin")
             return True
         letter = self.tin_letters()[0]
         self.cur_act = "tin"
