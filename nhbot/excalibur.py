@@ -10,7 +10,7 @@ from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
 
 JUNK_CLASSES = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.WEAPON_CLASS, nh.TOOL_CLASS, nh.ARMOR_CLASS)   # water spoils little
 CONTAINERS = ("bag", "sack", "box", "chest", "lamp", "candle")
-FOUNTAIN_DIP_DEPTH = 20     # fountain_dip: on dungeon levels above this only
+FOUNTAIN_DIP_DEPTH = 20     # fountain_plan: dips for a wish on dungeon levels above this only
 DEMON_WIN = 0.7      # dip Excalibur for a wish only while P(we beat a water demon) is above this
 
 
@@ -185,13 +185,46 @@ class ExcaliburMixin:
             return False                          # the demon a dip may bring could kill us (danger.win_prob)
         return self.dip_at_fountain(lv, fmask, exc.letter, "fountain_wish")
 
-    # ------------------------------------------------------------------ flag fountain_dip
-    def dippable_cursed(self):
-        """A known-cursed thing on us the water can reach (do_wear.c inaccessible_equipment: no suit under a
-        cloak, no shirt under a suit or cloak, no ring under gloves); not lawful, not a long sword (a dip at
-        XL 5+ curses it, may take a point off it and dries the fountain). We know of a curse mostly from taking
-        a piece off for a better one (equipment.wear): just when lifting it pays."""
+    # ------------------------------------------------------------------ flag fountain_plan
+    def fountain_plan_step(self, lv):
+        """fountain_plan (no threat in view -- the caller checks): one place for every reason to dip, first
+        that applies:
+          1. Excalibur can be made now (excal_step: lawful, XL, HP, an unnamed long sword);
+          2. a known-cursed thing we wear, or would wear were it not cursed (uncurse_target): 4/30 uncursed;
+          3. a wish: dungeon level below FOUNTAIN_DIP_DEPTH, full HP, P(we beat a water demon) > DEMON_WIN --
+             the lawful dip Excalibur, the others a thing we don't need (junk_to_dip).
+        A lawful hero without Excalibur yet keeps the fountains for it: no 2 or 3. True if it used the turn."""
+        if self.excal_step(lv):
+            return True
         lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
+        if lawful and not self.excalibur:
+            return False
+        fmask = self.fountains(lv)
+        if not fmask.any():
+            return False
+        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if hp < maxhp * self.opts.excal_hp:
+            return False
+        it = self.uncurse_target(lawful)
+        if it is not None:
+            return self.dip_at_fountain(lv, fmask, it.letter, "fountain_uncurse")
+        if self.bl(nh.NLE_BL_DEPTH) >= FOUNTAIN_DIP_DEPTH or hp < maxhp:
+            return False
+        if lawful:
+            it = next((i for i in self.items() if "Excalibur" in i.text and i.wielded), None)
+        else:
+            it = self.junk_to_dip()
+        if it is None or self.demon_win_prob() <= DEMON_WIN:
+            return False                          # the demon a dip may bring could kill us (danger.win_prob)
+        return self.dip_at_fountain(lv, fmask, it.letter, "fountain_wish")
+
+    def uncurse_target(self, lawful):
+        """A known-cursed thing to dip: worn or wielded and within the water's reach (do_wear.c
+        inaccessible_equipment: no suit under a cloak, no shirt under a suit or cloak, no ring under gloves), or
+        armor / a weapon we would put on or wield were it not cursed (equipment.improves, weapon_rank). Not a
+        long sword unless lawful (a dip at XL 5+ curses it, may take a point off it and dries the fountain).
+        We know of a curse on what we wear mostly from taking it off for a better piece: just when lifting it
+        pays."""
         worn = self.worn_by_slot()
         covered = set()
         if CLOAK in worn:
@@ -199,41 +232,25 @@ class ExcaliburMixin:
         if SUIT in worn:
             covered.add(SHIRT)
         covered = {worn[s]["letter"] for s in covered if s in worn}
+        wanted = {a["letter"] for a in self.armor_inventory() if a["cursed"] and not a["worn"]
+                  and self.improves(a, worn)}
+        cur = next((it for it in self.items() if it.wielded), None)
+        cur_rank = self.weapon_rank(cur.text) if cur is not None else (-1, 0)
         for it in self.items():
-            if not (it.cursed and it.on_body) or it.letter in covered \
-                    or (not lawful and re.search(r"\blong sword\b", it.text)):
+            if not it.cursed or (not lawful and re.search(r"\blong sword\b", it.text)):
                 continue
-            if it.ring_on and GLOVES in worn:
-                continue
-            return it
+            if it.on_body:
+                if it.letter in covered or (it.ring_on and GLOVES in worn):
+                    continue
+                return it
+            if it.letter in wanted or (it.ocls == nh.WEAPON_CLASS and self.weapon_rank(it.text) > cur_rank):
+                return it
         return None
 
     def junk_to_dip(self):
         """Something we don't need that water spoils little: not on us, not kept (carry.needed), no food,
-        container or light; gems and stones first."""
+        container or light, no long sword; gems and stones first."""
         cands = [it for it in self.items() if it.ocls in JUNK_CLASSES and not it.on_body and not it.alternate
                  and not it.quivered and "unpaid" not in it.text and not self.needed(it)
                  and not any(w in it.text for w in CONTAINERS) and not re.search(r"\blong sword\b", it.text)]
         return min(cands, key=lambda it: JUNK_CLASSES.index(it.ocls), default=None)
-
-    def fountain_dip_step(self, lv):
-        """fountain_dip (no threat in view -- the caller checks), above dungeon level FOUNTAIN_DIP_DEPTH, HP at
-        excal_hp: dip a cursed thing on us (4/30 the water uncurses it); else, not lawful (the lawful dip
-        Excalibur: fountain_wish_step) and while P(we beat a water demon) > DEMON_WIN, a thing we don't need
-        (1/30 a water demon). True if it used the turn."""
-        if not self.opts.fountain_dip or self.bl(nh.NLE_BL_DEPTH) >= FOUNTAIN_DIP_DEPTH:
-            return False
-        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.excal_hp:
-            return False
-        fmask = self.fountains(lv)
-        if not fmask.any():
-            return False
-        it = self.dippable_cursed()
-        if it is not None:
-            return self.dip_at_fountain(lv, fmask, it.letter, "fountain_uncurse")
-        if int(self.last_bl[nh.NLE_BL_ALIGN]) == 1:
-            return False
-        it = self.junk_to_dip()
-        if it is None or self.demon_win_prob() <= DEMON_WIN:
-            return False
-        return self.dip_at_fountain(lv, fmask, it.letter, "fountain_wish")

@@ -372,7 +372,9 @@ class PolicyMixin:
                 return True
             if self.shop_step(lv):
                 return True
-            if self.excal_step(lv) or self.fountain_wish_step(lv) or self.fountain_dip_step(lv):
+            fountain = self.fountain_plan_step(lv) if self.opts.fountain_plan else \
+                (self.excal_step(lv) or self.fountain_wish_step(lv))
+            if fountain:
                 return True
             if self.loot_step(lv):
                 return True
