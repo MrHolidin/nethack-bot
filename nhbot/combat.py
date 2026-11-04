@@ -467,8 +467,10 @@ class CombatMixin:
             if kind not in RAY_WANDS:
                 safe = True
             elif self.opts.wand_pwin:
-                p_back, _ = self.ray_risk(lv, (dy, dx), kind, letter)
+                p_back, harm = self.ray_risk(lv, (dy, dx), kind, letter)
                 safe = p_back < WAND_RAY_RISK  # wand_pwin: P(our ray comes back and hits us) (nhbot.rays)
+                if self.opts.ray_resisted_ok and harm["verdict"] in ("reflected", "resisted"):
+                    safe = True                  # coming back it does us no harm (items it may still destroy)
             else:
                 safe = self.ray_safe(lv, dy, dx)
             if kind in RAY_WANDS:
