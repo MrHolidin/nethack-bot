@@ -10,7 +10,7 @@ from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
 
 JUNK_CLASSES = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.WEAPON_CLASS, nh.TOOL_CLASS, nh.ARMOR_CLASS)   # water spoils little
 CONTAINERS = ("bag", "sack", "box", "chest", "lamp", "candle")
-FOUNTAIN_DIP_DEPTH = 20     # fountain_plan: dips for a wish on dungeon levels above this only
+FOUNTAIN_DIP_DEPTH = 20     # fountain_plan_step: dips for a wish on dungeon levels above this only
 DEMON_WIN = 0.7      # dip Excalibur for a wish only while P(we beat a water demon) is above this
 
 
@@ -185,10 +185,10 @@ class ExcaliburMixin:
             return False                          # the demon a dip may bring could kill us (danger.win_prob)
         return self.dip_at_fountain(lv, fmask, exc.letter, "fountain_wish")
 
-    # ------------------------------------------------------------------ flag fountain_plan
+    # ------------------------------------------------------------------ flag fountain_neutral
     def fountain_plan_step(self, lv):
-        """fountain_plan (no threat in view -- the caller checks): one place for every reason to dip, first
-        that applies:
+        """One place for every reason to dip, first that applies (no threat in view -- the caller checks; flag
+        fountain_neutral: the non-lawful only, the lawful keep excal_step + fountain_wish_step):
           1. Excalibur can be made now (excal_step: lawful, XL, HP, an unnamed long sword);
           2. a known-cursed thing we wear, or would wear were it not cursed (uncurse_target): 4/30 uncursed;
           3. a wish: dungeon level below FOUNTAIN_DIP_DEPTH, full HP, P(we beat a water demon) > DEMON_WIN --
