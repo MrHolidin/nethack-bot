@@ -378,7 +378,7 @@ class PolicyMixin:
                 return True
             if self.wishwand_step() or self.lamp_step():
                 return True
-            if self.read_good_scroll():
+            if self.read_scroll_step(lv):
                 return True
             if self.jewelry_id_step(lv):
                 return True

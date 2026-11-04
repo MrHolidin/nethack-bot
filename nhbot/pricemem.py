@@ -22,7 +22,6 @@ import re
 import nle.nethack as nh
 
 from nhbot.items import base_name
-from nhbot.scrolls import cha_factor
 
 SHUFFLED_CLASSES = (nh.AMULET_CLASS, nh.POTION_CLASS, nh.RING_CLASS, nh.SCROLL_CLASS, nh.SPBOOK_CLASS,
                     nh.WAND_CLASS)
@@ -38,6 +37,17 @@ for _i in range(nh.NUM_OBJECTS):
     _oc = nh.objclass(_i)
     OBJ.append((nh.OBJ_NAME(_oc), nh.OBJ_DESCR(_oc), ord(_oc.oc_class), _oc.oc_cost))
 _INDEX = {(c, n): i for i, (n, d, c, k) in enumerate(OBJ) if n}   # names repeat across classes
+
+
+def cha_factor(cha):
+    """(multiplier, divisor) from shk.c get_cost."""
+    if cha > 18: return 1, 2
+    if cha == 18: return 2, 3
+    if cha >= 16: return 3, 4
+    if cha <= 5: return 2, 1
+    if cha <= 7: return 3, 2
+    if cha <= 10: return 4, 3
+    return 1, 1
 
 
 def _pool(cls):

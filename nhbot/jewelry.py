@@ -23,7 +23,7 @@ from collections import Counter
 import numpy as np
 import nle.nethack as nh
 
-from nhbot.game import MENU_ITEM_RE, PAGE_RE
+from nhbot.game import ID_MENU, MENU_ITEM_RE, PAGE_RE
 from nhbot.items import base_name
 from nhbot.pricemem import appearance
 
@@ -37,7 +37,6 @@ RING_RE = re.compile(r"\brings? of (%s)\b" % "|".join(sorted(RING_ORDER, key=len
 IDENTIFY_RE = re.compile(r"\bscrolls? of identify\b")
 SCROLL_SHOPS = ("general store", "second-hand bookstore", "rare books")
 PRICE_RE = re.compile(r"for sale, (\d+) zorkmids?")
-ID_MENU = "What would you like to identify"
 MIN_PRICE = 20                   # the base price: no identify scroll costs less
 
 SCROLL_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
@@ -87,6 +86,7 @@ class JewelryMixin:
         self.jewelry_stats = Counter()
         self.pay_fails = 0
         self.jewelry_refused = set()     # letters the game would not put on / take off
+        self.id_menu_open, self.id_picked = False, 0     # answer_identify_menu: pages of one menu
 
     # ------------------------------------------------------------ what we have
     def unknown_jewelry(self):
@@ -203,8 +203,7 @@ class JewelryMixin:
     # ------------------------------------------------------------ identify
     def jewelry_id_step(self, lv):
         """No threat in view: read an identify scroll on unknown jewelry. True if it used the turn."""
-        unknown = {it.letter for it in self.unknown_jewelry()}
-        if not unknown:
+        if not self.unknown_jewelry():
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
@@ -213,37 +212,44 @@ class JewelryMixin:
         if not scrolls:
             return False
         self.cur_act = "identify"
-        if not self.ask("r", "read"):
+        if not self.read_scroll(lv, scrolls[0].letter):        # the menu: answer_identify_menu
             return False
-        self.press(scrolls[0].letter, expect_prompt=True)
         self.jewelry_stats["read"] += 1
-        selected, in_menu = 0, False
-        for _ in range(16):
-            tty = self.tty_text()
-            page = PAGE_RE.search(tty)
-            if ID_MENU in tty or (in_menu and page):
-                in_menu = True                     # page 2 on has no header: every "x - ..." line is an entry
-                items = self.menu_items(tty, ID_MENU) if ID_MENU in tty else \
-                    [(m.group(1), m.group(2)) for l in tty.split("\n") for m in [MENU_ITEM_RE.match(l.strip())] if m]
-                for l in [l for l, _ in items if l in unknown]:
-                    self.raw_step(ord(l))
-                    unknown.discard(l)
-                    selected += 1
-                if page and int(page.group(1)) < int(page.group(2)):
-                    self.raw_step(ord(">"))
-                    continue
-                self.jewelry_stats["picked"] += selected
-                self.raw_step(13 if selected else 27)  # nothing of ours: the rest is declined
-                if not selected:
-                    break
-                selected, in_menu = 0, False       # a blessed scroll may ask for the next ones
-                continue
-            if "--More--" in tty.replace("\n", ""):
-                self.raw_step(13)                  # "This is an identify scroll." comes before the menu
-                continue
-            break
-        self.settle()
         return True
+
+    def identify_choice(self):
+        """Letters to pick in the identify menu: the first non-empty group of unknown jewelry, (read_unknown)
+        unknown scrolls that are not identify or good by price, unknown potions, unknown wands. One group
+        only: the game identifies the picks in inventory order up to its limit, so a lower group picked too
+        could take the place of a higher one."""
+        groups = [self.unknown_jewelry()]
+        if self.opts.read_unknown:
+            mine = [it for it in self.items() if "unpaid" not in it.text and appearance(it.text) is not None]
+            groups += [[it for it in mine if it.ocls == nh.SCROLL_CLASS and not self.scroll_is_good(it.text)
+                        and not self.is_identify(it.text)],
+                       [it for it in mine if it.ocls == nh.POTION_CLASS],
+                       [it for it in mine if it.ocls == nh.WAND_CLASS]]
+        return {it.letter for it in next((g for g in groups if g), [])}
+
+    def answer_identify_menu(self, tty):
+        """settle: an identify menu page is on screen (page 2 on has no header: every "x - ..." line is an
+        entry). Pick identify_choice on this page, next page, and at the end confirm -- or ESC with nothing
+        picked (the menu would come back)."""
+        if not self.id_menu_open:
+            self.id_menu_open, self.id_picked = True, 0
+        want = self.identify_choice()
+        items = self.menu_items(tty, ID_MENU) if ID_MENU in tty else \
+            [(m.group(1), m.group(2)) for l in tty.split("\n") for m in [MENU_ITEM_RE.match(l.strip())] if m]
+        for l in [l for l, _ in items if l in want]:
+            self.raw_step(ord(l))
+            self.id_picked += 1
+        page = PAGE_RE.search(tty)
+        if page and int(page.group(1)) < int(page.group(2)):
+            self.raw_step(ord(">"))
+            return
+        self.jewelry_stats["picked"] += self.id_picked
+        self.raw_step(13 if self.id_picked else 27)
+        self.id_menu_open = False              # a blessed scroll may ask for the next ones: a new menu
 
     # ------------------------------------------------------------ buy
     def shop_buy_step(self, lv):

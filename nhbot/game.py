@@ -10,6 +10,7 @@ from nhbot.items import parse_item
 MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is on screen
 MENU_ITEM_RE = re.compile(r"^\s*([a-zA-Z]) - (.*)$")
 PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")       # a menu page: "(1 of 2)"
+ID_MENU = "What would you like to identify"         # invent.c menu_identify ("first" / "next")
 
 
 class GameOver(Exception):
@@ -46,6 +47,8 @@ class GameMixin:
             msg = self.message()
             flat = tty.replace("\n", "")
             menu = MENU_RE.search(tty)
+            if not menu and ID_MENU not in tty:
+                self.id_menu_open = False                        # an identify menu closed some other way
             if "Things that are here" in tty:
                 self.here_window = (self.turn(), self.pos(), " | ".join(
                     l.strip() for l in self.menu_lines(tty, "Things that are here")))
@@ -66,12 +69,18 @@ class GameMixin:
                 if "for what do you wish" in (msg + self.top_line()).lower():
                     self.answer_wish()                      # a djinni, a water demon, a wand of wishing
                     continue
+                if "to genocide" in (msg + self.top_line()).lower():
+                    self.answer_genocide(msg + " " + self.top_line())     # scrolls.py
+                    continue
                 if "who are you" in (msg + self.top_line()).lower():
                     for c in "Agent":                       # our real name (lawful: lying costs alignment)
                         self.raw_step(ord(c))
                     self.raw_step(13)
                     continue
                 self.raw_step(27)
+                continue
+            if ID_MENU in tty or (menu and self.id_menu_open):
+                self.answer_identify_menu(tty)                   # jewelry.py
                 continue
             if menu:
                 self.raw_step(27)
@@ -123,6 +132,8 @@ class GameMixin:
             self.raw_step(ord("y"))           # eat.c: "hard time getting all of it down" -- the next bites choke
         elif "eat it" in m or "eat one" in m:
             self.raw_step(ord("n"))
+        elif "what do you want to charge" in m:
+            self.answer_charge()                                 # scrolls.py
         elif "itemized billing" in m:
             self.raw_step(ord("n"))
         elif "sell it?" in m:
