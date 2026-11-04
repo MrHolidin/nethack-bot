@@ -17,11 +17,6 @@ DEFAULTS = {
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
     "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
-    "fountain_plan": False,    # A/B: one order of reasons to dip into a fountain: Excalibur now; else (Excalibur in hand,
-                               #      or not lawful) uncurse what we wear / would wear, if water won't rust it; else a
-                               #      wish (level < 20, P(we beat a water demon) > 70%) (nhbot.excalibur)
-    "wish_junk": False,        # A/B, with fountain_plan: the lawful too dip a thing we don't need for a wish, not
-                               #      Excalibur
     "nymph_wands": False,      # A/B: attack wands at thieves in line (sleep first); a ray only when P(it comes back
                                #      and hits us) < 10% (nhbot.rays)
     "elb_pwin": False,         # A/B: write Elbereth when P(we win the fight with the adjacent ones) < 50% (danger.py

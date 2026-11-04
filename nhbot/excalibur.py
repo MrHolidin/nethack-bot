@@ -11,8 +11,8 @@ from nhbot.materials import rusts
 
 JUNK_CLASSES = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.WEAPON_CLASS, nh.TOOL_CLASS, nh.ARMOR_CLASS)   # water spoils little
 CONTAINERS = ("bag", "sack", "box", "chest", "lamp", "candle")
-FOUNTAIN_DIP_DEPTH = 20     # fountain_plan_step: dips for a wish on dungeon levels above this only
-DEMON_WIN = 0.7      # dip Excalibur for a wish only while P(we beat a water demon) is above this
+FOUNTAIN_DIP_DEPTH = 20     # dips for a wish on dungeon levels above this only
+DEMON_WIN = 0.7      # dip for a wish only while P(we beat a water demon) is above this
 
 
 class ExcaliburMixin:
@@ -171,30 +171,16 @@ class ExcaliburMixin:
         self.excal_skip.add(lv.key)
         return False
 
-    def fountain_wish_step(self, lv):
-        """No threat in view (the caller checks): Excalibur in hand at full HP, dip it into a fountain of this
-        level -- fountain.c dipfountain: 1/30 a water demon, a wish at (20 - depth)%, else hostile
-        (M2_HOSTILE). Only while P(we beat that demon) > DEMON_WIN. True if it used the turn. (A/B
-        fountain_wish: +310 [-562, +1180]; wishes in 35 games of 1000 against 23.)"""
-        if not self.excalibur:
-            return False
-        exc = next((it for it in self.items() if "Excalibur" in it.text and it.wielded), None)
-        if exc is None or self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX):
-            return False
-        fmask = self.fountains(lv)
-        if not fmask.any() or self.demon_win_prob() <= DEMON_WIN:
-            return False                          # the demon a dip may bring could kill us (danger.win_prob)
-        return self.dip_at_fountain(lv, fmask, exc.letter, "fountain_wish")
-
-    # ------------------------------------------------------------------ flag fountain_plan
+    # ------------------------------------------------------------------ why we dip
     def fountain_plan_step(self, lv):
-        """fountain_plan: one place for every reason to dip, first that applies (no threat in view -- the caller
-        checks):
+        """Every reason to dip, first that applies (no threat in view -- the caller checks):
           1. Excalibur can be made now (excal_step: lawful, XL, HP, an unnamed long sword);
           2. a known-cursed thing we wear, or would wear were it not cursed (uncurse_target): 4/30 uncursed;
           3. a wish: dungeon level below FOUNTAIN_DIP_DEPTH, full HP, P(we beat a water demon) > DEMON_WIN --
              the lawful dip Excalibur, the others a thing we don't need (junk_to_dip).
-        A lawful hero without Excalibur yet keeps the fountains for it: no 2 or 3. True if it used the turn."""
+        A lawful hero without Excalibur yet keeps the fountains for it: no 2 or 3. True if it used the turn.
+        (A/B fountain_plan: +290 [-61, +650], the non-lawful +593 [+195, +994]; dipping junk instead of
+        Excalibur for the lawful too, wish_junk: -573 [-1385, +262].)"""
         if self.excal_step(lv):
             return True
         lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
@@ -211,10 +197,10 @@ class ExcaliburMixin:
             return self.dip_at_fountain(lv, fmask, it.letter, "fountain_uncurse")
         if self.bl(nh.NLE_BL_DEPTH) >= FOUNTAIN_DIP_DEPTH or hp < maxhp:
             return False
-        if lawful and not self.opts.wish_junk:
+        if lawful:
             it = next((i for i in self.items() if "Excalibur" in i.text and i.wielded), None)
         else:
-            it = self.junk_to_dip()               # wish_junk: the lawful too (a dip may curse what it dips)
+            it = self.junk_to_dip()
         if it is None or self.demon_win_prob() <= DEMON_WIN:
             return False                          # the demon a dip may bring could kill us (danger.win_prob)
         return self.dip_at_fountain(lv, fmask, it.letter, "fountain_wish")
