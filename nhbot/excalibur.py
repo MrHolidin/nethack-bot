@@ -221,7 +221,8 @@ class ExcaliburMixin:
 
     def uncurse_target(self, lawful):
         """A known-cursed thing to dip: worn or wielded and within the water's reach (do_wear.c
-        inaccessible_equipment: no suit under a cloak, no shirt under a suit or cloak, no ring under gloves), or
+        inaccessible_equipment: no suit under a cloak, no shirt under a suit or cloak, no ring under gloves; the
+        wielded weapon only when we have a better one to wield -- a dip for a wish may curse Excalibur), or
         armor / a weapon we would put on or wield were it not cursed (equipment.improves, weapon_rank). Not a
         long sword unless lawful (a dip at XL 5+ curses it, may take a point off it and dries the fountain); nothing
         water would rust (materials.rusts: each dip rusts it more, and a rusted piece makes half the dips do
@@ -239,9 +240,13 @@ class ExcaliburMixin:
                   and self.improves(a, worn)}
         cur = next((it for it in self.items() if it.wielded), None)
         cur_rank = self.weapon_rank(cur.text) if cur is not None else (-1, 0)
+        better_weapon = any(it.ocls == nh.WEAPON_CLASS and not it.cursed and self.weapon_rank(it.text) > cur_rank
+                            for it in self.items())
         for it in self.items():
             if not it.cursed or rusts(it.text) or (not lawful and re.search(r"\blong sword\b", it.text)):
                 continue
+            if it.wielded and not better_weapon:
+                continue                          # welded, but nothing better to wield (Excalibur): no matter
             if it.on_body:
                 if it.letter in covered or (it.ring_on and GLOVES in worn):
                     continue
