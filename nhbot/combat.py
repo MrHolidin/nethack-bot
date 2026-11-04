@@ -31,6 +31,8 @@ RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bou
 BEAM_WANDS = ("striking",)                                            # no bounce
 
 
+WAND_PWIN = 0.5            # wand_pwin: zap when P(we win the fight) is below this
+WAND_RAY_RISK = 0.1        # wand_pwin: ... and a ray when P(it comes back and hits us) is below this
 SAFE_RAY_DIST = 7          # ray range is rn1(7, 7) = 7..13: a wall >= 7 away can't bounce it back onto us
 
 
@@ -61,6 +63,7 @@ class CombatMixin:
         self.zaps = 0
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
+        self.wand_pwin_log = []          # wand_pwin: (turn, target, distance, wand, P(win), P(ray back), HP) per zap
         self.empty_wands = set()       # Item.key of wands that said "Nothing happens" / "You wrest"
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
@@ -354,20 +357,37 @@ class CombatMixin:
         for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=6):
             if d == 1 and pos not in [p for p, _ in hostiles]:
                 continue
-            if not self.worth_special(pos, name):
+            pwin = None
+            if self.opts.wand_pwin:
+                # wand_pwin: worth a charge when the fight with the adjacent ones and this one is likely lost
+                pwin = self.win_prob(hostiles if (pos, name) in hostiles else hostiles + [(pos, name)])
+                if pwin >= WAND_PWIN:
+                    continue
+            elif not self.worth_special(pos, name):
                 continue
             if d > 1 and self.peaceful_now(lv, pos, far=True):
                 continue
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
-                safe = kind not in RAY_WANDS or self.ray_safe(lv, dy, dx)
+                p_back = None
+                if kind not in RAY_WANDS:
+                    safe = True
+                elif self.opts.wand_pwin:
+                    p_back, _ = self.ray_risk(lv, (dy, dx), kind, letter)
+                    safe = p_back < WAND_RAY_RISK  # wand_pwin: P(our ray comes back and hits us) (nhbot.rays)
+                else:
+                    safe = self.ray_safe(lv, dy, dx)
                 if kind in RAY_WANDS:
                     self.ray_risk_note(lv, (dy, dx), d, kind, letter, safe)
                 if not safe:
                     continue
                 self.cur_act = "fight"
                 self.last_attack_target = pos
+                if pwin is not None and len(self.wand_pwin_log) < 30:
+                    self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2),
+                                               None if p_back is None else round(p_back, 3),
+                                               f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
                 return self.zap(letter, key)
         return False
 

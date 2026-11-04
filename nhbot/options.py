@@ -25,6 +25,8 @@ DEFAULTS = {
                                #      win_prob) instead of HP < elb_hp
     "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
                                #      message (combat.RTHREAT_RE), else it doesn't
+    "wand_pwin": False,        # A/B: an attack wand when P(we win the fight) < WAND_PWIN instead of the HP / damage rule,
+                               #      a ray when P(it comes back and hits us) < WAND_RAY_RISK instead of ray_safe (combat)
     "shk_marks_shop": False,   # A/B: standing in an unmarked room with a shopkeeper in view marks it as a shop
                                #      (mapmem.shop_from_keeper)
     "box_dagger_any": False,   # A/B: force a lock with any dagger we carry (known uncursed first),
