@@ -4,7 +4,8 @@ A scroll's appearance ("scroll labeled ZELGO MER") is random per game, its base 
 (objects.c). Shop prices narrow an appearance down to the types with that base price (pricemem.py).
 
 Read rule: an appearance whose possible types are all enchant weapon, enchant armor or remove curse -- never
-harmful -- is read (and not sold). read_unknown (A/B): also, at full HP with no hostile in view and while neither
+harmful -- is read (and not sold). read_unknown (A/B): also, at full HP above TEST_MIN_HP, with no hostile in view
+and no pet next to us, while neither
 enchant armor nor identify is known by name (discoveries), a scroll whose price group is unknown or is 20 zm
 (identify) or 60 zm (enchant weapon). Before a scroll that may be enchant armor, the worn pieces it could
 evaporate come off (equipment.strip_for_enchant) and are worn again after.
@@ -30,6 +31,7 @@ GOOD_TYPES = {"enchant armor", "enchant weapon", "remove curse"}
 GOOD_RE = re.compile(r"\bscrolls? of (?:enchant armor|enchant weapon|remove curse)\b")    # a stack: "3 scrolls of"
 UNKNOWN_READ_TYPES = {"identify", "enchant weapon"}     # read_unknown: price groups 20 and 60 zm
 TESTING_ENDS = {"enchant armor", "identify"}            # read_unknown: once one of these is known, stop
+TEST_MIN_HP = 40                                        # read_unknown: only above this HP
 GENOCIDE_SPECIES = ("water nymph", "mountain nymph", "wood nymph")
 GENOCIDE_CLASS = ("n",)
 CHARGE_FIRST = ("sleep", "magic missile", "fire", "cold", "lightning", "striking", "digging")
@@ -88,8 +90,15 @@ class ScrollMixin:
         return not post or set(post) <= UNKNOWN_READ_TYPES
 
     def test_reading_on(self):
-        """read_unknown: full HP, and neither enchant armor nor identify known by name yet."""
-        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX):
+        """read_unknown: full HP and more than TEST_MIN_HP (earth drops a boulder on us: d20 without a hard
+        helmet), no pet next to us (earth's boulders and fire's explosion hit the 8 squares around: a killed pet
+        costs alignment and maybe Luck), and neither enchant armor nor identify known by name yet."""
+        hp = self.bl(nh.NLE_BL_HP)
+        if hp < self.bl(nh.NLE_BL_HPMAX) or hp <= TEST_MIN_HP:
+            return False
+        y, x = self.pos()
+        g = self.obs["glyphs"]
+        if (G.KIND[g[max(0, y - 1):y + 2, max(0, x - 1):x + 2]] == G.PET).any():
             return False
         return not self.known_scroll_types() & TESTING_ENDS
 

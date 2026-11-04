@@ -266,6 +266,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "elb_turns": self.elb_turns,
             "elb_exits": dict(self.elb_exits),
             "deadly_prayers": self.deadly_prayers,
+            "punish_prayers": self.punish_prayers,
             "pray_failed": self.pray_failed,
             "stun_waits": self.stun_waits,
             "nymph_kills": self.nymph_kills, "nymph_zaps": dict(self.nymph_zap_stats),
