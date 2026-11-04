@@ -7,6 +7,7 @@ import nle.nethack as nh
 from nhbot.items import base_name, erosion
 
 OPENERS = ("dagger", "knife", "stiletto", "athame", "crysknife")   # opens tins, forces locks (a blade we can lose)
+UNCURSED_RE = re.compile(r"\b(?:uncursed|blessed)\b")
 
 
 class WeaponsMixin:
@@ -14,7 +15,9 @@ class WeaponsMixin:
         self.main_weapon = None
         self.rewields = 0
         self._wield_tried = set()      # wield candidates already tried
-        self.swapped_for = None        # "tin" / "box": the alternate dagger swapped in ('x') for that job
+        self.swapped_for = None        # "tin" / "box": a dagger swapped in for that job
+        self.swap_main = None          # the letter to wield back after it ('w'); None: 'x' swaps back
+        self.swap_welded = 0           # swap_in put a cursed dagger in our hands
 
     def dagger_alternate(self):
         """The alternate weapon, if it is a dagger / knife (not known cursed); else None."""
@@ -23,19 +26,40 @@ class WeaponsMixin:
             return None
         return alt
 
-    def swap_in(self, job):
-        """'x': the alternate dagger into our hands for job (swap_back undoes it)."""
+    def opener_daggers(self):
+        """Daggers / knives we could put in our hands for a job, best first: known uncursed (or blessed) ones and
+        the alternate weapon, then those of unknown curse status; never a known-cursed one (it would weld)."""
+        cands = [it for it in self.items() if it.ocls == nh.WEAPON_CLASS and not it.cursed and not it.wielded
+                 and any(w in base_name(it.text)[2] for w in OPENERS)]
+        return sorted(cands, key=lambda it: not (it.alternate or UNCURSED_RE.search(it.text)))
+
+    def swap_in(self, job, it=None):
+        """A dagger into our hands for job (swap_back undoes it): the alternate weapon with 'x', another one
+        with 'w' (the main weapon is wielded back after)."""
         self.swapped_for = job
         self.cur_act = job
-        self.press("x")
+        if it is None or it.alternate:
+            self.swap_main = None
+            self.press("x")
+            return
+        main = next((i for i in self.items() if i.wielded), None)
+        self.swap_main = main.letter if main is not None else None
+        seq0 = self.msg_seq
+        self.wield(it.letter)
+        if "welded" in self.text_since(seq0):
+            self.swap_welded += 1             # a cursed one: stuck with it until uncursed (weapon_upgrade can't)
+            self.swapped_for = None
 
     def swap_back(self, job=None):
-        """'x' back to the main weapon after a swap_in (for job, or any). True if it used the turn."""
+        """Back to the main weapon after a swap_in (for job, or any). True if it used the turn."""
         if self.swapped_for is None or (job is not None and self.swapped_for != job):
             return False
         self.cur_act = self.swapped_for
         self.swapped_for = None
-        self.press("x")
+        if self.swap_main is None:
+            self.press("x")
+        elif any(it.letter == self.swap_main for it in self.items()):
+            self.wield(self.swap_main)
         return True
 
     def wield(self, letter):

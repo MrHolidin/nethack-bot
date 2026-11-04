@@ -270,7 +270,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": self.elb_fail,
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
-            "boxes": dict(self.box_stats), "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
+            "boxes": dict(self.box_stats, welded=self.swap_welded), "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
             "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 
