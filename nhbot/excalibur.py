@@ -7,6 +7,8 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 
+DEMON_WIN = 0.7      # fountain_wish: dip only while P(we beat a water demon) is above this
+
 
 class ExcaliburMixin:
     def excal_init(self):
@@ -17,6 +19,7 @@ class ExcaliburMixin:
         self.fountain_levels = set()
         self.excal_trips = 0
         self.excal_skip = set()
+        self.demon_win = (None, 0.0)     # fountain_wish: (state key, P(we beat a water demon))
 
     def long_sword(self):
         for it in self.items():
@@ -123,10 +126,21 @@ class ExcaliburMixin:
         self.dips += 1
         return self.text_since(seq0)
 
+    def demon_win_prob(self):
+        """P(we win a fight with a water demon next to us, from full HP) -- danger.win_prob, cached while what it
+        depends on stays the same (level, XL, max HP, AC, the weapon in hand)."""
+        weapon = next((it.text for it in self.items() if it.wielded), None)
+        key = (self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC),
+               weapon)
+        if self.demon_win[0] != key:
+            self.demon_win = (key, self.win_prob([(None, "water demon")]))
+        return self.demon_win[1]
+
     def fountain_wish_step(self, lv):
         """fountain_wish (no threat in view, the caller checks): Excalibur in hand at full HP, dip it into a
         fountain of this level -- fountain.c dipfountain: 1/30 a water demon, a wish at (20 - depth)%, else
-        hostile (M2_HOSTILE). Not in the Mines (Minetown's watch), not a shop's. True if it used the turn."""
+        hostile (M2_HOSTILE). Only while P(we beat that demon) > DEMON_WIN. Not in the Mines (Minetown's watch),
+        not a shop's. True if it used the turn."""
         if not (self.opts.fountain_wish and self.excalibur) or lv.key[0] == 2:
             return False
         exc = next((it for it in self.items() if "Excalibur" in it.text and it.wielded), None)
@@ -137,6 +151,8 @@ class ExcaliburMixin:
             fmask &= ~lv.shop
         if not fmask.any() or lv.key in self.excal_skip:
             return False
+        if self.demon_win_prob() <= DEMON_WIN:
+            return False                          # the demon a dip may bring could kill us (danger.win_prob)
         self.cur_act = "fountain_wish"
         y, x = self.pos()
         if fmask[y, x]:

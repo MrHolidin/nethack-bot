@@ -38,6 +38,7 @@ MON_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
 FLEE_P = 0.5                     # flee: P(death this turn) above this
 WIN_SIMS = 200                   # win_prob: sampled fights
+EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 FLEE_TURNS = 100                 # flee: give up getting away after this long
 FLEE_DIST = 3                    # flee: toward a square at least this far (Chebyshev) from every hostile in view
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
@@ -158,12 +159,15 @@ class DangerMixin:
 
     # ------------------------------------------------------------ our attack: it may die before it acts
     def our_weapon(self):
+        """(weapon type or None, enchantment, (to-hit die, damage die) of an artifact's attack bonus)."""
         it = next((i for i in self.items() if i.wielded), None)
         if it is None:
-            return None, 0
+            return None, 0, (0, 0)
         _, ench, name = base_name(it.text)
+        if "Excalibur" in it.text:
+            return "long sword", (ench or 0), EXCALIBUR_BONUS
         name = WEAPON_NAME_OF.get(name, name)
-        return (name if name in WEAPON_DICE else None), (ench or 0)
+        return (name if name in WEAPON_DICE else None), (ench or 0), (0, 0)
 
     def our_hit_prob(self, name):
         """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit > rnd(20)."""
@@ -171,23 +175,25 @@ class DangerMixin:
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
         abon = -2 if st < 6 else -1 if st < 8 else 0 if st < 17 else 1 if st <= 68 else 2 if st < 118 else 3
         abon += (1 if xl < 3 else 0) + (-3 if dx < 4 else -2 if dx < 6 else -1 if dx < 8 else 0 if dx < 14 else dx - 14)
-        w, ench = self.our_weapon()
+        w, ench, (hit_die, _) = self.our_weapon()
         tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
-        return min(max(tmp - 1, 0), 20) / 20
+        if not hit_die:
+            return min(max(tmp - 1, 0), 20) / 20
+        return sum(min(max(tmp + k - 1, 0), 20) for k in range(1, hit_die + 1)) / (20 * hit_die)   # + rnd(die)
 
     def our_damage_pmf(self, name):
-        """dmgval (small / large dice + enchantment) + dbon, at least 1."""
+        """dmgval (small / large dice + enchantment) + dbon, at least 1; plus an artifact's damage die."""
         pm = PM_BY_NAME[name]
         st = self.bl(nh.NLE_BL_STR125)
         dbon = -1 if st < 6 else 0 if st < 16 else 1 if st < 17 else 2 if st == 18 else 3 if st <= 93 \
             else 4 if st <= 108 else 5 if st < 118 else 6
-        w, ench = self.our_weapon()
+        w, ench, (_, dmg_die) = self.our_weapon()
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
         out = np.zeros(max(2, d + ench + dbon + 1))
         for v in range(1, d + 1):
             out[max(1, v + ench + dbon)] += base[v]
-        return out
+        return conv(out, dice_pmf(1, dmg_die)) if dmg_die else out
 
     def our_kill_prob(self, name, hits):
         """P(this attack kills it): it took `hits` hits of ours already and lives; its HP d(level, 8)."""
@@ -279,13 +285,14 @@ class DangerMixin:
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
         d(level, 8), minus what our hits on it so far took, drawn again while that would leave it dead. Others
-        joining the fight are not counted; a fight still on after max_turns counts as won."""
+        joining the fight are not counted; a fight still on after max_turns counts as won. adjacent: (pos, name);
+        pos None for a monster that isn't there yet (fountain_wish: the water demon a dip may bring)."""
         if not adjacent:
             return 1.0
         rng = self.win_rng
         hp0 = self.bl(nh.NLE_BL_HP)
         mons = []
-        for pos, name in sorted(adjacent, key=lambda t: self.mon_level(t[0])):
+        for pos, name in sorted(adjacent, key=lambda t: PM_BY_NAME[t[1]].mlevel if t[1] in PM_BY_NAME else 0):
             pm = PM_BY_NAME.get(name)
             if pm is None:
                 continue
