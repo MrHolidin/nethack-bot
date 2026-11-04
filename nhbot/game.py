@@ -266,6 +266,7 @@ class GameMixin:
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
         self.msg_survival(m)
+        self.msg_enchant(m)
         self.msg_combat(m)
         self.danger_msg(m)
         self.msg_peace(m, lv)

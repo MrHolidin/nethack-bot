@@ -25,8 +25,6 @@ DEFAULTS = {
                                #      win_prob) instead of HP < elb_hp
     "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
                                #      message (combat.RTHREAT_RE), else it doesn't
-    "no_altar_engrave": False, # A/B: the terrain under an item decides whether we may engrave there (an altar under
-                               #      an item: no Elbereth) (elbereth.can_engrave_here)
     "open_boxes": False,       # A/B: walk to boxes and chests, open them (the alternate dagger forces a lock, else
                                #      kicks) and take what we would take from the floor (nhbot.boxes)
     "box_dagger_any": False,   # A/B (with open_boxes): force a lock with any dagger we carry (known uncursed first),

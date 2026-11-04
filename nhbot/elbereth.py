@@ -99,10 +99,10 @@ class ElberethMixin:
         return _HANDLESS[form]
 
     def can_engrave_here(self, lv):
-        """What a player knows before trying: the square, and whether they have hands. no_altar_engrave: the
-        terrain under an item counts (an item lying on an altar hid it: Elbereth "written" on an altar angers its
-        god -- engrave.c altar_wrath -- and writes nothing)."""
-        g = int((self.terrain_glyphs(lv) if self.opts.no_altar_engrave else lv.under)[self.pos()])
+        """What a player knows before trying: the square, and whether they have hands. The terrain under an item
+        counts: an item lying on an altar hides it, and Elbereth "written" on an altar angers its god
+        (engrave.c altar_wrath) and writes nothing."""
+        g = int(self.terrain_glyphs(lv)[self.pos()])
         if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in NO_ENGRAVE_CMAP:
             return False
         return not self.handless()

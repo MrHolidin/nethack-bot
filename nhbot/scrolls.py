@@ -24,6 +24,7 @@ What a scroll asks (read.c seffects), answered in game.settle and read_scroll:
   detections      gold / food / magic mapping (detect.c browse_map): the cursor to look around, ESC
 """
 import re
+from collections import Counter
 
 import nle.nethack as nh
 
@@ -41,6 +42,11 @@ GENOCIDE_SPECIES = ("water nymph", "mountain nymph", "wood nymph")
 GENOCIDE_CLASS = ("n",)
 CHARGE_FIRST = ("sleep", "magic missile", "fire", "cold", "lightning", "striking", "digging")
 DISCO_SCROLL_RE = re.compile(r"scroll of ([a-z ]+?) \(")
+# read.c / wield.c: "Your <xname> [violently ]glow(s) <colour> for a moment|while[, then evaporate(s)]" (an
+# artifact by name: "Excalibur glows blue ...")
+ENCHANT_RE = re.compile(r"((?:Your )?[\w'-]+(?: [\w'-]+)*?) (violently )?glows? (silver|blue|black) for a (?:moment|while)"
+                        r"(,? (?:and )?then evaporates?)?")
+ENCHANT_LOG = 20
 
 
 class ScrollMixin:
@@ -50,6 +56,8 @@ class ScrollMixin:
         self.genocide_typed = set()      # names given to a genocide question (never twice)
         self.read_seq = 0                # msg_seq when the last read began
         self.force_read_log = None       # force_read: the read (state and what the game said), once done
+        self.enchant_stats = Counter()   # msg_enchant: what enchant armor / weapon did, from the game's words
+        self.enchant_log = []            # (turn, effect, item) of the first ENCHANT_LOG of them
 
     def sucker(self):
         """Visible dunce cap or a shirt with nothing over it: shopkeepers add 1/3."""
@@ -66,6 +74,24 @@ class ScrollMixin:
             return True
         post = self.price_of_text(s) if "labeled" in s else None
         return bool(post) and set(post) <= GOOD_TYPES
+
+    # ------------------------------------------------------------ what enchanting did
+    def msg_enchant(self, m):
+        """Count what enchant armor / enchant weapon did (read.c seffects, wield.c chwepon): +1 or more to a piece
+        of armor (silver) or the weapon (blue), -1 / a curse (black), a piece gone (evaporates), wasted (skin)."""
+        for mm in ENCHANT_RE.finditer(m):
+            item, colour, rest = re.sub(r"^Your ", "", mm.group(1)), mm.group(3), mm.group(4) or ""
+            if "evaporate" in rest:
+                effect = "evaporated"
+            elif colour == "black":
+                effect = "down"
+            else:
+                effect = "armor_up" if colour == "silver" else "weapon_up"
+            self.enchant_stats[effect] += 1
+            if len(self.enchant_log) < ENCHANT_LOG:
+                self.enchant_log.append((self.turn(), effect, item))
+        if "Your skin glows then fades" in m:
+            self.enchant_stats["skin"] += 1
 
     # ------------------------------------------------------------ what we know
     def known_scroll_types(self):
