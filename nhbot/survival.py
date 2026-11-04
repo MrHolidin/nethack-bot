@@ -19,7 +19,6 @@ from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE
 HORN_SICK = nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
 HORN_FIXES = HORN_SICK | nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU
 HORN_HARM = HORN_FIXES | nh.BL_MASK_DEAF
-MINOR_FIRST_PRAY = 250          # can_pray(minor): before the first prayer, turns until u.ublesscnt <= 100 (+50)
 ATTR_LOSS_RE = re.compile(r"You feel (?:weak|stupid|foolish|clumsy|fragile|repulsive)!")
 
 # eat.c newuhs: the status line by u.uhunger
@@ -46,8 +45,6 @@ class SurvivalMixin:
         self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
         self.horn_stats = Counter()
         self._nut_at = (0, NOT_HUNGRY)
-        self.punish_prayers = 0
-        self.is_punished = False
 
     def pray(self):
         self.cur_act = "pray"
@@ -65,26 +62,20 @@ class SurvivalMixin:
         div = 5 if rank <= 1 else 6 if rank <= 3 else 7 if rank <= 5 else 8 if rank <= 7 else 9
         return hp <= 5 or hp * div <= min(maxhp, 15 * xl)
 
-    def can_pray(self, hunger_emergency=None, weak=False, minor=False):
+    def can_pray(self, hunger_emergency=None, weak=False):
         # Weak/Fainting is major trouble (timeout <= 200 suffices); 500 turns after a prayer is ~88% safe.
         # A/B (1000 games): +273 [-1, +553], deaths while fainted 108 -> 76
-        # minor: a minor trouble (punishment) needs the timeout <= 100; too soon costs Luck -3 and angers the god
         if self.god_angry:
             return False
         t = self.turn()
         if self.last_pray is None:
-            return t > (MINOR_FIRST_PRAY if minor else 100)   # u.ublesscnt = 300 - (moves - 1)
+            return t > 100            # every caller is in major trouble: u.ublesscnt = 300 - (moves - 1) <= 200
         gap = t - self.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
         if weak:
             return gap > self.opts.hunger_gap
         return gap > self.opts.pray_gap
-
-    def punished(self):
-        """A ball and chain on us: from "You are being punished" (read.c punish: the scroll, an angry god) until
-        "Your chain disappears" (pray.c fix_worst_trouble)."""
-        return self.is_punished
 
     def edible_now(self, s):
         return not re.search(r"\btins?\b", s) and "corpse" not in s and "egg" not in s
@@ -305,10 +296,6 @@ class SurvivalMixin:
         # eat.c givit(POISON_RES): "You feel healthy."; eating poison while resistant: "You seem unaffected"
         if "You feel healthy" in m or "You seem unaffected by the poison" in m:
             self.poison_res = True
-        if "You are being punished" in m:
-            self.is_punished = True
-        if "Your chain disappears" in m:
-            self.is_punished = False
         if "more confident in your" in m:
             self.skill_msgs += 1
             self.want_enhance = True

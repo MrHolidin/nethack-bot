@@ -178,9 +178,6 @@ class PolicyMixin:
         if self.lycanthropy and self.can_pray() and \
                 not any(n.startswith("were") for _, n in self.visible_hostiles(c.lv)):
             self.pray(); return True           # not while a lycanthrope in view can bite us again right after
-        if self.punished() and self.can_pray(minor=True):
-            self.punish_prayers += 1
-            self.pray(); return True           # punishment is a minor trouble (pray.c TROUBLE_PUNISHED)
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
         if cond & deadly and not self.god_angry and self.turn() - (self.last_pray or -9999) > 2:
