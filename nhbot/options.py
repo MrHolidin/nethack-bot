@@ -30,8 +30,9 @@ DEFAULTS = {
     "wand_resist": False,      # A/B: no attack wand at a monster that resists it (combat.wand_resisted), not only the
                                #      sleep-resistant elves and zombies by name
     "no_zap_elbereth": False,  # A/B: no attack wand while we stand on Elbereth (the attack would erase it)
-    "wand_ev": False,          # A/B (with wand_pwin): a zap only when P(we win) with it as our next action -- its chance
-                               #      to hit and its damage (combat.wand_effect) -- beats fighting on; best zap first
+    "wand_ev": False,          # A/B (with wand_pwin): one fight -- adjacent hostiles and targets in line -- for every
+                               #      choice; a zap when that fight's P(we win) <= wand_pwin and P(we win) with the zap as
+                               #      our next action (its chance to hit, its damage: combat.wand_effect) is higher
     "wand_pwin": False,        # A/B: a number p: an attack wand when P(we win the fight) <= p, at the target whose removal
                                #      raises it most, instead of the HP / damage rule; a ray when P(it comes back and
                                #      hits us) < WAND_RAY_RISK instead of ray_safe (combat.wand_pwin_targets)

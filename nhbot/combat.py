@@ -445,12 +445,12 @@ class CombatMixin:
             self.zap_stats["held_elbereth"] += 1
             return False                         # attacking from Elbereth erases it (engrave.c u_wipe_engr)
         targets = self.wand_targets(lv, hostiles)
-        if self.opts.wand_pwin:
+        if self.opts.wand_pwin and not self.opts.wand_ev:
             targets = self.wand_pwin_targets(hostiles, list(targets))
         if self.opts.track_sleep:
             targets = sorted(targets, key=lambda t: self.asleep(lv, t[2]))     # the ones asleep last
         if self.opts.wand_ev:
-            pairs = self.wand_ev_pairs(lv, hostiles, targets, wands)
+            pairs = self.wand_ev_pairs(hostiles, list(targets), wands)
         else:
             pairs = ((t, letter, kind) for t in targets for letter, kind in wands)
         for (key, d, pos, (dy, dx), name, pwin, gain), letter, kind in pairs:
@@ -496,32 +496,33 @@ class CombatMixin:
                 continue
             yield key, d, pos, step, name, None, None
 
-    def wand_ev_pairs(self, lv, hostiles, targets, wands):
-        """wand_ev: (target, wand letter, kind) worth a zap, best first. P(we win) when our next action is this
-        zap (win_prob with the opening: its chance to take effect and its damage, wand_effect) against P(we win)
-        just fighting on; only a zap that raises it. Both from the same draws (the RNG state restored)."""
-        out, held = [], False
+    def wand_ev_pairs(self, hostiles, targets, wands):
+        """wand_ev: (target, wand letter, kind) worth a zap, best first. One fight for every choice: the adjacent
+        hostiles and every target in line. Fighting on (win_prob) against each zap as our next action (win_prob with
+        the opening: its chance to take effect and its damage, wand_effect), all from the same draws (the RNG state
+        restored). A zap only when that fight is at most wand_pwin, and only one that beats fighting on."""
+        fight = list(hostiles) + [(t[2], t[4]) for t in targets if (t[2], t[4]) not in hostiles]
+        if not targets:
+            return []
+        state = self.win_rng.bit_generator.state
+        p_fight = self.win_prob(fight)
+        if p_fight > self.opts.wand_pwin:
+            return []
         depth, xl = self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP)
+        out, seen = [], {}
         for t in targets:
-            pos, name = t[2], t[4]
-            fight = hostiles if (pos, name) in hostiles else hostiles + [(pos, name)]
-            state = self.win_rng.bit_generator.state
-            p_fight = self.win_prob(fight)
-            seen = {}
             for letter, kind in wands:
-                if kind not in seen:
-                    p_eff, dmg = wand_effect(kind, name, depth, xl)
+                if (t[2], kind) not in seen:
+                    p_eff, dmg = wand_effect(kind, t[4], depth, xl)
                     self.win_rng.bit_generator.state = state
-                    seen[kind] = self.win_prob(fight, opening=(pos, p_eff, dmg)) if p_eff > 0 else 0.0
-                if seen[kind] > p_fight:
-                    out.append((seen[kind], (t[0], t[1], t[2], t[3], t[4], p_fight, seen[kind] - p_fight),
-                                letter, kind))
-                else:
-                    held = True
-        if held and not out:
+                    seen[(t[2], kind)] = self.win_prob(fight, opening=(t[2], p_eff, dmg)) if p_eff > 0 else 0.0
+                p = seen[(t[2], kind)]
+                if p > p_fight:
+                    out.append((p, (t[0], t[1], t[2], t[3], t[4], p_fight, p - p_fight), letter, kind))
+        if not out:
             self.zap_stats["held_ev"] += 1
         out.sort(key=lambda e: -e[0])
-        return [(t, letter, kind) for _, t, letter, kind in out]
+        return [(tt, letter, kind) for _, tt, letter, kind in out]
 
     def wand_pwin_targets(self, hostiles, targets):
         """wand_pwin (a threshold): the targets in line worth a charge, best first. A target is worth one
