@@ -1,5 +1,7 @@
-"""Large boxes and chests (open_boxes, A/B): walk to the ones we saw (an explore goal, kind "box"), and with no
-hostile in view open them and take out what the floor rules would take (pickup.take_reason).
+"""Large boxes and chests: walk to the ones we saw (an explore goal, kind "box"), and with no hostile in view open
+them and take out what the floor rules would take (pickup.take_reason). A/B open_boxes (with the pause), seeds
+72000 over base_k: score +1597 [+394, +2779], max_depth +0.1 [-0.1, +0.4]; seeds 71000 over base_i (before wand
+identification): score -434 [-1737, +885].
 
 NetHack 3.6.6 facts (mkobj.c, lock.c, dokick.c, trap.c):
   contents     chest 0..5 random objects (0..7 if locked), large box 0..3 (0..5)
@@ -48,8 +50,6 @@ class BoxMixin:
     # ------------------------------------------------------------------ goal
     def box_targets(self, lv):
         """Remembered boxes not done yet, outside shops (goals.goal_raw / goal_masks, kind "box")."""
-        if not self.opts.open_boxes:
-            return np.zeros(lv.under.shape, dtype=bool)
         m = BOX_GLYPH[lv.under] & ~lv.shop
         for p in self.goal_closed_set("box", lv.key):
             m[p] = False
@@ -85,8 +85,6 @@ class BoxMixin:
     def box_step(self, lv):
         """Housekeeping (no hostile in view): open the box under us, or go on kicking one open. True if it
         used the turn."""
-        if not self.opts.open_boxes:
-            return False
         if self.box_kick is not None:
             return self.box_kick_step(lv)
         pos = self.pos()

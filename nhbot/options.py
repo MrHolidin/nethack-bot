@@ -27,9 +27,7 @@ DEFAULTS = {
                                #      message (combat.RTHREAT_RE), else it doesn't
     "shk_marks_shop": False,   # A/B: standing in an unmarked room with a shopkeeper in view marks it as a shop
                                #      (mapmem.shop_from_keeper)
-    "open_boxes": False,       # A/B: walk to boxes and chests, open them (the alternate dagger forces a lock, else
-                               #      kicks) and take what we would take from the floor (nhbot.boxes)
-    "box_dagger_any": False,   # A/B (with open_boxes): force a lock with any dagger we carry (known uncursed first),
+    "box_dagger_any": False,   # A/B: force a lock with any dagger we carry (known uncursed first),
                                #      not only the alternate weapon (nhbot.boxes.box_opener)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
