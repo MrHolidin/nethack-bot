@@ -199,6 +199,7 @@ class PriceMemoryMixin:
         if rid not in bucket:
             bucket[rid] = r
             self.price_stats[kind] += 1
+            self.type_version += 1           # value.type_posterior reads the price readings
 
     def price_note_text(self, text):
         """Any text with price tags (look_here lines, 'You see here ...' messages)."""

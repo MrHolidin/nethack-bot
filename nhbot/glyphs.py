@@ -74,6 +74,10 @@ TERRAIN = np.array([bool(nh.glyph_is_cmap(g)) for g in range(N)])   # dungeon fe
                                                                       # stairs, traps, fountains, altars ...
 COVERED_KINDS = (OBJECT, CORPSE, GOLD)    # what lies on a square and hides the terrain under it
 TERRAIN_KINDS = (TRAP, UPSTAIR, DOWNSTAIR, DOOR_OPEN, DOOR_CLOSED, DOORWAY, LIQUID)   # worth knowing under an item
+IS_COVERED = np.zeros(256, dtype=bool)
+IS_COVERED[list(COVERED_KINDS)] = True
+IS_TERRAIN = np.zeros(256, dtype=bool)
+IS_TERRAIN[list(TERRAIN_KINDS)] = True
 
 TRANSIENT = np.zeros(N, dtype=bool)
 TRANSIENT[(KIND == MONSTER) | (KIND == PET) | (KIND == INVIS) | (KIND == EFFECT)] = True

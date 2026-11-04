@@ -151,7 +151,7 @@ class MapMixin:
         corpses) read the top glyph, lv.under, instead."""
         k = G.KIND[lv.under]
         tk = G.KIND[lv.terrain]
-        hidden = np.isin(k, G.COVERED_KINDS) & np.isin(tk, G.TERRAIN_KINDS)
+        hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
         if hidden.any():
             # nothing lies on a closed door: an item there means it was opened or broken since we saw it
             tk = np.where(tk == G.DOOR_CLOSED, G.DOOR_OPEN, tk)

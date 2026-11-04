@@ -48,17 +48,21 @@ for _i in range(nh.NUM_OBJECTS):
 class ValueMixin:
     def value_init(self):
         self.known_types = set()     # (class, name) seen identified in our inventory this game
-        self._known_at = -1
+        self._known_inv = None       # the inventory note_known_types last read
+        self.type_version = 0        # bumped whenever what type_posterior reads changes
+        self._post_memo = {}         # text -> (type_version, posterior)
 
     def note_known_types(self):
-        if self._known_at == self.steps:
-            return
-        self._known_at = self.steps
+        inv = self.inventory()
+        if inv == self._known_inv:
+            return                   # the same inventory adds nothing new
+        self._known_inv = inv
         for it in self.items():
             if appearance(it.text) is None and (it.ocls in RANDOM_CLASSES or it.ocls in (nh.ARMOR_CLASS, nh.TOOL_CLASS)):
                 key = describe(it.ocls, it.text)["key"]
-                if key in TYPE_PROB:
+                if key in TYPE_PROB and key not in self.known_types:
                     self.known_types.add(key)
+                    self.type_version += 1
 
     def type_posterior(self, text):
         """{type: probability} for an unidentified appearance, None for an identified item (or no look)."""
@@ -66,6 +70,14 @@ class ValueMixin:
         if key is None:
             return None
         self.note_known_types()
+        memo = self._post_memo.get(text)
+        if memo is not None and memo[0] == self.type_version:
+            return dict(memo[1])
+        post = self._type_posterior(key)
+        self._post_memo[text] = (self.type_version, post)
+        return dict(post)
+
+    def _type_posterior(self, key):
         cands = [n for n in candidates(key) if (_cls_of(n, key), n) not in self.known_types] or list(candidates(key))
         engraved = self.wand_engraved.get(key)              # wandid: the engraving test narrowed the types
         if engraved:

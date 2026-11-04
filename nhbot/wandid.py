@@ -98,6 +98,7 @@ class WandIdMixin:
         now = next((i for i in self.items() if i.letter == it.letter), None)
         if now is None or appearance(now.text) != key:
             self.wand_engraved[key] = frozenset()        # identified by the game (or gone)
+            self.type_version += 1
             self.wandid_stats["named_by_game"] += 1
             return True
         if WORN_OUT_RE.search(msgs):
@@ -105,5 +106,6 @@ class WandIdMixin:
             return True                                  # tested again once recharged? no: empty stays empty
         found = next((s for rx, s in RESULTS if rx.search(msgs)), None)
         self.wand_engraved[key] = found if found is not None else NO_MESSAGE
+        self.type_version += 1
         self.wandid_stats["msg" if found is not None else "no_msg"] += 1
         return True

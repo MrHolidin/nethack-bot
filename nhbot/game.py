@@ -190,9 +190,13 @@ class GameMixin:
         return self._inv
 
     def items(self):
-        """The inventory as Items (nhbot.items), parsed once per observation."""
+        """The inventory as Items (nhbot.items): a fresh list each observation, parsed again only when the
+        inventory changed."""
         if self._items_at != self.steps:
-            self._items = [parse_item(l, c, s) for l, c, s in self.inventory()]
+            inv = self.inventory()
+            if inv != self._items_inv:
+                self._items_parsed, self._items_inv = [parse_item(l, c, s) for l, c, s in inv], inv
+            self._items = list(self._items_parsed)
             self._items_at = self.steps
         return self._items
 

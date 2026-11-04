@@ -99,6 +99,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.asked = ""          # game.ask: the last question's message
         self.really_attacks = 0   # "Really attack?" questions (answered no)
         self._items, self._items_at = [], -1
+        self._items_parsed, self._items_inv = [], None
         self._inv, self._inv_at = (), -1
         self.msg_audit = Counter()  # cases where message reading may go wrong (game.audit, pickup, ...)
         self.here_window = None   # (turn, pos, text) of the last 'Things that are here' window
