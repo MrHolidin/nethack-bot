@@ -8,9 +8,10 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.items import WAND_SPENT_RE
-from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS, ray_squares
+from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
 from nhbot.goals import GOALS
-from nhbot.monsters import RANGED_TARGETS, permonst_of
+from nhbot.monattacks import ATTACKS
+from nhbot.monsters import PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
 from nhbot.rays import TERRAIN_CODE, our_protection, ray_harm, self_hit_prob
@@ -31,6 +32,10 @@ RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bou
 BEAM_WANDS = ("striking",)                                            # no bounce
 
 
+SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
+SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
+MR_BIT = {"sleep": 0x04, "fire": 0x01, "cold": 0x02, "lightning": 0x10}    # monst.c mresists: MR_SLEEP, ...
+_PM_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WAND_RAY_RISK = 0.1        # wand_pwin: ... and a ray when P(it comes back and hits us) is below this
 SAFE_RAY_DIST = 7          # ray range is rn1(7, 7) = 7..13: a wall >= 7 away can't bounce it back onto us
 
@@ -56,12 +61,28 @@ RTHREAT_RE = re.compile(r"(?:throws|shoots) |zaps (?:a|an|the) |You are (?:almos
 RTRAP_RE = re.compile(r"trap|shoots out at you|falls on your head|from the ceiling")
 
 
+def wand_resisted(kind, name):
+    """wand_resist: does a monster of this kind shrug off this attack wand? sleep / fire / cold / lightning:
+    its intrinsic resistance (mresists); magic missile and striking: magic resistance -- mondata.c resists_magm:
+    a magic-missile or random-breath attack, or a baby gray dragon (what it wears is not seen)."""
+    pm = PM_BY_NAME.get(name)
+    if pm is None:
+        return False
+    if kind in MR_BIT:
+        return bool(pm.mresists & MR_BIT[kind])
+    if kind in ("magic missile", "striking"):
+        return name == "baby gray dragon" or any(a[1] in ("MAGM", "RBRE") for a in ATTACKS[_PM_INDEX[name]])
+    return False
+
+
 class CombatMixin:
     def combat_init(self):
         self.kill_by = Counter()       # our kills, by kind
         self.zaps = 0
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
+        self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)
+        self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # wand_pwin: (turn, target, distance, wand, P(win), gain, P(ray back), HP)
         self.empty_wands = set()       # Item.key of wands that said "Nothing happens" / "You wrest"
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
@@ -347,18 +368,53 @@ class CombatMixin:
         if "Nothing happens" in msgs or "You wrest" in msgs:
             self.empty_wands.add(wand.key)
         self.zaps += 1
+        self.note_slept(key, msgs)
         return True
+
+    def note_slept(self, key, msgs):
+        """Our zap in direction key put these to sleep ("The sleep ray hits the X"): remember the monsters of
+        those names on the ray's straight path (asleep)."""
+        names = set(SLEEP_HIT_RE.findall(msgs))
+        if not names or key not in DIRS:
+            return
+        lv = self.level()
+        y, x = self.pos()
+        g = self.obs["glyphs"]
+        for sq in ray_squares(y, x, *DIRS[key], n=13):
+            if G.KIND[g[sq]] == G.MONSTER and G.monster_name(int(g[sq])) in names:
+                self.slept[(lv.key, sq)] = (self.turn(), G.monster_name(int(g[sq])))
+                self.zap_stats["slept"] += 1
+
+    def asleep(self, lv, pos):
+        """A sleep ray of ours hit the monster at pos less than SLEPT_TURNS ago and it is still there."""
+        v = self.slept.get((lv.key, pos)) if pos is not None else None
+        if v is None or self.turn() - v[0] >= SLEPT_TURNS:
+            return False
+        g = int(self.obs["glyphs"][pos])
+        return G.KIND[g] == G.MONSTER and G.monster_name(g) == v[1]
 
     def wand_step(self, lv, hostiles):
         wands = self.attack_wands()
         if not wands:
             return False
+        if self.opts.no_zap_elbereth and (self.pos() in lv.elbereth or self.elb_state is not None):
+            self.zap_stats["held_elbereth"] += 1
+            return False                         # attacking from Elbereth erases it (engrave.c u_wipe_engr)
         targets = self.wand_targets(lv, hostiles)
         if self.opts.wand_pwin:
             targets = self.wand_pwin_targets(hostiles, list(targets))
+        if self.opts.track_sleep:
+            targets = sorted(targets, key=lambda t: self.asleep(lv, t[2]))     # the ones asleep last
         for key, d, pos, (dy, dx), name, pwin, gain in targets:
             for letter, kind in wands:
-                if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
+                if self.opts.track_sleep and kind == "sleep" and self.asleep(lv, pos):
+                    self.zap_stats["held_asleep"] += 1
+                    continue                     # asleep already
+                if self.opts.wand_resist:
+                    if wand_resisted(kind, name):
+                        self.zap_stats["held_resist"] += 1
+                        continue
+                elif kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
                 p_back = None
                 if kind not in RAY_WANDS:

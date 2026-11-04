@@ -286,9 +286,13 @@ class PolicyMixin:
         """Attack the weakest-looking (lowest level) adjacent hostile; focus: Smith's rule among several."""
         if not c.hostiles:
             return False
-        target = min(c.hostiles, key=lambda t: self.mon_level(t[0]))[0]
-        if len(c.hostiles) > 1:
-            target = self.focus_target(c.hostiles, target)
+        cands = c.hostiles
+        if self.opts.track_sleep:
+            awake = [t for t in cands if not self.asleep(c.lv, t[0])]
+            cands = awake or cands               # one put to sleep comes after every awake one
+        target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
+        if len(cands) > 1:
+            target = self.focus_target(cands, target)
         self.attack(target)
         return True
 

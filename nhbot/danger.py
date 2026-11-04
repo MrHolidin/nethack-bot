@@ -287,6 +287,8 @@ class DangerMixin:
         d(level, 8), minus what our hits on it so far took, drawn again while that would leave it dead. Others
         joining the fight are not counted; a fight still on after max_turns counts as won. adjacent: (pos, name);
         pos None for a monster that isn't there yet (the water demon a dip may bring)."""
+        if self.opts.track_sleep and self.cur_key is not None and self.cur_key in self.levels:
+            adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
             return 1.0
         rng = self.win_rng
