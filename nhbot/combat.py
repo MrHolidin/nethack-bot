@@ -119,7 +119,6 @@ class CombatMixin:
         self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # wand_pwin: (turn, target, distance, wand, P(win), gain, P(ray back), HP)
-        self.empty_wands = set()       # Item.key of wands that said "Nothing happens" / "You wrest"
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
     def attack(self, target):
@@ -371,10 +370,6 @@ class CombatMixin:
         self.hunt = None
         return False
 
-    def wand_spent(self, it):
-        """A wand we know is empty: its charges show (n:0) / (n:-1), or zapping it did nothing."""
-        return it.ocls == nh.WAND_CLASS and (it.key in self.empty_wands or bool(WAND_SPENT_RE.search(it.text)))
-
     def attack_wands(self):
         out = []
         for it in self.items():
@@ -400,8 +395,7 @@ class CombatMixin:
         else:
             self.settle()
         msgs = self.text_since(seq0)
-        if "Nothing happens" in msgs or "You wrest" in msgs:
-            self.empty_wands.add(wand.key)
+        self.note_wand_use(wand, msgs)                   # charges.py
         self.zaps += 1
         self.note_slept(key, msgs)
         return True
@@ -508,10 +502,10 @@ class CombatMixin:
         out, seen = [], {}
         for t in targets:
             for letter, kind in wands:
-                if (t[3], kind) not in seen:
+                if (t[3], letter) not in seen:
                     self.win_rng.bit_generator.state = state
-                    seen[(t[3], kind)] = self.win_prob(fight, opening=self.zap_opening(lv, t[3], kind, letter, fight))
-                p = seen[(t[3], kind)]
+                    seen[(t[3], letter)] = self.win_prob(fight, opening=self.zap_opening(lv, t[3], kind, letter, fight))
+                p = seen[(t[3], letter)]
                 if p > p_fight:
                     out.append((p, (t[0], t[1], t[2], t[3], t[4], p_fight, p - p_fight), letter, kind))
         if not out:
@@ -548,8 +542,12 @@ class CombatMixin:
         resisted = RAY_RESIST.get("death" if maybe_death else kind) in prot
         our_dmg = dice_pmf(RAY_DICE[kind][0], 6) if kind in RAY_DICE and not resisted else None
 
+        p_charged = self.wand_p_charged(it) if it is not None else 0.0
+
         def opening(rng, alive_at, apply):
             got = {"dmg": 0, "sleep": 0}
+            if rng.random() >= p_charged:
+                return 0, 0                               # "Nothing happens"
 
             def hit(pos):
                 if pos == (y0, x0):

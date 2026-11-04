@@ -94,13 +94,13 @@ class WandIdMixin:
         self.wandid_stats["tests"] += 1
         self.engrave(it.letter, "x")
         msgs = self.text_since(seq0)
+        self.note_wand_use(it, msgs)                     # charges.py: a charge used, or it is spent
         now = next((i for i in self.items() if i.letter == it.letter), None)
         if now is None or appearance(now.text) != key:
             self.wand_engraved[key] = frozenset()        # identified by the game (or gone)
             self.wandid_stats["named_by_game"] += 1
             return True
         if WORN_OUT_RE.search(msgs):
-            self.empty_wands.add(now.key)
             self.wandid_stats["empty"] += 1
             return True                                  # tested again once recharged? no: empty stays empty
         found = next((s for rx, s in RESULTS if rx.search(msgs)), None)

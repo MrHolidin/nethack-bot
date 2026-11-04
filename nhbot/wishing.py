@@ -125,6 +125,7 @@ class WishMixin:
         self.press(wand.letter)                 # settle answers the wish
         msgs = self.text_since(seq0)
         self.wish_stats["wand_zaps"] += 1
-        if "Nothing happens" in msgs or "You wrest" in msgs or not re.search(r"wish", msgs):
-            self.empty_wands.add(wand.key)
+        self.note_wand_use(wand, msgs)                   # charges.py
+        if not re.search(r"wish", msgs):
+            self.wand_rec(wand)["empty"] = True
         return True

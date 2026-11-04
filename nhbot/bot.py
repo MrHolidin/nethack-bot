@@ -16,6 +16,7 @@ from nhbot.excalibur import ExcaliburMixin
 from nhbot.explore import ExploreMixin
 from nhbot.focus import FocusMixin
 from nhbot.game import GameMixin, GameOver
+from nhbot.charges import WandChargeMixin
 from nhbot.goals import GoalsMixin
 from nhbot.mapmem import MapMixin
 from nhbot.nav import NavMixin
@@ -45,7 +46,7 @@ MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS,
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
-          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin):
+          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin):
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
         """role_opts and any other keyword arguments are options (options.py); unknown names raise."""
@@ -176,6 +177,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.carry_init()
         self.price_init()
         self.wandid_init()
+        self.charges_init()
         self.danger_init()
         self.tins_init()
         self.altar_init()
