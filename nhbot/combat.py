@@ -31,7 +31,6 @@ RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bou
 BEAM_WANDS = ("striking",)                                            # no bounce
 
 
-WAND_PWIN = 0.5            # wand_pwin: zap when P(we win the fight) is below this
 WAND_RAY_RISK = 0.1        # wand_pwin: ... and a ray when P(it comes back and hits us) is below this
 SAFE_RAY_DIST = 7          # ray range is rn1(7, 7) = 7..13: a wall >= 7 away can't bounce it back onto us
 
@@ -63,7 +62,7 @@ class CombatMixin:
         self.zaps = 0
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
-        self.wand_pwin_log = []          # wand_pwin: (turn, target, distance, wand, P(win), P(ray back), HP) per zap
+        self.wand_pwin_log = []          # wand_pwin: (turn, target, distance, wand, P(win), gain, P(ray back), HP)
         self.empty_wands = set()       # Item.key of wands that said "Nothing happens" / "You wrest"
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
@@ -354,19 +353,10 @@ class CombatMixin:
         wands = self.attack_wands()
         if not wands:
             return False
-        for key, d, pos, (dy, dx), name in self.line_targets(lv, max_d=6):
-            if d == 1 and pos not in [p for p, _ in hostiles]:
-                continue
-            pwin = None
-            if self.opts.wand_pwin:
-                # wand_pwin: worth a charge when the fight with the adjacent ones and this one is likely lost
-                pwin = self.win_prob(hostiles if (pos, name) in hostiles else hostiles + [(pos, name)])
-                if pwin >= WAND_PWIN:
-                    continue
-            elif not self.worth_special(pos, name):
-                continue
-            if d > 1 and self.peaceful_now(lv, pos, far=True):
-                continue
+        targets = self.wand_targets(lv, hostiles)
+        if self.opts.wand_pwin:
+            targets = self.wand_pwin_targets(hostiles, list(targets))
+        for key, d, pos, (dy, dx), name, pwin, gain in targets:
             for letter, kind in wands:
                 if kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
                     continue                     # sleep resistant
@@ -385,11 +375,37 @@ class CombatMixin:
                 self.cur_act = "fight"
                 self.last_attack_target = pos
                 if pwin is not None and len(self.wand_pwin_log) < 30:
-                    self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2),
+                    self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2),
                                                None if p_back is None else round(p_back, 3),
                                                f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
                 return self.zap(letter, key)
         return False
+
+    def wand_targets(self, lv, hostiles):
+        """Hostiles in a line within 6 we may zap, nearest first (a generator: the peaceful check looks only as
+        far as needed); without wand_pwin only those worth_special."""
+        for key, d, pos, step, name in self.line_targets(lv, max_d=6):
+            if d == 1 and pos not in [p for p, _ in hostiles]:
+                continue
+            if not self.opts.wand_pwin and not self.worth_special(pos, name):
+                continue
+            if d > 1 and self.peaceful_now(lv, pos, far=True):
+                continue
+            yield key, d, pos, step, name, None, None
+
+    def wand_pwin_targets(self, hostiles, targets):
+        """wand_pwin (a threshold): the targets in line worth a charge, best first. A target is worth one
+        when P(we win the fight) -- with the adjacent hostiles and it -- is at most the threshold; best is the one
+        whose removal raises that P the most (win_prob without it)."""
+        out = []
+        for key, d, pos, step, name, _, _ in targets:
+            fight = hostiles if (pos, name) in hostiles else hostiles + [(pos, name)]
+            pwin = self.win_prob(fight)
+            if pwin > self.opts.wand_pwin:
+                continue
+            gain = self.win_prob([t for t in fight if t != (pos, name)]) - pwin
+            out.append((key, d, pos, step, name, pwin, gain))
+        return sorted(out, key=lambda t: -t[6])
 
     def ray_risk(self, lv, step, kind, letter):
         """(P(our ray of `kind` fired along `step` comes back and hits us), what that hit would do) -- nhbot.rays.
