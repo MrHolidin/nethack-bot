@@ -231,7 +231,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         """State every SNAP_EVERY turns (stats "snaps"): to see where two runs of one seed part, and in what."""
         magic = [it for it in self.items() if it.ocls in MAGIC_CLASSES]
         unknown = sum(1 for it in magic if appearance(it.text) is not None)
-        return {"t": self.turn(), "dlvl": self.bl(nh.NLE_BL_DEPTH), "max_depth": self.max_depth,
+        return {"t": self.turn(), "dlvl": self.bl(nh.NLE_BL_DEPTH), "dnum": self.bl(nh.NLE_BL_DNUM),
+                "max_depth": self.max_depth,
                 "xl": self.bl(nh.NLE_BL_XP), "hp": self.bl(nh.NLE_BL_HP), "maxhp": self.bl(nh.NLE_BL_HPMAX),
                 "ac": self.bl(nh.NLE_BL_AC), "gold": self.bl(nh.NLE_BL_GOLD),
                 "pet": self.turn() - self.pet_last_seen <= 100, "magic_known": len(magic) - unknown,
@@ -297,7 +298,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "pet_last_seen": self.pet_last_seen,
             "time_by": self.time_by,
             "levels_seen": len(self.levels),
-            "level_stats": [dict(key=list(k), turns=v.turns_here, search=v.search_turns,
+            "level_stats": [dict(key=list(k), entered=v.entered_turn, xl=v.entered_xl, turns=v.turns_here,
+                                 search=v.search_turns,
                                  down_known=bool((G.KIND[v.under] == G.DOWNSTAIR).any()),
                                  mines_branch=bool(v.avoid_down), desperate=v.desperate,
                                  seen=int(v.seen.sum()))

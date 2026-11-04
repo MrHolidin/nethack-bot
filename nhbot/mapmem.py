@@ -83,6 +83,7 @@ class Level:
         self.last_progress = 0
         self.last_reset = 0   # downstairs leading into the Gnomish Mines
         self.entered_turn = None
+        self.entered_xl = None     # experience level at the first arrival (stats)
         self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.elbereth = set()     # positions where we engraved
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
@@ -103,6 +104,7 @@ class MapMixin:
         if lv is None:
             lv = self.levels[key] = Level(key)
             lv.entered_turn = self.turn()
+            lv.entered_xl = self.bl(nh.NLE_BL_XP)
         return lv
 
     def update_memory(self):
