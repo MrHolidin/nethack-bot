@@ -372,7 +372,7 @@ class PolicyMixin:
                 return True
             if self.shop_step(lv):
                 return True
-            if self.excal_step(lv) or self.fountain_wish_step(lv) or self.fountain_neutral_step(lv):
+            if self.excal_step(lv) or self.fountain_wish_step(lv) or self.fountain_dip_step(lv):
                 return True
             if self.loot_step(lv):
                 return True

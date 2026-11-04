@@ -17,8 +17,9 @@ DEFAULTS = {
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
     "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
-    "fountain_neutral": False, # A/B: not lawful: dip a cursed thing we wear into fountains (uncurse 4/30), else a
-                               #      thing we don't need while P(we beat a water demon) > 70% (nhbot.excalibur)
+    "fountain_dip": False,     # A/B: above dungeon level 20: dip a cursed thing we wear into fountains (uncurse
+                               #      4/30); not lawful, else a thing we don't need while P(we beat a water demon)
+                               #      > 70% (nhbot.excalibur)
     "nymph_wands": False,      # A/B: attack wands at thieves in line (sleep first); a ray only when P(it comes back
                                #      and hits us) < 10% (nhbot.rays)
     "elb_pwin": False,         # A/B: write Elbereth when P(we win the fight with the adjacent ones) < 50% (danger.py
