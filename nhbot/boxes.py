@@ -29,6 +29,7 @@ for _i in range(nh.NUM_OBJECTS):
 BOX_TRIES = 12                   # actions on one box (loot, force, kick) before giving it up
 FAILED_TRIES = 3                 # loot attempts that ended in neither contents nor a lock before giving up
 FORCE_TRIES = 2                  # #force attempts (50 turns at most each) before kicking instead
+BOX_PAUSE = 300                  # turns a level's boxes are no goal after a hostile showed up on the way
 KICK_TRIES = 12                  # kicks (the lock gives 1 in 5)
 KICK_FROM = (G.FLOOR, G.TRAP, G.DOWNSTAIR, G.UPSTAIR, G.OBJECT, G.GOLD, G.CORPSE)   # squares we kick from
 NO_ACT = nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU | nh.BL_MASK_LEV
@@ -41,6 +42,8 @@ class BoxMixin:
         self.box_forces = Counter()      # (level key, square) -> #force attempts on that box
         self.box_fails = Counter()       # (level key, square) -> loot attempts that got neither contents nor a lock
         self.box_kick = None             # (level key, box square): kicking it open from next to it
+        self.box_paused = {}             # (level key, square) -> turn: not a goal until then (box_pause)
+        self.box_chase_turn = -1         # last turn we walked toward a box
 
     # ------------------------------------------------------------------ goal
     def box_targets(self, lv):
@@ -50,7 +53,28 @@ class BoxMixin:
         m = BOX_GLYPH[lv.under] & ~lv.shop
         for p in self.goal_closed_set("box", lv.key):
             m[p] = False
+        t = self.turn()
+        for (key, p), until in self.box_paused.items():
+            if key == lv.key and t < until:
+                m[p] = False
         return m
+
+    def box_goal_mask(self, lv, passable):
+        """goals.goal_masks, kind "box": the boxes to walk to now. Only with no hostile in view (the gate of
+        box_step); and when one shows up while we were on our way to a box, the level's boxes stop being
+        goals for BOX_PAUSE turns -- else we walk in, see it, turn away, lose sight of it and walk in again
+        (sleeping graveyard undead do not come to fight)."""
+        box = self.box_targets(lv)
+        if not box.any():
+            return box
+        if self.view_threats(lv):
+            if self.turn() - self.box_chase_turn <= 2:
+                until = self.turn() + BOX_PAUSE
+                for p in zip(*np.nonzero(box)):
+                    self.box_paused[(lv.key, (int(p[0]), int(p[1])))] = until
+                self.box_stats["paused"] += 1
+            return np.zeros_like(box)
+        return box & passable
 
     def box_done(self, lv, pos, why):
         self.box_stats[why] += 1

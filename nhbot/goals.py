@@ -67,6 +67,8 @@ class GoalsMixin:
 
     def goal_chase(self, kind):
         self.chasing = kind
+        if kind == "box":
+            self.box_chase_turn = self.turn()
 
     # ------------------------------------------------------------------ explore tier
     def goal_raw(self, kind, lv):
@@ -169,9 +171,8 @@ class GoalsMixin:
                 pile |= ct & im
         out["pile"] = pile
         out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
-        # boxes: opened by housekeeping, so only with no hostile in view (its gate)
-        box = self.box_targets(lv)
-        out["box"] = box & passable if box.any() and not self.view_threats(lv) else np.zeros_like(gold)
+        # boxes: opened by housekeeping, so only with no hostile in view (its gate; boxes.box_goal_mask)
+        out["box"] = self.box_goal_mask(lv, passable)
         return out
 
     def goal_summary(self):
