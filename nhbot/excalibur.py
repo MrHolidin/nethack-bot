@@ -211,10 +211,10 @@ class ExcaliburMixin:
             return self.dip_at_fountain(lv, fmask, it.letter, "fountain_uncurse")
         if self.bl(nh.NLE_BL_DEPTH) >= FOUNTAIN_DIP_DEPTH or hp < maxhp:
             return False
-        if lawful:
+        if lawful and not self.opts.wish_junk:
             it = next((i for i in self.items() if "Excalibur" in i.text and i.wielded), None)
         else:
-            it = self.junk_to_dip()
+            it = self.junk_to_dip()               # wish_junk: the lawful too (a dip may curse what it dips)
         if it is None or self.demon_win_prob() <= DEMON_WIN:
             return False                          # the demon a dip may bring could kill us (danger.win_prob)
         return self.dip_at_fountain(lv, fmask, it.letter, "fountain_wish")
