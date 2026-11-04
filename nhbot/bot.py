@@ -126,6 +126,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.hist = deque()
         self.no_eat_until = 0
         self.shops_seen = 0
+        self.shops_from_keeper = 0   # mapmem.shop_from_keeper: shops marked from a shopkeeper in view
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
         self.desperations = 0
         self.vault_drop = False
@@ -313,7 +314,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "ac": self.bl(nh.NLE_BL_AC),
             "worn": [e[2] for e in self.equip_events if e[1] == "wear"],
             "equip_fail": sum(1 for e in self.equip_events if e[1] == "fail"),
-            "shops": self.shops_seen,
+            "shops": self.shops_seen, "shops_from_keeper": self.shops_from_keeper,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "vault": [self.vault_drops, self.vault_moves],

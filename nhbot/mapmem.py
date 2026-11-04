@@ -56,6 +56,9 @@ TRAP_MSGS = (("bear", ("A bear trap closes on your foot", "You are caught in a b
              ("web", ("You stumble into a spider web", "You are stuck to the web"),
               ("You disentangle yourself", "You tear through", "cuts through the web")))
 
+SHOP_MAX = 150                   # shk_marks_shop: a shop room is no bigger than this
+
+
 class Level:
     def __init__(self, key):
         self.key = key
@@ -133,6 +136,8 @@ class MapMixin:
             # visit) locked us in, since shop squares are impassable from outside. Next to the shop and
             # neither door nor corridor means inside it.
             lv.shop[y, x] = True
+        if self.opts.shk_marks_shop:
+            self.shop_from_keeper(lv)
         self.max_depth = max(self.max_depth, self.bl(nh.NLE_BL_DEPTH))
         pc = int(lv.seen.sum()) + int((lv.visited > 0).sum())
         if pc > lv.progress_count:
@@ -176,14 +181,43 @@ class MapMixin:
             p[y, x] = False
         return p
 
-    def mark_shop(self, lv, door):
-        g = lv.under.copy()
-        g[self.pos()] = g[self.pos()]
-        corridor = set(CORRIDOR_GLYPHS)
+    def shop_floor(self, lv):
+        """Squares that can be shop floor: room floor (or what lies on it), not corridor, not a door."""
+        g = lv.under
         k = G.KIND[g]
-        inside_ok = np.isin(k, [G.FLOOR, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP, G.BOULDER]) & \
-            ~np.isin(g, list(corridor))
-        inside_ok &= ~lv.door_seen                  # a door under an item is not shop floor
+        ok = np.isin(k, [G.FLOOR, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP, G.BOULDER]) & ~np.isin(g, list(CORRIDOR_GLYPHS))
+        return ok & ~lv.door_seen                   # a door under an item is not shop floor
+
+    def shop_from_keeper(self, lv):
+        """shk_marks_shop: we stand in an unmarked room with a shopkeeper in view -- a shop we got into without
+        the greeting at its door (a mimic in the doorway, a fall, a teleport): mark the room, as mark_shop does
+        from the door. Only from inside (marked squares are closed to us from outside, and from the door the
+        greeting does it), only a closed room of at most SHOP_MAX squares with the shopkeeper in it."""
+        me = self.pos()
+        if lv.shop[me] or lv.door_seen[me]:
+            return
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        keepers = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "shopkeeper"]
+        if not keepers:
+            return
+        ok = self.shop_floor(lv)
+        ok[me] = True
+        for p in keepers:
+            ok[p] = True
+        room = self._flood(ok, [me], cap=SHOP_MAX + 1)
+        if len(room) > SHOP_MAX or not any(p in room for p in keepers):
+            return
+        k = self.kinds(lv)
+        for cy, cx in room:                         # closed: nothing unexplored right next to it
+            if (k[max(0, cy - 1):cy + 2, max(0, cx - 1):cx + 2] == G.UNKNOWN).any():
+                return
+        for c in room:
+            lv.shop[c] = True
+        self.shops_from_keeper += 1
+
+    def mark_shop(self, lv, door):
+        inside_ok = self.shop_floor(lv)
         seen = set()
         q = deque()
         y, x = door

@@ -25,6 +25,8 @@ DEFAULTS = {
                                #      win_prob) instead of HP < elb_hp
     "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
                                #      message (combat.RTHREAT_RE), else it doesn't
+    "shk_marks_shop": False,   # A/B: standing in an unmarked room with a shopkeeper in view marks it as a shop
+                               #      (mapmem.shop_from_keeper)
     "open_boxes": False,       # A/B: walk to boxes and chests, open them (the alternate dagger forces a lock, else
                                #      kicks) and take what we would take from the floor (nhbot.boxes)
     "box_dagger_any": False,   # A/B (with open_boxes): force a lock with any dagger we carry (known uncursed first),
