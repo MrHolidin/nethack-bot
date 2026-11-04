@@ -372,8 +372,7 @@ class PolicyMixin:
                 return True
             if self.shop_step(lv):
                 return True
-            lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
-            fountain = self.fountain_plan_step(lv) if self.opts.fountain_neutral and not lawful else \
+            fountain = self.fountain_plan_step(lv) if self.opts.fountain_plan else \
                 (self.excal_step(lv) or self.fountain_wish_step(lv))
             if fountain:
                 return True

@@ -186,10 +186,10 @@ class ExcaliburMixin:
             return False                          # the demon a dip may bring could kill us (danger.win_prob)
         return self.dip_at_fountain(lv, fmask, exc.letter, "fountain_wish")
 
-    # ------------------------------------------------------------------ flag fountain_neutral
+    # ------------------------------------------------------------------ flag fountain_plan
     def fountain_plan_step(self, lv):
-        """One place for every reason to dip, first that applies (no threat in view -- the caller checks; flag
-        fountain_neutral: the non-lawful only, the lawful keep excal_step + fountain_wish_step):
+        """fountain_plan: one place for every reason to dip, first that applies (no threat in view -- the caller
+        checks):
           1. Excalibur can be made now (excal_step: lawful, XL, HP, an unnamed long sword);
           2. a known-cursed thing we wear, or would wear were it not cursed (uncurse_target): 4/30 uncursed;
           3. a wish: dungeon level below FOUNTAIN_DIP_DEPTH, full HP, P(we beat a water demon) > DEMON_WIN --
