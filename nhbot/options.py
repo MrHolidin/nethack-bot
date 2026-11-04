@@ -29,6 +29,8 @@ DEFAULTS = {
                                #      enchant armor nor identify is known; identify picks unknown scrolls (nhbot.scrolls)
     "test_strip": False,       # A/B (with read_unknown): take the suit off before an untested scroll when no cloak
                                #      covers it and another piece stays on (equipment.strip_for_test)
+    "test_strip_plus": False,  # A/B (with read_unknown): take off every worn piece +3 or better before an untested
+                               #      scroll (equipment.strip_for_test_plus)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

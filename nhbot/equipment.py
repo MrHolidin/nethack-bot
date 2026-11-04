@@ -20,6 +20,7 @@ from nhbot.game import MENU_RE
 from nhbot.items import base_name, erosion, parse_item
 
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
+TEST_KEEP_ENCH = 3               # test_strip_plus: pieces this enchanted or more come off before an untested scroll
 
 # name (appearance or identified) -> (slot, base AC)
 ARMOR = {}
@@ -134,8 +135,8 @@ class EquipMixin:
         self.no_shield = False
         self.no_suit = False
         self.cursed_slots = set()
-        self.test_stripped = None     # strip_for_test: the suit taken off, until a suit is worn again
-        self.test_strip_refused = set()   # letters of suits that would not come off
+        self.test_stripped = set()    # strip_for_test(_plus): slots taken off before a test read, until worn again
+        self.test_strip_refused = set()   # letters of pieces that would not come off
         self.wear_failed = set()
         self.equip_events = []        # (turn, action, name)
         self.start_ac = None
@@ -242,14 +243,32 @@ class EquipMixin:
         suit = next((a for a in worn if a["slot"] == SUIT), None)
         if suit is None or len(worn) < 2 or any(a["slot"] == CLOAK for a in worn):
             return False
-        if suit["cursed"] or SUIT in self.cursed_slots or suit["letter"] in self.test_strip_refused:
+        return self.take_off_for_test(suit)
+
+    def strip_for_test_plus(self):
+        """test_strip_plus (A/B): before reading an untested scroll, take off every worn piece enchanted
+        +TEST_KEEP_ENCH or more, one per call -- destroy armor can't take it then (a suit under a cloak is safe
+        already: the cloak goes first). equip_step puts them back on once the reading is over. True if it used
+        the turn."""
+        worn = [a for a in self.armor_inventory() if a["worn"]]
+        cloak = any(a["slot"] == CLOAK for a in worn)
+        for a in worn:
+            if a["ench"] is None or a["ench"] < TEST_KEEP_ENCH or (a["slot"] == SUIT and cloak):
+                continue
+            if self.take_off_for_test(a):
+                return True
+        return False
+
+    def take_off_for_test(self, a):
+        """strip_for_test(_plus): take a off unless it can't come off. True if it used the turn."""
+        if a["cursed"] or a["slot"] in self.cursed_slots or a["letter"] in self.test_strip_refused:
             return False
         self.cur_act = "test_strip"
-        if self.take_off(suit):
-            self.test_stripped = suit["name"]
+        if self.take_off(a):
+            self.test_stripped.add(a["slot"])
             self.scroll_stats["test_strip"] = self.scroll_stats.get("test_strip", 0) + 1
         else:
-            self.test_strip_refused.add(suit["letter"])     # it would not come off: don't try every tick
+            self.test_strip_refused.add(a["letter"])     # it would not come off: don't try every tick
         return True
 
     def answer_wish(self):
@@ -294,9 +313,9 @@ class EquipMixin:
             self.equip_events.append((self.turn(), "fail", a["name"] + " | " + msgs[-80:]))
             return
         self.equip_events.append((self.turn(), "wear", a["name"]))
-        if slot == SUIT and self.test_stripped:
+        if slot in self.test_stripped:
             self.scroll_stats["test_rewear"] = self.scroll_stats.get("test_rewear", 0) + 1
-            self.test_stripped = None
+            self.test_stripped.discard(slot)
         # put the cloak back on (it stays in inventory; next equip_step re-wears it anyway)
 
     def take_off(self, a):

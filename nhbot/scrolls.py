@@ -147,7 +147,12 @@ class ScrollMixin:
         for letter, s, why in todo:
             if why == "unknown" and self.opts.test_strip and self.strip_for_test():
                 return True                           # the suit came off: destroy armor would take it
-            maybe_armor = "enchant armor" in s or "labeled" in s
+            if why == "unknown" and self.opts.test_strip_plus:
+                if self.strip_for_test_plus():
+                    return True                       # a +3 or better piece came off: destroy armor can't take it
+                maybe_armor = False                   # what is left on may be bare (+4 and up are off already)
+            else:
+                maybe_armor = "enchant armor" in s or "labeled" in s
             if maybe_armor:
                 ready = self.strip_for_enchant()      # the pieces it could evaporate come off first
                 if ready == "acted":
