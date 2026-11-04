@@ -488,7 +488,7 @@ class CombatMixin:
     def wand_ev_pairs(self, hostiles, targets, wands):
         """wand_ev: (target, wand letter, kind) worth a zap, best first. One fight for every choice: the adjacent
         hostiles and every target in line that is coming for us (threats.active_threat), the far ones walking up
-        (win_prob approach). Fighting on (win_prob) against each zap -- a direction and a wand -- as
+        (win_prob approach), each with the ranged attacks we saw it make (threats.ranged_profile). Fighting on (win_prob) against each zap -- a direction and a wand -- as
         our next action, played out in full (zap_opening: every monster on the way, the ray coming back at us), all
         from the same draws (the RNG state restored). A zap only when that fight is at most wand_pwin, and only one
         that beats fighting on."""
@@ -498,8 +498,9 @@ class CombatMixin:
             return []
         me = self.pos()
         approach = {p: max(0, max(abs(p[0] - me[0]), abs(p[1] - me[1])) - 1) for p, _ in fight if p is not None}
+        ranged = {p: r for p, _ in fight if p is not None and (r := self.ranged_profile(p)) is not None}
         state = self.win_rng.bit_generator.state
-        p_fight = self.win_prob(fight, approach=approach)
+        p_fight = self.win_prob(fight, approach=approach, ranged=ranged)
         if p_fight > self.opts.wand_pwin:
             return []
         lv = self.level()
@@ -509,7 +510,7 @@ class CombatMixin:
                 if (t[3], letter) not in seen:
                     self.win_rng.bit_generator.state = state
                     seen[(t[3], letter)] = self.win_prob(fight, opening=self.zap_opening(lv, t[3], kind, letter, fight),
-                                                         approach=approach)
+                                                         approach=approach, ranged=ranged)
                 p = seen[(t[3], letter)]
                 if p > p_fight:
                     out.append((p, (t[0], t[1], t[2], t[3], t[4], p_fight, p - p_fight), letter, kind))

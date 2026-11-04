@@ -25,16 +25,22 @@ import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
 from nhbot.focus import str_dbon, to_hit_abon
-from nhbot.items import base_name
+from nhbot.items import base_name, erosion
 from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
+from nhbot.rays import RAY_RESIST, our_protection, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
 NO_DAMAGE = {"RUST", "CORR", "DCAY", "SGLD", "SEDU", "SSEX", "SLIM", "ENCH", "CURS", "STON", "COLD"}
 POISON = {"DRST", "DRDX", "DRCO"}
 MAX_D = 400
+WAND_ORDER = ("death", "sleep", "fire", "cold", "lightning", "magic missile", "striking")   # muse.c find_offensive
+MISSILE_DIE = {"arrow": 6, "elven arrow": 7, "orcish arrow": 5, "silver arrow": 6, "ya": 7, "crossbow bolt": 4,
+               "rock": 3, "flint stone": 6, "boulder": 20}        # objects.c, small monsters' die
+BREATH_KIND = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning", "SLEE": "sleep", "MAGM": "magic missile",
+               "DISN": "death", "ACID": "fire", "DRST": "fire", "RBRE": "fire"}
 MON_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
 FLEE_P = 0.5                     # flee: P(death this turn) above this
@@ -183,15 +189,21 @@ class DangerMixin:
         return sum(min(max(tmp + k - 1, 0), 20) for k in range(1, hit_die + 1)) / (20 * hit_die)   # + rnd(die)
 
     def our_damage_pmf(self, name):
-        """dmgval (small / large dice + enchantment) + dbon, at least 1; plus an artifact's damage die."""
+        """weapon.c dmgval -- the small / large die + enchantment (not below 0), then less the erosion (rusty,
+        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die."""
         pm = PM_BY_NAME[name]
         dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
         w, ench, (_, dmg_die) = self.our_weapon()
+        wielded = next((i for i in self.items() if i.wielded), None)
+        eros = erosion(wielded.text) if w and wielded is not None else 0
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
-        out = np.zeros(max(2, d + ench + dbon + 1))
+        out = np.zeros(max(2, d + max(ench, 0) + dbon + 1))
         for v in range(1, d + 1):
-            out[max(1, v + ench + dbon)] += base[v]
+            dv = max(0, v + ench)
+            if dv > 0:
+                dv = max(1, dv - eros)
+            out[max(1, dv + dbon)] += base[v]
         return conv(out, dice_pmf(1, dmg_die)) if dmg_die else out
 
     def our_kill_prob(self, name, hits):
@@ -279,7 +291,7 @@ class DangerMixin:
                       for k, v in sorted(self.danger_p.items())}}
 
     # ------------------------------------------------------------ the fight to the end
-    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None):
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None):
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
@@ -293,7 +305,11 @@ class DangerMixin:
         with and one without the opening see the same monster HP and the same later rolls.
         approach (wand_ev): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
         mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
-        only hit monsters next to us (none there: we wait)."""
+        only hit monsters next to us (none there: we wait).
+        ranged (with approach): {pos: threats.ranged_profile} -- the ranged attacks we saw that monster make, used
+        without limit (ranged_plan / ranged_hit): a wand on every move, near or far (muse.c: it zaps instead of
+        hitting); missiles and breath on a move it is not next to us, after its step (monmove.c dochug: a monster
+        with a ranged attack may move and attack in one move)."""
         if self.opts.track_sleep and self.cur_key is not None and self.cur_key in self.levels:
             adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
@@ -308,17 +324,18 @@ class DangerMixin:
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
             mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
-                         self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove))
+                         self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name))
         if not mons:
             return 1.0
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
+        plans = [self.ranged_plan(ranged.get(m[6]), m[9]) if ranged else None for m in mons]
         zrng = self.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
         wins = 0
         for _ in range(sims):
             hps = []
-            for lev, _, dmg, _, _, hits, _, _, _ in mons:
+            for lev, _, dmg, _, _, hits, _, _, _, _ in mons:
                 for _try in range(20):
                     h = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -328,7 +345,7 @@ class DangerMixin:
                 hps.append(max(h, 1))
             hp, alive, asleep = hp0, list(range(len(mons))), 0
             if approach is not None:
-                if self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns) > 0:
+                if self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans) > 0:
                     wins += 1
                 continue
             for _turn in range(max_turns):
@@ -376,9 +393,11 @@ class DangerMixin:
                 wins += 1
         return wins / sims
 
-    def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns):
+    def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans=None):
         """One sampled fight of win_prob with approach (see there): our HP at its end (<= 0: lost)."""
         left = [approach.get(m[6], 0) for m in mons]
+        plans = plans or [None] * len(mons)
+        cool = [0] * len(mons)                   # breath: turns until it can breathe again
         alive, asleep = list(range(len(mons))), 0
         k, frac = divmod(self.our_speed(), 12)
         for _turn in range(max_turns):
@@ -417,6 +436,22 @@ class DangerMixin:
                 (one, inst), speed = mons[j][7], mons[j][8]
                 mk, mf = divmod(speed, 12)
                 moves = mk + (1 if mf and rng.random() < mf / 12 else 0)
+                plan = plans[j]
+                if plan is not None:
+                    cool[j] -= 1
+                    for _m in range(moves):
+                        if left[j] > 0:
+                            left[j] -= 1                 # its step, then (ranged) its attack
+                        dmg, sleep = self.ranged_hit(plan, left[j] + 1, cool, j, rng, asleep > 0)
+                        if dmg is None and left[j] == 0:
+                            if rng.random() < inst:
+                                return 0
+                            dmg = int(rng.choice(len(one), p=one))
+                        hp -= dmg or 0
+                        asleep = max(asleep, sleep)
+                        if hp <= 0:
+                            return hp
+                    continue
                 walk = min(moves, left[j])
                 left[j] -= walk
                 for _m in range(moves - walk):
@@ -426,6 +461,74 @@ class DangerMixin:
                 if hp <= 0:
                     return hp
         return hp
+
+    def ranged_plan(self, profile, name):
+        """What a monster's seen ranged attacks do to us, for ranged_hit (None: none seen)."""
+        if profile is None:
+            return None
+        ac = self.bl(nh.NLE_BL_AC)
+        prot = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body])
+        plan = {"wand": next((k for k in WAND_ORDER if k in profile["wands"]), None), "missile": None,
+                "breath": None, "ray_p": zap_hit_prob(ac), "ac": ac, "prot": prot}
+        mis = profile["missile"]
+        if mis:
+            plan["missile"] = (MISSILE_DIE.get(mis["kind"], WEAPON_DICE.get(mis["kind"], (6,))[0]), mis["counts"],
+                               mis["poisoned"] and not self.poison_res)
+        if profile["breath"]:
+            idx = MON_INDEX.get(name)
+            br = next((a for a in ATTACKS[idx] if a[0] == "BREA"), None) if idx is not None else None
+            if br is not None:
+                plan["breath"] = (BREATH_KIND.get(br[1], "fire"), br[2])
+        return plan
+
+    @staticmethod
+    def ranged_hit(plan, dist, cool, j, rng, we_sleep=False):
+        """One move's ranged attack of a monster `dist` squares away by its plan: (damage to us or None when it
+        has no ranged attack to make, turns we fall asleep). zap.c buzz/zhitu (a ray: zap_hit by our AC,
+        reflection, resistance, 6d6 / magic missile 2d6 / sleep d(6, 25) / death), bhitm striking (rnd(20) < 10 +
+        AC, 2d12, magic resistance), mthrowu.c m_throw / thitu (a missile hits when rnd(20) < AC + 8 + 3 - distance;
+        a poisoned one: 1 in 30 deadly, else mostly rnd(6) more), mhitu.c breamu (2 in 3, then 10..29 turns
+        before the next). A wand of sleep is not zapped at us asleep (muse.c find_offensive: multi >= 0): it
+        fights on instead."""
+        ac, prot = plan["ac"], plan["prot"]
+
+        def ray(kind, nd):
+            if rng.random() >= plan["ray_p"] or "reflection" in prot:
+                return 0, 0
+            if kind == "death":
+                return (0, 0) if "magic" in prot else (10 ** 6, 0)
+            if RAY_RESIST.get(kind) in prot:
+                return 0, 0
+            if kind == "sleep":
+                return 0, int(rng.integers(1, 26, size=6).sum())
+            return int(rng.integers(1, 7, size=nd).sum()), 0
+
+        wand = None if plan["wand"] == "sleep" and we_sleep else plan["wand"]
+        if wand == "striking":
+            if "magic" in prot or rng.integers(1, 21) >= 10 + ac:
+                return 0, 0
+            return int(rng.integers(1, 13, size=2).sum()), 0
+        if wand:
+            return ray(wand, 2 if wand == "magic missile" else 6)
+        if dist < 2:
+            return None, 0
+        if plan["missile"]:
+            die, counts, poisoned = plan["missile"]
+            dmg = 0
+            for _s in range(counts[int(rng.integers(len(counts)))]):
+                if rng.integers(1, 21) < ac + 11 - dist:
+                    dmg += int(rng.integers(1, die + 1))
+                    if poisoned:
+                        r = rng.integers(30)
+                        if r == 0:
+                            return 10 ** 6, 0
+                        if r > 5:
+                            dmg += int(rng.integers(1, 7))
+            return dmg, 0
+        if plan["breath"] and cool[j] <= 0 and rng.random() < 2 / 3:
+            cool[j] = 10 + int(rng.integers(20))
+            return ray(*plan["breath"])
+        return 0, 0
 
     # ------------------------------------------------------------ flee (flag flee)
     def our_speed(self):
