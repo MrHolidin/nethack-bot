@@ -7,7 +7,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 
-DEMON_WIN = 0.7      # fountain_wish: dip only while P(we beat a water demon) is above this
+DEMON_WIN = 0.7      # dip Excalibur for a wish only while P(we beat a water demon) is above this
 
 
 class ExcaliburMixin:
@@ -19,7 +19,7 @@ class ExcaliburMixin:
         self.fountain_levels = set()
         self.excal_trips = 0
         self.excal_skip = set()
-        self.demon_win = (None, 0.0)     # fountain_wish: (state key, P(we beat a water demon))
+        self.demon_win = (None, 0.0)     # (state key, P(we beat a water demon))
 
     def long_sword(self):
         for it in self.items():
@@ -124,7 +124,10 @@ class ExcaliburMixin:
                 lv.set_terrain(self.pos(), FLOOR_GLYPH)       # no fountain here any more
             return None
         self.dips += 1
-        return self.text_since(seq0)
+        recent = self.text_since(seq0)
+        if "water demon" in recent:              # fountain.c dipfountain case 21, either reason to dip
+            self.dip_events.append((self.turn(), "wish" if "grants you a wish" in recent else "demon"))
+        return recent
 
     def demon_win_prob(self):
         """P(we win a fight with a water demon next to us, from full HP) -- danger.win_prob, cached while what it
@@ -137,11 +140,12 @@ class ExcaliburMixin:
         return self.demon_win[1]
 
     def fountain_wish_step(self, lv):
-        """fountain_wish (no threat in view, the caller checks): Excalibur in hand at full HP, dip it into a
-        fountain of this level -- fountain.c dipfountain: 1/30 a water demon, a wish at (20 - depth)%, else
+        """No threat in view (the caller checks): Excalibur in hand at full HP, dip it into a fountain of this
+        level -- fountain.c dipfountain: 1/30 a water demon, a wish at (20 - depth)%, else
         hostile (M2_HOSTILE). Only while P(we beat that demon) > DEMON_WIN. Not in the Mines (Minetown's watch),
-        not a shop's. True if it used the turn."""
-        if not (self.opts.fountain_wish and self.excalibur) or lv.key[0] == 2:
+        not a shop's. True if it used the turn. (A/B fountain_wish: +310 [-562, +1180]; wishes in 35 games of
+        1000 against 23.)"""
+        if not self.excalibur or lv.key[0] == 2:
             return False
         exc = next((it for it in self.items() if "Excalibur" in it.text and it.wielded), None)
         if exc is None or self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX):
@@ -159,8 +163,6 @@ class ExcaliburMixin:
             recent = self.dip_into_fountain(lv, exc.letter)
             if recent is None:
                 return False
-            if "water demon" in recent:
-                self.dip_events.append((self.turn(), "wish" if "grants you a wish" in recent else "demon"))
             if self.fountain_gone(recent):
                 lv.set_terrain((y, x), FLOOR_GLYPH)
                 self.dip_events.append((self.turn(), "dried"))
