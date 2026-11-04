@@ -17,8 +17,6 @@ DEFAULTS = {
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
     "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
                                #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
-    "erosion_value": False,    # A/B: erosion (rusty, corroded, ...) counted when choosing armor (ARM_BONUS) and
-                               #      weapons (dmgval) (equipment.value, weapons.weapon_rank)
     "nymph_wands": False,      # A/B: attack wands at thieves in line (sleep first); a ray only when P(it comes back
                                #      and hits us) < 10% (nhbot.rays)
     "elb_pwin": False,         # A/B: write Elbereth when P(we win the fight with the adjacent ones) < 50% (danger.py
