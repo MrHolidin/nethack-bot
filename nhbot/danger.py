@@ -24,6 +24,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
+from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name
 from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
@@ -173,8 +174,7 @@ class DangerMixin:
         """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit > rnd(20)."""
         pm = PM_BY_NAME[name]
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
-        abon = -2 if st < 6 else -1 if st < 8 else 0 if st < 17 else 1 if st <= 68 else 2 if st < 118 else 3
-        abon += (1 if xl < 3 else 0) + (-3 if dx < 4 else -2 if dx < 6 else -1 if dx < 8 else 0 if dx < 14 else dx - 14)
+        abon = to_hit_abon(st, dx, xl)
         w, ench, (hit_die, _) = self.our_weapon()
         tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
         if not hit_die:
@@ -184,9 +184,7 @@ class DangerMixin:
     def our_damage_pmf(self, name):
         """dmgval (small / large dice + enchantment) + dbon, at least 1; plus an artifact's damage die."""
         pm = PM_BY_NAME[name]
-        st = self.bl(nh.NLE_BL_STR125)
-        dbon = -1 if st < 6 else 0 if st < 16 else 1 if st < 17 else 2 if st == 18 else 3 if st <= 93 \
-            else 4 if st <= 108 else 5 if st < 118 else 6
+        dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
         w, ench, (_, dmg_die) = self.our_weapon()
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
