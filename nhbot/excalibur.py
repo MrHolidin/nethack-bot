@@ -7,6 +7,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
+from nhbot.materials import rusts
 
 JUNK_CLASSES = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.WEAPON_CLASS, nh.TOOL_CLASS, nh.ARMOR_CLASS)   # water spoils little
 CONTAINERS = ("bag", "sack", "box", "chest", "lamp", "candle")
@@ -222,7 +223,9 @@ class ExcaliburMixin:
         """A known-cursed thing to dip: worn or wielded and within the water's reach (do_wear.c
         inaccessible_equipment: no suit under a cloak, no shirt under a suit or cloak, no ring under gloves), or
         armor / a weapon we would put on or wield were it not cursed (equipment.improves, weapon_rank). Not a
-        long sword unless lawful (a dip at XL 5+ curses it, may take a point off it and dries the fountain).
+        long sword unless lawful (a dip at XL 5+ curses it, may take a point off it and dries the fountain); nothing
+        water would rust (materials.rusts: each dip rusts it more, and a rusted piece makes half the dips do
+        nothing else -- fountain.c dipfountain).
         We know of a curse on what we wear mostly from taking it off for a better piece: just when lifting it
         pays."""
         worn = self.worn_by_slot()
@@ -237,7 +240,7 @@ class ExcaliburMixin:
         cur = next((it for it in self.items() if it.wielded), None)
         cur_rank = self.weapon_rank(cur.text) if cur is not None else (-1, 0)
         for it in self.items():
-            if not it.cursed or (not lawful and re.search(r"\blong sword\b", it.text)):
+            if not it.cursed or rusts(it.text) or (not lawful and re.search(r"\blong sword\b", it.text)):
                 continue
             if it.on_body:
                 if it.letter in covered or (it.ring_on and GLOVES in worn):
@@ -249,8 +252,9 @@ class ExcaliburMixin:
 
     def junk_to_dip(self):
         """Something we don't need that water spoils little: not on us, not kept (carry.needed), no food,
-        container or light, no long sword; gems and stones first."""
+        container or light, no long sword; what water won't rust first (a rusting one makes half the dips do
+        nothing else), then gems and stones."""
         cands = [it for it in self.items() if it.ocls in JUNK_CLASSES and not it.on_body and not it.alternate
                  and not it.quivered and "unpaid" not in it.text and not self.needed(it)
                  and not any(w in it.text for w in CONTAINERS) and not re.search(r"\blong sword\b", it.text)]
-        return min(cands, key=lambda it: JUNK_CLASSES.index(it.ocls), default=None)
+        return min(cands, key=lambda it: (rusts(it.text), JUNK_CLASSES.index(it.ocls)), default=None)
