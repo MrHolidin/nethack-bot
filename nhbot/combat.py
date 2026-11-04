@@ -519,7 +519,9 @@ class CombatMixin:
         AC (striking: in wand_effect) -- range lost, a reflecting dragon turning the ray back -- and a monster of the
         fight takes the effect (wand_effect); our own square: zap_hit by our AC, then reflection, resistance or
         the ray's damage (6d6, magic missile 2d6) / d(6, 25) turns asleep (zap.c zhitu). Monsters out of view,
-        destroyed items and blindness are not counted. fight: the (pos, name) of win_prob's fight."""
+        destroyed items and blindness are not counted. A hit on a peaceful monster (a priest, a shopkeeper, the
+        watch -- they and their god turn on us) or on our pet counts as the fight lost. fight: the (pos, name) of
+        win_prob's fight."""
         y0, x0 = self.pos()
         fight_pos = {pos for pos, _ in fight}
         g = self.obs["glyphs"]
@@ -527,10 +529,12 @@ class CombatMixin:
         mons = {}
         for (my, mx) in zip(*np.nonzero((G.KIND[g] == G.MONSTER) | (G.KIND[g] == G.PET))):
             pm = permonst_of(g[my, mx])
-            if pm is not None and (my, mx) != (y0, x0):
+            pos = (int(my), int(mx))
+            if pm is not None and pos != (y0, x0):
                 name = G.monster_name(int(g[my, mx]))
                 p_eff, dmg = wand_effect(kind, name, depth, xl)
-                mons[(int(my), int(mx))] = (zap_hit_prob(pm.ac), any(r in name for r in REFLECTORS), p_eff, dmg)
+                friend = G.KIND[g[my, mx]] == G.PET or self.peaceful_now(lv, pos, look=False)
+                mons[pos] = (zap_hit_prob(pm.ac), any(r in name for r in REFLECTORS), p_eff, dmg, friend)
         terrain = TERRAIN_CODE[self.terrain_glyphs(lv)]
         mines = bool(lv.key and lv.key[0] == 2)
         it = next((i for i in self.items() if i.letter == letter), None)
@@ -565,11 +569,13 @@ class CombatMixin:
                 m = mons.get(pos)
                 if m is None or (pos in fight_pos and not alive_at(pos)):
                     return None
-                p_hit, refl, p_eff, dmg = m
+                p_hit, refl, p_eff, dmg, friend = m
                 if kind == "striking":
                     p_hit, refl = 1.0, False                  # bhitm: its own roll, in p_eff
                 if rng.random() >= p_hit:
                     return (False, False)
+                if friend:
+                    got["dmg"] += 10 ** 6                     # a peaceful / our pet hit: counted as the fight lost
                 if refl:
                     return (True, True)
                 if pos in fight_pos and rng.random() < p_eff:
