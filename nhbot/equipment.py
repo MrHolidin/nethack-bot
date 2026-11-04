@@ -134,6 +134,8 @@ class EquipMixin:
         self.no_shield = False
         self.no_suit = False
         self.cursed_slots = set()
+        self.test_stripped = None     # strip_for_test: the suit taken off, until a suit is worn again
+        self.test_strip_refused = set()   # letters of suits that would not come off
         self.wear_failed = set()
         self.equip_events = []        # (turn, action, name)
         self.start_ac = None
@@ -231,6 +233,25 @@ class EquipMixin:
         self.take_off(risky[0])
         return "acted"
 
+    def strip_for_test(self):
+        """test_strip (A/B): before reading an untested scroll, take the body armor off when no cloak is worn
+        (destroy armor takes the cloak, else the suit: do_wear.c destroy_arm) and another piece stays on (enchant
+        armor needs one to land on -- and to show what it is). equip_step puts the suit back on once the reading
+        is over (read_scroll_step runs before it). True if it used the turn."""
+        worn = [a for a in self.armor_inventory() if a["worn"]]
+        suit = next((a for a in worn if a["slot"] == SUIT), None)
+        if suit is None or len(worn) < 2 or any(a["slot"] == CLOAK for a in worn):
+            return False
+        if suit["cursed"] or SUIT in self.cursed_slots or suit["letter"] in self.test_strip_refused:
+            return False
+        self.cur_act = "test_strip"
+        if self.take_off(suit):
+            self.test_stripped = suit["name"]
+            self.scroll_stats["test_strip"] = self.scroll_stats.get("test_strip", 0) + 1
+        else:
+            self.test_strip_refused.add(suit["letter"])     # it would not come off: don't try every tick
+        return True
+
     def answer_wish(self):
         """The "For what do you wish?" line is open: ask for the first armor of ARMOR_WISHES we don't carry."""
         have = " | ".join(self.armor_true_text(it.text) for it in self.items())
@@ -273,6 +294,9 @@ class EquipMixin:
             self.equip_events.append((self.turn(), "fail", a["name"] + " | " + msgs[-80:]))
             return
         self.equip_events.append((self.turn(), "wear", a["name"]))
+        if slot == SUIT and self.test_stripped:
+            self.scroll_stats["test_rewear"] = self.scroll_stats.get("test_rewear", 0) + 1
+            self.test_stripped = None
         # put the cloak back on (it stays in inventory; next equip_step re-wears it anyway)
 
     def take_off(self, a):

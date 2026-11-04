@@ -25,6 +25,8 @@ DEFAULTS = {
                                #      message (combat.RTHREAT_RE), else it doesn't
     "read_unknown": False,     # A/B: read untested scrolls (price group unknown, 20 or 60 zm) at full HP while neither
                                #      enchant armor nor identify is known; identify picks unknown scrolls (nhbot.scrolls)
+    "test_strip": False,       # A/B (with read_unknown): take the suit off before an untested scroll when no cloak
+                               #      covers it and another piece stays on (equipment.strip_for_test)
     "wand_engrave": False,     # A/B: with no threat in view, identify unknown wands by engraving (nhbot.wandid)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
