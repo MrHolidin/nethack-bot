@@ -28,8 +28,10 @@ class GiftMixin:
         gifts = self.opts.gift
         if not gifts:
             return
-        if isinstance(gifts, str):
-            gifts = [gifts]
+        self.gift_items([gifts] if isinstance(gifts, str) else gifts)
+
+    def gift_items(self, names, log=True):
+        """Put the named items (wish syntax) into the inventory, identified; one step without time after."""
         lib = ctypes.CDLL(self.env.unwrapped.nethack.dlpath)
         lib.readobjnam.restype = ctypes.c_void_p
         lib.readobjnam.argtypes = [ctypes.c_char_p, ctypes.c_void_p]
@@ -38,11 +40,11 @@ class GiftMixin:
         lib.addinv.argtypes = [ctypes.c_void_p]
         for f in ("bless", "uncurse"):
             getattr(lib, f).argtypes = [ctypes.c_void_p]
-        for name in gifts:
+        for name in names:
             buf = ctypes.create_string_buffer(name.encode(), 256)    # readobjnam edits its buffer
             obj = lib.readobjnam(buf, None)
             st = self.gift_stats.setdefault(name, {"given": 0, "held_end": False, "on_body_end": False,
-                                                   "first_on_body": None})
+                                                   "first_on_body": None}) if log else {"given": 0}
             if obj:
                 m = re.search(r"(?:^|\s)([+-]\d+)\s", name)
                 if m:

@@ -44,6 +44,7 @@ class ScrollMixin:
         self.scroll_known = None         # scroll types known by name (discoveries); None: ask again
         self.genocide_typed = set()      # names given to a genocide question (never twice)
         self.read_seq = 0                # msg_seq when the last read began
+        self.force_read_log = None       # force_read: the read (state and what the game said), once done
 
     def sucker(self):
         """Visible dunce cap or a shirt with nothing over it: shopkeepers add 1/3."""
@@ -89,18 +90,46 @@ class ScrollMixin:
         post = self.price_of_text(s)
         return not post or set(post) <= UNKNOWN_READ_TYPES
 
-    def test_reading_on(self):
-        """read_unknown: full HP and more than TEST_MIN_HP (earth drops a boulder on us: d20 without a hard
-        helmet), no pet next to us (earth's boulders and fire's explosion hit the 8 squares around: a killed pet
-        costs alignment and maybe Luck), and neither enchant armor nor identify known by name yet."""
+    def test_safe(self):
+        """Safe enough to read a scroll that may be harmful: full HP and more than TEST_MIN_HP (earth drops a
+        boulder on us: d20 without a hard helmet), no pet next to us (earth's boulders and fire's explosion hit
+        the 8 squares around: a killed pet costs alignment and maybe Luck)."""
         hp = self.bl(nh.NLE_BL_HP)
         if hp < self.bl(nh.NLE_BL_HPMAX) or hp <= TEST_MIN_HP:
             return False
         y, x = self.pos()
         g = self.obs["glyphs"]
-        if (G.KIND[g[max(0, y - 1):y + 2, max(0, x - 1):x + 2]] == G.PET).any():
+        return not (G.KIND[g[max(0, y - 1):y + 2, max(0, x - 1):x + 2]] == G.PET).any()
+
+    def test_reading_on(self):
+        """read_unknown: test_safe, and neither enchant armor nor identify known by name yet."""
+        return self.test_safe() and not self.known_scroll_types() & TESTING_ENDS
+
+    def read_state(self):
+        """The state a read happens in (logged with read_unknown and force_read reads)."""
+        return {"t": self.turn(), "dlvl": self.bl(nh.NLE_BL_DEPTH), "xl": self.bl(nh.NLE_BL_XP),
+                "hp": self.bl(nh.NLE_BL_HP), "maxhp": self.bl(nh.NLE_BL_HPMAX), "ac": self.bl(nh.NLE_BL_AC)}
+
+    def force_read_step(self, lv):
+        """force_read (experiments): the first time test_safe holds with no hostile in view (housekeeping),
+        an uncursed scroll of that type is put into the inventory (gift.gift_items) and read. Compare with
+        force_read="blank paper" (it reads as nothing; the same RNG use) on the same seeds: the effect of
+        reading that scroll in that state."""
+        if not self.opts.force_read or self.force_read_log is not None:
             return False
-        return not self.known_scroll_types() & TESTING_ENDS
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU) or not self.test_safe():
+            return False
+        name = self.opts.force_read
+        state = self.read_state()
+        self.gift_items(["uncursed scroll of " + name], log=False)
+        it = next((i for i in self.items() if i.ocls == nh.SCROLL_CLASS and name in i.text), None)
+        self.force_read_log = dict(state, said="")
+        if it is None or not self.read_scroll(lv, it.letter):
+            self.force_read_log["said"] = "not read"
+            return True
+        self.force_read_log["said"] = self.text_since(self.read_seq)[-120:]
+        return True
 
     # ------------------------------------------------------------ read
     def read_scroll_step(self, lv):
@@ -128,13 +157,15 @@ class ScrollMixin:
                     continue
             if "enchant weapon" in s and not any(it.wielded for it in self.items()):
                 continue
+            state = self.read_state()
             if not self.read_scroll(lv, letter):
                 return False
             self.scroll_stats["read"] += 1
             self.scroll_stats["read_names"].append(s[:60])
             if why == "unknown":
                 self.scroll_stats["tested"] = self.scroll_stats.get("tested", 0) + 1
-                self.scroll_stats.setdefault("tested_said", []).append(self.text_since(self.read_seq)[-90:])
+                self.scroll_stats.setdefault("tested_log", []).append(
+                    dict(state, said=self.text_since(self.read_seq)[-90:]))
             return True
         return False
 

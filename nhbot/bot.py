@@ -22,7 +22,7 @@ from nhbot.options import Options
 from nhbot.perception import PerceptionMixin
 from nhbot.pickup import PickupMixin
 from nhbot.policy import PolicyMixin
-from nhbot.pricemem import PriceMemoryMixin
+from nhbot.pricemem import PriceMemoryMixin, appearance
 from nhbot.scrolls import ScrollMixin
 from nhbot.shop import ShopMixin
 from nhbot.survival import SurvivalMixin
@@ -38,6 +38,8 @@ from nhbot.gift import GiftMixin
 from nhbot.weapons import WeaponsMixin
 from nhbot.wishing import WishMixin
 
+SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
+MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
 
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
@@ -118,6 +120,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.skill_msgs = 0
         self.kill_count = 0
         self.pet_last_seen = 0
+        self.snaps, self.next_snap = [], SNAP_EVERY
         self.faint_since = None
         self.hist = deque()
         self.no_eat_until = 0
@@ -217,9 +220,22 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
                             lvc.search_turns += dt
                 if self.gift_stats and self.turn() // 50 != t0 // 50:
                     self.gift_check()
+                while self.turn() >= self.next_snap:
+                    self.snaps.append(self.snapshot())
+                    self.next_snap += SNAP_EVERY
         except GameOver:
             pass
         return self.summary()
+
+    def snapshot(self):
+        """State every SNAP_EVERY turns (stats "snaps"): to see where two runs of one seed part, and in what."""
+        magic = [it for it in self.items() if it.ocls in MAGIC_CLASSES]
+        unknown = sum(1 for it in magic if appearance(it.text) is not None)
+        return {"t": self.turn(), "dlvl": self.bl(nh.NLE_BL_DEPTH), "max_depth": self.max_depth,
+                "xl": self.bl(nh.NLE_BL_XP), "hp": self.bl(nh.NLE_BL_HP), "maxhp": self.bl(nh.NLE_BL_HPMAX),
+                "ac": self.bl(nh.NLE_BL_AC), "gold": self.bl(nh.NLE_BL_GOLD),
+                "pet": self.turn() - self.pet_last_seen <= 100, "magic_known": len(magic) - unknown,
+                "magic_unknown": unknown, "kills": len(self.kills), "prayers": self.prayers}
 
     def summary(self):
         last = [m for _, m in list(self.messages)[-10:]]
@@ -251,7 +267,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": self.elb_fail,
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
-            "scrolls": dict(self.scroll_stats), "price_memory": dict(self.price_stats, appearances=self.price_report()),
+            "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
             "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 
