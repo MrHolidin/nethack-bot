@@ -84,6 +84,7 @@ class DangerMixin:
         self.danger_pending = None               # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.our_hits = {}                       # (level key, square) -> our hits on the monster there
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
+        self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
         self.hit_seen = False                    # this tick: a melee hit of ours
         self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
         self.flee_stats = Counter()
@@ -278,13 +279,17 @@ class DangerMixin:
                       for k, v in sorted(self.danger_p.items())}}
 
     # ------------------------------------------------------------ the fight to the end
-    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40):
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None):
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
         d(level, 8), minus what our hits on it so far took, drawn again while that would leave it dead. Others
         joining the fight are not counted; a fight still on after max_turns counts as won. adjacent: (pos, name);
-        pos None for a monster that isn't there yet (the water demon a dip may bring)."""
+        pos None for a monster that isn't there yet (the water demon a dip may bring).
+        opening (wand_ev): (pos, P(the zap takes effect), damage pmf or None) -- our first action is a zap at the
+        monster at pos instead of a melee hit: with that P it takes the damage (None: it falls asleep and is out
+        of the fight). Its draws come from a generator of their own and the melee draws of that action are still
+        made, so a fight with and one without the opening see the same monster HP and the same later rolls."""
         if self.opts.track_sleep and self.cur_key is not None and self.cur_key in self.levels:
             adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
@@ -299,15 +304,19 @@ class DangerMixin:
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
             mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
-                         self.our_hits.get((self.cur_key, pos), 0)))
+                         self.our_hits.get((self.cur_key, pos), 0), pos))
         if not mons:
             return 1.0
+        zj = None
+        if opening is not None:
+            zj = next((j for j, m in enumerate(mons) if m[6] == opening[0]), None)
+            zrng = self.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
         wins = 0
         for _ in range(sims):
             hps = []
-            for lev, _, dmg, _, _, hits in mons:
+            for lev, _, dmg, _, _, hits, _ in mons:
                 for _try in range(20):
                     h = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -322,8 +331,19 @@ class DangerMixin:
                     if not alive:
                         break
                     j = alive[0]
-                    if rng.random() < mons[j][1]:
-                        hps[j] -= int(rng.choice(len(mons[j][2]), p=mons[j][2]))
+                    hit = rng.random() < mons[j][1]
+                    d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
+                    if zj is not None and _turn == 0 and _a == 0:
+                        if zj in alive and zrng.random() < opening[1]:
+                            if opening[2] is None:
+                                alive.remove(zj)                 # asleep: out of the fight
+                            else:
+                                hps[zj] -= int(zrng.choice(len(opening[2]), p=opening[2]))
+                                if hps[zj] <= 0:
+                                    alive.remove(zj)
+                        continue
+                    if hit:
+                        hps[j] -= d
                         if hps[j] <= 0:
                             alive.pop(0)
                 if not alive:

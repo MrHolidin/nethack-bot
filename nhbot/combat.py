@@ -9,6 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.items import WAND_SPENT_RE
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
+from nhbot.danger import adj_level, dice_pmf
 from nhbot.goals import GOALS
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME, RANGED_TARGETS, permonst_of
@@ -73,6 +74,49 @@ def wand_resisted(kind, name):
     if kind in ("magic missile", "striking"):
         return name == "baby gray dragon" or any(a[1] in ("MAGM", "RBRE") for a in ATTACKS[_PM_INDEX[name]])
     return False
+
+
+def zap_hit_prob(ac):
+    """zap.c zap_hit for a wand's ray (no spell bonus): chance = rn2(20); 0: rnd(10) < AC; else
+    3 - chance < AC_VALUE(AC), AC_VALUE of a negative AC being -rnd(-AC)."""
+    p = max(0, min(10, ac - 1)) / 10 / 20
+    acs = [ac] if ac >= 0 else [-k for k in range(1, -ac + 1)]
+    for chance in range(1, 20):
+        p += sum(3 - chance < a for a in acs) / len(acs) / 20
+    return p
+
+
+def halved(pmf, w, rounding_up):
+    """The damage pmf when, with probability w, it is halved (resist: (d + 1) / 2; a ray: d / 2)."""
+    out = np.zeros(len(pmf))
+    for v, q in enumerate(pmf):
+        out[v] += (1 - w) * q
+        out[(v + 1) // 2 if rounding_up else v // 2] += w * q
+    return out
+
+
+def wand_effect(kind, name, depth, xl):
+    """wand_ev: (P(our zap of this attack wand takes effect on a monster of this kind), damage pmf; None for
+    sleep: it falls asleep). zap.c: striking (bhitm) hits when rnd(20) < 10 + AC, 2d12; a ray (buzz/zhitm)
+    hits by zap_hit, magic missile 2d6, fire / cold / lightning 6d6 (fire +7 on a cold resistant one, cold
+    +6d3 on a fire resistant one); resist() -- rn2(100 + 12 - level) < its magic resistance (mr) -- halves
+    the damage and stops a sleep. Its AC and level are those of its kind (armor and growth unseen)."""
+    pm = PM_BY_NAME.get(name)
+    if pm is None or wand_resisted(kind, name):
+        return 0.0, None
+    n = 100 + 12 - max(1, min(50, adj_level(pm.mlevel, depth, xl)))
+    p_res = min(pm.mr, n) / n
+    if kind == "striking":
+        return max(0, min(20, 9 + pm.ac)) / 20, halved(dice_pmf(2, 12), p_res, True)
+    p = zap_hit_prob(pm.ac)
+    if kind == "sleep":
+        return p * (1 - p_res), None
+    dmg = dice_pmf(2 if kind == "magic missile" else 6, 6)
+    if kind == "fire" and pm.mresists & MR_BIT["cold"]:
+        dmg = np.concatenate([np.zeros(7), dmg])
+    if kind == "cold" and pm.mresists & MR_BIT["fire"]:
+        dmg = np.convolve(dmg, dice_pmf(6, 3))
+    return p, halved(dmg, p_res, False)
 
 
 class CombatMixin:
@@ -405,36 +449,39 @@ class CombatMixin:
             targets = self.wand_pwin_targets(hostiles, list(targets))
         if self.opts.track_sleep:
             targets = sorted(targets, key=lambda t: self.asleep(lv, t[2]))     # the ones asleep last
-        for key, d, pos, (dy, dx), name, pwin, gain in targets:
-            for letter, kind in wands:
-                if self.opts.track_sleep and kind == "sleep" and self.asleep(lv, pos):
-                    self.zap_stats["held_asleep"] += 1
-                    continue                     # asleep already
-                if self.opts.wand_resist:
-                    if wand_resisted(kind, name):
-                        self.zap_stats["held_resist"] += 1
-                        continue
-                elif kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
-                    continue                     # sleep resistant
-                p_back = None
-                if kind not in RAY_WANDS:
-                    safe = True
-                elif self.opts.wand_pwin:
-                    p_back, _ = self.ray_risk(lv, (dy, dx), kind, letter)
-                    safe = p_back < WAND_RAY_RISK  # wand_pwin: P(our ray comes back and hits us) (nhbot.rays)
-                else:
-                    safe = self.ray_safe(lv, dy, dx)
-                if kind in RAY_WANDS:
-                    self.ray_risk_note(lv, (dy, dx), d, kind, letter, safe)
-                if not safe:
+        if self.opts.wand_ev:
+            pairs = self.wand_ev_pairs(lv, hostiles, targets, wands)
+        else:
+            pairs = ((t, letter, kind) for t in targets for letter, kind in wands)
+        for (key, d, pos, (dy, dx), name, pwin, gain), letter, kind in pairs:
+            if self.opts.track_sleep and kind == "sleep" and self.asleep(lv, pos):
+                self.zap_stats["held_asleep"] += 1
+                continue                     # asleep already
+            if self.opts.wand_resist:
+                if wand_resisted(kind, name):
+                    self.zap_stats["held_resist"] += 1
                     continue
-                self.cur_act = "fight"
-                self.last_attack_target = pos
-                if pwin is not None and len(self.wand_pwin_log) < 30:
-                    self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2),
-                                               None if p_back is None else round(p_back, 3),
-                                               f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
-                return self.zap(letter, key)
+            elif kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
+                continue                     # sleep resistant
+            p_back = None
+            if kind not in RAY_WANDS:
+                safe = True
+            elif self.opts.wand_pwin:
+                p_back, _ = self.ray_risk(lv, (dy, dx), kind, letter)
+                safe = p_back < WAND_RAY_RISK  # wand_pwin: P(our ray comes back and hits us) (nhbot.rays)
+            else:
+                safe = self.ray_safe(lv, dy, dx)
+            if kind in RAY_WANDS:
+                self.ray_risk_note(lv, (dy, dx), d, kind, letter, safe)
+            if not safe:
+                continue
+            self.cur_act = "fight"
+            self.last_attack_target = pos
+            if pwin is not None and len(self.wand_pwin_log) < 30:
+                self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2),
+                                           None if p_back is None else round(p_back, 3),
+                                           f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
+            return self.zap(letter, key)
         return False
 
     def wand_targets(self, lv, hostiles):
@@ -448,6 +495,33 @@ class CombatMixin:
             if d > 1 and self.peaceful_now(lv, pos, far=True):
                 continue
             yield key, d, pos, step, name, None, None
+
+    def wand_ev_pairs(self, lv, hostiles, targets, wands):
+        """wand_ev: (target, wand letter, kind) worth a zap, best first. P(we win) when our next action is this
+        zap (win_prob with the opening: its chance to take effect and its damage, wand_effect) against P(we win)
+        just fighting on; only a zap that raises it. Both from the same draws (the RNG state restored)."""
+        out, held = [], False
+        depth, xl = self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP)
+        for t in targets:
+            pos, name = t[2], t[4]
+            fight = hostiles if (pos, name) in hostiles else hostiles + [(pos, name)]
+            state = self.win_rng.bit_generator.state
+            p_fight = self.win_prob(fight)
+            seen = {}
+            for letter, kind in wands:
+                if kind not in seen:
+                    p_eff, dmg = wand_effect(kind, name, depth, xl)
+                    self.win_rng.bit_generator.state = state
+                    seen[kind] = self.win_prob(fight, opening=(pos, p_eff, dmg)) if p_eff > 0 else 0.0
+                if seen[kind] > p_fight:
+                    out.append((seen[kind], (t[0], t[1], t[2], t[3], t[4], p_fight, seen[kind] - p_fight),
+                                letter, kind))
+                else:
+                    held = True
+        if held and not out:
+            self.zap_stats["held_ev"] += 1
+        out.sort(key=lambda e: -e[0])
+        return [(t, letter, kind) for _, t, letter, kind in out]
 
     def wand_pwin_targets(self, hostiles, targets):
         """wand_pwin (a threshold): the targets in line worth a charge, best first. A target is worth one
