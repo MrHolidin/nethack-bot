@@ -218,17 +218,16 @@ class JewelryMixin:
         return True
 
     def identify_choice(self):
-        """Letters to pick in the identify menu: the first non-empty group of unknown jewelry, (read_unknown)
-        unknown scrolls that are not identify or good by price, unknown potions, unknown wands. One group
-        only: the game identifies the picks in inventory order up to its limit, so a lower group picked too
-        could take the place of a higher one."""
-        groups = [self.unknown_jewelry()]
-        if self.opts.read_unknown:
-            mine = [it for it in self.items() if "unpaid" not in it.text and appearance(it.text) is not None]
-            groups += [[it for it in mine if it.ocls == nh.SCROLL_CLASS and not self.scroll_is_good(it.text)
-                        and not self.is_identify(it.text)],
-                       [it for it in mine if it.ocls == nh.POTION_CLASS],
-                       [it for it in mine if it.ocls == nh.WAND_CLASS]]
+        """Letters to pick in the identify menu: the first non-empty group of unknown jewelry, unknown scrolls
+        that are not identify or good by price, unknown potions, unknown wands. One group only: the game
+        identifies the picks in inventory order up to its limit, so a lower group picked too could take the
+        place of a higher one."""
+        mine = [it for it in self.items() if "unpaid" not in it.text and appearance(it.text) is not None]
+        groups = [self.unknown_jewelry(),
+                  [it for it in mine if it.ocls == nh.SCROLL_CLASS and not self.scroll_is_good(it.text)
+                   and not self.is_identify(it.text)],
+                  [it for it in mine if it.ocls == nh.POTION_CLASS],
+                  [it for it in mine if it.ocls == nh.WAND_CLASS]]
         return {it.letter for it in next((g for g in groups if g), [])}
 
     def answer_identify_menu(self, tty):

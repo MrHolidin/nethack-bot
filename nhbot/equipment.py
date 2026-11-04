@@ -20,7 +20,7 @@ from nhbot.game import MENU_RE
 from nhbot.items import base_name, erosion, parse_item
 
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
-TEST_KEEP_ENCH = 3               # test_strip_plus: pieces this enchanted or more come off before an untested scroll
+TEST_KEEP_ENCH = 3               # strip_for_test: pieces this enchanted or more come off before an untested scroll
 
 # name (appearance or identified) -> (slot, base AC)
 ARMOR = {}
@@ -135,7 +135,7 @@ class EquipMixin:
         self.no_shield = False
         self.no_suit = False
         self.cursed_slots = set()
-        self.test_stripped = set()    # strip_for_test(_plus): slots taken off before a test read, until worn again
+        self.test_stripped = set()    # strip_for_test: slots taken off before a test read, until worn again
         self.test_strip_refused = set()   # letters of pieces that would not come off
         self.wear_failed = set()
         self.equip_events = []        # (turn, action, name)
@@ -235,18 +235,7 @@ class EquipMixin:
         return "acted"
 
     def strip_for_test(self):
-        """test_strip (A/B): before reading an untested scroll, take the body armor off when no cloak is worn
-        (destroy armor takes the cloak, else the suit: do_wear.c destroy_arm) and another piece stays on (enchant
-        armor needs one to land on -- and to show what it is). equip_step puts the suit back on once the reading
-        is over (read_scroll_step runs before it). True if it used the turn."""
-        worn = [a for a in self.armor_inventory() if a["worn"]]
-        suit = next((a for a in worn if a["slot"] == SUIT), None)
-        if suit is None or len(worn) < 2 or any(a["slot"] == CLOAK for a in worn):
-            return False
-        return self.take_off_for_test(suit)
-
-    def strip_for_test_plus(self):
-        """test_strip_plus (A/B): before reading an untested scroll, take off every worn piece enchanted
+        """Before reading an untested scroll (scrolls.read_scroll_step), take off every worn piece enchanted
         +TEST_KEEP_ENCH or more, one per call -- destroy armor can't take it then (a suit under a cloak is safe
         already: the cloak goes first). equip_step puts them back on once the reading is over. True if it used
         the turn."""
@@ -260,7 +249,7 @@ class EquipMixin:
         return False
 
     def take_off_for_test(self, a):
-        """strip_for_test(_plus): take a off unless it can't come off. True if it used the turn."""
+        """strip_for_test: take a off unless it can't come off. True if it used the turn."""
         if a["cursed"] or a["slot"] in self.cursed_slots or a["letter"] in self.test_strip_refused:
             return False
         self.cur_act = "test_strip"

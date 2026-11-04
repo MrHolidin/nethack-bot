@@ -1,14 +1,19 @@
-"""Reading scrolls (read_good; read_unknown) and answering what a scroll asks.
+"""Reading scrolls: the good ones, and untested ones while it pays; answering what a scroll asks.
 
 A scroll's appearance ("scroll labeled ZELGO MER") is random per game, its base price is fixed per type
 (objects.c). Shop prices narrow an appearance down to the types with that base price (pricemem.py).
 
-Read rule: an appearance whose possible types are all enchant weapon, enchant armor or remove curse -- never
-harmful -- is read (and not sold). read_unknown (A/B): also, at full HP above TEST_MIN_HP, with no hostile in view
-and no pet next to us, while neither
-enchant armor nor identify is known by name (discoveries), a scroll whose price group is unknown or is 20 zm
-(identify) or 60 zm (enchant weapon). Before a scroll that may be enchant armor, the worn pieces it could
-evaporate come off (equipment.strip_for_enchant) and are worn again after.
+Good scrolls: an appearance whose possible types are all enchant weapon, enchant armor or remove curse -- never
+harmful -- is read (and not sold). Before a scroll that may be enchant armor, the worn pieces it could evaporate
+come off (equipment.strip_for_enchant) and are worn again after.
+
+Untested scrolls (A/B read_unknown + test_strip_plus over base ev_on_f: score +753 [-679, +2146]; over read_unknown
+alone +1504 [+240, +2831]): with no hostile in view, at full HP above TEST_MIN_HP, no pet next to us, and while
+neither enchant armor nor identify is known by name (discoveries), a scroll whose price group is unknown or is 20 zm
+(identify) or 60 zm (enchant weapon) is read; every worn piece +3 or better comes off first
+(equipment.strip_for_test) -- destroy armor would otherwise take the Valkyrie's +3 shield. One forced read in that
+state against a blank one (force_read, 861 games): enchant armor +0.58 depth, destroy armor -0.81, fire -0.38,
+earth -0.24, amnesia -0.08.
 
 What a scroll asks (read.c seffects), answered in game.settle and read_scroll:
   identify        the menu: jewelry.answer_identify_menu
@@ -29,9 +34,9 @@ from nhbot.pricemem import appearance
 
 GOOD_TYPES = {"enchant armor", "enchant weapon", "remove curse"}
 GOOD_RE = re.compile(r"\bscrolls? of (?:enchant armor|enchant weapon|remove curse)\b")    # a stack: "3 scrolls of"
-UNKNOWN_READ_TYPES = {"identify", "enchant weapon"}     # read_unknown: price groups 20 and 60 zm
-TESTING_ENDS = {"enchant armor", "identify"}            # read_unknown: once one of these is known, stop
-TEST_MIN_HP = 40                                        # read_unknown: only above this HP
+UNKNOWN_READ_TYPES = {"identify", "enchant weapon"}     # untested scrolls: price groups 20 and 60 zm
+TESTING_ENDS = {"enchant armor", "identify"}            # untested scrolls: once one of these is known, stop
+TEST_MIN_HP = 40                                        # untested scrolls: only above this HP
 GENOCIDE_SPECIES = ("water nymph", "mountain nymph", "wood nymph")
 GENOCIDE_CLASS = ("n",)
 CHARGE_FIRST = ("sleep", "magic missile", "fire", "cold", "lightning", "striking", "digging")
@@ -84,7 +89,7 @@ class ScrollMixin:
         return self.scroll_known
 
     def unknown_readable(self, s):
-        """read_unknown: a scroll worth reading untested -- its price group unknown, or 20 / 60 zm."""
+        """A scroll worth reading untested: its price group unknown, or 20 / 60 zm."""
         if appearance(s) is None:
             return False                       # known by name, or blank paper ("unlabeled": not shuffled)
         post = self.price_of_text(s)
@@ -102,11 +107,11 @@ class ScrollMixin:
         return not (G.KIND[g[max(0, y - 1):y + 2, max(0, x - 1):x + 2]] == G.PET).any()
 
     def test_reading_on(self):
-        """read_unknown: test_safe, and neither enchant armor nor identify known by name yet."""
+        """Untested scrolls: test_safe, and neither enchant armor nor identify known by name yet."""
         return self.test_safe() and not self.known_scroll_types() & TESTING_ENDS
 
     def read_state(self):
-        """The state a read happens in (logged with read_unknown and force_read reads)."""
+        """The state a read happens in (logged for untested and force_read reads)."""
         return {"t": self.turn(), "dlvl": self.bl(nh.NLE_BL_DEPTH), "xl": self.bl(nh.NLE_BL_XP),
                 "hp": self.bl(nh.NLE_BL_HP), "maxhp": self.bl(nh.NLE_BL_HPMAX), "ac": self.bl(nh.NLE_BL_AC)}
 
@@ -133,22 +138,20 @@ class ScrollMixin:
 
     # ------------------------------------------------------------ read
     def read_scroll_step(self, lv):
-        """Housekeeping (no hostile in view): read a good scroll, else (read_unknown) an untested one."""
+        """Housekeeping (no hostile in view): read a good scroll, else an untested one."""
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False              # confused remove curse / enchant armor do other things
         inv = [(it.letter, it.text) for it in self.items() if it.ocls == nh.SCROLL_CLASS]
         good = [(l, s) for l, s in inv if self.scroll_is_good(s)]
         todo = [(l, s, "good") for l, s in good]
-        if self.opts.read_unknown and not good:
+        if not good:
             unknown = [(l, s) for l, s in inv if self.unknown_readable(s)]
             if unknown and self.test_reading_on():
                 todo = [(l, s, "unknown") for l, s in unknown]
         for letter, s, why in todo:
-            if why == "unknown" and self.opts.test_strip and self.strip_for_test():
-                return True                           # the suit came off: destroy armor would take it
-            if why == "unknown" and self.opts.test_strip_plus:
-                if self.strip_for_test_plus():
+            if why == "unknown":
+                if self.strip_for_test():
                     return True                       # a +3 or better piece came off: destroy armor can't take it
                 maybe_armor = False                   # what is left on may be bare (+4 and up are off already)
             else:
