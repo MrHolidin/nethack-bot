@@ -17,7 +17,7 @@ import re
 import nle.nethack as nh
 
 from nhbot.game import MENU_RE
-from nhbot.items import base_name, parse_item
+from nhbot.items import base_name, erosion, parse_item
 
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
 
@@ -103,7 +103,7 @@ def parse_armor(s):
     else:
         return None
     return {"slot": slot, "ac": ac, "ench": ench, "worn": worn, "cursed": cursed, "name": t, "safe": safe,
-            "text": s}
+            "text": s, "eroded": erosion(s)}
 
 
 BLESSED_RE = re.compile(r"\bblessed\b")
@@ -114,8 +114,11 @@ BLESSED_RE = re.compile(r"\bblessed\b")
 ARMOR_WISHES = ("blessed +2 gray dragon scale mail", "blessed +2 gauntlets of power", "blessed +2 speed boots",
                 "blessed +2 shield of reflection", "blessed +2 cloak of protection", "blessed +2 dwarvish iron helm")
 
-def value(a):
-    return a["ac"] + (a["ench"] if a["ench"] is not None else UNKNOWN_ENCH)
+def value(a, eroded=False):
+    """AC the piece gives: do_wear.c ARM_BONUS = a_ac + spe - min(greatest erosion, a_ac) (eroded: the
+    erosion counted -- flag erosion_value)."""
+    ac = a["ac"] - (min(a.get("eroded", 0), a["ac"]) if eroded else 0)
+    return ac + (a["ench"] if a["ench"] is not None else UNKNOWN_ENCH)
 
 
 def enchant_risk(a):
@@ -179,6 +182,9 @@ class EquipMixin:
     def two_handed(self):
         return any(it.two_hands for it in self.items())
 
+    def armor_value(self, a):
+        return value(a, eroded=self.opts.erosion_value)
+
     def improves(self, a, worn):
         if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
             return False
@@ -186,13 +192,13 @@ class EquipMixin:
             return False
         cur = worn.get(a["slot"])
         if cur is None:
-            return value(a) > 0.5
+            return self.armor_value(a) > 0.5
         if cur.get("cursed") or a["slot"] in self.cursed_slots:
             return False
-        if abs(value(a) - value(cur)) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
+        if abs(self.armor_value(a) - self.armor_value(cur)) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
                 and not BLESSED_RE.search(cur.get("text", "")):
             return True                       # as good, and blessed: resists erosion and a curse (altar test)
-        return value(a) > value(cur) + 0.5
+        return self.armor_value(a) > self.armor_value(cur) + 0.5
 
     # ---------------------------------------------------------- main hook
     def equip_step(self, lv):
@@ -204,7 +210,8 @@ class EquipMixin:
         # 1) wear something better we already carry
         cands = [a for a in inv if not a["worn"] and self.improves(a, worn)]
         if cands:
-            best = max(cands, key=lambda a: value(a) - (value(worn[a["slot"]]) if a["slot"] in worn else 0))
+            best = max(cands, key=lambda a: self.armor_value(a)
+                       - (self.armor_value(worn[a["slot"]]) if a["slot"] in worn else 0))
             self.wear(best, worn)
             return True
         return False                  # armor we won't wear is carried for selling (the value decides drops)

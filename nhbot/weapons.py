@@ -4,7 +4,7 @@ import re
 
 import nle.nethack as nh
 
-from nhbot.items import base_name
+from nhbot.items import base_name, erosion
 
 
 class WeaponsMixin:
@@ -29,9 +29,12 @@ class WeaponsMixin:
 
     def weapon_rank(self, s):
         """weapons: Excalibur > the two long-sword-skill blades > anything else. Lawful: katana < long sword
-        (a long sword can still become Excalibur); others: long sword < katana. Ties: known enchantment."""
+        (a long sword can still become Excalibur); others: long sword < katana. Ties: known enchantment (flag
+        erosion_value: minus the erosion -- weapon.c dmgval takes greatest_erosion off the damage)."""
         m = re.search(r"(?:^|\s)([+-]\d+) ", s)
         ench = int(m.group(1)) if m else 0
+        if self.opts.erosion_value:
+            ench -= erosion(s)
         lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
         if "Excalibur" in s:
             return (3, ench)

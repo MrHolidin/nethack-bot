@@ -87,6 +87,15 @@ PREFIX_WORDS = ("empty", "broken", "locked", "unlocked", "partly used", "partly 
 PREFIX_RE = re.compile(r"^(?:%s)\s+" % "|".join(sorted(PREFIX_WORDS, key=len, reverse=True)))
 
 
+EROSION_RE = re.compile(r"\b(?:(very|thoroughly) )?(?:rusty|burnt|corroded|rotted)\b")
+
+
+def erosion(s):
+    """Greatest erosion (objnam.c add_erosion_words: 1 plain, 2 "very", 3 "thoroughly") of the two kinds."""
+    return max((3 if m.group(1) == "thoroughly" else 2 if m.group(1) else 1 for m in EROSION_RE.finditer(s)),
+               default=0)
+
+
 def base_name(s, called=False):
     """Inventory / floor text -> (quantity, enchantment or None, bare name): no state suffixes, article or
     count, prefix words, enchantment; no 'called' / 'named' part unless called."""
