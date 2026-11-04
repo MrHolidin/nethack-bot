@@ -16,7 +16,7 @@ from nhbot.monsters import PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
 from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, our_protection, ray_harm, ray_walk,
-                        self_hit_prob, zap_hit_prob)
+                        self_hit_prob, zap_hit_prob, ROOM as ROOM_CODE, STONE as STONE_CODE)
 
 
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
@@ -541,7 +541,15 @@ class CombatMixin:
                 p_eff, dmg = wand_effect(kind, name, depth, xl)
                 friend = G.KIND[g[my, mx]] == G.PET or self.peaceful_now(lv, pos, look=False)
                 mons[pos] = (zap_hit_prob(pm.ac), any(r in name for r in REFLECTORS), p_eff, dmg, friend)
-        terrain = TERRAIN_CODE[self.terrain_glyphs(lv)]
+        terrain = TERRAIN_CODE[self.terrain_glyphs(lv)].copy()
+        for (my, mx) in mons:                    # a monster seen in line: the squares up to it are open, not rock
+            dy, dx = my - y0, mx - x0
+            if dy == 0 or dx == 0 or abs(dy) == abs(dx):
+                n = max(abs(dy), abs(dx))
+                for i in range(1, n + 1):
+                    sq = (y0 + i * np.sign(dy), x0 + i * np.sign(dx))
+                    if terrain[sq] == STONE_CODE:
+                        terrain[sq] = ROOM_CODE
         mines = bool(lv.key and lv.key[0] == 2)
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
@@ -555,9 +563,9 @@ class CombatMixin:
         p_charged = self.wand_p_charged(it) if it is not None else 0.0
 
         def opening(rng, alive_at, apply):
-            got = {"dmg": 0, "sleep": 0}
+            got = {"dmg": 0, "sleep": 0, "blind": False}
             if rng.random() >= p_charged:
-                return 0, 0                               # "Nothing happens"
+                return 0, 0, False                        # "Nothing happens"
 
             def hit(pos):
                 if pos == (y0, x0):
@@ -565,6 +573,7 @@ class CombatMixin:
                         return (False, False)
                     if reflect:
                         return (True, True)
+                    got["blind"] |= kind == "lightning"       # zap.c flashburn, resisted or not
                     if maybe_death and not resisted:
                         got["dmg"] += 10 ** 4                 # judged as death (ray_risk does the same)
                     elif kind == "sleep" and not resisted:
@@ -592,7 +601,7 @@ class CombatMixin:
                 beam_walk(terrain, (y0, x0), step, rng, hit)
             else:
                 ray_walk(terrain, (y0, x0), step, kind, rng, hit, mines)
-            return got["dmg"], got["sleep"]
+            return got["dmg"], got["sleep"], got["blind"]
 
         return opening
 

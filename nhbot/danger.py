@@ -36,12 +36,18 @@ MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
 NO_DAMAGE = {"RUST", "CORR", "DCAY", "SGLD", "SEDU", "SSEX", "SLIM", "ENCH", "CURS", "STON", "COLD"}
 POISON = {"DRST", "DRDX", "DRCO"}
 MAX_D = 400
+TAINT_AD = {"BLND": 1.0, "WERE": 0.25, "SEDU": 1.0, "SITM": 1.0, "SSEX": 1.0}   # a hit blinds / passes
+# lycanthropy (mhitu.c AD_WERE: 1 in 4) / charms and robs us: a fight won that way counts half (walk_fight)
+TAINTED_WIN = 0.5
 WAND_ORDER = ("death", "sleep", "fire", "cold", "lightning", "magic missile", "striking")   # muse.c find_offensive
 MISSILE_DIE = {"arrow": 6, "elven arrow": 7, "orcish arrow": 5, "silver arrow": 6, "ya": 7, "crossbow bolt": 4,
                "rock": 3, "flint stone": 6, "boulder": 20}        # objects.c, small monsters' die
 BREATH_KIND = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning", "SLEE": "sleep", "MAGM": "magic missile",
                "DISN": "death", "ACID": "fire", "DRST": "fire", "RBRE": "fire"}
 MON_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
+MON_INDICES = {}                         # name -> every kind of that name (a were's human and animal forms)
+for _i in range(nh.NUMMONS):
+    MON_INDICES.setdefault(nh.permonst(_i).mname, []).append(_i)
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
 FLEE_P = 0.5                     # flee: P(death this turn) above this
 WIN_SIMS = 200                   # win_prob: sampled fights
@@ -324,7 +330,8 @@ class DangerMixin:
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
             mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
-                         self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name))
+                         self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name,
+                         self.monster_taint(name)))
         if not mons:
             return 1.0
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
@@ -335,7 +342,7 @@ class DangerMixin:
         wins = 0
         for _ in range(sims):
             hps = []
-            for lev, _, dmg, _, _, hits, _, _, _, _ in mons:
+            for lev, _, dmg, _, _, hits, _, _, _, _, _ in mons:
                 for _try in range(20):
                     h = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -345,8 +352,9 @@ class DangerMixin:
                 hps.append(max(h, 1))
             hp, alive, asleep = hp0, list(range(len(mons))), 0
             if approach is not None:
-                if self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans) > 0:
-                    wins += 1
+                end, tainted = self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans)
+                if end > 0:
+                    wins += TAINTED_WIN if tainted else 1
                 continue
             for _turn in range(max_turns):
                 acts = k + (1 if frac and rng.random() < frac / 12 else 0)
@@ -368,7 +376,7 @@ class DangerMixin:
                                 hps[jj] -= dmg
                                 if hps[jj] <= 0:
                                     alive.remove(jj)
-                        lost, asleep = opening(zrng, alive_at, apply)
+                        lost, asleep, _ = opening(zrng, alive_at, apply)
                         hp -= lost
                         continue
                     if asleep > 0:
@@ -394,11 +402,13 @@ class DangerMixin:
         return wins / sims
 
     def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans=None):
-        """One sampled fight of win_prob with approach (see there): our HP at its end (<= 0: lost)."""
+        """One sampled fight of win_prob with approach (see there): (our HP at its end -- <= 0: lost, tainted: it
+        blinded us, gave us lycanthropy or charmed and robbed us -- TAINT_AD, a yellow light's explosion, a
+        lightning bolt's flash -- so a win counts TAINTED_WIN)."""
         left = [approach.get(m[6], 0) for m in mons]
         plans = plans or [None] * len(mons)
         cool = [0] * len(mons)                   # breath: turns until it can breathe again
-        alive, asleep = list(range(len(mons))), 0
+        alive, asleep, tainted = list(range(len(mons))), 0, False
         k, frac = divmod(self.our_speed(), 12)
         for _turn in range(max_turns):
             acts = k + (1 if frac and rng.random() < frac / 12 else 0)
@@ -421,8 +431,9 @@ class DangerMixin:
                             hps[jj] -= dmg
                             if hps[jj] <= 0:
                                 alive.remove(jj)
-                    lost, asleep = opening(zrng, alive_at, apply)
+                    lost, asleep, blind = opening(zrng, alive_at, apply)
                     hp -= lost
+                    tainted |= blind
                     continue
                 if asleep > 0 or not hit:
                     continue
@@ -433,34 +444,52 @@ class DangerMixin:
                 break
             asleep -= 1
             for j in list(alive):
-                (one, inst), speed = mons[j][7], mons[j][8]
+                (one, inst), speed, (p_taint, explodes) = mons[j][7], mons[j][8], mons[j][10]
                 mk, mf = divmod(speed, 12)
                 moves = mk + (1 if mf and rng.random() < mf / 12 else 0)
                 plan = plans[j]
                 if plan is not None:
                     cool[j] -= 1
-                    for _m in range(moves):
+                for _m in range(moves):
+                    if left[j] > 0:
+                        left[j] -= 1                     # its step; then a ranged attack, a melee one only next to us
+                        if plan is None:
+                            continue
+                    if plan is not None:
+                        dmg, sleep, blind = self.ranged_hit(plan, left[j] + 1, cool, j, rng, asleep > 0)
+                        if dmg is not None:
+                            hp -= dmg
+                            asleep, tainted = max(asleep, sleep), tainted or blind
+                            if hp <= 0:
+                                return hp, tainted
+                            continue
                         if left[j] > 0:
-                            left[j] -= 1                 # its step, then (ranged) its attack
-                        dmg, sleep = self.ranged_hit(plan, left[j] + 1, cool, j, rng, asleep > 0)
-                        if dmg is None and left[j] == 0:
-                            if rng.random() < inst:
-                                return 0
-                            dmg = int(rng.choice(len(one), p=one))
-                        hp -= dmg or 0
-                        asleep = max(asleep, sleep)
-                        if hp <= 0:
-                            return hp
-                    continue
-                walk = min(moves, left[j])
-                left[j] -= walk
-                for _m in range(moves - walk):
+                            continue
+                    if explodes:
+                        tainted = True                   # mhitu.c explmu: it blows up, blinding us
+                        alive.remove(j)
+                        break
                     if rng.random() < inst:
-                        return 0
+                        return 0, tainted
                     hp -= int(rng.choice(len(one), p=one))
-                if hp <= 0:
-                    return hp
-        return hp
+                    if p_taint and rng.random() < p_taint:
+                        tainted = True
+                    if hp <= 0:
+                        return hp, tainted
+        return hp, tainted
+
+    def monster_taint(self, name):
+        """(P(one move of its melee blinds us, gives us lycanthropy or charms and robs us) -- TAINT_AD over the
+        attacks of every kind of that name: a were's animal form bites -- , it explodes blinding: a yellow light)."""
+        keep, explodes = 1.0, False
+        for idx in MON_INDICES.get(name, ()):
+            level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+            for i, (at, ad, _, _) in enumerate(ATTACKS[idx]):
+                if at == "EXPL" and ad == "BLND":
+                    explodes = True
+                elif at in MELEE and ad in TAINT_AD:
+                    keep *= 1 - self.hit_prob(level, i) * TAINT_AD[ad]
+        return 1 - keep, explodes
 
     def ranged_plan(self, profile, name):
         """What a monster's seen ranged attacks do to us, for ranged_hit (None: none seen)."""
@@ -484,7 +513,7 @@ class DangerMixin:
     @staticmethod
     def ranged_hit(plan, dist, cool, j, rng, we_sleep=False):
         """One move's ranged attack of a monster `dist` squares away by its plan: (damage to us or None when it
-        has no ranged attack to make, turns we fall asleep). zap.c buzz/zhitu (a ray: zap_hit by our AC,
+        has no ranged attack to make, turns we fall asleep, a lightning flash blinded us). zap.c buzz/zhitu (a ray: zap_hit by our AC,
         reflection, resistance, 6d6 / magic missile 2d6 / sleep d(6, 25) / death), bhitm striking (rnd(20) < 10 +
         AC, 2d12, magic resistance), mthrowu.c m_throw / thitu (a missile hits when rnd(20) < AC + 8 + 3 - distance;
         a poisoned one: 1 in 30 deadly, else mostly rnd(6) more), mhitu.c breamu (2 in 3, then 10..29 turns
@@ -494,24 +523,25 @@ class DangerMixin:
 
         def ray(kind, nd):
             if rng.random() >= plan["ray_p"] or "reflection" in prot:
-                return 0, 0
+                return 0, 0, False
+            blind = kind == "lightning"                  # zap.c flashburn, resisted or not
             if kind == "death":
-                return (0, 0) if "magic" in prot else (10 ** 6, 0)
+                return (0, 0, False) if "magic" in prot else (10 ** 6, 0, False)
             if RAY_RESIST.get(kind) in prot:
-                return 0, 0
+                return 0, 0, blind
             if kind == "sleep":
-                return 0, int(rng.integers(1, 26, size=6).sum())
-            return int(rng.integers(1, 7, size=nd).sum()), 0
+                return 0, int(rng.integers(1, 26, size=6).sum()), False
+            return int(rng.integers(1, 7, size=nd).sum()), 0, blind
 
         wand = None if plan["wand"] == "sleep" and we_sleep else plan["wand"]
         if wand == "striking":
             if "magic" in prot or rng.integers(1, 21) >= 10 + ac:
-                return 0, 0
-            return int(rng.integers(1, 13, size=2).sum()), 0
+                return 0, 0, False
+            return int(rng.integers(1, 13, size=2).sum()), 0, False
         if wand:
             return ray(wand, 2 if wand == "magic missile" else 6)
         if dist < 2:
-            return None, 0
+            return None, 0, False
         if plan["missile"]:
             die, counts, poisoned = plan["missile"]
             dmg = 0
@@ -521,14 +551,14 @@ class DangerMixin:
                     if poisoned:
                         r = rng.integers(30)
                         if r == 0:
-                            return 10 ** 6, 0
+                            return 10 ** 6, 0, False
                         if r > 5:
                             dmg += int(rng.integers(1, 7))
-            return dmg, 0
+            return dmg, 0, False
         if plan["breath"] and cool[j] <= 0 and rng.random() < 2 / 3:
             cool[j] = 10 + int(rng.integers(20))
             return ray(*plan["breath"])
-        return 0, 0
+        return 0, 0, False
 
     # ------------------------------------------------------------ flee (flag flee)
     def our_speed(self):
