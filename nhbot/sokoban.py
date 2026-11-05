@@ -206,12 +206,11 @@ class SokobanMixin:
     def soko_oracle_dlvl(self):
         """Dlvl of the Oracle's level if we saw it, else None: main Dlvl 5-9 with centaur statues (oracle.des puts
         them round the centre room, whose four fountains we may not have seen) or four fountains."""
-        if self.soko_oracle is None:
-            for key, lv in self.levels.items():
-                if key[0] == 0 and 5 <= key[1] <= 9 and (
-                        np.isin(lv.under, CENTAUR_STATUES).sum() >= 2
-                        or (self.terrain_glyphs(lv) == FOUNTAIN_GLYPH).sum() >= 4):
-                    self.soko_oracle = key[1]
+        lv = self.level()                    # what we see of a level changes only while we are on it
+        if self.soko_oracle is None and lv.key[0] == 0 and 5 <= lv.key[1] <= 9 and (
+                np.isin(lv.under, CENTAUR_STATUES).sum() >= 2
+                or (self.terrain_glyphs(lv) == FOUNTAIN_GLYPH).sum() >= 4):
+            self.soko_oracle = lv.key[1]
         return self.soko_oracle
 
     def soko_search_step(self, lv, grids, nothing_left):
