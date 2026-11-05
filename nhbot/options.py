@@ -8,6 +8,7 @@ DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "sacrifice": False,        # A/B: a neutral hero offers fresh corpses of its kills at a neutral altar, carried there
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
+    "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while

@@ -13,6 +13,9 @@ from nhbot.carry import LEAVE_RE
 # first one often comes while we stand in the door seeing nothing inside yet (a keeper blocking for a pick-axe,
 # a wall just repaired), which marked nothing
 SHOP_WELCOME_RE = re.compile(r"Welcome(?: again)? to [A-Z][\w' -]*?(?:'s|s') ([^!]+)!")
+# hack.c check_special_room: entering a zoo says "Welcome to David's treasure zoo!" -- the same shape as a shop
+# greeting, but no shop (zoo_not_shop)
+ZOO_WELCOME = "Welcome to David's treasure zoo!"
 # merchandise: an object glyph other than a boulder / statue (ROCK_CLASS)
 ITEM_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
 for _g in range(nh.MAX_GLYPH):
@@ -27,8 +30,16 @@ class ShopMixin:
         self.shop_browsed = set()        # (level key, square) of shop squares we stood on to read the tags
         self.browse_stats = {"steps": 0, "looks": 0}
 
+    def shop_welcome(self, m):
+        """A shopkeeper's greeting in m (the regex match, its group 1 the shop type), or None. zoo_not_shop: the
+        zoo's greeting is none -- taken for one, the zoo was marked a shop, closed to us from outside (80014:
+        the only way between two halves of the level, 4000 turns of searching)."""
+        if self.opts.zoo_not_shop:
+            m = m.replace(ZOO_WELCOME, "")
+        return SHOP_WELCOME_RE.search(m)
+
     def shop_greeted(self, lv, m):
-        mm = SHOP_WELCOME_RE.search(m)
+        mm = self.shop_welcome(m)
         if not mm:
             return
         stype = mm.group(1)
@@ -96,7 +107,7 @@ class ShopMixin:
             self.price_note_text(m)
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
-        if lv and SHOP_WELCOME_RE.search(m) and not ARRIVED_RE.search(self.text_since(self.tick_seq)):
+        if lv and self.shop_welcome(m) and not ARRIVED_RE.search(self.text_since(self.tick_seq)):
             # shop entrance: mark the shop from the door -- after falling in through a trap door we are
             # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())
