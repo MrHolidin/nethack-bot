@@ -9,7 +9,7 @@ and options (the recorder only watches: it sends no keys of its own).
 
 A recording holds every frame the terminal showed -- one per key the bot sent -- as the rows that changed since
 the frame before (every KEY_EVERY frames all of them, so the viewer can jump anywhere), the colors likewise, the
-status line numbers, the key, and what the bot was doing: the policy step that acted on that tick and its own
+status line numbers (with the branch: DNUM, DLEVEL), the key, what we wield and wear (when it changes), and what the bot was doing: the policy step that acted on that tick and its own
 activity label (fight, explore, rest, ...). Besides the frames: the message log, events worth jumping to (kills,
 level changes, zaps, prayers, low HP, the end) and, with wand_ev on, the wand decisions (P(win) of fighting on and
 of each zap considered).
@@ -34,6 +34,12 @@ KEY_EVERY = 200                  # frames between full screens
 VIEWER = os.path.join(ROOT, "tools", "replay_viewer.html")
 DATA_MARK = "/*REPLAY_DATA*/null"
 LOW_HP = 0.33                    # an event when HP falls below this share of max
+BRANCHES = {1: "Gehennom", 2: "Mines", 3: "Quest", 4: "Sokoban", 5: "Ludios", 6: "Vlad's", 7: "Planes"}   # dungeon.def
+
+
+def level_name(depth, dnum, dlevel):
+    """'Dlvl 4', or 'Dlvl 4 (Mines 2)' off the main dungeon."""
+    return f"Dlvl {depth}" + (f" ({BRANCHES.get(dnum, 'branch')} {dlevel})" if dnum else "")
 
 
 def key_name(code):
@@ -54,6 +60,7 @@ class RecordingBot(Bot):
     def __init__(self, *a, **k):
         super().__init__(*a, **k)
         self.rec_frames, self.rec_events, self.rec_decisions, self.rec_msgs = [], [], [], []
+        self.rec_equip = []              # [frame, {"w": wielded, "a": worn}] whenever it changes
         self._prev_rows, self._prev_cols = None, None
         self._prev_depth, self._low = None, False
 
@@ -72,11 +79,11 @@ class RecordingBot(Bot):
         bl = self.obs["blstats"]
         stats = [int(bl[nh.NLE_BL_HP]), int(bl[nh.NLE_BL_HPMAX]), int(bl[nh.NLE_BL_DEPTH]), int(bl[nh.NLE_BL_XP]),
                  int(bl[nh.NLE_BL_AC]), int(bl[nh.NLE_BL_GOLD]), int(bl[nh.NLE_BL_HUNGER]),
-                 int(bl[nh.NLE_BL_CONDITION])]
+                 int(bl[nh.NLE_BL_CONDITION]), int(bl[nh.NLE_BL_DNUM]), int(bl[nh.NLE_BL_DLEVEL])]
         t = int(bl[nh.NLE_BL_TIME])
         if t == 0 and self.rec_frames:          # the game is over: the status is gone, keep the last one (HP 0)
             prev = self.rec_frames[-1]
-            t, stats = prev["t"], [0] + prev["s"][1:]
+            t, stats = prev["t"], [0] + prev["s"][1:]   # (and the branch: DNUM / DLEVEL are gone too)
         f = {"t": t, "k": key_name(code), "s": stats,
              "r": [[i, r] for i, r in enumerate(rows) if full or r != self._prev_rows[i]],
              "c": [[i, c] for i, c in enumerate(cols) if full or c != self._prev_cols[i]]}
@@ -85,9 +92,10 @@ class RecordingBot(Bot):
         self.rec_frames.append(f)
         self._prev_rows, self._prev_cols = rows, cols
         hp, hpmax, depth = f["s"][0], f["s"][1], f["s"][2]
-        if self._prev_depth is not None and depth != self._prev_depth:
-            self.event("level", f"Dungeon level {self._prev_depth} → {depth}")
-        self._prev_depth = depth
+        where = (depth, f["s"][8], f["s"][9])
+        if self._prev_depth is not None and where != self._prev_depth:
+            self.event("level", f"{level_name(*self._prev_depth)} → {level_name(*where)}")
+        self._prev_depth = where
         low = hpmax > 0 and hp < LOW_HP * hpmax
         if low and not self._low:
             self.event("lowhp", f"HP {hp}/{hpmax}")
@@ -107,6 +115,19 @@ class RecordingBot(Bot):
             step, act = self.last_step or "", self.cur_act or ""
             for f in self.rec_frames[start:]:
                 f["p"], f["a"] = step, act
+            self.record_equip()
+
+    def record_equip(self):
+        """What we wield and wear, kept whenever it changes (its text without the state in parentheses)."""
+        if not self.rec_frames:
+            return
+        clean = lambda s: re.sub(r"\s*\((?:weapon in hands?|being worn|wielded|alternate weapon; not wielded|"
+                                 r"in quiver)\)", "", s).strip()
+        items = self.items()
+        eq = {"w": [clean(i.text) for i in items if i.held],
+              "a": [clean(i.text) for i in items if i.worn or i.ring_on]}
+        if not self.rec_equip or self.rec_equip[-1][1] != eq:
+            self.rec_equip.append([len(self.rec_frames) - 1, eq])
 
     def log_msg(self, m):
         m2 = m.strip()
@@ -163,7 +184,8 @@ def record(seed, kw, character="val"):
     return {"v": 1, "seed": seed, "kw": kw, "character": character, "rows": 24, "cols": 80,
             "summary": {"turns": s["turns"], "score": int(s["score"]), "max_depth": s["max_depth"], "xl": s["xl"],
                         "last": [m for _, _, m in b.rec_msgs[-6:]]},
-            "frames": b.rec_frames, "events": b.rec_events, "decisions": b.rec_decisions, "msgs": b.rec_msgs}
+            "frames": b.rec_frames, "events": b.rec_events, "decisions": b.rec_decisions, "msgs": b.rec_msgs,
+            "equip": b.rec_equip}
 
 
 def build_html(rec_gz=None, standalone=True):

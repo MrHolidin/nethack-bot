@@ -105,6 +105,8 @@ header.top .game b { color: var(--ink); font-weight: 600; }
 .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; }
 .kv .k { color: var(--muted); }
 .kv .v { font-family: var(--font-mono); overflow-wrap: anywhere; }
+.stat .v .br { font-size: 11px; color: var(--accent); font-family: var(--font-ui); text-transform: uppercase; letter-spacing: 0.05em; margin-left: 4px; }
+.equip .v div { padding: 1px 0; }
 
 .decision .head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
 .dec-row { display: grid; grid-template-columns: minmax(0, 1fr) 3.6em; gap: 2px 8px; align-items: center; margin-bottom: 4px; }
@@ -182,6 +184,7 @@ header.top .game b { color: var(--ink); font-weight: 600; }
       <div class="legend">
         <span><i style="background:var(--good)"></i>HP / max</span>
         <span><i style="background:var(--muted)"></i>dungeon level</span>
+        <span><i style="background:var(--accent);height:4px"></i>off the main dungeon (Mines, Sokoban)</span>
         <span><i style="background:var(--accent)"></i>wand decisions</span>
         <span><i style="background:var(--bad)"></i>kills, prayers, zaps (ticks)</span>
       </div>
@@ -215,6 +218,11 @@ header.top .game b { color: var(--ink); font-weight: 600; }
       </div>
     </div>
 
+    <div class="unit">
+      <h2>Equipment</h2>
+      <div class="kv equip" id="equip"><div class="empty">Not in this recording.</div></div>
+    </div>
+
     <div class="unit decision">
       <h2>Wand decision</h2>
       <div id="dec"><div class="empty">No wand decision this turn.</div></div>
@@ -240,6 +248,7 @@ const EV_COLORS = { kill: "var(--bad)", level: "var(--muted)", zap: "var(--accen
                     lowhp: "var(--warn)", death: "var(--bad)", end: "var(--ink)", decision: "var(--accent)" };
 const EV_NAMES = { kill: "Kills", level: "Levels", zap: "Zaps", pray: "Prayers", lowhp: "Low HP", decision: "Decisions", end: "End" };
 const HUNGER = ["", "Hungry", "Weak", "Fainting", "Fainted", "Starved"];
+const BRANCH = { 1: "Gehennom", 2: "Mines", 3: "Quest", 4: "Sokoban", 5: "Ludios", 6: "Vlad's", 7: "Planes" };
 const CONDS = [[1,"Stoned",1],[2,"Slimed",1],[4,"Strangled",1],[8,"Food pois.",1],[16,"Ill",1],[32,"Blind"],[64,"Deaf"],
                [128,"Stunned"],[256,"Confused"],[512,"Halluc."],[1024,"Levitating"],[2048,"Flying"],[4096,"Riding"]];
 
@@ -352,13 +361,22 @@ function frameOfTurn(t) {
 function renderPanels() {
   const f = R.frames[cur];
   const [hp, hpmax, dl, xl, ac, gold, hun, cond] = f.s;
-  $("sTurn").textContent = f.t; $("sHp").textContent = `${hp}/${hpmax}`; $("sDl").textContent = dl;
+  $("sTurn").textContent = f.t; $("sHp").textContent = `${hp}/${hpmax}`;
+  const dnum = f.s[8], dlev = f.s[9];
+  $("sDl").innerHTML = dnum ? `${dl}<span class="br">${esc(BRANCH[dnum] || "branch")} ${dlev}</span>` : `${dl}`;
   $("sXl").textContent = xl; $("sAc").textContent = ac; $("sGold").textContent = gold;
   $("sHun").textContent = HUNGER[hun] || "–"; $("sFrame").textContent = `${cur + 1}`;
   const share = hpmax ? hp / hpmax : 0;
   $("hpfill").style.width = `${Math.max(0, Math.min(1, share)) * 100}%`;
   $("hpbar").className = "hpbar" + (share < 0.33 ? " low" : share < 0.6 ? " mid" : "");
   $("conds").innerHTML = CONDS.filter(([m]) => cond & m).map(([, n, bad]) => `<span class="chip${bad ? " bad" : ""}">${n}</span>`).join("");
+  if (R.equip) {
+    let e = null;
+    for (const [i, eq] of R.equip) { if (i <= cur) e = eq; else break; }
+    const list = xs => xs && xs.length ? xs.map(x => `<div>${esc(x)}</div>`).join("") : `<div class="empty">none</div>`;
+    $("equip").innerHTML = e ? `<div class="k">Wielded</div><div class="v">${list(e.w)}</div><div class="k">Worn</div><div class="v">${list(e.a)}</div>`
+                             : `<div class="empty">–</div>`;
+  }
   $("bStep").textContent = f.p || "–"; $("bAct").textContent = f.a || "–"; $("bKey").textContent = f.k || "–";
   $("readout").innerHTML = `turn <b>${f.t}</b> · frame ${cur + 1}/${R.frames.length}`;
 
@@ -432,8 +450,16 @@ function drawTimeline() {
   const maxDl = Math.max(1, ...R.frames.map(f => f.s[2]));
   g.strokeStyle = css("--muted"); g.globalAlpha = 0.55; g.beginPath();
   const step = Math.max(1, Math.floor(n / (w * 2)));
-  for (let i = 0; i < n; i += step) { const y = top + (bot - top) * (R.frames[i].s[2] - 1) / Math.max(1, maxDl - 1); i ? g.lineTo(X(i), y) : g.moveTo(X(i), y); }
+  const dly = i => top + (bot - top) * (R.frames[i].s[2] - 1) / Math.max(1, maxDl - 1);
+  for (let i = 0; i < n; i += step) { i ? g.lineTo(X(i), dly(i)) : g.moveTo(X(i), dly(i)); }
   g.stroke(); g.globalAlpha = 1;
+  // the stretches off the main dungeon (the Mines, Sokoban, ...) over it in the accent colour
+  g.strokeStyle = css("--accent"); g.lineWidth = 3; g.beginPath();
+  let on = false;
+  for (let i = 0; i < n; i += step) {
+    if (R.frames[i].s[8]) { on ? g.lineTo(X(i), dly(i)) : g.moveTo(X(i), dly(i)); on = true; } else on = false;
+  }
+  g.stroke(); g.lineWidth = 1;
   // HP share: area + line
   const good = css("--good");
   g.beginPath(); g.moveTo(X(0), bot);
