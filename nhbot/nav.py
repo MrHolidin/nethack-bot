@@ -220,6 +220,9 @@ class NavMixin:
         if "intact doorway" in self.text_since(seq0) and not known:
             self.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
             return                                         # (a second refusal is counted: no loop without time)
+        if self.opts.door_resists and "The door resists!" in self.text_since(seq0):
+            self.door_stats["resisted"] += 1    # lock.c doopen: a stuck door, opened with P ~ (Str+Dex+Con)/3 in 20 a try
+            return                                # -- try again; not the square's fault (80014: left after two)
         if self.opts.squeeze_plan and "carrying too much to get through" in self.text_since(seq0):
             return                    # refused for our weight, not the square's fault (explore.squeeze_open_step)
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
