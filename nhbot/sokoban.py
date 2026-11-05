@@ -82,6 +82,7 @@ class SokoLevel:
         self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
+        self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
@@ -443,6 +444,8 @@ class SokobanMixin:
         """Top level: open the zoo's locked door (west of the goal), walk to the closets on the far side of the
         zoo (the prize lies in one of them), pick up an amulet or a bag there, put the amulet on. Done after
         the closets were seen (or the prize taken)."""
+        if st.prize_inv0 is None:
+            st.prize_inv0 = self.soko_prize_items()
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         here = st.from_map(self.pos())
         # a monster of the zoo may have carried the prize off (they go for an amulet of reflection) and dropped
@@ -464,7 +467,9 @@ class SokobanMixin:
             return True
         if not todo:
             self.soko_done = True
-            self.soko_stats["prize_missing"] += 1
+            # taken on this level by the generic pick-up (from where a monster dropped it) -- or not found
+            got = self.soko_prize_items() - st.prize_inv0
+            self.soko_stats["prize_elsewhere" if got else "prize_missing"] += 1
             return self.soko_leave(lv, st)
         # an amulet or a tool seen first, then the closets, then the nearest
         like = self.soko_prize_like(lv, st)
@@ -475,6 +480,10 @@ class SokobanMixin:
         self.soko_stats["zoo_no_way"] += 1
         st.closet_done.add(tgt)
         return self.soko_wait()
+
+    def soko_prize_items(self):
+        """Inventory letters of the amulets and bags we carry."""
+        return frozenset(it.letter for it in self.items() if it.ocls == nh.AMULET_CLASS or "bag" in it.text)
 
     def soko_piles(self, lv, st):
         """Squares of the zoo and its door (variant coords) where the map shows an item or a corpse (gold, which
