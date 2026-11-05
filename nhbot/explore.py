@@ -289,11 +289,17 @@ class ExploreMixin:
         return False
 
     def level_travel_step(self, lv, grids, key, act, stat):
-        """One step toward main-dungeon level `key` from this one by the stairs we know: to the up staircase and
-        up it, or down a main down staircase (not the Mines one, avoid_down). False: no way known."""
+        """One step toward main-dungeon level `key` from this one by the stairs we know: to an up staircase and
+        up it, or down a down staircase (not the Mines one, avoid_down) -- never one we took before into
+        another level than the next main one (Level.stairs_to: Sokoban's up staircase, the Mines'). False: no way
+        known."""
         k_mem = grids[0]
+        nxt = (0, lv.key[1] - 1 if key[1] < lv.key[1] else lv.key[1] + 1)
+        elsewhere = [p for p, k in lv.stairs_to.items() if k != nxt]
         if key[1] < lv.key[1]:
             up = k_mem == G.UPSTAIR
+            for p in elsewhere:
+                up[p] = False
             if not up.any():
                 return False
             if up[self.pos()]:
@@ -304,7 +310,7 @@ class ExploreMixin:
                 return True
             return self.walk_to(lv, up, act=act, grids=grids)[0] == "moved"
         down = k_mem == G.DOWNSTAIR
-        for p in lv.avoid_down:
+        for p in list(lv.avoid_down) + elsewhere:
             down[p] = False
         if down.any() and self.go_down(lv, grids, down):
             self.mines_trip_stats[stat + "_down"] += 1

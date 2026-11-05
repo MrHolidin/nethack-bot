@@ -89,6 +89,7 @@ class Level:
         self.entered_xl = None     # experience level at the first arrival (stats)
         self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
+        self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
         self.kill_piles = set()    # squares where we killed a monster that may carry things (monsters.CARRIERS)
         self.elbereth = set()     # positions where we engraved
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"

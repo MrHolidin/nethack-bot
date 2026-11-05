@@ -107,6 +107,10 @@ class PolicyMixin:
         arrived_by_stairs = False
         if lv.key != self.prev_key:
             arrived_by_stairs = self.took_stairs
+            if self.last_stair_dir and self.stair_from and self.stair_from[0] == self.prev_key \
+                    and self.prev_key in self.levels:
+                self.levels[self.prev_key].stairs_to[self.stair_from[1]] = lv.key
+                lv.stairs_to[self.pos()] = self.prev_key
             self.note_stair_arrival(lv, True)
             self.prev_key = lv.key
         else:

@@ -38,6 +38,7 @@ class GameMixin:
         code = ord(key) if isinstance(key, str) else key
         if key in ("<", ">"):
             self.last_stair_dir = key
+            self.stair_from = (self.cur_key, self.pos())    # where this staircase leads: step_level_arrival
         self.raw_step(code)
         self.settle(expect_prompt)
 

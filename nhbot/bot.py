@@ -167,6 +167,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.intro = self.message()
         self.equip_init()
         self.last_stair_dir = None
+        self.stair_from = None           # (level key, square) of the staircase we last took
         self.perception_init()
         self.survival_init()
         self.explore_init()
