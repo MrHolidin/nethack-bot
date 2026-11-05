@@ -28,7 +28,7 @@ from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name, erosion
 from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import NEVER_MELEE, PM_BY_NAME
+from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
 from nhbot.rays import RAY_RESIST, our_protection, zap_hit_prob
 
@@ -337,7 +337,8 @@ class DangerMixin:
             mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
                          self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name,
                          self.monster_taint(name), self.monster_turn_pmf(name, 4),
-                         bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), name in NEVER_MELEE))
+                         bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),
+                         self.monster_effects(name)))
         if not mons:
             return 1.0
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
@@ -350,7 +351,7 @@ class DangerMixin:
         for _ in range(sims):
             hps = []
             hcap = []
-            for lev, _, dmg, _, _, hits, _, _, _, _, _, _, _, _, _ in mons:
+            for lev, _, dmg, _, _, hits, _, _, _, _, _, _, _, _, _, _ in mons:
                 for _try in range(20):
                     h = full = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -414,26 +415,30 @@ class DangerMixin:
     def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans=None, hcap=None,
                    state=None):
         """One sampled fight of win_prob with approach (see there): (our HP at its end -- <= 0: lost, tainted: it
-        blinded us, gave us lycanthropy or charmed and robbed us -- TAINT_AD, a yellow light's explosion, a
-        lightning bolt's flash -- so a win counts TAINTED_WIN). Monsters that regenerate (M1_REGEN) get 1 HP a
+        blinded us, gave us lycanthropy, charmed and robbed us or took our gold -- TAINT_AD, a yellow light's or
+        a black light's (hallucination) explosion, a lightning bolt's flash -- so a win counts TAINTED_WIN).
+        monster_effects of its hits: asleep, stunned / confused (our blows go astray), slowed (our speed
+        without intrinsic Fast), stoned, our brain eaten (Int). Monsters that regenerate (M1_REGEN) get 1 HP a
         turn back (mon.c mon_regen); a paralysing hit (or a gelatinous cube we hit) freezes us
         (monster_paralysis), and while we sleep or are frozen they hit us +4 (mhitu.c); confused or stunned
         (state) our blow goes astray as domove's confdir sends it; we never hit the kinds we never melee
-        (monsters.NEVER_MELEE: a floating eye)."""
-        state = state or {"aim": 1.0, "free_action": False}
+        (perception.never_melee: a floating eye, a cockatrice when we hold no weapon)."""
+        state = state or self.our_state()
         left = [approach.get(m[6], 0) for m in mons]
         plans = plans or [None] * len(mons)
         cool = [0] * len(mons)                   # breath: turns until it can breathe again
         alive, asleep, tainted = list(range(len(mons))), 0, False
-        k, frac = divmod(self.our_speed(), 12)
+        us = {"stun": 0, "conf": 0, "slow": False, "int": state.get("int", 18)}
         for _turn in range(max_turns):
+            k, frac = divmod(state["speed_slow"] if us["slow"] else state.get("speed", self.our_speed()), 12)
             acts = k + (1 if frac and rng.random() < frac / 12 else 0)
+            aim = 1 / 8 if us["stun"] > 0 else 0.8 + 0.2 / 8 if us["conf"] > 0 else state["aim"]
             for _a in range(acts):
                 if not alive:
                     break
-                ready = [j for j in alive if left[j] == 0 and not mons[j][14]]      # never hit a floating eye
+                ready = [j for j in alive if left[j] == 0 and not mons[j][14]]      # never_melee: a floating eye
                 j = ready[0] if ready else None
-                hit = j is not None and rng.random() < mons[j][1] * state["aim"]
+                hit = j is not None and rng.random() < mons[j][1] * aim
                 d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
                 if opening is not None and _turn == 0 and _a == 0:
                     def alive_at(pos):
@@ -462,6 +467,8 @@ class DangerMixin:
             if not alive or hp <= 0:
                 break
             asleep -= 1
+            us["stun"] -= 1
+            us["conf"] -= 1
             for j in list(alive):
                 if mons[j][12] and hcap is not None and hps[j] < hcap[j]:
                     hps[j] += 1                          # mon_regen
@@ -500,9 +507,57 @@ class DangerMixin:
                     p_plys = mons[j][13][0]
                     if p_plys and asleep <= 0 and not state["free_action"] and rng.random() < p_plys:
                         asleep = int(rng.integers(1, 11))    # mhitu.c AD_PLYS: nomul(-rnd(10))
+                    for p, kind, n, die in mons[j][15]:
+                        if rng.random() >= p:
+                            continue
+                        if kind == "ston":
+                            return 0, tainted            # stoned (no lizard / acid counted)
+                        if kind == "drin":
+                            if us["int"] <= 3:
+                                return 0, tainted        # eat.c eat_brains: "Your last thought fades away."
+                            us["int"] -= int(rng.integers(1, 3))
+                        elif kind == "sleep":
+                            if asleep <= 0 and not state.get("sleep_res"):
+                                asleep = int(rng.integers(1, 11))
+                        elif kind == "slow":
+                            us["slow"] = True
+                        else:                            # stun / conf: the attack's dice more turns of it
+                            us[kind] = max(us[kind], 0) + int(rng.integers(1, die + 1, size=max(n, 1)).sum())
                     if hp <= 0:
                         return hp, tainted
         return hp, tainted
+
+    def monster_effects(self, name):
+        """What one move of its melee may do to us besides damage, as [(P per move, kind, dice n, die)] (mhitu.c):
+        AD_SLEE 1 in 5 of the hits, asleep rnd(10) (not if we resist sleep); AD_STUN 1 in 4, stunned for the
+        attack's dice; AD_CONF 1 in 4, confused the same; AD_SLOW 1 in 4, we lose intrinsic speed; AD_STON
+        (a cockatrice's touch) 1 in 3 hissing, then 1 in 10: stoned; AD_DRIN (a mind flayer's tentacle) unless
+        our helmet blocks it (7 in 8): Int -rnd(2), at Int 3 our last thought fades."""
+        idx = MON_INDEX.get(name)
+        if idx is None:
+            return []
+        level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+        helmet = None
+        out = []
+        for i, (at, ad, n, d) in enumerate(ATTACKS[idx]):
+            if at not in MELEE:
+                continue
+            hit = self.hit_prob(level, i)
+            if ad == "SLEE":
+                out.append((hit / 5, "sleep", n, d))
+            elif ad == "STUN":
+                out.append((hit / 4, "stun", n, d))
+            elif ad == "CONF":
+                out.append((hit / 4, "conf", n, d))
+            elif ad == "SLOW" and self.bl(nh.NLE_BL_XP) >= 7:
+                out.append((hit / 4, "slow", n, d))     # only intrinsic Fast is lost (our_speed's Valkyrie)
+            elif ad == "STON":
+                out.append((hit / 30, "ston", n, d))
+            elif ad == "DRIN":
+                if helmet is None:
+                    helmet = any(a["worn"] and a["slot"] == "helm" for a in self.armor_inventory())
+                out.append((hit / 8 if helmet else hit, "drin", n, d))
+        return out
 
     def monster_paralysis(self, name):
         """(P(one move of its melee freezes us): mhitu.c AD_PLYS, 1 in 3 of the hits, for rnd(10) turns; the
@@ -532,8 +587,14 @@ class DangerMixin:
             aim = 0.8 + 0.2 / 8
         else:
             aim = 1.0
-        free = any(i.ring_on and "free action" in i.text for i in self.items())
-        return {"aim": aim, "free_action": free}
+        its = self.items()
+        free = any(i.ring_on and "free action" in i.text for i in its)
+        prot = our_protection(self.role, self.race, [i.text for i in its if i.on_body])
+        sp = self.our_speed()
+        slow = 12 * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else 12
+        return {"aim": aim, "free_action": free, "int": self.bl(nh.NLE_BL_INT), "speed": sp,
+                "speed_slow": min(sp, slow), "sleep_res": "sleep" in prot,
+                "helmet": any(a["worn"] and a["slot"] == "helm" for a in self.armor_inventory())}
 
     def pack_profile(self):
         """What a ray hitting us can blow up in our pack (zap.c zhitu -> destroy_item): the potion stacks'
@@ -566,8 +627,8 @@ class DangerMixin:
         for idx in MON_INDICES.get(name, ()):
             level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             for i, (at, ad, _, _) in enumerate(ATTACKS[idx]):
-                if at == "EXPL" and ad == "BLND":
-                    explodes = True
+                if at == "EXPL" and ad in ("BLND", "HALU"):
+                    explodes = True                  # a yellow light blinds, a black light makes us hallucinate
                 elif ad == "SGLD" and not self.bl(nh.NLE_BL_GOLD):
                     continue                     # nothing to steal
                 elif at in MELEE and ad in TAINT_AD:
