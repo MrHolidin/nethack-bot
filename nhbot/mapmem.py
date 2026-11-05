@@ -91,9 +91,9 @@ class Level:
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
         self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
         self.altar_align = {}      # sacrifice: altar square -> its alignment, read on stepping there
-        self.stationary = {}       # remember_molds: square -> a never-melee monster that never moves, seen there
+        self.stationary = {}       # square -> a never-melee monster that never moves, seen there
         self.squeeze_shut = set()  # squeeze_plan: (from, to) diagonal squeezes refused for our weight, both ways
-        self.not_stairs = set()    # mines_xl: squares where the game said there is no staircase
+        self.not_stairs = set()    # squares where the game said there is no staircase
         self.kill_piles = set()    # squares where we killed a monster that may carry things (monsters.CARRIERS)
         self.elbereth = set()     # positions where we engraved
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"

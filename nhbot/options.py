@@ -6,18 +6,12 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
-    "avoid_mines": False,      # True / False / "until_excalibur"
     "sacrifice": False,        # A/B: a neutral hero offers fresh corpses of its kills at a neutral altar, carried there
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
-    "remember_molds": False,   # A/B: never-melee monsters that never move are remembered where seen and their squares
-                               #      avoided out of sight too (perception.stationary_avoid)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while
                                #      the level's up or down staircase is unknown
-    "mines_xl": False,         # A/B: a number n: the Mines are closed below XL n; from XL n on, with their staircase
-                               #      known (Level.avoid_down, from a bounce), walk to it and go in -- Excalibur first
-                               #      at the fountains we know (explore.mines_trip_step)
     "force_read": None,        # experiments: a scroll type ("destroy armor", control "blank paper") read once, the first
                                #      time it is safe (nhbot.scrolls.force_read_step)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
@@ -49,7 +43,10 @@ DEFAULTS = {
     "hunger_gap": 500,         # ... before praying when Weak
     "faint_wait": 200,         # turns Fainting before the emergency prayer
     "descend_after": 2000,     # turns on a level before descending anyway
-    "mines_after": 3000,       # avoid_mines: the Mines staircase opens after this many turns
+    "mines_xl": 5,             # the Mines are closed below this XL; from it on, with their staircase known
+                               # (Level.avoid_down, from a bounce), walk to it and go in -- Excalibur first at the
+                               # fountains we know (explore.mines_trip_step)
+    "mines_after": 3000,       # a closed Mines staircase opens after this many turns on its level anyway
     "elb_hp": 0.5,             # write Elbereth below this HP fraction
     "elb_exit": 0.85,          # leave Elbereth at this HP fraction
     "elb_max": 400,            # turns at most on one Elbereth

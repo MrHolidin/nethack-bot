@@ -20,7 +20,7 @@ from nhbot.survival import HORN_FIXES, HORN_SICK
 
 
 STEPS = (
-    "level_arrival",     # bounce off the Mines staircase (avoid_mines); Mines-return bookkeeping
+    "level_arrival",     # bounce off the Mines staircase (mines_blocked); Mines-return bookkeeping
     "progress",          # no-time loop guard; forget obstacles / go desperate on a stalled level
     "engulfed",
     "unihorn_sick",      # food poisoning / illness: a unicorn horn before a prayer

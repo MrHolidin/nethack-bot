@@ -656,7 +656,7 @@ class CombatMixin:
         self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
             lvk = self.levels.get(self.cur_key)
-            if lvk is not None and self.opts.remember_molds:
+            if lvk is not None:
                 lvk.stationary.pop(self.last_attack_target, None)   # killed it (a missile at a mold)
             if lvk is not None and mk.group(2) in CARRIERS:
                 lvk.kill_piles.add(self.last_attack_target)    # what it carried lies under its corpse (pickup.py)
