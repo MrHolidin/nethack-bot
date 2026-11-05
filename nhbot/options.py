@@ -10,6 +10,8 @@ DEFAULTS = {
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
     "peace_shut": False,       # A/B: PEACE_SHUT_WAITS waits for a peaceful monster on a square of our path close it
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
+    "minetown_search": False,  # A/B: a Minetown of rooms and corridors with no way down found is searched, not left
+                               #      (explore.minetown_rooms)
     "two_down": False,         # A/B: two down staircases on main Dlvl 2-4, one taken to the next main level: the other
                                #      is the Mines' (explore.two_down_mines) -- known without a bounce off it
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again

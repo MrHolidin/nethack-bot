@@ -7,7 +7,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, NEIGH, ROWS, WEAK
+from nhbot.consts import COLS, CORRIDOR_GLYPHS, NEIGH, ROWS, WEAK
 from nhbot.goals import GOALS
 
 REST_DESCEND_HP = 0.95      # rest on the down staircase below this fraction of max HP
@@ -128,8 +128,8 @@ class ExploreMixin:
         if self.unblock_step(lv, grids, frontier | downstairs):
             return
         # the Mines' cave levels (mkmap) have no secret doors or corridors -- no way on found: leave the Mines
-        # instead of searching
-        if lv.key[0] == 2 and not self.mines_return_on:
+        # instead of searching (minetown_search: but a Minetown of rooms and corridors is searched)
+        if lv.key[0] == 2 and not self.mines_return_on and not self.minetown_rooms(lv):
             self.mines_return_start(lv, "no_way")
             if self.mines_return_step(lv, grids):
                 return
@@ -353,6 +353,14 @@ class ExploreMixin:
         if not out and self.opts.two_down:
             out = self.two_down_mines(lv)
         return out
+
+    def minetown_rooms(self, lv):
+        """minetown_search: a Minetown of rooms and corridors -- mines.des minetn-2/3/4/7 (RANDOM_CORRIDORS): its
+        staircases lie in rooms of their own, joined by corridors whose doors may be secret (mklev.c dodoor: 1 in
+        8) and whose squares may be (dig_corridor) -- so searching there finds the way down, as on a main level
+        (75022, 75017: left the Mines from such a Minetown, no way down found). Told by corridor squares."""
+        return bool(self.opts.minetown_search and self.is_minetown(lv)
+                    and np.isin(lv.under, CORRIDOR_GLYPHS).any())
 
     def two_down_mines(self, lv):
         """two_down: on main Dlvl 2-4 (where the Mines branch: dungeon.def) two down staircases in view, one of
