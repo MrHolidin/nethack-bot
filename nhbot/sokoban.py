@@ -88,6 +88,9 @@ class SokoLevel:
         self.plan = self.lv["plan"]   # the pushes we follow: the variant's, or one made here (soko_replan)
         self.states = STATES[name]
         self.replans = 0
+        self.crossing = False         # the bottom level given up: to its stairs up through its pits (soko_cross)
+        self.leave_tried = False      # a plan back to the stairs down was looked for (soko_leave)
+        self.leaving = False          # following a plan back to the stairs down (soko_give_up), not up
         self.real_extra = set()       # boulders the plan doesn't know that answered no attack (soko_mimic_hunt)
         self.hallu_seen = False       # we hallucinated here: items in the memory may be boulders (soko_state)
         self.leave_explore = 0        # soko_leave: ticks the generic explore had to find the way down
@@ -485,8 +488,10 @@ class SokobanMixin:
     def _sokoban_step(self, lv):
         self.cur_act = "soko"
         st = self.soko_level(lv)
-        if st is None or st.failed or self.soko_failed or self.soko_done:
+        if st is None or ((self.soko_done or st.failed or self.soko_failed) and not st.leaving):
             return self.soko_leave(lv, st)
+        if st.crossing:
+            return self.soko_cross(lv, st)
         if st.plan is None:
             return self.soko_give_up(lv, st, "no_plan")
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
@@ -496,7 +501,7 @@ class SokobanMixin:
             # the map isn't kept: wait it out (the other steps still fight)
             self.soko_stats["impaired_wait"] += 1
             return self.soko_wait()
-        if not st.solved and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
+        if not st.solved and not st.leaving and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
             return self.soko_give_up(lv, st, "turns")
         bs, ts = self.soko_state(lv, st)
         i = self.soko_match(st, bs, ts)
@@ -569,18 +574,21 @@ class SokobanMixin:
         arrive = tuple(st.lv["arrive"])
         return here != arrive and self.soko_walk(st, here, arrive, bs, ts) is None
 
-    def soko_replan(self, st, bs, ts, walls=()):
+    def soko_replan(self, st, bs, ts, walls=(), goal=None, force=False):
         """The level no longer matches the plan (a monster's scroll of earth dropped boulders, a wand of striking
         broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_SECS of compute), at most
         SOKO_REPLANS times a level. True if a new plan was found -- we follow it from its start."""
-        if st.replans >= SOKO_REPLANS:
+        if st.replans >= SOKO_REPLANS and not force:
             return False
         st.replans += 1
         solver = SOLVERS.get(st.name)
         if solver is None:
             solver = SOLVERS[st.name] = soko_solver.Level(st.lv)
         here = st.from_map(self.pos())
-        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here), walls=walls) if here in st.floor else None
+        if goal is None and st.leaving:
+            goal = tuple(st.lv["arrive"])          # leaving: a plan back to the stairs down
+        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here), walls=walls,
+                            goal=goal) if here in st.floor else None
         if plan is None:
             self.soko_stats["replan_fail"] += 1
             return False
@@ -593,7 +601,11 @@ class SokobanMixin:
         return True
 
     def soko_finish(self, lv, st, bs, ts, extra):
-        """The plan done: up the stairs; on the top level into the zoo for the prize."""
+        """The plan done: up the stairs; on the top level into the zoo for the prize. A plan to leave done: down
+        the stairs we arrived on."""
+        if st.leaving:
+            st.leaving = False
+            return self.soko_leave(lv, st)
         if not st.solved:
             st.solved = True
             self.soko_stats["solved_" + st.name[:5]] += 1
@@ -866,17 +878,49 @@ class SokobanMixin:
         return self.read_scroll(lv, it.letter)
 
     def soko_give_up(self, lv, st, why):
-        if st is not None and not st.failed:
+        """Sokoban abandoned: back down (soko_leave). The bottom level with the way to its stairs up open through
+        its pits: up instead, on with the levels above (soko_cross)."""
+        if st is None:
+            return self.soko_leave(lv, st)
+        st.leaving = False
+        if not st.failed and not st.crossing and all(k == "pit" for k in st.lv["traps"].values()):
+            # the bottom level, its pits: we may climb in and out of one -- the stairs up reached that way, the
+            # levels above are whole: on with Sokoban there
+            bs, ts = self.soko_state(lv, st)
+            here = st.from_map(self.pos())
+            if self.soko_walk(st, here, tuple(st.lv["goal"]), bs, frozenset()) is not None:
+                st.crossing = True
+                self.soko_stats["cross_pits_" + why] += 1
+                return self.soko_cross(lv, st)
+        if not st.failed:
             st.failed = True
             self.soko_failed = True
             self.soko_stats["fail_" + why] += 1
             self.soko_stats["fail_at_" + st.name[:5]] += 1
         return self.soko_leave(lv, st)
 
+    def soko_cross(self, lv, st):
+        """A bottom level we can't solve: to its stairs up through its pits (soko_give_up), and up."""
+        bs, ts = self.soko_state(lv, st)
+        here = st.from_map(self.pos())
+        goal = tuple(st.lv["goal"])
+        if here == goal:
+            self.soko_stats["up"] += 1
+            self.took_stairs = True
+            self.press("<")
+            return True
+        nxt = self.soko_walk(st, here, goal, bs, frozenset())
+        if nxt is None or nxt == here:
+            st.crossing = False                       # shut off after all: give up as before
+            return self.soko_give_up(lv, st, "cross_failed")
+        self.move(st.to_map(nxt))
+        return True
+
     def soko_leave(self, lv, st):
-        """Back down: to this level's down staircase (where we arrived), by Sokoban's rules, and down it. No such
-        way (a level we gave up, boulders across it): the generic explore, which pushes boulders like anywhere
-        else now (mapmem.passable_grid) and goes down the stairs when it can."""
+        """Back down: to this level's down staircase (where we arrived), by Sokoban's rules, and down it; an open
+        trap in the way stepped into (a pit we climb out of, a hole drops us a level). Boulders across the way: a
+        plan of pushes to that staircase (soko_solver), once a level. None: the generic explore, which pushes
+        boulders like anywhere else now (mapmem.passable_grid) and goes down the stairs when it can."""
         self.cur_act = "soko_leave"
         if st is not None:
             arrive = tuple(st.lv["arrive"])
@@ -889,6 +933,21 @@ class SokobanMixin:
             bs, ts = self.soko_state(lv, st)
             if self.soko_step_to(lv, st, arrive, bs, ts):
                 return True
+            # an open trap in the way: leaving, step into it -- out of a pit we climb, a hole drops us to the
+            # level below (Sokoban left all the same)
+            nxt = self.soko_walk(st, here, arrive, bs, frozenset())
+            if nxt is not None and nxt != here:
+                self.soko_stats["leave_via_trap" if nxt in ts else "leave_walk"] += 1
+                self.move(st.to_map(nxt))
+                return True
+            # boulders between us and it: a plan of pushes that opens the way (once a level), followed as a
+            # level's own plan is (_sokoban_step)
+            if not st.leave_tried:
+                st.leave_tried = True
+                if self.soko_replan(st, bs, ts, goal=arrive, force=True):
+                    st.leaving = True
+                    self.soko_stats["leave_plan"] += 1
+                    return self.soko_wait()
         self.soko_stats["leave_explore"] += 1
         if st is not None:
             st.leave_explore += 1

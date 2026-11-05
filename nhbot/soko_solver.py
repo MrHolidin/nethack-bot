@@ -160,22 +160,29 @@ class Level:
                 heapq.heappush(heap, (g + 1 + weight * hv, g + 1, tick, nbf, b, (plan, (b, d))))
         return results
 
-    def solve(self, want=4, budget=600, start=None, walls=()):
+    def solve(self, want=4, budget=600, start=None, walls=(), goal=None):
         """Trap by trap (fill_one), depth first with backtracking over the alternatives each step offers;
         returns the plan -- a list of ((row, col), (drow, dcol)) -- or None. budget: seconds (of compute).
         start: (boulders, open traps, hero square), (row, col) each -- the level's own start by default.
-        walls: more squares taken as wall for this search (a monster that won't leave)."""
-        if not walls:
-            return self._solve(want, budget, start)
-        saved = bytes(self.wall)
-        for p in walls:
-            self.wall[self.idx(p)] = 1
-        self._dist = {}
+        walls: more squares taken as wall for this search (a monster that won't leave). goal: another square to
+        reach than the level's (the staircase down, to leave a level we gave up)."""
+        saved_goal = self.goal
+        if goal is not None:
+            self.goal = self.idx(goal)
         try:
-            return self._solve(want, budget, start)
-        finally:
-            self.wall[:] = saved
+            if not walls:
+                return self._solve(want, budget, start)
+            saved = bytes(self.wall)
+            for p in walls:
+                self.wall[self.idx(p)] = 1
             self._dist = {}
+            try:
+                return self._solve(want, budget, start)
+            finally:
+                self.wall[:] = saved
+                self._dist = {}
+        finally:
+            self.goal = saved_goal
 
     def _solve(self, want, budget, start):
         lv = self.lv
