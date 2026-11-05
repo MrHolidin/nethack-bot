@@ -146,7 +146,9 @@ class SurvivalMixin:
     def eat_corpse_here(self):
         self.press("e", expect_prompt=True)
         m = self.message().lower()
-        if self.obs["misc"][0] and "corpse here" in m:
+        # "There is a jackal corpse here; eat it?" / "There are 2 jackal corpses here; eat one?" (eat.c floorfood);
+        # without eat_plural the second one is answered no (settle)
+        if self.obs["misc"][0] and ("corpse here" in m or self.opts.eat_plural and "corpses here" in m):
             name = re.search(r"there (?:is|are) (?:an? |\d+ )?(.+?) corpses? here", m)
             if name and self.corpse_ok(name.group(1)):
                 self.press("y")

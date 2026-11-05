@@ -15,6 +15,7 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
                                #      "explored": only on a level explored (mapmem.Level.explored)
+    "eat_plural": False,       # A/B: "There are 2 jackal corpses here; eat one?" is answered as for one corpse (else no)
     "read_explored": False,    # A/B: untested scrolls are read only on a level explored (mapmem.Level.explored)
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
                                #      it with a reachable frontier (hole, trap door, teleport)
