@@ -26,13 +26,14 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, DELTA2KEY, ROWS, ray_squares
+from nhbot.consts import COLS, DELTA2KEY, FOUNTAIN_GLYPH, ROWS, ray_squares
 from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
 SOKO_LEVEL_TURNS = 4000   # a level not solved in this many turns is given up
 SOKO_BEHIND_WAITS = 10    # waits for a monster beyond the boulder before we go round to attack it
 SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the plan
+SOKO_SEARCH_TURNS = 500  # turns spent searching for hidden passages on the level below the Oracle (no entrance seen)
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
@@ -60,6 +61,7 @@ def plan_states(lv):
 
 
 STATES = {name: plan_states(lv) for name, lv in LEVELS.items()}
+CENTAUR_STATUES = [nh.GLYPH_STATUE_OFF + i for i in range(nh.NUMMONS) if "centaur" in nh.permonst(i).mname]
 
 
 class SokoLevel:
@@ -114,6 +116,7 @@ class SokobanMixin:
         self.soko_failed = False        # a level given up: Sokoban is over for this game
         self.soko_stats = Counter()
         self.soko_secs = 0.0            # compute time spent in this module (the tick that acted included)
+        self.soko_search_from = None    # turn we began searching the level below the Oracle for the entrance
 
     # ------------------------------------------------------------------ in the main dungeon
     def soko_entrance(self):
@@ -152,7 +155,7 @@ class SokobanMixin:
             return False
         ent = self.soko_entrance()
         if ent is None:
-            return False
+            return self.soko_search_step(lv, grids, nothing_left)
         key, ups = ent
         if key != lv.key:
             if not nothing_left:
@@ -176,6 +179,31 @@ class SokobanMixin:
         if mask[self.pos()]:
             self.soko_stats["enter"] += 1
         return self.stairs_step(lv, grids, mask, "<")
+
+    def soko_oracle_dlvl(self):
+        """Dlvl of the Oracle's level if we saw it, else None: main Dlvl 5-9 with centaur statues (oracle.des puts
+        them round the centre room, whose four fountains we may not have seen) or four fountains."""
+        for key, lv in self.levels.items():
+            if key[0] == 0 and 5 <= key[1] <= 9 and (
+                    np.isin(lv.under, CENTAUR_STATUES).sum() >= 2
+                    or (self.terrain_glyphs(lv) == FOUNTAIN_GLYPH).sum() >= 4):
+                return key[1]
+        return None
+
+    def soko_search_step(self, lv, grids, nothing_left):
+        """The level below the Oracle has Sokoban's up staircase. Explored with only one up staircase seen: the
+        rest of it lies past a hidden door or corridor -- search (explore.search_mode), SOKO_SEARCH_TURNS at most.
+        True if it used the turn."""
+        if not nothing_left or self.soko_oracle_dlvl() is None or lv.key != (0, self.soko_oracle_dlvl() + 1):
+            return False
+        t = self.turn()
+        if self.soko_search_from is None:
+            self.soko_search_from = t
+        if t - self.soko_search_from > SOKO_SEARCH_TURNS:
+            return False
+        self.soko_stats["search"] += 1
+        self.search_mode(lv, grids)
+        return True
 
     # ------------------------------------------------------------------ in Sokoban
     def in_sokoban(self, lv):
@@ -222,7 +250,8 @@ class SokobanMixin:
         top = G.KIND[lv.under]
         terr = G.KIND[lv.terrain]
         oy, ox = st.off
-        bs = frozenset(p for p in st.floor if top[p[0] + oy, p[1] + ox] == G.BOULDER)
+        me = st.from_map(self.pos())          # the memory keeps what lay where we stand: a boulder we just pushed on
+        bs = frozenset(p for p in st.floor if top[p[0] + oy, p[1] + ox] == G.BOULDER and p != me)
         # an open trap: shown as one -- or remembered as one under an item or a monster (a filled pit or hole
         # shows the floor; the terrain layer alone has been seen to keep the trap) -- unless a push of ours
         # filled it (an item on the filled square hides that from the map). A boulder shown on a trap we did not
