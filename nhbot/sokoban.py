@@ -47,6 +47,8 @@ ZOO_QUIET = 8             # turns with the zoo's monsters in view all where they
 ZOO_HOLD_MAX = 300        # turns at most spent holding the zoo's doorway
 ZOO_BACK_HP = 0.7         # in the zoo below this share of HP with its monsters moving: back to the doorway
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
+ZOO_VOLLEY_MIN = 2        # zoo monsters on a line worth a ray wand
+ZOO_SCARE_MIN = 2         # zoo monsters next to us worth a scroll of scare monster
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
@@ -683,7 +685,9 @@ class SokobanMixin:
     def step_soko_zoo(self, c):
         """Top level, the plan done and the zoo's door open: fight the zoo at the goal square -- the zoo's only
         way out is the door west of it, so its monsters come one at a time -- while those in view keep moving
-        (the ones still asleep stay put); inside the zoo, hurt with its monsters moving: back to that square."""
+        (the ones still asleep stay put); inside the zoo, hurt with its monsters moving: back to that square.
+        Runs before the melee step: a scroll of scare monster when they crowd us; with none next to us, a ray
+        wand down a line of them."""
         lv = c.lv
         if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_done or self.soko_failed:
             return False
@@ -699,6 +703,10 @@ class SokobanMixin:
     def _soko_zoo(self, lv, st, c):
         if self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED:
             return False                                   # not open yet: soko_prize kicks it
+        if self.soko_zoo_scare(lv, c):
+            return True
+        if c.hostiles:
+            return False                                   # one next to us: the melee step
         t = self.turn()
         inside = st.zoo | {st.zoo_door}
         seen = frozenset(q for q in (st.from_map(p) for p, _ in self.visible_hostiles(lv)) if q in inside)
@@ -706,6 +714,8 @@ class SokobanMixin:
             st.zoo_seen, st.zoo_moved = seen, t
         if not seen or t - st.zoo_moved >= ZOO_QUIET:
             return False
+        if self.soko_zoo_volley(lv):
+            return True
         here = st.from_map(self.pos())
         goal = tuple(st.lv["goal"])
         if here == goal:
@@ -721,6 +731,58 @@ class SokobanMixin:
             self.cur_act = "soko_zoo"
             return self.soko_step_to(lv, st, goal, bs, ts)
         return False
+
+    def soko_zoo_volley(self, lv):
+        """The zoo awake, nothing next to us: a ray wand along a line with ZOO_VOLLEY_MIN of its monsters on it
+        (through its door they line up) -- sleep, cold, fire, lightning, magic missile, the first whose ray
+        coming back is no danger to us (combat.ray_risk). True if zapped."""
+        if self.hallu_blind_ranged():
+            return False
+        order = {"sleep": 0, "cold": 1, "fire": 2, "lightning": 3, "magic missile": 4}
+        wands = sorted((order[k], l, k) for l, k in self.attack_wands() if k in order)
+        if not wands:
+            return False
+        y, x = self.pos()
+        g = self.obs["glyphs"]
+        km = self.kinds(lv)
+        hostile = {p for p, _ in self.visible_hostiles(lv)}
+        best = None
+        for dy, dx in DIRS8:
+            n = 0
+            for q in ray_squares(y, x, dy, dx, n=13):
+                if km[q] in (G.WALL, G.DOOR_CLOSED, G.UNKNOWN) or G.KIND[int(g[q])] == G.PET:
+                    break
+                n += q in hostile
+            if n >= ZOO_VOLLEY_MIN and (best is None or n > best[0]):
+                best = (n, (dy, dx))
+        if best is None:
+            return False
+        step = best[1]
+        for _, letter, kind in wands:
+            p, harm = self.ray_risk(lv, step, kind, letter)
+            if harm["verdict"] in ("reflected", "resisted") or (p < 0.1 and harm["verdict"] != "dangerous") \
+                    or p < 0.02:
+                self.soko_stats["zoo_zap_" + kind] += 1
+                self.cur_act = "fight"
+                self.zap(letter, DELTA2KEY[step])
+                return True
+        return False
+
+    def soko_zoo_scare(self, lv, c):
+        """The zoo upon us (ZOO_SCARE_MIN next to us, or below half HP with one next to us): read a scroll of scare
+        monster we know -- what sees us flees. True if read."""
+        if not c.hostiles or not (len(c.hostiles) >= ZOO_SCARE_MIN or c.hp < c.maxhp * 0.5):
+            return False
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
+            return False
+        it = next((it for it in self.items() if it.ocls == nh.SCROLL_CLASS and "scare monster" in it.text
+                   and not it.cursed), None)
+        if it is None:
+            return False
+        self.soko_stats["zoo_scare"] += 1
+        self.cur_act = "fight"
+        return self.read_scroll(lv, it.letter)
 
     def soko_give_up(self, lv, st, why):
         if st is not None and not st.failed:

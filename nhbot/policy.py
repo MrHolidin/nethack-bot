@@ -39,8 +39,8 @@ STEPS = (
     "regen",             # ring of regeneration on below full HP, off at full (nothing next to us)
     "weapon",
     "wands",
+    "soko_zoo",          # Sokoban's top level: its zoo fought at the doorway, scroll and wands (nhbot.sokoban)
     "melee",
-    "soko_zoo",          # Sokoban's top level: its zoo fought at the doorway (nhbot.sokoban)
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
