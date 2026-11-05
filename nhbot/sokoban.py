@@ -39,6 +39,7 @@ SOKO_SEARCH_TURNS = 500  # turns spent searching for hidden passages on the leve
 SOKO_REPLANS = 3          # re-plans (soko_replan) a level at most
 SOKO_REPLAN_SECS = 2.0    # compute for one re-plan
 SOKO_DOOR_WAITS = 50      # turns between kicks at a locked door that refused one (wounded legs)
+SOKO_LEAVE_EXPLORE = 500  # ticks of the generic explore to leave a level given up, then we only search
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
@@ -79,6 +80,8 @@ class SokoLevel:
         self.plan = self.lv["plan"]   # the pushes we follow: the variant's, or one made here (soko_replan)
         self.states = STATES[name]
         self.replans = 0
+        self.hallu_seen = False       # we hallucinated here: items in the memory may be boulders (soko_state)
+        self.leave_explore = 0        # soko_leave: ticks the generic explore had to find the way down
         self.door_waits = 0           # turns waited at a locked door we could not kick (soko_step_to)
         self.i = 0                    # the plan's state we were at last
         self.failed = False
@@ -261,6 +264,10 @@ class SokobanMixin:
         oy, ox = st.off
         me = st.from_map(self.pos())          # the memory keeps what lay where we stand: a boulder we just pushed on
         bs = frozenset(p for p in st.floor if top[p[0] + oy, p[1] + ox] == G.BOULDER and p != me)
+        if st.hallu_seen:
+            # hallucinating, the boulders showed as random objects -- and the memory keeps that till we see the
+            # square again: an item where the plan's state has a boulder is that boulder
+            bs |= {p for p in st.states[st.i][0] if p != me and G.IS_COVERED[top[p[0] + oy, p[1] + ox]]}
         # an open trap: shown as one; or an item on it (a level's random objects lie on traps too, we arrive to
         # see the item) with the trap under it -- or never seen there; unless a push of ours filled it (an item on
         # the filled square hides that from the map). A filled pit or hole shows the floor. A boulder shown on a
@@ -417,6 +424,13 @@ class SokobanMixin:
             return self.soko_leave(lv, st)
         if st.plan is None:
             return self.soko_give_up(lv, st, "no_plan")
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        st.hallu_seen |= bool(cond & nh.BL_MASK_HALLU)
+        if cond & (nh.BL_MASK_HALLU | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_BLIND):
+            # a confused or stunned push may go any way; hallucinating, boulders look like anything; blind,
+            # the map isn't kept: wait it out (the other steps still fight)
+            self.soko_stats["impaired_wait"] += 1
+            return self.soko_wait()
         if not st.solved and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
             return self.soko_give_up(lv, st, "turns")
         bs, ts = self.soko_state(lv, st)
@@ -643,5 +657,12 @@ class SokobanMixin:
             if self.soko_step_to(lv, st, arrive, bs, ts):
                 return True
         self.soko_stats["leave_explore"] += 1
+        if st is not None:
+            st.leave_explore += 1
+            if st.leave_explore > SOKO_LEAVE_EXPLORE:
+                # boulders shut us in for good: search (cheap), the other steps keep us alive
+                self.cur_act = "search"
+                self.press("2"); self.press("0"); self.press("s")
+                return True
         self.explore(lv)
         return True
