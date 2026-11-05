@@ -45,7 +45,9 @@ BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster 
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
 ZOO_QUIET = 8             # turns with the zoo's monsters in view all where they were: the wave is over (the rest sleep)
 ZOO_HOLD_MAX = 300        # turns at most spent holding the zoo's doorway
-ZOO_BACK_HP = 0.5         # in the zoo below this share of HP with its monsters moving: back to the doorway
+ZOO_BACK_HP = 0.7         # in the zoo below this share of HP with its monsters moving: back to the doorway
+ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
+ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -96,6 +98,7 @@ class SokoLevel:
         self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
+        self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
         rows = self.lv["map"]
@@ -558,13 +561,24 @@ class SokobanMixin:
         if st.prize_inv0 is None:
             st.prize_inv0 = self.soko_prize_items()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED and hp < maxhp and not self.visible_hostiles(lv):
-            self.soko_stats["zoo_rest"] += 1          # the zoo wakes when its door is kicked: full HP first
+        here = st.from_map(self.pos())
+        shut = self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED
+        if st.solved_turn is None:
+            st.solved_turn = self.turn()
+        y, x = self.pos()
+        vis = self.visible_hostiles(lv)
+        near = any(max(abs(p[0] - y), abs(p[1] - x)) <= 2 for p, _ in vis)
+        # the zoo wakes all at once when its door is kicked (dokick.c wake_nearby): full HP and a prayer in hand
+        # first (waiting ZOO_PRAY_WAIT turns at most for the prayer); once open, into the zoo only fit -- rest
+        # outside it first (its monsters still asleep in view don't stop that)
+        if (shut and not vis and (hp < maxhp or (not self.can_pray()
+                                                 and self.turn() - st.solved_turn < ZOO_PRAY_WAIT))) \
+                or (not shut and not near and here not in st.zoo and hp < maxhp * ZOO_ENTER_HP):
+            self.soko_stats["zoo_rest"] += 1
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return True
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
-        here = st.from_map(self.pos())
         # a monster of the zoo may have carried the prize off (they go for an amulet of reflection) and dropped
         # it where it died -- under its corpse, the pile shows its top: the piles in the zoo and on its door
         # are looked into too
