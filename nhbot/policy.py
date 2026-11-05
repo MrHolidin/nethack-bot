@@ -86,8 +86,7 @@ class PolicyMixin:
         self._hunger_at = (t, h)
         self.nutrition_tick()
         self.tick_seq = self.msg_seq
-        if self.opts.wand_ev:
-            self.threat_track()                  # threats.py: who is coming for us
+        self.threat_track()                      # threats.py: who is coming for us
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return
@@ -289,9 +288,8 @@ class PolicyMixin:
         if not c.hostiles:
             return False
         cands = c.hostiles
-        if self.opts.track_sleep:
-            awake = [t for t in cands if not self.asleep(c.lv, t[0])]
-            cands = awake or cands               # one put to sleep comes after every awake one
+        awake = [t for t in cands if not self.asleep(c.lv, t[0])]
+        cands = awake or cands                   # one put to sleep comes after every awake one
         target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
         if len(cands) > 1:
             target = self.focus_target(cands, target)

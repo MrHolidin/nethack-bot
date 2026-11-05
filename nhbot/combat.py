@@ -38,8 +38,7 @@ SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns 
 SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
 MR_BIT = {"sleep": 0x04, "fire": 0x01, "cold": 0x02, "lightning": 0x10}    # monst.c mresists: MR_SLEEP, ...
 _PM_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
-WAND_RAY_RISK = 0.1        # wand_pwin: ... and a ray when P(it comes back and hits us) is below this
-SAFE_RAY_DIST = 7          # ray range is rn1(7, 7) = 7..13: a wall >= 7 away can't bounce it back onto us
+WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
 
 
 # mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
@@ -118,7 +117,7 @@ class CombatMixin:
         self.ray_risk_log = []
         self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
-        self.wand_pwin_log = []          # wand_pwin: (turn, target, distance, wand, P(win), gain, P(ray back), HP)
+        self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
 
     def attack(self, target):
@@ -423,74 +422,49 @@ class CombatMixin:
         return G.KIND[g] == G.MONSTER and G.monster_name(g) == v[1]
 
     def wand_step(self, lv, hostiles):
+        """An attack wand when wand_ev_pairs finds a zap that beats fighting on. Never from Elbereth (attacking
+        erases it: engrave.c u_wipe_engr), never sleep at one our sleep ray put down (asleep), never at a monster
+        that resists the wand (wand_resisted). Targets asleep come last."""
         wands = self.attack_wands()
         if not wands:
             return False
-        if self.opts.no_zap_elbereth and (self.pos() in lv.elbereth or self.elb_state is not None):
+        if self.pos() in lv.elbereth or self.elb_state is not None:
             self.zap_stats["held_elbereth"] += 1
-            return False                         # attacking from Elbereth erases it (engrave.c u_wipe_engr)
-        targets = self.wand_targets(lv, hostiles)
-        if self.opts.wand_pwin and not self.opts.wand_ev:
-            targets = self.wand_pwin_targets(hostiles, list(targets))
-        if self.opts.track_sleep:
-            targets = sorted(targets, key=lambda t: self.asleep(lv, t[2]))     # the ones asleep last
-        if self.opts.wand_ev:
-            pairs = self.wand_ev_pairs(hostiles, list(targets), wands)
-        else:
-            pairs = ((t, letter, kind) for t in targets for letter, kind in wands)
-        for (key, d, pos, (dy, dx), name, pwin, gain), letter, kind in pairs:
-            if self.opts.track_sleep and kind == "sleep" and self.asleep(lv, pos):
+            return False
+        targets = sorted(self.wand_targets(lv, hostiles), key=lambda t: self.asleep(lv, t[2]))
+        for (key, d, pos, (dy, dx), name, pwin, gain), letter, kind in self.wand_ev_pairs(hostiles, targets, wands):
+            if kind == "sleep" and self.asleep(lv, pos):
                 self.zap_stats["held_asleep"] += 1
-                continue                     # asleep already
-            if self.opts.wand_resist:
-                if wand_resisted(kind, name):
-                    self.zap_stats["held_resist"] += 1
-                    continue
-            elif kind == "sleep" and ("elf" in name or "zombie" in name or "Elvenking" in name):
-                continue                     # sleep resistant
-            p_back = None
-            if kind not in RAY_WANDS:
-                safe = True
-            elif self.opts.wand_ev:
-                safe = True                      # the ray coming back is in the P(win) of the zap (zap_opening)
-            elif self.opts.wand_pwin:
-                p_back, harm = self.ray_risk(lv, (dy, dx), kind, letter)
-                safe = p_back < WAND_RAY_RISK  # wand_pwin: P(our ray comes back and hits us) (nhbot.rays)
-                if self.opts.ray_resisted_ok and harm["verdict"] in ("reflected", "resisted"):
-                    safe = True                  # coming back it does us no harm (items it may still destroy)
-            else:
-                safe = self.ray_safe(lv, dy, dx)
-            if kind in RAY_WANDS:
-                self.ray_risk_note(lv, (dy, dx), d, kind, letter, safe)
-            if not safe:
                 continue
+            if wand_resisted(kind, name):
+                self.zap_stats["held_resist"] += 1
+                continue
+            if kind in RAY_WANDS:          # statistics only: the ray coming back is in the P(win) of the zap
+                self.ray_risk_note(lv, (dy, dx), d, kind, letter, True)
             self.cur_act = "fight"
             self.last_attack_target = pos
-            if pwin is not None and len(self.wand_pwin_log) < 30:
-                self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2),
-                                           None if p_back is None else round(p_back, 3),
+            if len(self.wand_pwin_log) < 30:
+                self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2), None,
                                            f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
             return self.zap(letter, key)
         return False
 
     def wand_targets(self, lv, hostiles):
         """Hostiles in a line within 6 we may zap, nearest first (a generator: the peaceful check looks only as
-        far as needed); without wand_pwin only those worth_special."""
+        far as needed)."""
         for key, d, pos, step, name in self.line_targets(lv, max_d=6):
             if d == 1 and pos not in [p for p, _ in hostiles]:
-                continue
-            if not self.opts.wand_pwin and not self.worth_special(pos, name):
                 continue
             if d > 1 and self.peaceful_now(lv, pos, far=True):
                 continue
             yield key, d, pos, step, name, None, None
 
     def wand_ev_pairs(self, hostiles, targets, wands):
-        """wand_ev: (target, wand letter, kind) worth a zap, best first. One fight for every choice: the adjacent
+        """(target, wand letter, kind) worth a zap, best first. One fight for every choice: the adjacent
         hostiles and every target in line that is coming for us (threats.active_threat), the far ones walking up
         (win_prob approach), each with the ranged attacks we saw it make (threats.ranged_profile). Fighting on (win_prob) against each zap -- a direction and a wand -- as
         our next action, played out in full (zap_opening: every monster on the way, the ray coming back at us), all
-        from the same draws (the RNG state restored). A zap only when that fight is at most wand_pwin, and only one
+        from the same draws (the RNG state restored). A zap only when that fight is at most WAND_PWIN, and only one
         that beats fighting on."""
         fight = list(hostiles) + [(t[2], t[4]) for t in targets
                                   if (t[2], t[4]) not in hostiles and self.active_threat(t[2])]
@@ -501,7 +475,7 @@ class CombatMixin:
         ranged = {p: r for p, _ in fight if p is not None and (r := self.ranged_profile(p)) is not None}
         state = self.win_rng.bit_generator.state
         p_fight = self.win_prob(fight, approach=approach, ranged=ranged)
-        if p_fight > self.opts.wand_pwin:
+        if p_fight > WAND_PWIN:
             return []
         lv = self.level()
         out, seen = [], {}
@@ -607,20 +581,6 @@ class CombatMixin:
 
         return opening
 
-    def wand_pwin_targets(self, hostiles, targets):
-        """wand_pwin (a threshold): the targets in line worth a charge, best first. A target is worth one
-        when P(we win the fight) -- with the adjacent hostiles and it -- is at most the threshold; best is the one
-        whose removal raises that P the most (win_prob without it)."""
-        out = []
-        for key, d, pos, step, name, _, _ in targets:
-            fight = hostiles if (pos, name) in hostiles else hostiles + [(pos, name)]
-            pwin = self.win_prob(fight)
-            if pwin > self.opts.wand_pwin:
-                continue
-            gain = self.win_prob([t for t in fight if t != (pos, name)]) - pwin
-            out.append((key, d, pos, step, name, pwin, gain))
-        return sorted(out, key=lambda t: -t[6])
-
     def ray_risk(self, lv, step, kind, letter):
         """(P(our ray of `kind` fired along `step` comes back and hits us), what that hit would do) -- nhbot.rays.
         A wand the engraving test left as sleep-or-death is judged as death."""
@@ -643,7 +603,7 @@ class CombatMixin:
         return p, harm
 
     def ray_risk_note(self, lv, step, d, kind, letter, safe):
-        """Statistics only: the risk of a ray we fire (safe) or ray_safe holds back."""
+        """Statistics only: the risk of a ray we fire (safe) or hold back."""
         p, harm = self.ray_risk(lv, step, kind, letter)
         ev = "zap" if safe else "held"
         bucket = "0" if p == 0 else "<5%" if p < 0.05 else "<20%" if p < 0.2 else "<50%" if p < 0.5 else ">=50%"
@@ -651,23 +611,6 @@ class CombatMixin:
         self.ray_risk_stats[f"{ev} {harm['verdict']}"] += 1
         if len(self.ray_risk_log) < 40:
             self.ray_risk_log.append((self.turn(), ev, kind, d, round(p, 3), harm["verdict"]))
-
-    def ray_safe(self, lv, dy, dx):
-        """A ray going from us in direction (dy, dx) can't bounce back at us: a closed door closer than
-        SAFE_RAY_DIST absorbs it, otherwise no wall or unknown square lies closer than SAFE_RAY_DIST."""
-        y, x = self.pos()
-        k_mem = self.kinds(lv)
-        # buzz(): range rn1(7, 7), one per square; a bounce at distance d reaches us after 2d squares
-        for i in range(1, SAFE_RAY_DIST):
-            yy, xx = y + i * dy, x + i * dx
-            if not (0 <= yy < ROWS and 0 <= xx < COLS):
-                return False
-            k = k_mem[yy, xx]
-            if k == G.DOOR_CLOSED:
-                return True                      # a closed door absorbs the ray (open doors pass it)
-            if k in (G.WALL, G.UNKNOWN):
-                return False                     # a ray passes over a boulder (buzz bounces on terrain only)
-        return True
 
     def msg_combat(self, m):
         """Our hits and kills, being shot at, being attacked by something unseen."""

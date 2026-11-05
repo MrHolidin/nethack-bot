@@ -26,7 +26,8 @@ sys.path.insert(0, ROOT)
 
 import nle.nethack as nh  # noqa: E402
 
-from nhbot import Bot, GameOver  # noqa: E402
+from nhbot import Bot  # noqa: E402
+from nhbot.combat import WAND_PWIN  # noqa: E402
 
 KEY_EVERY = 200                  # frames between full screens
 VIEWER = os.path.join(ROOT, "tools", "replay_viewer.html")
@@ -148,7 +149,7 @@ class RecordingBot(Bot):
             opts = [[lab, round(p, 3)] for lab, p in zip(labels, got[1:])]
             chosen = f"{out[0][2]} → {out[0][0][4]}" if out else None
             self.rec_decisions.append({"i": max(0, len(self.rec_frames) - 1), "t": self.turn(),
-                                       "threshold": self.opts.wand_pwin, "fight": round(got[0], 3),
+                                       "threshold": WAND_PWIN, "fight": round(got[0], 3),
                                        "opts": opts, "chosen": chosen,
                                        "line": [[t[4], t[1], bool(self.active_threat(t[2]))] for t in targets]})
         return out

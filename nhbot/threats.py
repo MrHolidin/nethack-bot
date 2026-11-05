@@ -1,4 +1,4 @@
-"""Which monsters in view are coming for us (wand_ev's fight): tracks of the monsters on screen from tick to tick.
+"""Which monsters in view are coming for us (the fight of combat.wand_ev_pairs): tracks of the monsters on screen from tick to tick.
 
 A monster is an active threat when it stands next to us, came into view this turn close enough to hit us next
 turn (its moves a turn, mmove / 12 rounded up, reach the square next to us), has ever attacked us (a message names it: "The X hits!",
@@ -7,7 +7,7 @@ ACTIVE_RECENT turns ago, brought it closer to us (the distance from where we sta
 not in the fight: asleep, busy, wandering, or not after us.
 
 Tracks match the monsters on screen of the last ticks by name: the nearest track of the same name within
-2 squares plus one per turn unseen. Only kept while wand_ev is on (the tracker reads the screen, no looks).
+2 squares plus one per turn unseen (the tracker reads the screen, no looks).
 
 A track also keeps the ranged attacks we saw that monster make (ranged_profile, for win_prob's walk_fight, which
 gives it unlimited use of them):

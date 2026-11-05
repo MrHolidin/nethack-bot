@@ -321,7 +321,7 @@ class DangerMixin:
         without limit (ranged_plan / ranged_hit): a wand on every move, near or far (muse.c: it zaps instead of
         hitting); missiles and breath on a move it is not next to us, after its step (monmove.c dochug: a monster
         with a ranged attack may move and attack in one move)."""
-        if self.opts.track_sleep and self.cur_key is not None and self.cur_key in self.levels:
+        if self.cur_key is not None and self.cur_key in self.levels:
             adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
             return 1.0

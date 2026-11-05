@@ -25,18 +25,6 @@ DEFAULTS = {
                                #      win_prob) instead of HP < elb_hp
     "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
                                #      message (combat.RTHREAT_RE), else it doesn't
-    "track_sleep": False,      # A/B: monsters our sleep ray hit count as asleep for SLEPT_TURNS: not zapped with sleep
-                               #      again, attacked after the awake ones, left out of win_prob (combat.asleep)
-    "wand_resist": False,      # A/B: no attack wand at a monster that resists it (combat.wand_resisted), not only the
-                               #      sleep-resistant elves and zombies by name
-    "no_zap_elbereth": False,  # A/B: no attack wand while we stand on Elbereth (the attack would erase it)
-    "wand_ev": False,          # A/B (with wand_pwin): one fight -- adjacent hostiles and targets in line -- for every
-                               #      choice; a zap when that fight's P(we win) <= wand_pwin and P(we win) with the zap as
-                               #      our next action (its chance to hit, its damage: combat.wand_effect) is higher
-    "ray_resisted_ok": False,  # A/B (with wand_pwin): a ray we reflect or resist may come back at us (rays.ray_harm)
-    "wand_pwin": False,        # A/B: a number p: an attack wand when P(we win the fight) <= p, at the target whose removal
-                               #      raises it most, instead of the HP / damage rule; a ray when P(it comes back and
-                               #      hits us) < WAND_RAY_RISK instead of ray_safe (combat.wand_pwin_targets)
     "shk_marks_shop": False,   # A/B: standing in an unmarked room with a shopkeeper in view marks it as a shop
                                #      (mapmem.shop_from_keeper)
     "box_dagger_any": False,   # A/B: force a lock with any dagger we carry (known uncursed first),

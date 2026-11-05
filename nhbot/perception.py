@@ -322,14 +322,6 @@ class PerceptionMixin:
         hit = min(max((10 + ac + lvl - 1) / 20.0, 0.05), 1.0)
         return (1.0 + 1.5 * lvl) * hit * max(pm.mmove, 1) / 12.0
 
-    def worth_special(self, pos, name):
-        """Is this target worth a charge / energy / a flash?"""
-        g = self.obs["glyphs"][pos]
-        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp < maxhp * 0.5:
-            return True
-        return self.est_dmg(g, name) >= 2.0 or self.threat(g) >= 1
-
     def blind_attackers(self, lv, hostiles):
         """blind_strike: while blind, an adjacent 'I' is only a target if it attacked us. mhitu.c marks the square
         of an unseen attacker with 'I' in the same turn as its "It hits!"; 'I' also appears when we bump into or
