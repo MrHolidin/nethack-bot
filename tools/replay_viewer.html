@@ -1,0 +1,547 @@
+<title>nhbot Replays</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
+<style>
+/* Layout: a console bench -- the 80x24 terminal is the instrument, a tape strip (HP over the game) under it,
+   the bot's readouts in a side rack. The terminal keeps its dark phosphor look in both themes. */
+:root {
+  --bg: #eef0ec;
+  --panel: #f8f9f6;
+  --ink: #1b2024;
+  --muted: #5d676d;
+  --rule: #d3d8d3;
+  --accent: #a3620d;          /* amber: the playhead, the chosen option */
+  --accent-soft: #f1dfc2;
+  --good: #2f7d45;
+  --warn: #b07a0b;
+  --bad: #b33a2e;
+  --term-bg: #0c0f11;
+  --term-fg: #c9cdd2;
+  --term-edge: #23292e;
+  --font-ui: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12161a; --panel: #192026; --ink: #e2e6e9; --muted: #8e99a1; --rule: #2a333a;
+    --accent: #e7a948; --accent-soft: #3a2c16; --good: #6cc47f; --warn: #e2b24a; --bad: #f07a6e;
+    --term-edge: #2c353c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12161a; --panel: #192026; --ink: #e2e6e9; --muted: #8e99a1; --rule: #2a333a;
+  --accent: #e7a948; --accent-soft: #3a2c16; --good: #6cc47f; --warn: #e2b24a; --bad: #f07a6e;
+  --term-edge: #2c353c; color-scheme: dark;
+}
+html, body { background: var(--bg); color: var(--ink); }
+body {
+  font-family: var(--font-ui); font-size: 14px; line-height: 1.4;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px 24px;
+}
+* { box-sizing: border-box; }
+button, select, input { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 12px; }
+header.top h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+header.top .game { color: var(--muted); }
+header.top .game b { color: var(--ink); font-weight: 600; }
+.openbtn { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.btn {
+  border: 1px solid var(--rule); background: var(--panel); border-radius: 6px; padding: 5px 10px;
+  cursor: pointer; line-height: 1.2;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:focus-visible, .tl:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+
+.bench { display: grid; grid-template-columns: minmax(0, auto) minmax(260px, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1060px) { .bench { grid-template-columns: minmax(0, 1fr); } }
+.stage { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.term {
+  --fs: min(14px, calc((100vw - 48px) / 49));
+  font-family: var(--font-mono); font-size: var(--fs); line-height: 1.22;
+  background: var(--term-bg); color: var(--term-fg); border: 1px solid var(--term-edge); border-radius: 8px;
+  padding: 10px 12px; white-space: pre; overflow-x: auto; max-width: 100%;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02), 0 1px 0 rgba(0,0,0,0.04);
+}
+.term .row { height: calc(var(--fs) * 1.22); }
+.c0 { color: #59616b } .c1 { color: #d9534a } .c2 { color: #47a85a } .c3 { color: #b98a34 }
+.c4 { color: #4f7ee0 } .c5 { color: #b862cd } .c6 { color: #34aebd } .c7 { color: #c9cdd2 }
+.c8 { color: #7d848e } .c9 { color: #f08f43 } .ca { color: #83e294 } .cb { color: #f3d566 }
+.cc { color: #86adff } .cd { color: #f094ff } .ce { color: #86e6f1 } .cf { color: #ffffff }
+
+.transport { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.transport .btn { min-width: 36px; text-align: center; }
+.transport .readout { margin-left: auto; color: var(--muted); }
+.transport .readout b { color: var(--ink); font-weight: 600; }
+.transport label { color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.transport select, .transport input { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 4px 6px; }
+.transport input { width: 6.5em; }
+
+.tape { position: relative; }
+.tl { display: block; width: 100%; height: 86px; cursor: pointer; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); touch-action: none; }
+.tape .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.tape .legend i { display: inline-block; width: 10px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+
+.rack { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.unit { background: var(--panel); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.unit h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--muted); margin: 0 0 8px; font-weight: 600; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 10px; }
+.stat .k { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.stat .v { font-family: var(--font-mono); font-size: 16px; font-variant-numeric: tabular-nums; }
+.hpbar { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--rule); overflow: hidden; }
+.hpbar span { display: block; height: 100%; background: var(--good); transition: width 0.08s linear; }
+.hpbar.mid span { background: var(--warn); } .hpbar.low span { background: var(--bad); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; min-height: 20px; }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 10px; background: var(--accent-soft); color: var(--ink); border: 1px solid var(--rule); }
+.chip.bad { background: var(--bad); color: var(--panel); border-color: var(--bad); }
+
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 3px 12px; }
+.kv .k { color: var(--muted); }
+.kv .v { font-family: var(--font-mono); overflow-wrap: anywhere; }
+
+.decision .head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 6px; }
+.dec-row { display: grid; grid-template-columns: minmax(0, 1fr) 3.6em; gap: 2px 8px; align-items: center; margin-bottom: 4px; }
+.dec-row .lab { font-size: 12.5px; overflow-wrap: anywhere; }
+.dec-row .p { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.dec-row .bar { grid-column: 1 / -1; height: 5px; background: var(--rule); border-radius: 3px; position: relative; overflow: hidden; }
+.dec-row .bar span { position: absolute; inset: 0 auto 0 0; background: var(--muted); }
+.dec-row.fight .bar span { background: var(--ink); }
+.dec-row.chosen .bar span { background: var(--accent); }
+.dec-row.chosen .lab { font-weight: 600; }
+.dec-row .bar .thr { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--bad); }
+.empty { color: var(--muted); font-size: 12.5px; }
+
+.log { font-family: var(--font-mono); font-size: 12px; display: flex; flex-direction: column; gap: 2px; max-height: 210px; overflow-y: auto; }
+.log div { overflow-wrap: anywhere; }
+.log .t { color: var(--muted); margin-right: 6px; }
+.log .now { color: var(--accent); }
+.log .old { opacity: 0.62; }
+
+.events .filters { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.events .filters button { font-size: 11.5px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--rule); background: transparent; cursor: pointer; }
+.events .filters button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.evlist { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; }
+.evlist button { all: unset; cursor: pointer; display: grid; grid-template-columns: 4.2em 0.6em minmax(0, 1fr); gap: 6px; padding: 3px 4px; border-radius: 4px; font-size: 12.5px; }
+.evlist button:hover, .evlist button:focus-visible { background: var(--accent-soft); }
+.evlist button.cur { outline: 1px solid var(--accent); }
+.evlist .t { font-family: var(--font-mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.evlist .dot { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+.evlist .txt { overflow-wrap: anywhere; }
+
+.drop[hidden] { display: none; }
+.drop { position: fixed; inset: 0; background: color-mix(in srgb, var(--bg) 82%, transparent); display: grid; place-items: center; z-index: 20; border: 3px dashed var(--accent); font-size: 18px; }
+.err { color: var(--bad); margin: 6px 0 0; }
+.keys { color: var(--muted); font-size: 12px; }
+.keys kbd { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--panel); }
+@media (prefers-reduced-motion: reduce) { .hpbar span { transition: none; } }
+</style>
+
+<header class="top">
+  <h1>nhbot Replays</h1>
+  <div class="game" id="gameline">No recording loaded</div>
+  <div class="openbtn">
+    <input type="file" id="file" accept=".gz,.json" hidden>
+    <button class="btn" id="openbtn" type="button">Open recording…</button>
+  </div>
+</header>
+<p class="err" id="err" hidden></p>
+
+<div class="bench">
+  <section class="stage" aria-label="Replay">
+    <div class="term" id="term" role="img" aria-label="Game screen"></div>
+    <div class="transport">
+      <button class="btn" id="prevEv" type="button" title="Previous event (,)">⏮</button>
+      <button class="btn" id="back" type="button" title="Back one frame (←)">◀</button>
+      <button class="btn primary" id="play" type="button" title="Play / pause (Space)">▶ Play</button>
+      <button class="btn" id="fwd" type="button" title="Forward one frame (→)">▶|</button>
+      <button class="btn" id="nextEv" type="button" title="Next event (.)">⏭</button>
+      <label for="speed">Speed
+        <select id="speed">
+          <option value="2">2 turns/s</option>
+          <option value="5">5 turns/s</option>
+          <option value="10" selected>10 turns/s</option>
+          <option value="25">25 turns/s</option>
+          <option value="60">60 turns/s</option>
+          <option value="200">200 turns/s</option>
+          <option value="0">every frame</option>
+        </select>
+      </label>
+      <label for="goto">Turn <input id="goto" class="mono" type="number" min="1" placeholder="go to"></label>
+      <div class="readout mono" id="readout"></div>
+    </div>
+    <div class="tape">
+      <canvas class="tl" id="tl" tabindex="0" aria-label="Timeline: HP and dungeon level over the game. Click to jump."></canvas>
+      <div class="legend">
+        <span><i style="background:var(--good)"></i>HP / max</span>
+        <span><i style="background:var(--muted)"></i>dungeon level</span>
+        <span><i style="background:var(--accent)"></i>wand decisions</span>
+        <span><i style="background:var(--bad)"></i>kills, prayers, zaps (ticks)</span>
+      </div>
+    </div>
+    <div class="keys"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 10 turns · <kbd>,</kbd><kbd>.</kbd> event</div>
+  </section>
+
+  <aside class="rack">
+    <div class="unit">
+      <h2>Status</h2>
+      <div class="stats">
+        <div class="stat"><div class="k">Turn</div><div class="v" id="sTurn">–</div></div>
+        <div class="stat"><div class="k">HP</div><div class="v" id="sHp">–</div></div>
+        <div class="stat"><div class="k">Dlvl</div><div class="v" id="sDl">–</div></div>
+        <div class="stat"><div class="k">XL</div><div class="v" id="sXl">–</div></div>
+        <div class="hpbar" id="hpbar"><span id="hpfill" style="width:0"></span></div>
+        <div class="stat"><div class="k">AC</div><div class="v" id="sAc">–</div></div>
+        <div class="stat"><div class="k">Gold</div><div class="v" id="sGold">–</div></div>
+        <div class="stat"><div class="k">Hunger</div><div class="v" id="sHun">–</div></div>
+        <div class="stat"><div class="k">Frame</div><div class="v" id="sFrame">–</div></div>
+      </div>
+      <div class="chips" id="conds"></div>
+    </div>
+
+    <div class="unit">
+      <h2>Bot</h2>
+      <div class="kv">
+        <div class="k">Policy step</div><div class="v" id="bStep">–</div>
+        <div class="k">Doing</div><div class="v" id="bAct">–</div>
+        <div class="k">Key sent</div><div class="v" id="bKey">–</div>
+      </div>
+    </div>
+
+    <div class="unit decision">
+      <h2>Wand decision</h2>
+      <div id="dec"><div class="empty">No wand decision this turn.</div></div>
+    </div>
+
+    <div class="unit">
+      <h2>Messages</h2>
+      <div class="log" id="log"></div>
+    </div>
+
+    <div class="unit events">
+      <h2>Events</h2>
+      <div class="filters" id="filters"></div>
+      <div class="evlist" id="evlist"></div>
+    </div>
+  </aside>
+</div>
+<div class="drop" id="drop" hidden>Drop a recording (.json.gz) to open it</div>
+
+<script>
+const EMBED = /*REPLAY_DATA*/null;
+const EV_COLORS = { kill: "var(--bad)", level: "var(--muted)", zap: "var(--accent)", pray: "var(--good)",
+                    lowhp: "var(--warn)", death: "var(--bad)", end: "var(--ink)", decision: "var(--accent)" };
+const EV_NAMES = { kill: "Kills", level: "Levels", zap: "Zaps", pray: "Prayers", lowhp: "Low HP", decision: "Decisions", end: "End" };
+const HUNGER = ["", "Hungry", "Weak", "Fainting", "Fainted", "Starved"];
+const CONDS = [[1,"Stoned",1],[2,"Slimed",1],[4,"Strangled",1],[8,"Food pois.",1],[16,"Ill",1],[32,"Blind"],[64,"Deaf"],
+               [128,"Stunned"],[256,"Confused"],[512,"Halluc."],[1024,"Levitating"],[2048,"Flying"],[4096,"Riding"]];
+
+let R = null;               // the recording
+let cur = 0;                // current frame index
+let screen = null, colors = null, screenAt = -1;
+let turnIdx = [];           // frame index -> turn (from frames)
+let decAt = [];             // decision indices sorted by frame
+let playing = false, timer = null, lastTs = 0, acc = 0;
+let filt = new Set(["kill", "level", "zap", "pray", "lowhp", "decision", "end"]);
+let events = [];
+
+const $ = id => document.getElementById(id);
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function esc(s) { return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+async function gunzip(bytes) {
+  if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return new TextDecoder().decode(bytes);
+  const ds = new DecompressionStream("gzip");
+  const out = new Response(new Blob([bytes]).stream().pipeThrough(ds));
+  return await out.text();
+}
+
+async function loadBytes(bytes, name) {
+  try {
+    const rec = JSON.parse(await gunzip(bytes));
+    if (!rec.frames || !rec.frames.length) throw new Error("no frames in it");
+    setRecording(rec, name);
+    $("err").hidden = true;
+  } catch (e) {
+    $("err").textContent = `Could not open ${name}: ${e.message}. Open a .json.gz file written by tools/replay.py.`;
+    $("err").hidden = false;
+  }
+}
+
+function setRecording(rec, name) {
+  R = rec; cur = 0; screenAt = -1; pause();
+  turnIdx = R.frames.map(f => f.t);
+  decAt = (R.decisions || []).map(d => d.i);
+  events = (R.events || []).map(e => ({...e}));
+  for (const d of (R.decisions || [])) {
+    if (d.opts && d.opts.length) events.push({ i: d.i, t: d.t, type: "decision",
+      text: d.chosen ? `zap ${d.chosen} (${d.fight.toFixed(2)} → ${Math.max(...d.opts.map(o => o[1])).toFixed(2)})`
+                     : `held: fight ${d.fight.toFixed(2)}, best zap ${Math.max(...d.opts.map(o => o[1])).toFixed(2)}` });
+  }
+  events.sort((a, b) => a.i - b.i);
+  const s = R.summary || {};
+  const kw = R.kw && Object.keys(R.kw).length ? Object.entries(R.kw).map(([k, v]) => v === true ? k : `${k}=${v}`).join(", ") : "base";
+  $("gameline").innerHTML = `seed <b>${R.seed}</b> · ${esc(kw)} · <b>${s.turns ?? "?"}</b> turns · score <b>${s.score ?? "?"}</b> · deepest Dlvl <b>${s.max_depth ?? "?"}</b>${name ? ` · <span class="mono">${esc(name)}</span>` : ""}`;
+  buildFilters();
+  buildEvents();
+  drawTimeline();
+  const m = /^#t(\d+)$/.exec(location.hash || "");
+  seek(m ? frameOfTurn(+m[1]) : 0);
+}
+
+// ------------------------------------------------------------------ screen reconstruction
+function screenFor(i) {
+  if (screenAt === i) return;
+  let start;
+  if (screenAt >= 0 && screenAt < i && i - screenAt < 400) {
+    start = screenAt + 1;
+  } else {
+    let k = i;
+    while (k > 0 && !R.frames[k].f) k--;
+    screen = new Array(24).fill(" ".repeat(80));
+    colors = new Array(24).fill("7".repeat(80));
+    start = k;
+  }
+  for (let j = start; j <= i; j++) {
+    const f = R.frames[j];
+    for (const [r, s] of f.r) screen[r] = s;
+    for (const [r, c] of f.c) colors[r] = c;
+  }
+  screenAt = i;
+}
+
+function renderTerm() {
+  let html = "";
+  for (let r = 0; r < 24; r++) {
+    const s = screen[r], c = colors[r];
+    let line = "", run = "", rc = null;
+    for (let x = 0; x < 80; x++) {
+      const ch = s[x] ?? " ", cc = c[x] ?? "7";
+      if (cc !== rc) {
+        if (run) line += rc === "7" ? esc(run) : `<span class="c${rc}">${esc(run)}</span>`;
+        run = ""; rc = cc;
+      }
+      run += ch;
+    }
+    if (run) line += rc === "7" ? esc(run) : `<span class="c${rc}">${esc(run)}</span>`;
+    html += `<div class="row">${line}</div>`;
+  }
+  $("term").innerHTML = html;
+}
+
+// ------------------------------------------------------------------ panels
+function lastIndexLE(arr, v) {     // arr sorted ascending
+  let lo = 0, hi = arr.length - 1, ans = -1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (arr[m] <= v) { ans = m; lo = m + 1; } else hi = m - 1; }
+  return ans;
+}
+function frameOfTurn(t) {
+  let lo = 0, hi = turnIdx.length - 1;
+  while (lo < hi) { const m = (lo + hi) >> 1; if (turnIdx[m] < t) lo = m + 1; else hi = m; }
+  return lo;
+}
+
+function renderPanels() {
+  const f = R.frames[cur];
+  const [hp, hpmax, dl, xl, ac, gold, hun, cond] = f.s;
+  $("sTurn").textContent = f.t; $("sHp").textContent = `${hp}/${hpmax}`; $("sDl").textContent = dl;
+  $("sXl").textContent = xl; $("sAc").textContent = ac; $("sGold").textContent = gold;
+  $("sHun").textContent = HUNGER[hun] || "–"; $("sFrame").textContent = `${cur + 1}`;
+  const share = hpmax ? hp / hpmax : 0;
+  $("hpfill").style.width = `${Math.max(0, Math.min(1, share)) * 100}%`;
+  $("hpbar").className = "hpbar" + (share < 0.33 ? " low" : share < 0.6 ? " mid" : "");
+  $("conds").innerHTML = CONDS.filter(([m]) => cond & m).map(([, n, bad]) => `<span class="chip${bad ? " bad" : ""}">${n}</span>`).join("");
+  $("bStep").textContent = f.p || "–"; $("bAct").textContent = f.a || "–"; $("bKey").textContent = f.k || "–";
+  $("readout").innerHTML = `turn <b>${f.t}</b> · frame ${cur + 1}/${R.frames.length}`;
+
+  // wand decision: the latest one, while its turn or the next is on screen (a zap ends the turn)
+  const di = lastIndexLE(decAt, cur);
+  const d = di >= 0 ? R.decisions[di] : null;
+  if (d && f.t - d.t <= 1 && (d.opts.length || d.fight < 1)) {
+    const best = d.opts.length ? Math.max(...d.opts.map(o => o[1])) : null;
+    let h = `<div class="head"><span>${d.chosen ? "Zap chosen" : d.fight > d.threshold ? "Fight is safe enough: no zap considered" : "No zap beats fighting"}</span><span class="mono">T${d.t} · threshold ${d.threshold}</span></div>`;
+    const thr = `<span class="thr" style="left:calc(${d.threshold * 100}% - 1px)"></span>`;
+    h += `<div class="dec-row fight"><div class="lab">Fight on</div><div class="p">${d.fight.toFixed(2)}</div><div class="bar"><span style="width:${d.fight * 100}%"></span>${thr}</div></div>`;
+    for (const [lab, p] of d.opts) {
+      const ch = d.chosen && lab.startsWith(d.chosen.split(" → ")[0]) && lab.includes(d.chosen.split(" → ")[1]) && p === best;
+      h += `<div class="dec-row${ch ? " chosen" : ""}"><div class="lab">${esc(lab)}</div><div class="p">${p.toFixed(2)}</div><div class="bar"><span style="width:${p * 100}%"></span></div></div>`;
+    }
+    if (d.line && d.line.length) h += `<div class="empty">In line: ${d.line.map(([n, dist, act]) => `${esc(n)} ${dist} sq${act ? "" : " (not coming)"}`).join(", ")}</div>`;
+    $("dec").innerHTML = h;
+  } else {
+    $("dec").innerHTML = `<div class="empty">No wand decision this turn or the last.</div>`;
+  }
+
+  // messages up to now
+  const msgs = R.msgs || [];
+  let mi = -1, lo = 0, hi = msgs.length - 1;
+  while (lo <= hi) { const m = (lo + hi) >> 1; if (msgs[m][0] <= cur) { mi = m; lo = m + 1; } else hi = m - 1; }
+  let lh = "";
+  for (let k = Math.max(0, mi - 11); k <= mi; k++) {
+    const [, t, m] = msgs[k];
+    const cls = t === f.t ? "now" : (f.t - t > 30 ? "old" : "");
+    lh += `<div class="${cls}"><span class="t">T${t}</span>${esc(m)}</div>`;
+  }
+  $("log").innerHTML = lh || `<div class="empty">No messages yet.</div>`;
+  $("log").scrollTop = $("log").scrollHeight;
+
+  // event list highlight
+  const list = $("evlist");
+  let near = null;
+  for (const b of list.children) { b.classList.remove("cur"); if (+b.dataset.i <= cur) near = b; }
+  if (near) { near.classList.add("cur"); if (playing) near.scrollIntoView({ block: "nearest" }); }
+}
+
+function buildFilters() {
+  const have = new Set(events.map(e => e.type));
+  $("filters").innerHTML = Object.entries(EV_NAMES).filter(([k]) => have.has(k)).map(([k, n]) =>
+    `<button type="button" data-k="${k}" aria-pressed="${filt.has(k)}">${n} ${events.filter(e => e.type === k).length}</button>`).join("");
+  for (const b of $("filters").children) b.onclick = () => {
+    const k = b.dataset.k; filt.has(k) ? filt.delete(k) : filt.add(k);
+    b.setAttribute("aria-pressed", filt.has(k)); buildEvents(); drawTimeline(); renderPanels();
+  };
+}
+function buildEvents() {
+  $("evlist").innerHTML = events.filter(e => filt.has(e.type)).map(e =>
+    `<button type="button" data-i="${e.i}"><span class="t">T${e.t}</span><span class="dot" style="background:${EV_COLORS[e.type] || "var(--muted)"}"></span><span class="txt">${esc(e.text)}</span></button>`).join("");
+  for (const b of $("evlist").children) b.onclick = () => { pause(); seek(+b.dataset.i); };
+}
+
+// ------------------------------------------------------------------ timeline
+function drawTimeline() {
+  const cv = $("tl"), dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+  const g = cv.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  if (!R) return;
+  const n = R.frames.length, pad = 6, top = 8, bot = h - 18;
+  const X = i => pad + (w - 2 * pad) * (n > 1 ? i / (n - 1) : 0);
+  // grid
+  g.strokeStyle = css("--rule"); g.lineWidth = 1;
+  for (const q of [0, 0.5, 1]) { const y = bot - (bot - top) * q; g.beginPath(); g.moveTo(pad, y + 0.5); g.lineTo(w - pad, y + 0.5); g.stroke(); }
+  // dungeon level (step line, scaled to the deepest level)
+  const maxDl = Math.max(1, ...R.frames.map(f => f.s[2]));
+  g.strokeStyle = css("--muted"); g.globalAlpha = 0.55; g.beginPath();
+  const step = Math.max(1, Math.floor(n / (w * 2)));
+  for (let i = 0; i < n; i += step) { const y = top + (bot - top) * (R.frames[i].s[2] - 1) / Math.max(1, maxDl - 1); i ? g.lineTo(X(i), y) : g.moveTo(X(i), y); }
+  g.stroke(); g.globalAlpha = 1;
+  // HP share: area + line
+  const good = css("--good");
+  g.beginPath(); g.moveTo(X(0), bot);
+  for (let i = 0; i < n; i += step) { const [hp, mx] = R.frames[i].s; g.lineTo(X(i), bot - (bot - top) * (mx ? Math.max(0, hp) / mx : 0)); }
+  g.lineTo(X(n - 1), bot); g.closePath();
+  g.fillStyle = good; g.globalAlpha = 0.16; g.fill(); g.globalAlpha = 1;
+  g.strokeStyle = good; g.lineWidth = 1.4; g.beginPath();
+  for (let i = 0; i < n; i += step) { const [hp, mx] = R.frames[i].s; const y = bot - (bot - top) * (mx ? Math.max(0, hp) / mx : 0); i ? g.lineTo(X(i), y) : g.moveTo(X(i), y); }
+  g.stroke();
+  // event ticks under the plot
+  for (const e of events) {
+    if (!filt.has(e.type) || e.type === "level") continue;
+    g.fillStyle = e.type === "decision" || e.type === "zap" ? css("--accent") : e.type === "pray" ? good : e.type === "lowhp" ? css("--warn") : css("--bad");
+    g.fillRect(Math.round(X(e.i)), bot + 4, 1.5, e.type === "decision" || e.type === "zap" ? 9 : 5);
+  }
+  // turn labels
+  g.fillStyle = css("--muted"); g.font = `11px ${css("--font-mono")}`; g.textBaseline = "top";
+  g.textAlign = "left"; g.fillText(`T${R.frames[0].t}`, pad, 0);
+  g.textAlign = "right"; g.fillText(`T${R.frames[n - 1].t} · Dlvl ${maxDl}`, w - pad, 0);
+  // playhead
+  const px = X(cur);
+  g.strokeStyle = css("--accent"); g.lineWidth = 2; g.beginPath(); g.moveTo(px, top - 2); g.lineTo(px, h - 2); g.stroke();
+  g.fillStyle = css("--accent"); g.beginPath(); g.arc(px, top - 2, 3.5, 0, Math.PI * 2); g.fill();
+}
+function seekFromX(clientX) {
+  const cv = $("tl"), r = cv.getBoundingClientRect(), pad = 6;
+  const q = Math.max(0, Math.min(1, (clientX - r.left - pad) / (r.width - 2 * pad)));
+  seek(Math.round(q * (R.frames.length - 1)));
+}
+
+// ------------------------------------------------------------------ control
+function seek(i) {
+  if (!R) return;
+  cur = Math.max(0, Math.min(R.frames.length - 1, i));
+  screenFor(cur); renderTerm(); renderPanels(); drawTimeline();
+}
+function stepTurns(dt) {
+  const t = R.frames[cur].t + dt;
+  if (dt > 0) { let i = cur; while (i < R.frames.length - 1 && R.frames[i].t < t) i++; seek(i); }
+  else seek(frameOfTurn(Math.max(R.frames[0].t, t)));
+}
+function jumpEvent(dir) {
+  const vis = events.filter(e => filt.has(e.type));
+  const e = dir > 0 ? vis.find(e => e.i > cur) : [...vis].reverse().find(e => e.i < cur);
+  if (e) seek(e.i);
+}
+function play() {
+  if (!R) return;
+  if (cur >= R.frames.length - 1) seek(0);
+  playing = true; $("play").textContent = "❚❚ Pause"; lastTs = performance.now(); acc = 0;
+  const loop = ts => {
+    if (!playing) return;
+    const speed = +$("speed").value;
+    const dt = (ts - lastTs) / 1000; lastTs = ts;
+    let next = cur;
+    if (speed === 0) next = cur + 1;
+    else {
+      acc += dt * speed;
+      const whole = Math.floor(acc);
+      if (whole > 0) { acc -= whole; const t = R.frames[cur].t + whole; while (next < R.frames.length - 1 && R.frames[next].t < t) next++; }
+    }
+    if (next !== cur) seek(next);
+    if (cur >= R.frames.length - 1) { pause(); return; }
+    timer = requestAnimationFrame(loop);
+  };
+  timer = requestAnimationFrame(loop);
+}
+function pause() { playing = false; if (timer) cancelAnimationFrame(timer); $("play").textContent = "▶ Play"; }
+
+$("play").onclick = () => playing ? pause() : play();
+$("back").onclick = () => { pause(); seek(cur - 1); };
+$("fwd").onclick = () => { pause(); seek(cur + 1); };
+$("prevEv").onclick = () => { pause(); jumpEvent(-1); };
+$("nextEv").onclick = () => { pause(); jumpEvent(1); };
+$("goto").onchange = e => { const t = +e.target.value; if (R && t) { pause(); seek(frameOfTurn(t)); } };
+$("openbtn").onclick = () => $("file").click();
+$("file").onchange = async e => { const f = e.target.files[0]; if (f) loadBytes(new Uint8Array(await f.arrayBuffer()), f.name); };
+let dragging = false;
+$("tl").addEventListener("pointerdown", e => { if (!R) return; dragging = true; pause(); $("tl").setPointerCapture(e.pointerId); seekFromX(e.clientX); });
+$("tl").addEventListener("pointermove", e => { if (dragging) seekFromX(e.clientX); });
+$("tl").addEventListener("pointerup", () => { dragging = false; });
+window.addEventListener("resize", () => drawTimeline());
+document.addEventListener("keydown", e => {
+  if (!R || e.target.matches("input, select")) return;
+  if (e.key === " ") { e.preventDefault(); playing ? pause() : play(); }
+  else if (e.key === "ArrowRight") { e.preventDefault(); pause(); e.shiftKey ? stepTurns(10) : seek(cur + 1); }
+  else if (e.key === "ArrowLeft") { e.preventDefault(); pause(); e.shiftKey ? stepTurns(-10) : seek(cur - 1); }
+  else if (e.key === ".") { pause(); jumpEvent(1); }
+  else if (e.key === ",") { pause(); jumpEvent(-1); }
+  else if (e.key === "Home") { pause(); seek(0); }
+  else if (e.key === "End") { pause(); seek(R.frames.length - 1); }
+});
+let dragDepth = 0;
+window.addEventListener("dragenter", e => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; $("drop").hidden = false; } });
+window.addEventListener("dragleave", () => { if (--dragDepth <= 0) { dragDepth = 0; $("drop").hidden = true; } });
+window.addEventListener("dragover", e => e.preventDefault());
+window.addEventListener("drop", async e => {
+  e.preventDefault(); dragDepth = 0; $("drop").hidden = true;
+  const f = e.dataTransfer.files[0]; if (f) loadBytes(new Uint8Array(await f.arrayBuffer()), f.name);
+});
+
+(async () => {
+  if (EMBED) {
+    const bin = Uint8Array.from(atob(EMBED), c => c.charCodeAt(0));
+    await loadBytes(bin, "");
+  } else {
+    screen = new Array(24).fill(" ".repeat(80)); colors = new Array(24).fill("7".repeat(80));
+    screen[11] = "            Open a recording written by tools/replay.py (.json.gz), or drop it here.".padEnd(80);
+    renderTerm(); drawTimeline();
+  }
+})();
+</script>

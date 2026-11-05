@@ -48,6 +48,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin):
+    OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
+
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
         """role_opts and any other keyword arguments are options (options.py); unknown names raise."""
@@ -57,8 +59,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
                                 actions=nh.ACTIONS, allow_all_yn_questions=True,
                                 allow_all_modes=True, max_episode_steps=1_000_000,
                                 penalty_step=0.0, penalty_time=0.0,
-                                observation_keys=("glyphs", "blstats", "message", "inv_strs",
-                                                  "inv_letters", "inv_oclasses", "tty_chars", "misc"))
+                                observation_keys=self.OBS_KEYS)
         self.seed = seed
         self.verbose = verbose
         self.max_steps = max_steps
