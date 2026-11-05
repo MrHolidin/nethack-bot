@@ -12,7 +12,7 @@ from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
 from nhbot.danger import adj_level, dice_pmf
 from nhbot.goals import GOALS
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import PM_BY_NAME, RANGED_TARGETS, permonst_of
+from nhbot.monsters import CARRIERS, PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
 from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, our_protection, ray_harm, ray_walk,
@@ -624,6 +624,8 @@ class CombatMixin:
         self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
             lvk = self.levels.get(self.cur_key)
+            if self.opts.kill_site and lvk is not None and mk.group(2) in CARRIERS:
+                lvk.kill_piles.add(self.last_attack_target)    # what it carried lies under its corpse (pickup.py)
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
                 self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))

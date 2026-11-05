@@ -15,6 +15,9 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
                                #      "explored": only on a level explored (mapmem.Level.explored)
+    "kill_site": False,        # A/B: a corpse meal interrupted stays a goal (partly eaten is eaten); the square of a kill
+                               #      that may carry things (monsters.CARRIERS) with its corpse on top is a pile to
+                               #      inspect (pickup.corpse_piles)
     "eat_plural": False,       # A/B: "There are 2 jackal corpses here; eat one?" is answered as for one corpse (else no)
     "read_explored": False,    # A/B: untested scrolls are read only on a level explored (mapmem.Level.explored)
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left

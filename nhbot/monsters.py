@@ -35,6 +35,13 @@ NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog",
 
 PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
 
+# Monsters that may carry things -- dropped where they die, under the corpse (mon.c: relobj, then make_corpse):
+# a weapon attack (makemon.c m_initweap arms them) or a liking for objects (monflag.h M2_GREEDY | M2_JEWELS |
+# M2_COLLECT | M2_MAGIC).
+M2_LIKES_OBJS = 0x10000000 | 0x20000000 | 0x40000000 | 0x80000000
+CARRIERS = {nh.permonst(i).mname for i in range(nh.NUMMONS)
+            if nh.permonst(i).mflags2 & M2_LIKES_OBJS or any(a[0] == "WEAP" for a in ATTACKS[i])}
+
 
 # hurt us only when we hit them (a passive attack and no active one): molds, jellies, acid blob, floating eye.
 # A shrieker has no attack at all: hitting it is free.

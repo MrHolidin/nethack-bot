@@ -50,7 +50,7 @@ GOALS = {
 EXPLORE_KINDS = tuple(k for k, g in GOALS.items() if g.tier == "explore")
 CHASE_ONLY = ("frontier", "downstairs")       # walked to, but not goals with a lifetime
 STAT_FIELDS = ("created", "consumed", "expired", "abandoned", "vanished", "unfinished", "chase_turns",
-               "unreach_cell", "unreach_path")
+               "unreach_cell", "unreach_path", "kept")
 
 
 class GoalsMixin:
@@ -121,12 +121,15 @@ class GoalsMixin:
     # ------------------------------------------------------------------ own tier
     def pursue(self, kind, lv, goals, consume):
         """One tick toward an own-tier goal, goals = its candidate squares. Like the explore tier: on any of
-        them, consume it; else step toward the nearest reachable one by path; none reachable: nothing
-        happens, they stay goals (until consumed or expired). True if the tick acted."""
+        them, consume it (a consume returning "keep" leaves the goal: a meal interrupted); else step toward the
+        nearest reachable one by path; none reachable: nothing happens, they stay goals (until consumed or
+        expired). True if the tick acted."""
         here = self.pos()
         if here in goals:
-            consume(here)
-            self.goal_event(kind, "consumed", self.goal_forget(kind, lv, here))
+            if consume(here) == "keep":
+                self.goal_event(kind, "kept")
+            else:
+                self.goal_event(kind, "consumed", self.goal_forget(kind, lv, here))
             return True
         mask = np.zeros(lv.under.shape, dtype=bool)
         for p in goals:

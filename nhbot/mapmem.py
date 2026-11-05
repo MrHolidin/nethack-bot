@@ -89,6 +89,7 @@ class Level:
         self.entered_xl = None     # experience level at the first arrival (stats)
         self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
+        self.kill_piles = set()    # kill_site: squares where we killed a monster that may carry things (CARRIERS)
         self.elbereth = set()     # positions where we engraved
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
         self.search_goal = None   # square chosen for searching, kept until reached

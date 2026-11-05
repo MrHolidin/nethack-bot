@@ -166,15 +166,25 @@ class PickupMixin:
         mask = glyphs_mod.ARMOR_GLYPH[lv.under].copy()
         if self.food_count() < MAX_FOOD:
             mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
+        for p in self.corpse_piles(lv):
+            mask[p] = True
         for p in self.goal_closed_set("pile", lv.key):
             mask[p] = False
         return mask
 
+    def corpse_piles(self, lv):
+        """kill_site: squares of our kills (Level.kill_piles) where a corpse lies on top -- what the monster
+        carried is under it, unseen."""
+        if not self.opts.kill_site:
+            return []
+        return [p for p in lv.kill_piles if G.KIND[lv.under[p]] == G.CORPSE]
+
     def pile_to_inspect(self, lv, y, x):
-        """An armor / food / carried-class pile under us that we have not looked at, outside a shop."""
+        """An armor / food / carried-class pile under us (or a corpse on what a kill carried) that we have not
+        looked at, outside a shop."""
         return bool((G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                     or self.carry_glyph(lv.under[y, x])) and (y, x) not in self.goal_closed_set("pile", lv.key)
-                    and not lv.shop[y, x])
+                     or self.carry_glyph(lv.under[y, x]) or (y, x) in self.corpse_piles(lv))
+                    and (y, x) not in self.goal_closed_set("pile", lv.key) and not lv.shop[y, x])
 
     # ------------------------------------------------------------------ what to take
     def food_needed(self, it):
