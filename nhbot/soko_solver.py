@@ -117,7 +117,7 @@ class Level:
         dist = self.push_dist(ts)
         return sum(1 for b in bs if b in dist) >= len(ts)
 
-    def fill_one(self, bs, ts, pos, want=4, limit=200_000, weight=2):
+    def fill_one(self, bs, ts, pos, want=4, limit=200_000, weight=2, t_end=None):
         """Best-first over pushes from this state until a trap is filled: up to `want` distinct results
         (boulders left, traps left, hero square, pushes as a linked list). Priority: pushes so far + weight *
         the fewest pushes any boulder needs to some open trap (walls only, push_dist of that trap alone)."""
@@ -133,6 +133,8 @@ class Level:
         heap = [(weight * hmin(bs), 0, tick, bs, pos, ())]
         results = []
         while heap and tick < limit:
+            if t_end is not None and tick & 255 == 0 and time.perf_counter() > t_end:
+                break                          # out of compute (solve's budget)
             _, g, _, cbs, cpos, plan = heapq.heappop(heap)
             reach = self.walk(cpos, cbs, ts)
             for b, d, to in self.pushes(reach, cbs, ts):
@@ -189,7 +191,7 @@ class Level:
             key = (bs, ts, min(reach))
             if key in dead or not ts:
                 return None
-            for nb, nt, npos, nplan in self.fill_one(bs, ts, pos, want):
+            for nb, nt, npos, nplan in self.fill_one(bs, ts, pos, want, t_end=t_end):
                 got = rec(nb, nt, npos, (plan, nplan))
                 if got is not None:
                     return got
