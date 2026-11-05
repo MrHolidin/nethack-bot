@@ -36,8 +36,9 @@ MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
 NO_DAMAGE = {"RUST", "CORR", "DCAY", "SGLD", "SEDU", "SSEX", "SLIM", "ENCH", "CURS", "STON", "COLD"}
 POISON = {"DRST", "DRDX", "DRCO"}
 MAX_D = 400
-TAINT_AD = {"BLND": 1.0, "WERE": 0.25, "SEDU": 1.0, "SITM": 1.0, "SSEX": 1.0}   # a hit blinds / passes
-# lycanthropy (mhitu.c AD_WERE: 1 in 4) / charms and robs us: a fight won that way counts half (walk_fight)
+TAINT_AD = {"BLND": 1.0, "WERE": 0.25, "SEDU": 1.0, "SITM": 1.0, "SSEX": 1.0, "SGLD": 1.0}   # a hit blinds /
+# passes lycanthropy (mhitu.c AD_WERE: 1 in 4) / charms and robs us / steals our gold (a leprechaun: steal.c
+# somegold, most of what we carry; only when we carry some): a fight won that way counts half (walk_fight)
 TAINTED_WIN = 0.5
 M1_REGEN = 0x00800000                    # monflag.h
 WAND_ORDER = ("death", "sleep", "fire", "cold", "lightning", "magic missile", "striking")   # muse.c find_offensive
@@ -559,7 +560,7 @@ class DangerMixin:
         return dmg
 
     def monster_taint(self, name):
-        """(P(one move of its melee blinds us, gives us lycanthropy or charms and robs us) -- TAINT_AD over the
+        """(P(one move of its melee blinds us, gives us lycanthropy, charms and robs us or takes our gold) -- TAINT_AD over the
         attacks of every kind of that name: a were's animal form bites -- , it explodes blinding: a yellow light)."""
         keep, explodes = 1.0, False
         for idx in MON_INDICES.get(name, ()):
@@ -567,6 +568,8 @@ class DangerMixin:
             for i, (at, ad, _, _) in enumerate(ATTACKS[idx]):
                 if at == "EXPL" and ad == "BLND":
                     explodes = True
+                elif ad == "SGLD" and not self.bl(nh.NLE_BL_GOLD):
+                    continue                     # nothing to steal
                 elif at in MELEE and ad in TAINT_AD:
                     keep *= 1 - self.hit_prob(level, i) * TAINT_AD[ad]
         return 1 - keep, explodes
