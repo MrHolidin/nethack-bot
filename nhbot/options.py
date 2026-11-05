@@ -13,7 +13,9 @@ DEFAULTS = {
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
-    "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest)
+    "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
+                               #      "explored": only on a level explored (mapmem.Level.explored)
+    "read_explored": False,    # A/B: untested scrolls are read only on a level explored (mapmem.Level.explored)
     "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
                                #      it with a reachable frontier (hole, trap door, teleport)
     "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)

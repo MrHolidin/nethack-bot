@@ -3,7 +3,7 @@ shop prices: pricemem / value.type_posterior) -- healing, extra healing, restore
 hallucination, sleeping -- is drunk with nothing threatening us, standing on Elbereth (sleeping: 25..34 helpless
 turns uncursed). Healing, extra healing, confusion, hallucination and sleeping name themselves when drunk;
 restore ability does not (potion.c peffects: unkn; the 'Call a ... potion' prompt is escaped by settle).
-Each appearance is drunk once.
+Each appearance is drunk once. quaff_test="explored": only on a level explored (Level.explored).
 
 """
 from collections import Counter
@@ -40,7 +40,7 @@ class PotionTestMixin:
     def quaff_test_step(self, lv):
         """No threat in view (the caller checks): stand on Elbereth, then drink one potion of the 100 group.
         True if it used the turn."""
-        if not self.opts.quaff_test:
+        if not self.opts.quaff_test or (self.opts.quaff_test == "explored" and not lv.explored):
             return False
         it, key = self.potion_to_test()
         if it is None or (lv.key, self.pos()) in self.quaff_refused or not self.elb_can_write(lv):

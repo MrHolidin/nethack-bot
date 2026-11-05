@@ -42,6 +42,7 @@ class ExploreMixin:
             dil[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] |= \
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
+        lv.explored = not frontier.any()
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
@@ -94,6 +95,8 @@ class ExploreMixin:
             status, reached = self.walk_to(lv, targets, grids=grids,
                                            chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))
             lv.unexplored = status == "moved" and bool(frontier[reached]) and on_level <= self.opts.descend_after
+            if status == "unreachable":
+                lv.explored = True            # what frontier is left we can't get to
             if status == "moved":
                 return
             if status == "here":

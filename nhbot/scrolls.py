@@ -164,7 +164,8 @@ class ScrollMixin:
 
     # ------------------------------------------------------------ read
     def read_scroll_step(self, lv):
-        """Housekeeping (no hostile in view): read a good scroll, else an untested one."""
+        """Housekeeping (no hostile in view): read a good scroll, else an untested one (read_explored: only on a
+        level explored, Level.explored)."""
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False              # confused remove curse / enchant armor do other things
@@ -173,7 +174,7 @@ class ScrollMixin:
         todo = [(l, s, "good") for l, s in good]
         if not good:
             unknown = [(l, s) for l, s in inv if self.unknown_readable(s)]
-            if unknown and self.test_reading_on():
+            if unknown and self.test_reading_on() and (lv.explored or not self.opts.read_explored):
                 todo = [(l, s, "unknown") for l, s in unknown]
         for letter, s, why in todo:
             if why == "unknown":
