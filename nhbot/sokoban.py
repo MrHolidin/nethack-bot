@@ -26,7 +26,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, DELTA2KEY, ROWS
+from nhbot.consts import COLS, DELTA2KEY, ROWS, ray_squares
 from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
@@ -35,6 +35,7 @@ SOKO_BEHIND_WAITS = 10    # waits for a monster beyond the boulder before we go 
 SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the plan
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
+FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -74,6 +75,8 @@ class SokoLevel:
         self.retreat_until = -1       # soko_retreat: keep away from a peaceful monster in our way till then
         self.retreat_from = None
         self.last_i = -1
+        self.closet_done = set()      # top level: the prize closets looked into
+        self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
         self.doors = set(map(tuple, self.lv["doors"]))
@@ -203,10 +206,12 @@ class SokobanMixin:
         oy, ox = st.off
         bs = frozenset(p for p in st.floor if top[p[0] + oy, p[1] + ox] == G.BOULDER)
         # an open trap: shown as one -- or remembered as one under an item or a monster (a filled pit or hole
-        # shows the floor; the terrain layer alone has been seen to keep the trap)
+        # shows the floor; the terrain layer alone has been seen to keep the trap) -- unless a push of ours
+        # filled it (an item on the filled square hides that from the map)
         ts = frozenset(tuple(t) for t in st.lv["traps"]
-                       if top[t[0] + oy, t[1] + ox] == G.TRAP
-                       or (G.IS_COVERED[top[t[0] + oy, t[1] + ox]] and terr[t[0] + oy, t[1] + ox] == G.TRAP))
+                       if tuple(t) not in st.filled
+                       and (top[t[0] + oy, t[1] + ox] == G.TRAP
+                            or (G.IS_COVERED[top[t[0] + oy, t[1] + ox]] and terr[t[0] + oy, t[1] + ox] == G.TRAP)))
         return bs, ts
 
     def soko_match(self, st, bs, ts):
@@ -270,7 +275,8 @@ class SokobanMixin:
 
     def soko_attack_at(self, lv, st, target, bs, ts):
         """Fight whatever is on target (variant coords): from a square next to it, 'F' toward it; else walk to
-        the nearest such square. Done (behind_waits reset) once a push works again or nothing answers."""
+        the nearest such square. Done (behind_waits reset) once a push works again or nothing answers. False if
+        no square next to it is reachable."""
         here = st.from_map(self.pos())
         if max(abs(here[0] - target[0]), abs(here[1] - target[1])) == 1:
             seq = self.msg_seq
@@ -290,8 +296,19 @@ class SokobanMixin:
                 if nxt is not None and nxt != here:
                     self.move(st.to_map(nxt))
                     return True
-        st.behind_waits = 0                  # no way to its side: wait at the push again
-        return self.soko_wait()
+        return False                         # no way to its side
+
+    def soko_throw_over(self, st, d):
+        """Throw a missile from the push square along the push (over the boulder) at the monster beyond it.
+        True if thrown; a few more push tries before the next throw."""
+        th = [] if self.hallu_blind_ranged() else self.throwables()
+        if not th:
+            return False
+        y, x = self.pos()
+        self.soko_stats["behind_throw"] += 1
+        self.throw(th[0][0], DELTA2KEY[d], ray_squares(y, x, d[0], d[1]))
+        st.behind_waits = SOKO_BEHIND_WAITS - 3
+        return True
 
     def soko_retreat(self, lv, st, blocker, bs, ts):
         """A peaceful monster in the way: for SOKO_RETREAT turns stand at least 4 squares from it (the nearest
@@ -355,8 +372,14 @@ class SokobanMixin:
             here = st.from_map(self.pos())
             beyond = (b[0] + d[0], b[1] + d[1])
             if st.behind_waits > SOKO_BEHIND_WAITS:
-                # it doesn't go away (a mimic posing as an object, something stuck there): attack it from beside
-                return self.soko_attack_at(lv, st, beyond, bs, ts)
+                # it doesn't go away (a mimic posing as an object, something stuck between the boulder and a
+                # trap): attack it from beside, else throw over the boulder at it (missiles fly over boulders)
+                if self.soko_attack_at(lv, st, beyond, bs, ts):
+                    return True
+                if here == stand and self.soko_throw_over(st, d):
+                    return True
+                st.behind_waits = 0
+                return self.soko_wait()
             if here == stand:
                 if st.blocked == self.turn():
                     self.soko_stats["wait_behind"] += 1
@@ -365,7 +388,10 @@ class SokobanMixin:
                 seq = self.msg_seq
                 self.soko_stats["push"] += 1
                 self.move(st.to_map(b))
-                if any(w in self.text_since(seq) for w in BEHIND_RE):
+                said = self.text_since(seq)
+                if any(w in said for w in FILL_RE):
+                    st.filled.add(beyond)
+                if any(w in said for w in BEHIND_RE):
                     st.blocked = self.turn()
                 else:
                     st.behind_waits = 0
@@ -401,21 +427,20 @@ class SokobanMixin:
         the closets were seen (or the prize taken)."""
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         here = st.from_map(self.pos())
-        for p in closets:
-            if here == p:
-                seq = self.msg_seq
-                self.pickup_matching(["amulet", "bag"], own=True)
-                got = self.text_since(seq)
-                st.closet_done = getattr(st, "closet_done", set()) | {p}
-                if "amulet" in got or "bag" in got:
-                    self.soko_stats["prize"] += 1
-                    am = next((it for it in self.items() if it.ocls == nh.AMULET_CLASS and not it.on_body), None)
-                    if am is not None:
-                        self.jewelry_put_on(am)
-                        self.soko_stats["amulet_worn"] += 1
-                    self.soko_done = True
-                return True
-        todo = [p for p in closets if p not in getattr(st, "closet_done", set())]
+        todo = [p for p in closets if p not in st.closet_done]
+        if here in todo:
+            seq = self.msg_seq
+            self.pickup_matching(["amulet", "bag"], own=True)
+            got = self.text_since(seq)
+            st.closet_done.add(here)
+            if "amulet" in got or "bag" in got:
+                self.soko_stats["prize"] += 1
+                am = next((it for it in self.items() if it.ocls == nh.AMULET_CLASS and not it.on_body), None)
+                if am is not None:
+                    self.jewelry_put_on(am)
+                    self.soko_stats["amulet_worn"] += 1
+                self.soko_done = True
+            return True
         if not todo:
             self.soko_done = True
             self.soko_stats["prize_missing"] += 1
@@ -429,7 +454,7 @@ class SokobanMixin:
         if self.soko_step_to(lv, st, tgt, bs, ts, extra):
             return True
         self.soko_stats["zoo_no_way"] += 1
-        st.closet_done = getattr(st, "closet_done", set()) | {tgt}
+        st.closet_done.add(tgt)
         return self.soko_wait()
 
     def soko_give_up(self, lv, st, why):
