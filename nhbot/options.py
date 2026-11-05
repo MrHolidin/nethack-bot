@@ -11,9 +11,6 @@ DEFAULTS = {
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while
                                #      the level's up or down staircase is unknown
-    "hunt_easy": False,        # A/B: a number p: hostiles in view we would melee (not never_melee) and beat with
-                               #      P(win) > p (danger.win_prob) are explore goals: the squares next to them
-                               #      (combat.prey_mask, goal kind "prey")
     "mines_xl": False,         # A/B: a number n: the Mines are closed below XL n; from XL n on, with their staircase
                                #      known (Level.avoid_down, from a bounce), walk to it and go in -- Excalibur first
                                #      at the fountains we know (explore.mines_trip_step)

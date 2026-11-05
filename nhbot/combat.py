@@ -39,6 +39,7 @@ SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
 MR_BIT = {"sleep": 0x04, "fire": 0x01, "cold": 0x02, "lightning": 0x10}    # monst.c mresists: MR_SLEEP, ...
 _PM_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
+PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
 
 
 # mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
@@ -119,7 +120,7 @@ class CombatMixin:
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
-        self.prey_cache = {}             # hunt_easy: prey_win by state
+        self.prey_cache = {}             # prey_win by state
 
     def attack(self, target):
         self.cur_act = "fight"
@@ -451,12 +452,13 @@ class CombatMixin:
         return False
 
     def prey_mask(self, lv, passable):
-        """hunt_easy: the squares next to a hostile in view that we would melee (not never_melee) and beat with
-        P(win) > hunt_easy -- danger.win_prob of the fight next to it at our HP now -- for explore to walk to;
-        once it is next to us the melee step hits it."""
+        """Prey: the squares next to a hostile in view that we would melee (not never_melee) and beat with
+        P(win) > PREY_PWIN -- danger.win_prob of the fight next to it at our HP now -- for explore to walk to;
+        once it is next to us the melee step hits it. (A/B hunt_easy 0.95: +1838 [+251, +3343], median
+        4645 -> 5089.)"""
         mask = np.zeros_like(passable)
         for (y, x), name in self.visible_hostiles(lv):
-            if name not in PM_BY_NAME or self.never_melee(name) or self.prey_win(name, (y, x)) <= self.opts.hunt_easy:
+            if name not in PM_BY_NAME or self.never_melee(name) or self.prey_win(name, (y, x)) <= PREY_PWIN:
                 continue
             for dy, dx in NEIGH:
                 q = (y + dy, x + dx)
@@ -465,7 +467,7 @@ class CombatMixin:
         return mask
 
     def prey_win(self, name, pos):
-        """hunt_easy: P(we win a fight with this monster next to us), cached while what it depends on stays the
+        """P(we win a fight with this monster next to us), cached while what it depends on stays the
         same (its name, our HP, max HP, AC, XL, the dungeon level, the weapon in hand); the RNG state restored."""
         weapon = next((it.text for it in self.items() if it.wielded), None)
         key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),

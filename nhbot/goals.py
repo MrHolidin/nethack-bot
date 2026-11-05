@@ -6,6 +6,7 @@ it, whether it holds us on the level (items_first). Two tiers:
   explore  the goal joins the exploration frontier: explore() walks to the nearest of frontier + goals, and
            another step consumes it when we stand on it. Its walk mask must use the same gate as the
            consuming step (else we walk to a square where nothing happens). gold, pile, altar, box.
+           Also walked to, with no lifetime: prey (the squares next to a hostile we beat, combat.prey_mask).
   own      a policy step of its own walks to it and consumes it, at its place in STEPS.
            retrieve (our thrown missiles), corpse (fresh corpse of our kill), loot (stolen items).
 
@@ -48,7 +49,7 @@ GOALS = {
     "loot": GoalKind("loot", "own"),
 }
 EXPLORE_KINDS = tuple(k for k, g in GOALS.items() if g.tier == "explore")
-CHASE_ONLY = ("frontier", "downstairs", "prey")   # walked to, but not goals with a lifetime (prey: hunt_easy)
+CHASE_ONLY = ("frontier", "downstairs", "prey")   # walked to, but not goals with a lifetime (prey: combat.prey_mask)
 STAT_FIELDS = ("created", "consumed", "expired", "abandoned", "vanished", "unfinished", "chase_turns",
                "unreach_cell", "unreach_path", "kept")
 
@@ -176,8 +177,7 @@ class GoalsMixin:
         out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
         # boxes: opened by housekeeping, so only with no hostile in view (its gate; boxes.box_goal_mask)
         out["box"] = self.box_goal_mask(lv, passable)
-        if self.opts.hunt_easy:
-            out["prey"] = self.prey_mask(lv, passable) if ok else np.zeros_like(gold)   # the melee step hits it
+        out["prey"] = self.prey_mask(lv, passable) if ok else np.zeros_like(gold)   # the melee step hits it
         return out
 
     def goal_summary(self):
