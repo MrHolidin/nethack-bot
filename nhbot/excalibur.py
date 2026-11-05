@@ -66,7 +66,7 @@ class ExcaliburMixin:
         return False
 
     def excal_fountain_level(self):
-        """mines_xl: the main-dungeon level, nearest in depth, with a fountain we could make Excalibur at (not a
+        """The main-dungeon level, nearest in depth, with a fountain we could make Excalibur at (not a
         shop's, not on a level we gave up reaching it on), while Excalibur can be made at all (lawful, XL
         excal_xl, an unnamed long sword; not the HP: we rest for that). None: no such level."""
         if self.excalibur or int(self.last_bl[nh.NLE_BL_ALIGN]) != 1 or self.bl(nh.NLE_BL_XP) < self.opts.excal_xl \

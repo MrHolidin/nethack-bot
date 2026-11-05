@@ -1,5 +1,5 @@
 """Exploring a level and leaving it: frontier and item goals, when to descend, searching for hidden
-passages, the Gnomish Mines (avoid_mines, mines_xl, mines_return), waiting for the pet, magic mapping."""
+passages, the Gnomish Mines (mines_blocked, mines_trip_step, mines_return), waiting for the pet, magic mapping."""
 import re
 from collections import Counter
 
@@ -12,7 +12,7 @@ from nhbot.goals import GOALS
 
 REST_DESCEND_HP = 0.95      # rest on the down staircase below this fraction of max HP
 REST_DESCEND_MAX = 600      # ... at most this many turns a level
-MINES_TRIP_RETRY = 500      # mines_xl: the Mines staircase out of reach -- try again this many turns later (by then
+MINES_TRIP_RETRY = 500      # the Mines staircase out of reach -- try again this many turns later (by then
                             # step_progress may have forgotten the obstacles in the way)
 
 
@@ -22,8 +22,8 @@ class ExploreMixin:
         self.pet_waits = 0
         self.pet_waited_total = 0
         self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
-        self.mines_trip_stats = Counter()  # mines_xl: ticks of the trip to the Mines by what they did
-        self.mines_trip_retry = 0          # mines_xl: no trip before this turn (the staircase was out of reach)
+        self.mines_trip_stats = Counter()  # ticks of the trip to the Mines by what they did
+        self.mines_trip_retry = 0          # no trip to the Mines before this turn (the staircase was out of reach)
         self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
         self.door_stats = Counter()
@@ -231,16 +231,12 @@ class ExploreMixin:
             self.press("s")
 
     def mines_blocked(self):
-        """avoid_mines: True/False, or "until_excalibur": lawful long-sword users first look for
-        Excalibur in the main dungeon (the Mines have no usable fountains)."""
+        """The Mines staircase is closed: below XL mines_xl (mines_xl_open), while Excalibur can still be made
+        at a fountain we know (excal_fountain_level), and once mines_return brought us back (the Mines are
+        finished). A/B mines_xl 5 vs the Mines always open: +1041 [+135, +2013], then +2636 [+1582, +3695]."""
         if self.mines_done:
             return True                       # mines_return brought us back: the Mines are finished
-        if self.opts.mines_xl:
-            return not self.mines_xl_open() or self.excal_fountain_level() is not None
-        if self.opts.avoid_mines == "until_excalibur":
-            return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
-                and self.long_sword() is not None and self.turn() < 8000
-        return bool(self.opts.avoid_mines)
+        return not self.mines_xl_open() or self.excal_fountain_level() is not None
 
     def squeeze_passed(self, lv):
         """squeeze_plan: through the squeeze we shed weight for -- it is open again, both ways."""
@@ -296,19 +292,19 @@ class ExploreMixin:
         return False
 
     def mines_xl_open(self):
-        """mines_xl: the Mines open from XL mines_xl on -- or once a main-dungeon level got desperate (no way on
+        """The Mines open from XL mines_xl on -- or once a main-dungeon level got desperate (no way on
         found there: the Mines are the way on)."""
         return self.bl(nh.NLE_BL_XP) >= self.opts.mines_xl or any(l.desperate for k, l in self.levels.items()
                                                                  if k[0] == 0)
 
     def mines_trip_step(self, lv, grids):
-        """mines_xl: the Mines open (mines_xl_open), in the main dungeon, their staircase known (mines_stairs) and
+        """The Mines open (mines_xl_open), in the main dungeon, their staircase known (mines_stairs) and
         the Mines not done: Excalibur first -- while it can be made at a fountain we know (excal_fountain_level),
         go to that level (the dip itself is excalibur.excal_step, housekeeping; below its HP we rest there) --
         then to the branch level and down its Mines staircase. A level we know no way to (an up staircase never
         seen: we fell past it): its fountain is given up (excal_skip), the Mines tried again MINES_TRIP_RETRY
         turns later. True if it used the turn."""
-        if not self.opts.mines_xl or lv.key[0] != 0 or self.mines_done or not self.mines_xl_open() \
+        if lv.key[0] != 0 or self.mines_done or not self.mines_xl_open() \
                 or self.turn() < self.mines_trip_retry:
             return False
         branch = next((k for k, l in self.levels.items() if k[0] == 0 and self.mines_stairs(l)), None)
@@ -348,7 +344,7 @@ class ExploreMixin:
         return False
 
     def mines_stairs(self, lv):
-        """mines_xl: the down staircases of this level we know lead into the Mines -- marked on a bounce
+        """The down staircases of this level we know lead into the Mines -- marked on a bounce
         (avoid_down) or taken (Level.stairs_to) -- as linked_stairs places them."""
         marks = {p: (2, 1) for p in lv.avoid_down}
         marks.update({p: k for p, k in lv.stairs_to.items() if k[0] == 2})
@@ -373,7 +369,7 @@ class ExploreMixin:
         return out - lv.not_stairs
 
     def stairs_step(self, lv, grids, mask, key):
-        """mines_xl: to a staircase of mask and take it (down: go_down, with its pet wait and rest). The game
+        """To a staircase of mask and take it (down: go_down, with its pet wait and rest). The game
         saying there is none here: the square is noted (Level.not_stairs) -- no turn passed. True if it acted."""
         if key == ">":
             if not self.go_down(lv, grids, mask):
