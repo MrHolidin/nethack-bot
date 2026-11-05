@@ -80,7 +80,7 @@ class SokoLevel:
         self.retreat_until = -1       # soko_retreat: keep away from a peaceful monster in our way till then
         self.retreat_from = None
         self.last_i = -1
-        self.closet_done = set()      # top level: the prize closets (and squares an amulet or a tool lay on) looked into
+        self.closet_done = set()      # top level: the prize closets and the zoo piles looked into
         self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
@@ -252,13 +252,13 @@ class SokobanMixin:
         oy, ox = st.off
         me = st.from_map(self.pos())          # the memory keeps what lay where we stand: a boulder we just pushed on
         bs = frozenset(p for p in st.floor if top[p[0] + oy, p[1] + ox] == G.BOULDER and p != me)
-        # an open trap: shown as one -- or remembered as one under an item or a monster (a filled pit or hole
-        # shows the floor; the terrain layer alone has been seen to keep the trap) -- unless a push of ours
-        # filled it (an item on the filled square hides that from the map). A boulder shown on a trap we did not
-        # fill is a giant mimic posing as one (a real one would have filled it): the trap is still open.
+        # an open trap: shown as one; or an item on it (a level's random objects lie on traps too, we arrive to
+        # see the item) with the trap under it -- or never seen there; unless a push of ours filled it (an item on
+        # the filled square hides that from the map). A filled pit or hole shows the floor. A boulder shown on a
+        # trap we did not fill is a giant mimic posing as one (a real one would have filled it): still open.
         def is_open(t):
             k = top[t[0] + oy, t[1] + ox]
-            return k in (G.TRAP, G.BOULDER) or (G.IS_COVERED[k] and terr[t[0] + oy, t[1] + ox] == G.TRAP)
+            return k in (G.TRAP, G.BOULDER) or (G.IS_COVERED[k] and terr[t[0] + oy, t[1] + ox] in (G.TRAP, G.UNKNOWN))
         ts = frozenset(tuple(t) for t in st.lv["traps"] if tuple(t) not in st.filled and is_open(t))
         return bs, ts
 
