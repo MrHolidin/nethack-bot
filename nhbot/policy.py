@@ -40,6 +40,7 @@ STEPS = (
     "weapon",
     "wands",
     "melee",
+    "soko_zoo",          # Sokoban's top level: its zoo fought at the doorway (nhbot.sokoban)
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
