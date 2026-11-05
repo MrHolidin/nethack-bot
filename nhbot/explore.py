@@ -23,6 +23,7 @@ class ExploreMixin:
         self.pet_waited_total = 0
         self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
         self.mines_trip_stats = Counter()  # ticks of the trip to the Mines by what they did
+        self.two_down_levels = set()       # two_down: branch levels whose Mines staircase we inferred
         self.mines_trip_retry = 0          # no trip to the Mines before this turn (the staircase was out of reach)
         self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
@@ -348,7 +349,28 @@ class ExploreMixin:
         (avoid_down) or taken (Level.stairs_to) -- as linked_stairs places them."""
         marks = {p: (2, 1) for p in lv.avoid_down}
         marks.update({p: k for p, k in lv.stairs_to.items() if k[0] == 2})
-        return self.linked_stairs(lv, marks, G.DOWNSTAIR)
+        out = self.linked_stairs(lv, marks, G.DOWNSTAIR)
+        if not out and self.opts.two_down:
+            out = self.two_down_mines(lv)
+        return out
+
+    def two_down_mines(self, lv):
+        """two_down: on main Dlvl 2-4 (where the Mines branch: dungeon.def) two down staircases in view, one of
+        them taken to the next main level (Level.stairs_to) -- the other is the Mines'. Known so without a bounce
+        off it (442 of 834 base_v games past Dlvl 4 never learned where the Mines were)."""
+        if lv.key[0] != 0 or not 2 <= lv.key[1] <= 4:
+            return set()
+        downs = {(int(y), int(x)) for y, x in zip(*np.nonzero(self.kinds(lv) == G.DOWNSTAIR))} - lv.not_stairs
+        if len(downs) != 2:
+            return set()
+        main = self.linked_stairs(lv, {p: k for p, k in lv.stairs_to.items() if k == (0, lv.key[1] + 1)},
+                                  G.DOWNSTAIR) & downs
+        if len(main) != 1:
+            return set()
+        if lv.key not in self.two_down_levels:
+            self.two_down_levels.add(lv.key)
+            self.mines_trip_stats["two_down"] += 1
+        return downs - main
 
     def linked_stairs(self, lv, marks, kind):
         """The staircases of `kind` (G.UPSTAIR / G.DOWNSTAIR) that the noted squares of marks stand for. We note
