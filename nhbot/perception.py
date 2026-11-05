@@ -183,6 +183,22 @@ class PerceptionMixin:
         me = self.pos()
         return [(int(a), int(b)) for a, b in zip(ys, xs) if (a, b) != me]
 
+    def stationary_avoid(self, lv):
+        """remember_molds: the never-melee monsters that never move (molds, lichens' kin: mmove 0) stay where we saw
+        them while out of sight (Level.stationary) -- their squares avoided like the ones in view, so a pile under a
+        mold in a dark corridor is no goal we walk up to, see the mold and turn from, over and over. Forgotten
+        when we stand next to the square and it is not there."""
+        g = self.obs["glyphs"]
+        y, x = self.pos()
+        blind = int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND
+        for pos, name in list(lv.stationary.items()):
+            here = G.KIND[g[pos]] == G.MONSTER and G.monster_name(int(g[pos])) == name
+            if not here and not blind and max(abs(pos[0] - y), abs(pos[1] - x)) <= 1:
+                del lv.stationary[pos]
+                continue
+            if not here and pos not in self.avoid_cells and not (lv.desperate and name not in self.always_avoid()):
+                self.avoid_cells.append(pos)
+
     def adjacent_hostiles(self, lv):
         y, x = self.pos()
         g = self.obs["glyphs"]
@@ -196,6 +212,11 @@ class PerceptionMixin:
                     if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
                             and not self.spore_ok(name):
                         self.avoid_cells.append((yy, xx))
+                    if self.opts.remember_molds and self.never_melee(name) and name in PM_BY_NAME \
+                            and PM_BY_NAME[name].mmove == 0:
+                        lv.stationary[(yy, xx)] = name
+        if self.opts.remember_molds:
+            self.stationary_avoid(lv)
         for dy, dx in NEIGH:
             ny, nx = y + dy, x + dx
             if not (0 <= ny < ROWS and 0 <= nx < COLS):
