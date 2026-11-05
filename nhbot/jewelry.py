@@ -78,7 +78,7 @@ def to_identify(ocls, text):
 
 def wear_name(it):
     m = (AMULET_RE if it.ocls == nh.AMULET_CLASS else RING_RE).search(it.text)
-    return m.group(1).replace(" ", "_")
+    return m.group(1).replace(" ", "_") if m else "unidentified"
 
 
 class JewelryMixin:

@@ -82,7 +82,7 @@ class SokoLevel:
         self.replans = 0
         self.hallu_seen = False       # we hallucinated here: items in the memory may be boulders (soko_state)
         self.leave_explore = 0        # soko_leave: ticks the generic explore had to find the way down
-        self.door_waits = 0           # turns waited at a locked door we could not kick (soko_step_to)
+        self.door_wait_until = -1     # no kicking a locked door till then: our legs refused (soko_step_to)
         self.i = 0                    # the plan's state we were at last
         self.failed = False
         self.solved = False
@@ -129,18 +129,25 @@ class SokobanMixin:
         self.soko_stats = Counter()
         self.soko_secs = 0.0            # compute time spent in this module (the tick that acted included)
         self.soko_search_from = None    # turn we began searching the level below the Oracle for the entrance
+        self.soko_oracle = None         # the Oracle's Dlvl once seen (soko_oracle_dlvl)
+        self.soko_ent = None            # Sokoban's entrance once found (soko_entrance)
 
     # ------------------------------------------------------------------ in the main dungeon
     def soko_entrance(self):
         """(level key, squares) of Sokoban's up staircase on the main level that has it, or None: a staircase we
         took into Sokoban (Level.stairs_to), or the second up staircase of a main Dlvl 5-10 level whose other
         one we know leads to the level above."""
+        if self.soko_ent is not None:
+            key, got = self.soko_ent
+            if not got & self.levels[key].not_stairs:      # found once: it stays, unless it proved no staircase
+                return self.soko_ent
+            self.soko_ent = None
         for key, lv in self.levels.items():
-            if key[0] != 0:
+            if key[0] != 0 or not 5 <= key[1] <= 10:      # the entrance: the Oracle's Dlvl (5-9) plus one
                 continue
             marks = {p: k for p, k in lv.stairs_to.items() if k[0] == SOKO_DNUM}
             got = self.linked_stairs(lv, marks, G.UPSTAIR) if marks else set()
-            if not got and 5 <= key[1] <= 10:
+            if not got:
                 ups = {(int(y), int(x)) for y, x in zip(*np.nonzero(self.kinds(lv) == G.UPSTAIR))} - lv.not_stairs
                 if len(ups) == 2:
                     main = self.linked_stairs(lv, {p: k for p, k in lv.stairs_to.items() if k == (0, key[1] - 1)},
@@ -148,7 +155,8 @@ class SokobanMixin:
                     if len(main) == 1:
                         got = ups - main
             if got:
-                return key, got
+                self.soko_ent = (key, got)
+                return self.soko_ent
         return None
 
     def sokoban_trip_step(self, lv, grids, nothing_left):
@@ -195,12 +203,13 @@ class SokobanMixin:
     def soko_oracle_dlvl(self):
         """Dlvl of the Oracle's level if we saw it, else None: main Dlvl 5-9 with centaur statues (oracle.des puts
         them round the centre room, whose four fountains we may not have seen) or four fountains."""
-        for key, lv in self.levels.items():
-            if key[0] == 0 and 5 <= key[1] <= 9 and (
-                    np.isin(lv.under, CENTAUR_STATUES).sum() >= 2
-                    or (self.terrain_glyphs(lv) == FOUNTAIN_GLYPH).sum() >= 4):
-                return key[1]
-        return None
+        if self.soko_oracle is None:
+            for key, lv in self.levels.items():
+                if key[0] == 0 and 5 <= key[1] <= 9 and (
+                        np.isin(lv.under, CENTAUR_STATUES).sum() >= 2
+                        or (self.terrain_glyphs(lv) == FOUNTAIN_GLYPH).sum() >= 4):
+                    self.soko_oracle = key[1]
+        return self.soko_oracle
 
     def soko_search_step(self, lv, grids, nothing_left):
         """The level below the Oracle has Sokoban's up staircase. Explored with only one up staircase seen: the
@@ -334,14 +343,14 @@ class SokobanMixin:
         mp = st.to_map(nxt)
         if G.KIND[int(self.obs["glyphs"][mp])] == G.MONSTER and self.peaceful_now(lv, mp):
             return self.soko_retreat(lv, st, mp, bs, ts)
-        if lv.blocked[mp] and self.kinds(lv)[mp] == G.DOOR_CLOSED:
+        if self.turn() < st.door_wait_until and self.kinds(lv)[mp] == G.DOOR_CLOSED:
             # a locked door we could not kick (wounded legs: no turn passes, it would loop): wait, try again later
-            st.door_waits += 1
-            if st.door_waits % SOKO_DOOR_WAITS == 0:
-                lv.blocked[mp] = False
             self.soko_stats["door_wait"] += 1
             return self.soko_wait()
+        seq = self.msg_seq
         self.move(mp)
+        if "no shape for kicking" in self.text_since(seq):
+            st.door_wait_until = self.turn() + SOKO_DOOR_WAITS
         return True
 
     def soko_attack_at(self, lv, st, target, bs, ts):
@@ -444,7 +453,16 @@ class SokobanMixin:
             st.since, st.last_i, st.behind_waits = self.turn(), i, 0
         stuck = self.turn() - st.since
         if stuck > SOKO_STUCK and i < len(st.plan):
-            return self.soko_give_up(lv, st, "stuck")
+            # the push won't go (a monster stays beyond the boulder): a plan that leaves that square alone
+            b, d = st.plan[i]
+            if self.soko_replan(st, bs, ts, walls=((b[0] + d[0], b[1] + d[1]),)):
+                return self.soko_wait()
+            if not self.soko_trapped(st, bs, ts):
+                return self.soko_give_up(lv, st, "stuck")
+            # the way back down is shut behind us (Sokoban's pushes go one way): giving up would leave us here
+            # for good -- wait on, the monster may yet go or die
+            st.since = self.turn()
+            self.soko_stats["trapped_wait"] += 1
         extra = bs - st.states[i][0]
         if st.retreat_until >= self.turn():
             return self.soko_retreat_step(lv, st, bs, ts)
@@ -484,7 +502,13 @@ class SokobanMixin:
             return self.soko_give_up(lv, st, "no_way_to_push") if stuck > SOKO_STUCK // 2 else self.soko_wait()
         return self.soko_finish(lv, st, bs, ts, extra)
 
-    def soko_replan(self, st, bs, ts):
+    def soko_trapped(self, st, bs, ts):
+        """No way back to the staircase we arrived on (by Sokoban's rules)."""
+        here = st.from_map(self.pos())
+        arrive = tuple(st.lv["arrive"])
+        return here != arrive and self.soko_walk(st, here, arrive, bs, ts) is None
+
+    def soko_replan(self, st, bs, ts, walls=()):
         """The level no longer matches the plan (a monster's scroll of earth dropped boulders, a wand of striking
         broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_SECS of compute), at most
         SOKO_REPLANS times a level. True if a new plan was found -- we follow it from its start."""
@@ -495,7 +519,7 @@ class SokobanMixin:
         if solver is None:
             solver = SOLVERS[st.name] = soko_solver.Level(st.lv)
         here = st.from_map(self.pos())
-        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here)) if here in st.floor else None
+        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here), walls=walls) if here in st.floor else None
         if plan is None:
             self.soko_stats["replan_fail"] += 1
             return False
@@ -521,6 +545,10 @@ class SokobanMixin:
                 self.press("<")
                 return True
             return self.soko_step_to(lv, st, goal, bs, ts, extra) or self.soko_wait()
+        if not self.opts.soko_zoo:
+            self.soko_done = True
+            self.soko_stats["zoo_skipped"] += 1
+            return self.soko_leave(lv, st)
         return self.soko_prize(lv, st, bs, ts, extra)
 
     def soko_prize(self, lv, st, bs, ts, extra):
@@ -542,14 +570,15 @@ class SokobanMixin:
         # are looked into too
         todo = [p for p in closets + sorted(self.soko_piles(lv, st)) if p not in st.closet_done]
         if here in todo:
-            seq = self.msg_seq
+            had = self.soko_prize_items()
             self.pickup_matching(["amulet", "bag"], own=True)
-            got = self.text_since(seq)
             st.closet_done.add(here)
-            if "amulet" in got or "bag" in got:
+            new = self.soko_prize_items() - had
+            if new:
                 self.soko_stats["prize"] += 1
-                am = next((it for it in self.items() if it.ocls == nh.AMULET_CLASS and not it.on_body), None)
-                if am is not None:
+                # an amulet from a closet is the prize, reflection (one from a pile in the zoo may be anything)
+                am = next((it for it in self.items() if it.letter in new and it.ocls == nh.AMULET_CLASS), None)
+                if am is not None and here in closets:
                     self.jewelry_put_on(am)
                     self.soko_stats["amulet_worn"] += 1
                 self.soko_done = True
