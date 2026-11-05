@@ -31,6 +31,7 @@ from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
 SOKO_LEVEL_TURNS = 4000   # a level not solved in this many turns is given up
+SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the plan
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
@@ -68,6 +69,8 @@ class SokoLevel:
         self.solved = False
         self.since = None             # turn the plan last advanced
         self.blocked = -1             # turn a push was refused for a monster beyond the boulder
+        self.retreat_until = -1       # soko_retreat: keep away from a peaceful monster in our way till then
+        self.retreat_from = None
         self.last_i = -1
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
@@ -233,16 +236,54 @@ class SokobanMixin:
                 q.append(n)
         return None
 
-    def soko_step_to(self, lv, st, target, bs, ts):
-        """One step toward target (variant coords). True if it moved (or tried)."""
+    def soko_step_to(self, lv, st, target, bs, ts, extra=frozenset()):
+        """One step toward target (variant coords). True if it acted. A peaceful monster on the next square:
+        back off (soko_retreat) -- in a dead end it waits for us to leave its only way out. No way at all but
+        through a boulder the plan doesn't know (extra: on the top level a giant mimic posing as one): attack
+        that boulder ('F'), the mimic shows itself and the fight steps take over."""
         here = st.from_map(self.pos())
         nxt = self.soko_walk(st, here, target, bs, ts)
+        if nxt is None and extra:
+            nxt = self.soko_walk(st, here, target, bs - extra, ts)
+            if nxt is not None and nxt in extra:
+                self.soko_stats["mimic_attack"] += 1
+                y, x = self.pos()
+                ty, tx = st.to_map(nxt)
+                self.press("F")
+                self.press(DELTA2KEY[(ty - y, tx - x)])
+                return True
         if nxt is None:
             return False
         if nxt == here:
             return True
-        self.move(st.to_map(nxt))
+        mp = st.to_map(nxt)
+        if G.KIND[int(self.obs["glyphs"][mp])] == G.MONSTER and self.peaceful_now(lv, mp):
+            return self.soko_retreat(lv, st, mp, bs, ts)
+        self.move(mp)
         return True
+
+    def soko_retreat(self, lv, st, blocker, bs, ts):
+        """A peaceful monster in the way: for SOKO_RETREAT turns stand at least 4 squares from it (the nearest
+        such square we reach), then try again."""
+        if st.retreat_until < self.turn():
+            st.retreat_until = self.turn() + SOKO_RETREAT
+            st.retreat_from = st.from_map(blocker)
+            self.soko_stats["retreat"] += 1
+        return self.soko_retreat_step(lv, st, bs, ts)
+
+    def soko_retreat_step(self, lv, st, bs, ts):
+        here = st.from_map(self.pos())
+        far = lambda p: max(abs(p[0] - st.retreat_from[0]), abs(p[1] - st.retreat_from[1])) >= 4
+        if far(here):
+            return self.soko_wait()
+        cands = sorted((abs(p[0] - here[0]) + abs(p[1] - here[1]), p) for p in st.floor
+                       if far(p) and p not in bs and p not in ts)
+        for _, p in cands[:12]:
+            nxt = self.soko_walk(st, here, p, bs, ts)
+            if nxt is not None and nxt != here:
+                self.move(st.to_map(nxt))
+                return True
+        return self.soko_wait()
 
     def sokoban_step(self, lv):
         """In Sokoban: the explore step's place. True always (we never explore here)."""
@@ -273,6 +314,9 @@ class SokobanMixin:
         stuck = self.turn() - st.since
         if stuck > SOKO_STUCK and i < len(st.lv["plan"]):
             return self.soko_give_up(lv, st, "stuck")
+        extra = bs - st.states[i][0]
+        if st.retreat_until >= self.turn():
+            return self.soko_retreat_step(lv, st, bs, ts)
         if i < len(st.lv["plan"]):
             b, d = st.lv["plan"][i]
             b, d = tuple(b), tuple(d)
@@ -288,16 +332,16 @@ class SokobanMixin:
                 if any(w in self.text_since(seq) for w in BEHIND_RE):
                     st.blocked = self.turn()
                 return True
-            if self.soko_step_to(lv, st, stand, bs, ts):
+            if self.soko_step_to(lv, st, stand, bs, ts, extra):
                 return True
             return self.soko_give_up(lv, st, "no_way_to_push") if stuck > SOKO_STUCK // 2 else self.soko_wait()
-        return self.soko_finish(lv, st, bs, ts)
+        return self.soko_finish(lv, st, bs, ts, extra)
 
     def soko_wait(self):
         self.press("s")
         return True
 
-    def soko_finish(self, lv, st, bs, ts):
+    def soko_finish(self, lv, st, bs, ts, extra):
         """The plan done: up the stairs; on the top level into the zoo for the prize."""
         if not st.solved:
             st.solved = True
@@ -310,18 +354,16 @@ class SokobanMixin:
                 self.took_stairs = True
                 self.press("<")
                 return True
-            return self.soko_step_to(lv, st, goal, bs, ts) or self.soko_wait()
-        return self.soko_prize(lv, st, bs, ts)
+            return self.soko_step_to(lv, st, goal, bs, ts, extra) or self.soko_wait()
+        return self.soko_prize(lv, st, bs, ts, extra)
 
-    def soko_prize(self, lv, st, bs, ts):
+    def soko_prize(self, lv, st, bs, ts, extra):
         """Top level: open the zoo's locked door (west of the goal), walk to the closets on the far side of the
         zoo (the prize lies in one of them), pick up an amulet or a bag there, put the amulet on. Done after
         the closets were seen (or the prize taken)."""
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         here = st.from_map(self.pos())
         for p in closets:
-            mp = st.to_map(p)
-            top = G.KIND[lv.under[mp]]
             if here == p:
                 seq = self.msg_seq
                 self.pickup_matching(["amulet", "bag"], own=True)
@@ -346,7 +388,7 @@ class SokobanMixin:
             return k in (G.OBJECT,)
         todo.sort(key=lambda p: (not has_item(p), abs(p[0] - here[0]) + abs(p[1] - here[1])))
         tgt = todo[0]
-        if self.soko_step_to(lv, st, tgt, bs, ts):
+        if self.soko_step_to(lv, st, tgt, bs, ts, extra):
             return True
         self.soko_stats["zoo_no_way"] += 1
         st.closet_done = getattr(st, "closet_done", set()) | {tgt}
@@ -361,20 +403,21 @@ class SokobanMixin:
         return self.soko_leave(lv, st)
 
     def soko_leave(self, lv, st):
-        """Back down: to this level's down staircase (where we arrived) and down it."""
+        """Back down: to this level's down staircase (where we arrived), by Sokoban's rules, and down it. No such
+        way (a level we gave up, boulders across it): the generic explore, which pushes boulders like anywhere
+        else now (mapmem.passable_grid) and goes down the stairs when it can."""
         self.cur_act = "soko_leave"
-        k = self.kinds(lv)
-        down = k == G.DOWNSTAIR
         if st is not None:
-            down[st.to_map(tuple(st.lv["arrive"]))] = True
-        if not down.any():
-            return self.soko_wait()
-        grids = self.grids(lv)
-        if down[self.pos()]:
-            self.took_stairs = True
-            self.press(">")
-            self.soko_stats["left_level"] += 1
-            return True
-        if self.walk_to(lv, down, grids=grids, act="soko_leave")[0] == "moved":
-            return True
-        return self.soko_wait()
+            arrive = tuple(st.lv["arrive"])
+            here = st.from_map(self.pos())
+            if here == arrive:
+                self.took_stairs = True
+                self.press(">")
+                self.soko_stats["left_level"] += 1
+                return True
+            bs, ts = self.soko_state(lv, st)
+            if self.soko_step_to(lv, st, arrive, bs, ts):
+                return True
+        self.soko_stats["leave_explore"] += 1
+        self.explore(lv)
+        return True
