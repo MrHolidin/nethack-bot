@@ -277,7 +277,10 @@ def main():
 def write(levels, plans):
     lines = ['"""Sokoban\'s eight level variants (tools/data/sokoban.des) and a plan for each -- written by',
              'tools/soko_solve.py, do not edit. Squares are (row, col) in the level\'s MAP block; a plan is the',
-             'list of pushes (boulder square, (drow, dcol)), in order."""', "", "LEVELS = {"]
+             'list of pushes (boulder square, (drow, dcol)), in order. The plans of the upper three levels come from',
+             'AutoAscend (tools/soko_import_aa.py; MIT License, Copyright (c) 2022 Maciej Sypetkowski, Michal',
+             'Sypetkowski), the bottom level\'s from our solver; all checked in tools/soko_solve.py\'s simulator."""',
+             "", "LEVELS = {"]
     for name in sorted(levels):
         lv = levels[name]
         lines.append(f"    {name!r}: {{")

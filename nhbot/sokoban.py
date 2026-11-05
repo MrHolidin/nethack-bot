@@ -19,6 +19,7 @@ While in Sokoban the generic code must not break the puzzle: boulders and traps 
 walk (mapmem.passable_grid), unknown scrolls are not read (scroll of earth makes boulders), and the explore step
 is this module's.
 """
+import time
 from collections import Counter, deque
 
 import numpy as np
@@ -30,7 +31,8 @@ from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
 SOKO_LEVEL_TURNS = 4000   # a level not solved in this many turns is given up
-SOKO_STUCK = 60           # ticks with the plan not advancing (a refused push, an unreachable square): give up
+SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
+BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -64,7 +66,8 @@ class SokoLevel:
         self.i = 0                    # the plan's state we were at last
         self.failed = False
         self.solved = False
-        self.stuck = 0
+        self.since = None             # turn the plan last advanced
+        self.blocked = -1             # turn a push was refused for a monster beyond the boulder
         self.last_i = -1
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
@@ -84,6 +87,7 @@ class SokobanMixin:
         self.soko_done = False          # the top level's prize taken (or the zoo given up)
         self.soko_failed = False        # a level given up: Sokoban is over for this game
         self.soko_stats = Counter()
+        self.soko_secs = 0.0            # compute time spent in this module (the tick that acted included)
 
     # ------------------------------------------------------------------ in the main dungeon
     def soko_entrance(self):
@@ -107,6 +111,15 @@ class SokobanMixin:
         return None
 
     def sokoban_trip_step(self, lv, grids, nothing_left):
+        if not self.opts.sokoban:
+            return False
+        t0 = time.perf_counter()
+        try:
+            return self._sokoban_trip_step(lv, grids, nothing_left)
+        finally:
+            self.soko_secs += time.perf_counter() - t0
+
+    def _sokoban_trip_step(self, lv, grids, nothing_left):
         """Main dungeon, Sokoban not done: to the level with its entrance, and -- with nothing left to do there
         (nothing_left) and full HP -- up into it. True if it used the turn."""
         if not self.opts.sokoban or self.soko_done or self.soko_failed or lv.key[0] != 0:
@@ -235,6 +248,13 @@ class SokobanMixin:
         """In Sokoban: the explore step's place. True always (we never explore here)."""
         if not self.in_sokoban(lv):
             return False
+        t0 = time.perf_counter()
+        try:
+            return self._sokoban_step(lv)
+        finally:
+            self.soko_secs += time.perf_counter() - t0
+
+    def _sokoban_step(self, lv):
         self.cur_act = "soko"
         st = self.soko_level(lv)
         if st is None or st.failed or self.soko_failed or self.soko_done:
@@ -248,11 +268,10 @@ class SokobanMixin:
         if i is None:
             return self.soko_give_up(lv, st, "deviation")
         st.i = i
-        if i == st.last_i:
-            st.stuck += 1
-        else:
-            st.stuck, st.last_i = 0, i
-        if st.stuck > SOKO_STUCK and i < len(st.lv["plan"]):
+        if i != st.last_i or st.since is None:
+            st.since, st.last_i = self.turn(), i
+        stuck = self.turn() - st.since
+        if stuck > SOKO_STUCK and i < len(st.lv["plan"]):
             return self.soko_give_up(lv, st, "stuck")
         if i < len(st.lv["plan"]):
             b, d = st.lv["plan"][i]
@@ -260,12 +279,18 @@ class SokobanMixin:
             stand = (b[0] - d[0], b[1] - d[1])
             here = st.from_map(self.pos())
             if here == stand:
+                if st.blocked == self.turn():
+                    self.soko_stats["wait_behind"] += 1
+                    return self.soko_wait()          # a monster beyond the boulder: the push costs no time -- wait
+                seq = self.msg_seq
                 self.soko_stats["push"] += 1
                 self.move(st.to_map(b))
+                if any(w in self.text_since(seq) for w in BEHIND_RE):
+                    st.blocked = self.turn()
                 return True
             if self.soko_step_to(lv, st, stand, bs, ts):
                 return True
-            return self.soko_give_up(lv, st, "no_way_to_push") if st.stuck > SOKO_STUCK // 2 else self.soko_wait()
+            return self.soko_give_up(lv, st, "no_way_to_push") if stuck > SOKO_STUCK // 2 else self.soko_wait()
         return self.soko_finish(lv, st, bs, ts)
 
     def soko_wait(self):

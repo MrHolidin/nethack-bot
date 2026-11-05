@@ -351,7 +351,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],
             "blind_held": self.blind_held,
-            "mines_return": self.mines_return_log, "mines_trip": dict(self.mines_trip_stats), "sacrifice": dict(self.sac_stats), "sokoban": dict(self.soko_stats),
+            "mines_return": self.mines_return_log, "mines_trip": dict(self.mines_trip_stats), "sacrifice": dict(self.sac_stats), "sokoban": dict(self.soko_stats, secs=round(self.soko_secs, 1)),
             "minetown_seen": self.minetown_seen,
             "hallu_held": self.hallu_held,
             "resets": self.resets,
