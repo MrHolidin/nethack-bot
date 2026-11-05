@@ -10,9 +10,10 @@ variants this is and where it lies on the screen (soko_identify). The state is r
 the boulders (their glyphs) and the traps still open -- and matched against the plan's states; the next push
 is the plan's at that state: walk to the square behind the boulder (no squeezing between boulders, never
 diagonally through a door, never onto a trap) and step into it. Nothing in the plan depends on where we stand,
-so a fight, a meal or a pick-up in between is harmless. A state that matches none (a boulder where the plan
-never had one), a push the game refuses for long, or too many turns on a level: the level is given up and
-Sokoban with it (we go back down). The plan done: up the stairs -- on the top level kick the zoo's locked door,
+so a fight, a meal or a pick-up in between is harmless. A state that matches none (a monster's scroll of earth
+dropped boulders): solved afresh from what we see (soko_solver, a few seconds of compute at most). No new plan,
+a push the game refuses for long, or too many turns on a level: the level is given up and Sokoban with it (we
+go back down). The plan done: up the stairs -- on the top level kick the zoo's locked door,
 then fetch the prize (bag of holding or amulet of reflection) from its closet, wear an amulet.
 
 While in Sokoban the generic code must not break the puzzle: boulders and traps are impassable to every other
@@ -26,6 +27,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
+from nhbot import soko_solver
 from nhbot.consts import COLS, DELTA2KEY, FOUNTAIN_GLYPH, ROWS, ray_squares
 from nhbot.soko_data import LEVELS
 
@@ -34,6 +36,9 @@ SOKO_LEVEL_TURNS = 4000   # a level not solved in this many turns is given up
 SOKO_BEHIND_WAITS = 10    # waits for a monster beyond the boulder before we go round to attack it
 SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the plan
 SOKO_SEARCH_TURNS = 500  # turns spent searching for hidden passages on the level below the Oracle (no entrance seen)
+SOKO_REPLANS = 3          # re-plans (soko_replan) a level at most
+SOKO_REPLAN_SECS = 2.0    # compute for one re-plan
+SOKO_DOOR_WAITS = 50      # turns between kicks at a locked door that refused one (wounded legs)
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
@@ -44,11 +49,11 @@ ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
 
-def plan_states(lv):
+def plan_states(boulders, traps, plan):
     """The (boulders, open traps) before each push of the plan and after the last."""
-    bs, ts = set(map(tuple, lv["boulders"])), set(map(tuple, lv["traps"]))
+    bs, ts = set(map(tuple, boulders)), set(map(tuple, traps))
     out = [(frozenset(bs), frozenset(ts))]
-    for (b, d) in lv["plan"] or ():
+    for (b, d) in plan or ():
         b = tuple(b)
         to = (b[0] + d[0], b[1] + d[1])
         bs.discard(b)
@@ -60,7 +65,8 @@ def plan_states(lv):
     return out
 
 
-STATES = {name: plan_states(lv) for name, lv in LEVELS.items()}
+STATES = {name: plan_states(lv["boulders"], lv["traps"], lv["plan"]) for name, lv in LEVELS.items()}
+SOLVERS = {}                  # variant -> soko_solver.Level, made on the first re-plan
 CENTAUR_STATUES = [nh.GLYPH_STATUE_OFF + i for i in range(nh.NUMMONS) if "centaur" in nh.permonst(i).mname]
 
 
@@ -70,7 +76,10 @@ class SokoLevel:
     def __init__(self, name, off):
         self.name, self.off = name, off
         self.lv = LEVELS[name]
+        self.plan = self.lv["plan"]   # the pushes we follow: the variant's, or one made here (soko_replan)
         self.states = STATES[name]
+        self.replans = 0
+        self.door_waits = 0           # turns waited at a locked door we could not kick (soko_step_to)
         self.i = 0                    # the plan's state we were at last
         self.failed = False
         self.solved = False
@@ -318,6 +327,13 @@ class SokobanMixin:
         mp = st.to_map(nxt)
         if G.KIND[int(self.obs["glyphs"][mp])] == G.MONSTER and self.peaceful_now(lv, mp):
             return self.soko_retreat(lv, st, mp, bs, ts)
+        if lv.blocked[mp] and self.kinds(lv)[mp] == G.DOOR_CLOSED:
+            # a locked door we could not kick (wounded legs: no turn passes, it would loop): wait, try again later
+            st.door_waits += 1
+            if st.door_waits % SOKO_DOOR_WAITS == 0:
+                lv.blocked[mp] = False
+            self.soko_stats["door_wait"] += 1
+            return self.soko_wait()
         self.move(mp)
         return True
 
@@ -399,25 +415,27 @@ class SokobanMixin:
         st = self.soko_level(lv)
         if st is None or st.failed or self.soko_failed or self.soko_done:
             return self.soko_leave(lv, st)
-        if st.lv["plan"] is None:
+        if st.plan is None:
             return self.soko_give_up(lv, st, "no_plan")
         if not st.solved and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
             return self.soko_give_up(lv, st, "turns")
         bs, ts = self.soko_state(lv, st)
         i = self.soko_match(st, bs, ts)
+        if i is None and self.soko_replan(st, bs, ts):
+            i = 0
         if i is None:
             return self.soko_give_up(lv, st, "deviation")
         st.i = i
         if i != st.last_i or st.since is None:
             st.since, st.last_i, st.behind_waits = self.turn(), i, 0
         stuck = self.turn() - st.since
-        if stuck > SOKO_STUCK and i < len(st.lv["plan"]):
+        if stuck > SOKO_STUCK and i < len(st.plan):
             return self.soko_give_up(lv, st, "stuck")
         extra = bs - st.states[i][0]
         if st.retreat_until >= self.turn():
             return self.soko_retreat_step(lv, st, bs, ts)
-        if i < len(st.lv["plan"]):
-            b, d = st.lv["plan"][i]
+        if i < len(st.plan):
+            b, d = st.plan[i]
             b, d = tuple(b), tuple(d)
             stand = (b[0] - d[0], b[1] - d[1])
             here = st.from_map(self.pos())
@@ -451,6 +469,25 @@ class SokobanMixin:
                 return True
             return self.soko_give_up(lv, st, "no_way_to_push") if stuck > SOKO_STUCK // 2 else self.soko_wait()
         return self.soko_finish(lv, st, bs, ts, extra)
+
+    def soko_replan(self, st, bs, ts):
+        """The level no longer matches the plan (a monster's scroll of earth dropped boulders, a wand of striking
+        broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_SECS of compute), at most
+        SOKO_REPLANS times a level. True if a new plan was found -- we follow it from its start."""
+        if st.replans >= SOKO_REPLANS:
+            return False
+        st.replans += 1
+        solver = SOLVERS.get(st.name)
+        if solver is None:
+            solver = SOLVERS[st.name] = soko_solver.Level(st.lv)
+        here = st.from_map(self.pos())
+        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here)) if here in st.floor else None
+        if plan is None:
+            self.soko_stats["replan_fail"] += 1
+            return False
+        self.soko_stats["replan"] += 1
+        st.plan, st.states, st.i, st.last_i = plan, plan_states(bs, ts, plan), 0, -1
+        return True
 
     def soko_wait(self):
         self.press("s")
