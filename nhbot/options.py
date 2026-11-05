@@ -7,6 +7,8 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
+    "sacrifice": False,        # A/B: a neutral hero offers fresh corpses of its kills at a neutral altar, carried there
+                               #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
     "remember_molds": False,   # A/B: never-melee monsters that never move are remembered where seen and their squares
                                #      avoided out of sight too (perception.stationary_avoid)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when

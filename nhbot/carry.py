@@ -212,7 +212,7 @@ class CarryMixin:
         if self.bl(nh.NLE_BL_CAP) < 1 and not force:
             return False
         inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.cant_drop
-               and (max_tier >= 4 or not it.on_body)]
+               and (max_tier >= 4 or not it.on_body) and not self.sac_carrying(it)]
         if not inv:
             return False
         looks = self.carried_by_look()

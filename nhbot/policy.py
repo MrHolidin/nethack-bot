@@ -46,6 +46,7 @@ STEPS = (
     "ammo_here",
     "retrieve_missiles",
     "eat",
+    "sacrifice",         # sacrifice: a fresh corpse of a kill to an altar of our alignment, in time
     "eat_corpse",
     "digger_stash",
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
@@ -353,6 +354,9 @@ class PolicyMixin:
 
     def step_eat(self, c):
         return c.hunger >= HUNGRY and self.turn() >= self.no_eat_until and self.eat_from_inventory()
+
+    def step_sacrifice(self, c):
+        return self.sacrifice_step(c.lv, c.hostiles)
 
     def step_eat_corpse(self, c):
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""

@@ -86,6 +86,8 @@ class WeaponsMixin:
         lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
         if "Excalibur" in s:
             return (3, ench)
+        if self.opts.sacrifice and "Mjollnir" in s and int(self.last_bl[nh.NLE_BL_ALIGN]) == 0:
+            return (3, ench)                 # sacrifice: the neutral Valkyrie's gift (war hammer: Expert)
         if re.search(r"\blong swords?\b", s):
             return (2 if lawful else 1, ench)
         if re.search(r"\bkatanas?\b", s) or (re.search(r"\bsamurai swords?\b", s) and "long samurai" not in s):

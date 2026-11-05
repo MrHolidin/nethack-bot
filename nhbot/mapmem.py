@@ -90,6 +90,7 @@ class Level:
         self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
         self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
+        self.altar_align = {}      # sacrifice: altar square -> its alignment, read on stepping there
         self.stationary = {}       # remember_molds: square -> a never-melee monster that never moves, seen there
         self.squeeze_shut = set()  # squeeze_plan: (from, to) diagonal squeezes refused for our weight, both ways
         self.not_stairs = set()    # mines_xl: squares where the game said there is no staircase

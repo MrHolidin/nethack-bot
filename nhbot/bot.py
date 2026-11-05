@@ -40,6 +40,7 @@ from nhbot.jewelry import JewelryMixin
 from nhbot.gift import GiftMixin
 from nhbot.weapons import WeaponsMixin
 from nhbot.wishing import WishMixin
+from nhbot.sacrifice import SacrificeMixin
 
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
@@ -47,7 +48,8 @@ MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS,
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
-          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin):
+          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
+          SacrificeMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -186,6 +188,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.danger_init()
         self.tins_init()
         self.altar_init()
+        self.sacrifice_init()
         self.gift_init()
         self.potiontest_init()
         self.jewelry_init()
@@ -346,7 +349,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
             "ward": [self.ward_writes, self.ward_waits],
             "blind_held": self.blind_held,
-            "mines_return": self.mines_return_log, "mines_trip": dict(self.mines_trip_stats),
+            "mines_return": self.mines_return_log, "mines_trip": dict(self.mines_trip_stats), "sacrifice": dict(self.sac_stats),
             "minetown_seen": self.minetown_seen,
             "hallu_held": self.hallu_held,
             "resets": self.resets,
