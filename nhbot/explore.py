@@ -230,19 +230,27 @@ class ExploreMixin:
         if self.mines_done:
             return True                       # mines_return brought us back: the Mines are finished
         if self.opts.mines_xl:
-            return self.bl(nh.NLE_BL_XP) < self.opts.mines_xl or self.excal_fountain_level() is not None
+            return not self.mines_xl_open() or self.excal_fountain_level() is not None
         if self.opts.avoid_mines == "until_excalibur":
             return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
                 and self.long_sword() is not None and self.turn() < 8000
         return bool(self.opts.avoid_mines)
 
+    def mines_xl_open(self):
+        """mines_xl: the Mines open from XL mines_xl on -- or once a main-dungeon level got desperate (no way on
+        found there: the Mines are the way on)."""
+        return self.bl(nh.NLE_BL_XP) >= self.opts.mines_xl or any(l.desperate for k, l in self.levels.items()
+                                                                 if k[0] == 0)
+
     def mines_trip_step(self, lv, grids):
-        """mines_xl: from XL mines_xl on, in the main dungeon, the Mines staircase known (a level with avoid_down)
-        and the Mines not done: Excalibur first -- while it can be made at a fountain we know
+        """mines_xl: the Mines open (mines_xl_open), in the main dungeon, their staircase known (a level with
+        avoid_down) and the Mines not done: Excalibur first -- while it can be made at a fountain we know
         (excal_fountain_level), go to that level (the dip itself is excalibur.excal_step, housekeeping; below its
-        HP we rest there) -- then to the branch level and down its Mines staircase. True if it used the turn."""
-        if not self.opts.mines_xl or lv.key[0] != 0 or self.mines_done \
-                or self.bl(nh.NLE_BL_XP) < self.opts.mines_xl or self.turn() < self.mines_trip_retry:
+        HP we rest there) -- then to the branch level and down its Mines staircase. A level we know no way to
+        (an up staircase never seen: we fell past it): its fountain is given up (excal_skip), the Mines tried
+        again MINES_TRIP_RETRY turns later. True if it used the turn."""
+        if not self.opts.mines_xl or lv.key[0] != 0 or self.mines_done or not self.mines_xl_open() \
+                or self.turn() < self.mines_trip_retry:
             return False
         branch = next((k for k, l in self.levels.items() if k[0] == 0 and l.avoid_down), None)
         if branch is None:
@@ -250,7 +258,11 @@ class ExploreMixin:
         fk = self.excal_fountain_level()
         if fk is not None:
             if fk != lv.key:
-                return self.level_travel_step(lv, grids, fk, "excal", "excal_travel")
+                if self.level_travel_step(lv, grids, fk, "excal", "excal_travel"):
+                    return True
+                self.mines_trip_stats["excal_no_way"] += 1
+                self.excal_skip.add(fk)
+                return False
             hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
             if hp >= maxhp * self.opts.excal_hp or self.visible_hostiles(lv):
                 return False
@@ -259,7 +271,11 @@ class ExploreMixin:
             self.press("2"); self.press("0"); self.press("s")
             return True
         if lv.key != branch:
-            return self.level_travel_step(lv, grids, branch, "mines", "travel")
+            if self.level_travel_step(lv, grids, branch, "mines", "travel"):
+                return True
+            self.mines_trip_stats["no_way"] += 1
+            self.mines_trip_retry = self.turn() + MINES_TRIP_RETRY
+            return False
         down = np.zeros_like(grids[0], dtype=bool)
         for p in lv.avoid_down:
             down[p] = True
