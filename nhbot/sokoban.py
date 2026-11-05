@@ -82,6 +82,7 @@ class SokoLevel:
         self.plan = self.lv["plan"]   # the pushes we follow: the variant's, or one made here (soko_replan)
         self.states = STATES[name]
         self.replans = 0
+        self.real_extra = set()       # boulders the plan doesn't know that answered no attack (soko_mimic_hunt)
         self.hallu_seen = False       # we hallucinated here: items in the memory may be boulders (soko_state)
         self.leave_explore = 0        # soko_leave: ticks the generic explore had to find the way down
         self.door_wait_until = -1     # no kicking a locked door till then: our legs refused (soko_step_to)
@@ -355,6 +356,35 @@ class SokobanMixin:
             st.door_wait_until = self.turn() + SOKO_DOOR_WAITS
         return True
 
+    def soko_mimic_hunt(self, lv, st, bs, ts, extra):
+        """A boulder the plan doesn't know is a giant mimic posing as one (the top level has two): fight it while
+        we can still reach its side -- once the plan's boulders close it in (a corridor of holes) only missiles
+        reach it, and it stops the push. One that answers no attack is a real boulder (st.real_extra). True if
+        it acted."""
+        here = st.from_map(self.pos())
+        for m in sorted(extra, key=lambda p: abs(p[0] - here[0]) + abs(p[1] - here[1])):
+            if max(abs(here[0] - m[0]), abs(here[1] - m[1])) == 1 and not (
+                    here[0] != m[0] and here[1] != m[1] and (here in st.doors or m in st.doors)):
+                seq = self.msg_seq
+                self.soko_stats["mimic_hunt"] += 1
+                self.cur_act = "fight"
+                ty, tx = st.to_map(m)
+                self.press("F")
+                self.press(DELTA2KEY[(ty - self.pos()[0], tx - self.pos()[1])])
+                said = self.text_since(seq)
+                if "harmlessly" in said or "thin air" in said or "nothing" in said.lower():
+                    st.real_extra.add(m)
+                return True
+            sides = [(m[0] + dr, m[1] + dc) for dr, dc in DIRS8]
+            for n in sides:
+                if n in st.floor and n not in bs and n not in ts:
+                    nxt = self.soko_walk(st, here, n, bs, ts)
+                    if nxt is not None and nxt != here:
+                        self.cur_act = "soko"
+                        self.move(st.to_map(nxt))
+                        return True
+        return False
+
     def soko_attack_at(self, lv, st, target, bs, ts):
         """Fight whatever is on target (variant coords): from a square next to it, 'F' toward it; else walk to
         the nearest such square. Done (behind_waits reset) once a push works again or nothing answers. False if
@@ -481,6 +511,8 @@ class SokobanMixin:
         extra = bs - st.states[i][0]
         if st.retreat_until >= self.turn():
             return self.soko_retreat_step(lv, st, bs, ts)
+        if i < len(st.plan) and self.soko_mimic_hunt(lv, st, bs, ts, extra - st.real_extra):
+            return True
         if i < len(st.plan):
             b, d = st.plan[i]
             b, d = tuple(b), tuple(d)
