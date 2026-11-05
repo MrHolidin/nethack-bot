@@ -23,7 +23,7 @@ class ExploreMixin:
         self.pet_waited_total = 0
         self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
         self.mines_trip_stats = Counter()  # ticks of the trip to the Mines by what they did
-        self.two_down_levels = set()       # two_down: branch levels whose Mines staircase we inferred
+        self.two_down_levels = set()       # branch levels whose Mines staircase we inferred (two_down_mines)
         self.mines_trip_retry = 0          # no trip to the Mines before this turn (the staircase was out of reach)
         self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
@@ -349,10 +349,7 @@ class ExploreMixin:
         (avoid_down) or taken (Level.stairs_to) -- as linked_stairs places them."""
         marks = {p: (2, 1) for p in lv.avoid_down}
         marks.update({p: k for p, k in lv.stairs_to.items() if k[0] == 2})
-        out = self.linked_stairs(lv, marks, G.DOWNSTAIR)
-        if not out and self.opts.two_down:
-            out = self.two_down_mines(lv)
-        return out
+        return self.linked_stairs(lv, marks, G.DOWNSTAIR) or self.two_down_mines(lv)
 
     def minetown_rooms(self, lv):
         """minetown_search: a Minetown of rooms and corridors -- mines.des minetn-2/3/4/7 (RANDOM_CORRIDORS): its
@@ -363,9 +360,10 @@ class ExploreMixin:
                     and np.isin(lv.under, CORRIDOR_GLYPHS).any())
 
     def two_down_mines(self, lv):
-        """two_down: on main Dlvl 2-4 (where the Mines branch: dungeon.def) two down staircases in view, one of
-        them taken to the next main level (Level.stairs_to) -- the other is the Mines'. Known so without a bounce
-        off it (442 of 834 base_v games past Dlvl 4 never learned where the Mines were)."""
+        """On main Dlvl 2-4 (where the Mines branch: dungeon.def) two down staircases in view, one of them taken
+        to the next main level (Level.stairs_to) -- the other is the Mines'. Known so without a bounce off it
+        (442 of 834 base_v games past Dlvl 4 never learned where the Mines were). A/B two_down vs base_v: +597
+        [-222, +1397], neutral +1601 [+1034, +2198], median 5439 -> 6592; games in the Mines 380 -> 620."""
         if lv.key[0] != 0 or not 2 <= lv.key[1] <= 4:
             return set()
         downs = {(int(y), int(x)) for y, x in zip(*np.nonzero(self.kinds(lv) == G.DOWNSTAIR))} - lv.not_stairs

@@ -12,8 +12,6 @@ DEFAULTS = {
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
     "minetown_search": False,  # A/B: a Minetown of rooms and corridors with no way down found is searched, not left
                                #      (explore.minetown_rooms)
-    "two_down": False,         # A/B: two down staircases on main Dlvl 2-4, one taken to the next main level: the other
-                               #      is the Mines' (explore.two_down_mines) -- known without a bounce off it
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
