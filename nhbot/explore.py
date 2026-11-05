@@ -1,5 +1,6 @@
 """Exploring a level and leaving it: frontier and item goals, when to descend, searching for hidden
 passages, the Gnomish Mines (avoid_mines, mines_xl, mines_return), waiting for the pet, magic mapping."""
+import re
 from collections import Counter
 
 import numpy as np
@@ -243,16 +244,16 @@ class ExploreMixin:
                                                                  if k[0] == 0)
 
     def mines_trip_step(self, lv, grids):
-        """mines_xl: the Mines open (mines_xl_open), in the main dungeon, their staircase known (a level with
-        avoid_down) and the Mines not done: Excalibur first -- while it can be made at a fountain we know
-        (excal_fountain_level), go to that level (the dip itself is excalibur.excal_step, housekeeping; below its
-        HP we rest there) -- then to the branch level and down its Mines staircase. A level we know no way to
-        (an up staircase never seen: we fell past it): its fountain is given up (excal_skip), the Mines tried
-        again MINES_TRIP_RETRY turns later. True if it used the turn."""
+        """mines_xl: the Mines open (mines_xl_open), in the main dungeon, their staircase known (mines_stairs) and
+        the Mines not done: Excalibur first -- while it can be made at a fountain we know (excal_fountain_level),
+        go to that level (the dip itself is excalibur.excal_step, housekeeping; below its HP we rest there) --
+        then to the branch level and down its Mines staircase. A level we know no way to (an up staircase never
+        seen: we fell past it): its fountain is given up (excal_skip), the Mines tried again MINES_TRIP_RETRY
+        turns later. True if it used the turn."""
         if not self.opts.mines_xl or lv.key[0] != 0 or self.mines_done or not self.mines_xl_open() \
                 or self.turn() < self.mines_trip_retry:
             return False
-        branch = next((k for k, l in self.levels.items() if k[0] == 0 and l.avoid_down), None)
+        branch = next((k for k, l in self.levels.items() if k[0] == 0 and self.mines_stairs(l)), None)
         if branch is None:
             return False
         fk = self.excal_fountain_level()
@@ -277,10 +278,10 @@ class ExploreMixin:
             self.mines_trip_retry = self.turn() + MINES_TRIP_RETRY
             return False
         down = np.zeros_like(grids[0], dtype=bool)
-        for p in lv.avoid_down:
+        for p in self.mines_stairs(lv):
             down[p] = True
         on = bool(down[self.pos()])
-        if self.go_down(lv, grids, down):
+        if self.stairs_step(lv, grids, down, ">"):
             self.cur_act = "mines"
             self.mines_trip_stats["enter" if on else "to_stairs"] += 1
             return True
@@ -288,40 +289,71 @@ class ExploreMixin:
         self.mines_trip_retry = self.turn() + MINES_TRIP_RETRY
         return False
 
+    def mines_stairs(self, lv):
+        """mines_xl: the down staircases of this level we know lead into the Mines -- marked on a bounce
+        (avoid_down) or taken (Level.stairs_to) -- as linked_stairs places them."""
+        marks = {p: (2, 1) for p in lv.avoid_down}
+        marks.update({p: k for p, k in lv.stairs_to.items() if k[0] == 2})
+        return self.linked_stairs(lv, marks, G.DOWNSTAIR)
+
+    def linked_stairs(self, lv, marks, kind):
+        """The staircases of `kind` (G.UPSTAIR / G.DOWNSTAIR) that the noted squares of marks stand for. We note
+        the square we arrive on, and that may be beside the staircase: a monster on it, half the time we land
+        next to it (do.c u_collide_m, no message). So a noted square the map shows as that staircase -- or a
+        boulder on it -- is it; one that shows something else stands for the staircases of that kind next to it.
+        Squares where the game said there is no staircase (Level.not_stairs) never count."""
+        k_mem = self.kinds(lv)
+        out = set()
+        for p in marks:
+            if k_mem[p] in (kind, G.BOULDER):
+                out.add(p)
+                continue
+            for dy, dx in NEIGH:
+                q = (p[0] + dy, p[1] + dx)
+                if 0 <= q[0] < ROWS and 0 <= q[1] < COLS and k_mem[q] == kind:
+                    out.add(q)
+        return out - lv.not_stairs
+
+    def stairs_step(self, lv, grids, mask, key):
+        """mines_xl: to a staircase of mask and take it (down: go_down, with its pet wait and rest). The game
+        saying there is none here: the square is noted (Level.not_stairs) -- no turn passed. True if it acted."""
+        if key == ">":
+            if not self.go_down(lv, grids, mask):
+                return False
+        elif mask[self.pos()]:
+            self.took_stairs = True
+            self.press("<")
+        else:
+            return self.walk_to(lv, mask, grids=grids)[0] == "moved"
+        if re.search(r"You can't go (?:down|up) here", self.message()):
+            lv.not_stairs.add(self.pos())
+            self.mines_trip_stats["not_stairs"] += 1
+        return True
+
     def level_travel_step(self, lv, grids, key, act, stat):
         """One step toward main-dungeon level `key` from this one by the stairs we know: to an up staircase and
-        up it, or down a down staircase (not the Mines one, avoid_down) -- never one we took before into
-        another level than the next main one (Level.stairs_to: Sokoban's up staircase, the Mines'); one we know
-        leads there counts even if the map shows something else on it (a boulder pushed onto it). False: no way
-        known."""
+        up it, or down a down staircase -- never one we know leads elsewhere than the next main level (Sokoban's
+        up staircase, the Mines'; Level.stairs_to, avoid_down, placed by linked_stairs); one we know leads there
+        counts even if the map shows a boulder on it. False: no way known."""
         k_mem = grids[0]
-        nxt = (0, lv.key[1] - 1 if key[1] < lv.key[1] else lv.key[1] + 1)
-        elsewhere = [p for p, k in lv.stairs_to.items() if k != nxt]
-        there = [p for p, k in lv.stairs_to.items() if k == nxt]
-        if key[1] < lv.key[1]:
-            up = k_mem == G.UPSTAIR
-            for p in there:
-                up[p] = True
-            for p in elsewhere:
-                up[p] = False
-            if not up.any():
-                return False
-            if up[self.pos()]:
-                self.cur_act = act
-                self.mines_trip_stats[stat + "_up"] += 1
-                self.took_stairs = True
-                self.press("<")
-                return True
-            return self.walk_to(lv, up, act=act, grids=grids)[0] == "moved"
-        down = k_mem == G.DOWNSTAIR
+        up_way = key[1] < lv.key[1]
+        nxt = (0, lv.key[1] - 1 if up_way else lv.key[1] + 1)
+        kind = G.UPSTAIR if up_way else G.DOWNSTAIR
+        there = self.linked_stairs(lv, {p: k for p, k in lv.stairs_to.items() if k == nxt}, kind)
+        elsewhere = self.linked_stairs(lv, {p: k for p, k in lv.stairs_to.items() if k != nxt}, kind)
+        if not up_way:
+            elsewhere |= self.mines_stairs(lv)
+        mask = k_mem == kind
         for p in there:
-            down[p] = True
-        for p in list(lv.avoid_down) + elsewhere:
-            down[p] = False
-        if down.any() and self.go_down(lv, grids, down):
-            self.mines_trip_stats[stat + "_down"] += 1
-            return True
-        return False
+            mask[p] = True
+        for p in (elsewhere - there) | lv.not_stairs:
+            mask[p] = False
+        if not mask.any():
+            return False
+        self.cur_act = act
+        if mask[self.pos()]:
+            self.mines_trip_stats[stat + ("_up" if up_way else "_down")] += 1
+        return self.stairs_step(lv, grids, mask, "<" if up_way else ">")
 
     def mines_return_start(self, lv, why):
         if not self.mines_return_on:
