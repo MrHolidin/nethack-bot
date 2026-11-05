@@ -347,9 +347,12 @@ class SokobanMixin:
         return False                         # no way to its side
 
     def soko_throw_over(self, st, d):
-        """Throw a missile from the push square along the push (over the boulder) at the monster beyond it.
-        True if thrown; a few more push tries before the next throw."""
-        th = [] if self.hallu_blind_ranged() else self.throwables()
+        """Throw a missile from the push square along the push (over the boulder) at the monster beyond it -- a
+        missile, else a gem or a spare weapon (combat.expendables). True if thrown; a few more push tries before
+        the next throw."""
+        ocls = {it.letter: it.ocls for it in self.items()}
+        th = [] if self.hallu_blind_ranged() else \
+            [t for t in self.expendables() if ocls.get(t[0]) in (nh.WEAPON_CLASS, nh.GEM_CLASS)]
         if not th:
             return False
         y, x = self.pos()
@@ -398,7 +401,7 @@ class SokobanMixin:
             return self.soko_leave(lv, st)
         if st.lv["plan"] is None:
             return self.soko_give_up(lv, st, "no_plan")
-        if self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
+        if not st.solved and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
             return self.soko_give_up(lv, st, "turns")
         bs, ts = self.soko_state(lv, st)
         i = self.soko_match(st, bs, ts)
@@ -475,6 +478,12 @@ class SokobanMixin:
         the closets were seen (or the prize taken)."""
         if st.prize_inv0 is None:
             st.prize_inv0 = self.soko_prize_items()
+        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+        if self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED and hp < maxhp and not self.visible_hostiles(lv):
+            self.soko_stats["zoo_rest"] += 1          # the zoo wakes when its door is kicked: full HP first
+            self.cur_act = "rest"
+            self.press("2"); self.press("0"); self.press("s")
+            return True
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         here = st.from_map(self.pos())
         # a monster of the zoo may have carried the prize off (they go for an amulet of reflection) and dropped
