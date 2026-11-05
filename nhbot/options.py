@@ -7,8 +7,6 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
-    "prey_far_peace": False,   # A/B: prey (combat.prey_mask) is looked at from a distance too (peaceful_now far): not
-                               #      a peaceful one we walk up to, find peaceful and leave again
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while

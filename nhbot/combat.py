@@ -460,8 +460,9 @@ class CombatMixin:
         for (y, x), name in self.visible_hostiles(lv):
             if name not in PM_BY_NAME or self.never_melee(name) or self.prey_win(name, (y, x)) <= PREY_PWIN:
                 continue
-            if self.opts.prey_far_peace and self.peaceful_now(lv, (y, x), far=True):
-                continue                  # visible_hostiles looks only next to us: a far peaceful one counts too
+            if self.peaceful_now(lv, (y, x), far=True):
+                continue                  # visible_hostiles looks only next to us: a far peaceful one is no prey
+                                          # (A/B prey_far_peace: lawful chase turns 447631 -> 87813)
             for dy, dx in NEIGH:
                 q = (y + dy, x + dx)
                 if 0 <= q[0] < ROWS and 0 <= q[1] < COLS and passable[q]:
