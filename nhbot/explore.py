@@ -93,6 +93,8 @@ class ExploreMixin:
                     want_down = False
                     self.items_first_holds += 1
 
+        if self.sokoban_trip_step(lv, grids, want_down or lv.explored):
+            return
         if want_down and self.revisit_up(lv, grids):
             return
         if want_down and self.go_down(lv, grids, downstairs):

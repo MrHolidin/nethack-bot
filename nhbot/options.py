@@ -10,6 +10,8 @@ DEFAULTS = {
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
     "peace_shut": False,       # A/B: PEACE_SHUT_WAITS waits for a peaceful monster on a square of our path close it
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
+    "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
+                               #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when

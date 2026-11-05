@@ -442,5 +442,7 @@ class PolicyMixin:
         return False
 
     def step_explore(self, c):
+        if self.opts.sokoban and self.in_sokoban(c.lv):
+            return self.sokoban_step(c.lv)             # Sokoban: the plan, never the generic explore
         self.explore(c.lv)
         return True

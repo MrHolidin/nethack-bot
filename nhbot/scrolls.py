@@ -169,6 +169,8 @@ class ScrollMixin:
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False              # confused remove curse / enchant armor do other things
+        if self.opts.sokoban and self.in_sokoban(lv):
+            return False              # a scroll of earth would drop boulders into the puzzle
         inv = [(it.letter, it.text) for it in self.items() if it.ocls == nh.SCROLL_CLASS]
         good = [(l, s) for l, s in inv if self.scroll_is_good(s)]
         todo = [(l, s, "good") for l, s in good]

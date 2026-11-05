@@ -190,6 +190,9 @@ class MapMixin:
             for sq, until in lv.peace_shut.items():
                 if until > t:
                     p[sq] = False
+        if self.opts.sokoban and self.in_sokoban(lv):
+            # Sokoban: no other walk may push a boulder out of the plan or step into a pit / hole
+            p[(k_mem == G.BOULDER) | (k_live == G.BOULDER) | (k_mem == G.TRAP)] = False
         # stationary dangerous monsters block
         for (y, x) in self.avoid_cells:
             p[y, x] = False
