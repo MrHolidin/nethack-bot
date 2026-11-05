@@ -7,6 +7,9 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
+    "hunt_easy": False,        # A/B: a number p: hostiles in view we would melee (not never_melee) and beat with
+                               #      P(win) > p (danger.win_prob) are explore goals: the squares next to them
+                               #      (combat.prey_mask, goal kind "prey")
     "mines_xl": False,         # A/B: a number n: the Mines are closed below XL n; from XL n on, with their staircase
                                #      known (Level.avoid_down, from a bounce), walk to it and go in -- Excalibur first
                                #      at the fountains we know (explore.mines_trip_step)

@@ -119,6 +119,7 @@ class CombatMixin:
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
         self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
+        self.prey_cache = {}             # hunt_easy: prey_win by state
 
     def attack(self, target):
         self.cur_act = "fight"
@@ -448,6 +449,32 @@ class CombatMixin:
                                            f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
             return self.zap(letter, key)
         return False
+
+    def prey_mask(self, lv, passable):
+        """hunt_easy: the squares next to a hostile in view that we would melee (not never_melee) and beat with
+        P(win) > hunt_easy -- danger.win_prob of the fight next to it at our HP now -- for explore to walk to;
+        once it is next to us the melee step hits it."""
+        mask = np.zeros_like(passable)
+        for (y, x), name in self.visible_hostiles(lv):
+            if name not in PM_BY_NAME or self.never_melee(name) or self.prey_win(name, (y, x)) <= self.opts.hunt_easy:
+                continue
+            for dy, dx in NEIGH:
+                q = (y + dy, x + dx)
+                if 0 <= q[0] < ROWS and 0 <= q[1] < COLS and passable[q]:
+                    mask[q] = True
+        return mask
+
+    def prey_win(self, name, pos):
+        """hunt_easy: P(we win a fight with this monster next to us), cached while what it depends on stays the
+        same (its name, our HP, max HP, AC, XL, the dungeon level, the weapon in hand); the RNG state restored."""
+        weapon = next((it.text for it in self.items() if it.wielded), None)
+        key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),
+               self.bl(nh.NLE_BL_DEPTH), weapon)
+        if key not in self.prey_cache:
+            state = self.win_rng.bit_generator.state
+            self.prey_cache[key] = self.win_prob([(pos, name)])
+            self.win_rng.bit_generator.state = state
+        return self.prey_cache[key]
 
     def wand_targets(self, lv, hostiles):
         """Hostiles in a line within 6 we may zap, nearest first (a generator: the peaceful check looks only as

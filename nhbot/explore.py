@@ -80,7 +80,7 @@ class ExploreMixin:
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
             stuff = np.zeros_like(gold)
             for kind, m in self.goal_masks(lv, passable, gold).items():
-                if GOALS[kind].holds_descent:
+                if kind in GOALS and GOALS[kind].holds_descent:
                     stuff |= m
             stuff[y, x] = False
             if stuff.any():

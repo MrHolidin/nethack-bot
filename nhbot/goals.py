@@ -48,7 +48,7 @@ GOALS = {
     "loot": GoalKind("loot", "own"),
 }
 EXPLORE_KINDS = tuple(k for k, g in GOALS.items() if g.tier == "explore")
-CHASE_ONLY = ("frontier", "downstairs")       # walked to, but not goals with a lifetime
+CHASE_ONLY = ("frontier", "downstairs", "prey")   # walked to, but not goals with a lifetime (prey: hunt_easy)
 STAT_FIELDS = ("created", "consumed", "expired", "abandoned", "vanished", "unfinished", "chase_turns",
                "unreach_cell", "unreach_path", "kept")
 
@@ -176,6 +176,8 @@ class GoalsMixin:
         out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
         # boxes: opened by housekeeping, so only with no hostile in view (its gate; boxes.box_goal_mask)
         out["box"] = self.box_goal_mask(lv, passable)
+        if self.opts.hunt_easy:
+            out["prey"] = self.prey_mask(lv, passable) if ok else np.zeros_like(gold)   # the melee step hits it
         return out
 
     def goal_summary(self):
