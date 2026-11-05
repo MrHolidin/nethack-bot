@@ -382,11 +382,9 @@ class SokobanMixin:
 
     def soko_throw_over(self, st, d):
         """Throw a missile from the push square along the push (over the boulder) at the monster beyond it -- a
-        missile, else a gem or a spare weapon (combat.expendables). True if thrown; a few more push tries before
-        the next throw."""
-        ocls = {it.letter: it.ocls for it in self.items()}
-        th = [] if self.hallu_blind_ranged() else \
-            [t for t in self.expendables() if ocls.get(t[0]) in (nh.WEAPON_CLASS, nh.GEM_CLASS)]
+        missile, else a gem, a spare weapon, unworn armor or a tool (combat.expendables). True if thrown; a few
+        more push tries before the next throw."""
+        th = [] if self.hallu_blind_ranged() else self.expendables()
         if not th:
             return False
         y, x = self.pos()
@@ -395,9 +393,24 @@ class SokobanMixin:
         st.behind_waits = SOKO_BEHIND_WAITS - 3
         return True
 
+    def soko_zap_over(self, st, d):
+        """Nothing left to throw: a ray along the push at the monster beyond the boulder (a ray passes over
+        boulders; striking's force bolt would break the boulder, sleep coming back would put us down) -- cold
+        first (a Valkyrie resists it). True if zapped."""
+        if self.hallu_blind_ranged():
+            return False
+        order = {"cold": 0, "magic missile": 1, "fire": 2, "lightning": 3}
+        wands = sorted((order[k], l) for l, k in self.attack_wands() if k in order)
+        if not wands:
+            return False
+        self.soko_stats["behind_zap"] += 1
+        self.zap(wands[0][1], DELTA2KEY[d])
+        st.behind_waits = SOKO_BEHIND_WAITS - 3
+        return True
+
     def soko_retreat(self, lv, st, blocker, bs, ts):
-        """A peaceful monster in the way: for SOKO_RETREAT turns stand at least 4 squares from it (the nearest
-        such square we reach), then try again."""
+        """A monster in the way (a peaceful one on our path, one beyond the boulder that won't go): for
+        SOKO_RETREAT turns stand at least 4 squares from it (the nearest such square we reach), then try again."""
         if st.retreat_until < self.turn():
             st.retreat_until = self.turn() + SOKO_RETREAT
             st.retreat_from = st.from_map(blocker)
@@ -479,10 +492,13 @@ class SokobanMixin:
                 # trap): attack it from beside, else throw over the boulder at it (missiles fly over boulders)
                 if self.soko_attack_at(lv, st, beyond, bs, ts):
                     return True
-                if here == stand and self.soko_throw_over(st, d):
+                if here == stand and (self.soko_throw_over(st, d) or self.soko_zap_over(st, d)):
                     return True
+                # nothing to throw: walk away for a while -- it stays there to get at us; gone from its sight it
+                # may move off, and the push goes
                 st.behind_waits = 0
-                return self.soko_wait()
+                self.soko_stats["behind_retreat"] += 1
+                return self.soko_retreat(lv, st, st.to_map(beyond), bs, ts)
             if here == stand:
                 if st.blocked == self.turn():
                     self.soko_stats["wait_behind"] += 1
