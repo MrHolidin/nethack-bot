@@ -1,6 +1,7 @@
 """Which monsters in view are coming for us (wand_ev's fight): tracks of the monsters on screen from tick to tick.
 
-A monster is an active threat when it stands next to us, has ever attacked us (a message names it: "The X hits!",
+A monster is an active threat when it stands next to us, came into view this turn close enough to hit us next
+turn (its moves a turn, mmove / 12 rounded up, reach the square next to us), has ever attacked us (a message names it: "The X hits!",
 "The X misses!", "The X zaps a wand!", ... -- the nearest one of that name in view), or its last move, at most
 ACTIVE_RECENT turns ago, brought it closer to us (the distance from where we stand now). The others in view are
 not in the fight: asleep, busy, wandering, or not after us.
@@ -20,6 +21,7 @@ import re
 import numpy as np
 
 from nhbot import glyphs as G
+from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
 TRACK_FORGET = 10            # turns a track is kept unseen
@@ -73,7 +75,7 @@ class ThreatMixin:
                     tr["closer"] = t if _dist(p, me) < _dist(tr["pos"], me) else None
                 tr["pos"], tr["seen"] = p, t
             else:
-                tracks.append({"name": n, "pos": p, "seen": t, "closer": None, "attacked": None,
+                tracks.append({"name": n, "pos": p, "seen": t, "first": t, "closer": None, "attacked": None,
                                "wands": set(), "missile": None, "breath": False})
         self.mon_tracks = tracks
 
@@ -132,5 +134,9 @@ class ThreatMixin:
         if _dist(pos, me) <= 1:
             return True
         tr = next((r for r in self.mon_tracks if r["pos"] == pos and r["seen"] == t), None)
-        return tr is not None and (tr["attacked"] is not None
-                                   or (tr["closer"] is not None and t - tr["closer"] <= ACTIVE_RECENT))
+        if tr is None:
+            return False
+        if tr.get("first") == t:                 # just come into view: a threat if it can hit us next turn
+            pm = PM_BY_NAME.get(tr["name"])
+            return pm is not None and _dist(pos, me) - 1 < -(-pm.mmove // 12)
+        return tr["attacked"] is not None or (tr["closer"] is not None and t - tr["closer"] <= ACTIVE_RECENT)

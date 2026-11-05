@@ -28,7 +28,7 @@ from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name, erosion
 from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import PM_BY_NAME
+from nhbot.monsters import NEVER_MELEE, PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
 from nhbot.rays import RAY_RESIST, our_protection, zap_hit_prob
 
@@ -336,7 +336,7 @@ class DangerMixin:
             mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
                          self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name,
                          self.monster_taint(name), self.monster_turn_pmf(name, 4),
-                         bool(pm.mflags1 & M1_REGEN)))
+                         bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), name in NEVER_MELEE))
         if not mons:
             return 1.0
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
@@ -349,7 +349,7 @@ class DangerMixin:
         for _ in range(sims):
             hps = []
             hcap = []
-            for lev, _, dmg, _, _, hits, _, _, _, _, _, _, _ in mons:
+            for lev, _, dmg, _, _, hits, _, _, _, _, _, _, _, _, _ in mons:
                 for _try in range(20):
                     h = full = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -415,9 +415,11 @@ class DangerMixin:
         """One sampled fight of win_prob with approach (see there): (our HP at its end -- <= 0: lost, tainted: it
         blinded us, gave us lycanthropy or charmed and robbed us -- TAINT_AD, a yellow light's explosion, a
         lightning bolt's flash -- so a win counts TAINTED_WIN). Monsters that regenerate (M1_REGEN) get 1 HP a
-        turn back (mon.c mon_regen); while we sleep they hit us +4 (mhitu.c); confused or stunned (state) our
-        blow goes astray as domove's confdir sends it."""
-        state = state or {"aim": 1.0}
+        turn back (mon.c mon_regen); a paralysing hit (or a gelatinous cube we hit) freezes us
+        (monster_paralysis), and while we sleep or are frozen they hit us +4 (mhitu.c); confused or stunned
+        (state) our blow goes astray as domove's confdir sends it; we never hit the kinds we never melee
+        (monsters.NEVER_MELEE: a floating eye)."""
+        state = state or {"aim": 1.0, "free_action": False}
         left = [approach.get(m[6], 0) for m in mons]
         plans = plans or [None] * len(mons)
         cool = [0] * len(mons)                   # breath: turns until it can breathe again
@@ -428,7 +430,7 @@ class DangerMixin:
             for _a in range(acts):
                 if not alive:
                     break
-                ready = [j for j in alive if left[j] == 0]
+                ready = [j for j in alive if left[j] == 0 and not mons[j][14]]      # never hit a floating eye
                 j = ready[0] if ready else None
                 hit = j is not None and rng.random() < mons[j][1] * state["aim"]
                 d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
@@ -453,6 +455,9 @@ class DangerMixin:
                 hps[j] -= d
                 if hps[j] <= 0:
                     alive.remove(j)
+                elif mons[j][13][1] and not state["free_action"] and rng.random() < 2 / 3:
+                    n, die = mons[j][13][1]              # uhitm.c passive: a gelatinous cube freezes us
+                    asleep = max(asleep, min(127, int(rng.integers(1, die + 1, size=n).sum())))
             if not alive or hp <= 0:
                 break
             asleep -= 1
@@ -491,9 +496,30 @@ class DangerMixin:
                     hp -= int(rng.choice(len(one), p=one))
                     if p_taint and rng.random() < p_taint:
                         tainted = True
+                    p_plys = mons[j][13][0]
+                    if p_plys and asleep <= 0 and not state["free_action"] and rng.random() < p_plys:
+                        asleep = int(rng.integers(1, 11))    # mhitu.c AD_PLYS: nomul(-rnd(10))
                     if hp <= 0:
                         return hp, tainted
         return hp, tainted
+
+    def monster_paralysis(self, name):
+        """(P(one move of its melee freezes us): mhitu.c AD_PLYS, 1 in 3 of the hits, for rnd(10) turns; the
+        dice of its passive paralysis when we hit it and it lives -- uhitm.c passive, 2 in 3: d(level + 1, die)
+        turns -- or None)."""
+        keep, passive = 1.0, None
+        idx = MON_INDEX.get(name)
+        if idx is None:
+            return 0.0, None
+        level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+        for i, (at, ad, _, d) in enumerate(ATTACKS[idx]):
+            if ad != "PLYS":
+                continue
+            if at == "NONE":
+                passive = (level + 1, d)
+            elif at in MELEE:
+                keep *= 1 - self.hit_prob(level, i) / 3
+        return 1 - keep, passive
 
     def our_state(self):
         """What our condition does to a fight we simulate: aim -- P(our blow goes where we meant): stunned, a
@@ -505,7 +531,8 @@ class DangerMixin:
             aim = 0.8 + 0.2 / 8
         else:
             aim = 1.0
-        return {"aim": aim}
+        free = any(i.ring_on and "free action" in i.text for i in self.items())
+        return {"aim": aim, "free_action": free}
 
     def pack_profile(self):
         """What a ray hitting us can blow up in our pack (zap.c zhitu -> destroy_item): the potion stacks'
