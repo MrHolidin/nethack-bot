@@ -147,6 +147,7 @@ header.top .game b { color: var(--ink); font-weight: 600; }
   <h1>nhbot Replays</h1>
   <div class="game" id="gameline">No recording loaded</div>
   <div class="openbtn">
+    <select class="btn" id="gamesel" aria-label="Game" hidden></select>
     <input type="file" id="file" accept=".gz,.json" hidden>
     <button class="btn" id="openbtn" type="button">Open recording…</button>
   </div>
@@ -185,7 +186,7 @@ header.top .game b { color: var(--ink); font-weight: 600; }
         <span><i style="background:var(--bad)"></i>kills, prayers, zaps (ticks)</span>
       </div>
     </div>
-    <div class="keys"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 10 turns · <kbd>,</kbd><kbd>.</kbd> event</div>
+    <div class="keys"><kbd>Space</kbd> play · <kbd>←</kbd><kbd>→</kbd> frame · <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 10 turns · <kbd>,</kbd><kbd>.</kbd> event · <kbd>End</kbd> the end</div>
   </section>
 
   <aside class="rack">
@@ -234,7 +235,7 @@ header.top .game b { color: var(--ink); font-weight: 600; }
 <div class="drop" id="drop" hidden>Drop a recording (.json.gz) to open it</div>
 
 <script>
-const EMBED = /*REPLAY_DATA*/null;
+const EMBED = /*REPLAY_DATA*/null;      // a base64 .json.gz, or [{label, data}] for several games
 const EV_COLORS = { kill: "var(--bad)", level: "var(--muted)", zap: "var(--accent)", pray: "var(--good)",
                     lowhp: "var(--warn)", death: "var(--bad)", end: "var(--ink)", decision: "var(--accent)" };
 const EV_NAMES = { kill: "Kills", level: "Levels", zap: "Zaps", pray: "Prayers", lowhp: "Low HP", decision: "Decisions", end: "End" };
@@ -522,8 +523,8 @@ document.addEventListener("keydown", e => {
   else if (e.key === "ArrowLeft") { e.preventDefault(); pause(); e.shiftKey ? stepTurns(-10) : seek(cur - 1); }
   else if (e.key === ".") { pause(); jumpEvent(1); }
   else if (e.key === ",") { pause(); jumpEvent(-1); }
-  else if (e.key === "Home") { pause(); seek(0); }
-  else if (e.key === "End") { pause(); seek(R.frames.length - 1); }
+  else if (e.key === "Home") { e.preventDefault(); pause(); seek(0); }
+  else if (e.key === "End") { e.preventDefault(); pause(); seek(R.frames.length - 1); }
 });
 let dragDepth = 0;
 window.addEventListener("dragenter", e => { if ([...e.dataTransfer.types].includes("Files")) { dragDepth++; $("drop").hidden = false; } });
@@ -534,10 +535,20 @@ window.addEventListener("drop", async e => {
   const f = e.dataTransfer.files[0]; if (f) loadBytes(new Uint8Array(await f.arrayBuffer()), f.name);
 });
 
+const GAMES = EMBED == null ? [] : Array.isArray(EMBED) ? EMBED : [{ label: "", data: EMBED }];
+async function loadGame(k) {
+  const bin = Uint8Array.from(atob(GAMES[k].data), c => c.charCodeAt(0));
+  await loadBytes(bin, "");
+}
 (async () => {
-  if (EMBED) {
-    const bin = Uint8Array.from(atob(EMBED), c => c.charCodeAt(0));
-    await loadBytes(bin, "");
+  if (GAMES.length > 1) {
+    const sel = $("gamesel");
+    sel.innerHTML = GAMES.map((g, k) => `<option value="${k}">${esc(g.label || `game ${k + 1}`)}</option>`).join("");
+    sel.hidden = false;
+    sel.onchange = () => { pause(); loadGame(+sel.value); };
+  }
+  if (GAMES.length) {
+    await loadGame(0);
   } else {
     screen = new Array(24).fill(" ".repeat(80)); colors = new Array(24).fill("7".repeat(80));
     screen[11] = "            Open a recording written by tools/replay.py (.json.gz), or drop it here.".padEnd(80);

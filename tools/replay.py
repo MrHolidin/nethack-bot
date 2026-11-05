@@ -1,6 +1,7 @@
 """Record one game of the bot as a replay, and build the replay viewer around it.
 
     python tools/replay.py SEED [--kw JSON] [--char val] [--out game.json.gz] [--html game.html]
+    python tools/replay.py bundle games.html A.json.gz B.json.gz ...      (several games, picked from a list)
 
 --out writes the recording (gzipped JSON) for tools/replay_viewer.html to open; --html writes a copy of the viewer
 with the recording built in (one file that opens anywhere). The game is the same one eval.py plays for that seed
@@ -166,10 +167,14 @@ def record(seed, kw, character="val"):
 
 
 def build_html(rec_gz=None, standalone=True):
-    """The viewer with this recording built in (None: the empty viewer, which opens recordings itself).
-    replay_viewer.html is a page body; standalone wraps it in a full HTML document to open as a local file."""
+    """The viewer with this recording built in (None: the empty viewer, which opens recordings itself; a list of
+    (label, recording) pairs: several games, picked from a list). replay_viewer.html is a page body; standalone
+    wraps it in a full HTML document to open as a local file."""
     html = open(VIEWER, encoding="utf-8").read()
-    if rec_gz is not None:
+    if isinstance(rec_gz, list):
+        games = [{"label": label, "data": base64.b64encode(gz).decode("ascii")} for label, gz in rec_gz]
+        html = html.replace(DATA_MARK, json.dumps(games), 1)
+    elif rec_gz is not None:
         html = html.replace(DATA_MARK, json.dumps(base64.b64encode(rec_gz).decode("ascii")), 1)
     if standalone:
         html = ('<!doctype html>\n<html lang="en"><head><meta charset="utf-8">'
@@ -178,7 +183,27 @@ def build_html(rec_gz=None, standalone=True):
     return html
 
 
+def game_label(rec):
+    """seed, turns, score, deepest level and what killed us (eval.death_cause on the last messages)."""
+    from eval import death_cause
+    s = rec["summary"]
+    return (f"seed {rec['seed']} · T{s['turns']} · score {s['score']} · Dlvl {s['max_depth']} · "
+            f"{death_cause(s['last'])}")
+
+
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "bundle":
+        ap = argparse.ArgumentParser(description="several recordings in one viewer: replay.py bundle OUT.html REC...")
+        ap.add_argument("cmd")
+        ap.add_argument("html")
+        ap.add_argument("recs", nargs="+", help=".json.gz recordings")
+        a = ap.parse_args()
+        games = []
+        for path in a.recs:
+            gz = open(path, "rb").read()
+            games.append((game_label(json.loads(gzip.decompress(gz))), gz))
+        open(a.html, "w", encoding="utf-8").write(build_html(games))
+        return
     ap = argparse.ArgumentParser()
     ap.add_argument("seed", type=int)
     ap.add_argument("--kw", default="{}", help="Bot options as JSON, e.g. '{\"wand_ev\": true}'")
