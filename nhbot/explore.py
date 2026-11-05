@@ -1,5 +1,5 @@
 """Exploring a level and leaving it: frontier and item goals, when to descend, searching for hidden
-passages, the Gnomish Mines (avoid_mines, mines_return), waiting for the pet, magic mapping."""
+passages, the Gnomish Mines (avoid_mines, mines_xl, mines_return), waiting for the pet, magic mapping."""
 from collections import Counter
 
 import numpy as np
@@ -11,6 +11,8 @@ from nhbot.goals import GOALS
 
 REST_DESCEND_HP = 0.95      # rest on the down staircase below this fraction of max HP
 REST_DESCEND_MAX = 600      # ... at most this many turns a level
+MINES_TRIP_RETRY = 500      # mines_xl: the Mines staircase out of reach -- try again this many turns later (by then
+                            # step_progress may have forgotten the obstacles in the way)
 
 
 class ExploreMixin:
@@ -19,6 +21,8 @@ class ExploreMixin:
         self.pet_waits = 0
         self.pet_waited_total = 0
         self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
+        self.mines_trip_stats = Counter()  # mines_xl: ticks of the trip to the Mines by what they did
+        self.mines_trip_retry = 0          # mines_xl: no trip before this turn (the staircase was out of reach)
         self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us
         self.trap_stats = Counter()
         self.door_stats = Counter()
@@ -44,6 +48,8 @@ class ExploreMixin:
         frontier = passable & dil & (lv.visited == 0)
         lv.explored = not frontier.any()
         if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
+            return
+        if self.mines_trip_step(lv, grids):
             return
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
         for p in self.goal_closed_set("gold", lv.key):
@@ -223,10 +229,71 @@ class ExploreMixin:
         Excalibur in the main dungeon (the Mines have no usable fountains)."""
         if self.mines_done:
             return True                       # mines_return brought us back: the Mines are finished
+        if self.opts.mines_xl:
+            return self.bl(nh.NLE_BL_XP) < self.opts.mines_xl or self.excal_fountain_level() is not None
         if self.opts.avoid_mines == "until_excalibur":
             return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
                 and self.long_sword() is not None and self.turn() < 8000
         return bool(self.opts.avoid_mines)
+
+    def mines_trip_step(self, lv, grids):
+        """mines_xl: from XL mines_xl on, in the main dungeon, the Mines staircase known (a level with avoid_down)
+        and the Mines not done: Excalibur first -- while it can be made at a fountain we know
+        (excal_fountain_level), go to that level (the dip itself is excalibur.excal_step, housekeeping; below its
+        HP we rest there) -- then to the branch level and down its Mines staircase. True if it used the turn."""
+        if not self.opts.mines_xl or lv.key[0] != 0 or self.mines_done \
+                or self.bl(nh.NLE_BL_XP) < self.opts.mines_xl or self.turn() < self.mines_trip_retry:
+            return False
+        branch = next((k for k, l in self.levels.items() if k[0] == 0 and l.avoid_down), None)
+        if branch is None:
+            return False
+        fk = self.excal_fountain_level()
+        if fk is not None:
+            if fk != lv.key:
+                return self.level_travel_step(lv, grids, fk, "excal", "excal_travel")
+            hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
+            if hp >= maxhp * self.opts.excal_hp or self.visible_hostiles(lv):
+                return False
+            self.cur_act = "rest"                # excal_step dips from excal_hp of max HP on
+            self.mines_trip_stats["excal_rest"] += 1
+            self.press("2"); self.press("0"); self.press("s")
+            return True
+        if lv.key != branch:
+            return self.level_travel_step(lv, grids, branch, "mines", "travel")
+        down = np.zeros_like(grids[0], dtype=bool)
+        for p in lv.avoid_down:
+            down[p] = True
+        on = bool(down[self.pos()])
+        if self.go_down(lv, grids, down):
+            self.cur_act = "mines"
+            self.mines_trip_stats["enter" if on else "to_stairs"] += 1
+            return True
+        self.mines_trip_stats["unreachable"] += 1
+        self.mines_trip_retry = self.turn() + MINES_TRIP_RETRY
+        return False
+
+    def level_travel_step(self, lv, grids, key, act, stat):
+        """One step toward main-dungeon level `key` from this one by the stairs we know: to the up staircase and
+        up it, or down a main down staircase (not the Mines one, avoid_down). False: no way known."""
+        k_mem = grids[0]
+        if key[1] < lv.key[1]:
+            up = k_mem == G.UPSTAIR
+            if not up.any():
+                return False
+            if up[self.pos()]:
+                self.cur_act = act
+                self.mines_trip_stats[stat + "_up"] += 1
+                self.took_stairs = True
+                self.press("<")
+                return True
+            return self.walk_to(lv, up, act=act, grids=grids)[0] == "moved"
+        down = k_mem == G.DOWNSTAIR
+        for p in lv.avoid_down:
+            down[p] = False
+        if down.any() and self.go_down(lv, grids, down):
+            self.mines_trip_stats[stat + "_down"] += 1
+            return True
+        return False
 
     def mines_return_start(self, lv, why):
         if not self.mines_return_on:

@@ -65,6 +65,17 @@ class ExcaliburMixin:
         self.excal_skip.add(lv.key)                # can't reach it: don't keep coming back
         return False
 
+    def excal_fountain_level(self):
+        """mines_xl: the main-dungeon level, nearest in depth, with a fountain we could make Excalibur at (not a
+        shop's, not on a level we gave up reaching it on), while Excalibur can be made at all (lawful, XL
+        excal_xl, an unnamed long sword; not the HP: we rest for that). None: no such level."""
+        if self.excalibur or int(self.last_bl[nh.NLE_BL_ALIGN]) != 1 or self.bl(nh.NLE_BL_XP) < self.opts.excal_xl \
+                or self.long_sword() is None:
+            return None
+        dl = self.bl(nh.NLE_BL_DEPTH)
+        keys = [k for k, l in self.levels.items() if k[0] == 0 and self.fountains(l).any()]
+        return min(keys, key=lambda k: abs(k[1] - dl)) if keys else None
+
     def excal_go_up(self, lv):
         """No fountain here, but one is remembered a few levels up: walk back up to it."""
         if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:

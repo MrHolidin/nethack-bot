@@ -7,6 +7,9 @@ an unknown name raises, so a typo cannot silently run the default configuration.
 DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "avoid_mines": False,      # True / False / "until_excalibur"
+    "mines_xl": False,         # A/B: a number n: the Mines are closed below XL n; from XL n on, with their staircase
+                               #      known (Level.avoid_down, from a bounce), walk to it and go in -- Excalibur first
+                               #      at the fountains we know (explore.mines_trip_step)
     "force_read": None,        # experiments: a scroll type ("destroy armor", control "blank paper") read once, the first
                                #      time it is safe (nhbot.scrolls.force_read_step)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
