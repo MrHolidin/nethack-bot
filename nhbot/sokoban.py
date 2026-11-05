@@ -49,6 +49,10 @@ ZOO_BACK_HP = 0.7         # in the zoo below this share of HP with its monsters 
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
 ZOO_VOLLEY_MIN = 2        # zoo monsters on a line worth a ray wand
 ZOO_SCARE_MIN = 2         # zoo monsters next to us worth a scroll of scare monster
+ZOO_OPEN_TRIES = 3        # zaps at the zoo's door (opening, or a ray that destroys it) at most
+ZOO_UNLOCK_TRIES = 20     # #apply of a key / lock pick / credit card at it at most (each can fail, takes turns)
+DOOR_RAYS = ("cold", "fire", "lightning")   # rays that destroy a door without a sound (cold: a Valkyrie resists it)
+UNLOCK_TOOLS = ("key", "lock pick", "credit card")
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
@@ -101,6 +105,11 @@ class SokoLevel:
         self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
+        self.zoo_quiet = False        # the zoo's door opened without a sound: the zoo sleeps on
+        self.zoo_unlocked = False     # the zoo's door unlocked quietly (soko_zoo_open)
+        self.zoo_kit = None           # what we had to open it quietly with (stats)
+        self.zoo_open_tries = 0
+        self.zoo_unlock_tries = 0
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
@@ -622,10 +631,12 @@ class SokobanMixin:
         # outside it first (its monsters still asleep in view don't stop that)
         if (shut and not vis and (hp < maxhp or (not self.can_pray()
                                                  and self.turn() - st.solved_turn < ZOO_PRAY_WAIT))) \
-                or (not shut and not near and here not in st.zoo and hp < maxhp * ZOO_ENTER_HP):
+                or (not shut and (not near or st.zoo_quiet) and here not in st.zoo and hp < maxhp * ZOO_ENTER_HP):
             self.soko_stats["zoo_rest"] += 1
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
+            return True
+        if shut and here == tuple(st.lv["goal"]) and self.soko_zoo_open(lv, st):
             return True
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         # a monster of the zoo may have carried the prize off (they go for an amulet of reflection) and dropped
@@ -714,10 +725,19 @@ class SokobanMixin:
             st.zoo_seen, st.zoo_moved = seen, t
         if not seen or t - st.zoo_moved >= ZOO_QUIET:
             return False
-        if self.soko_zoo_volley(lv):
-            return True
         here = st.from_map(self.pos())
         goal = tuple(st.lv["goal"])
+        if st.zoo_quiet:
+            # opened without a sound: the zoo sleeps -- no waiting for it at the door, no rays waking a line of
+            # it; in we go, killing them one at a time, back to the door only when hurt
+            if here in inside and c.hp < c.maxhp * ZOO_BACK_HP:
+                bs, ts = self.soko_state(lv, st)
+                self.soko_stats["zoo_back"] += 1
+                self.cur_act = "soko_zoo"
+                return self.soko_step_to(lv, st, goal, bs, ts)
+            return False
+        if self.soko_zoo_volley(lv):
+            return True
         if here == goal:
             if st.zoo_hold >= ZOO_HOLD_MAX:
                 return False
@@ -731,6 +751,67 @@ class SokobanMixin:
             self.cur_act = "soko_zoo"
             return self.soko_step_to(lv, st, goal, bs, ts)
         return False
+
+    def soko_zoo_open(self, lv, st):
+        """At the goal, the zoo's door still locked: open it without a sound, so the zoo sleeps on and is killed
+        one at a time (a Valkyrie is stealthy: monmove.c disturb wakes nothing) -- a wand of opening, a key, lock
+        pick or credit card (#apply, some turns), a fire, cold or lightning ray (zap.c zap_over_floor: the door
+        burns, shatters, splinters; no noise). Kicking it (the move into it) wakes the whole zoo (dokick.c
+        wake_nearby): only with none of these. True if it acted."""
+        if st.zoo_unlocked:
+            return False                              # unlocked: the move into it opens it
+        ty, tx = st.to_map(st.zoo_door)
+        y, x = self.pos()
+        key = DELTA2KEY[(ty - y, tx - x)]
+        items = self.items()
+        if st.zoo_kit is None:
+            st.zoo_kit = "+".join(k for k, ok in (
+                ("opening", any(it.ocls == nh.WAND_CLASS and self.wand_kind(it) == "opening" for it in items)),
+                ("tool", any(self.soko_unlock_tool(it) for it in items)),
+                ("ray", any(k in DOOR_RAYS for _, k in self.attack_wands())))
+                if ok) or "none"
+            self.soko_stats["zoo_kit_" + st.zoo_kit] += 1
+        seq = self.msg_seq
+        wand = next((it for it in items if it.ocls == nh.WAND_CLASS and self.wand_kind(it) == "opening"
+                     and not self.wand_spent(it)), None)
+        if wand is not None and st.zoo_open_tries < ZOO_OPEN_TRIES:
+            st.zoo_open_tries += 1
+            self.soko_stats["zoo_open_wand"] += 1
+            self.zap(wand.letter, key)
+            st.zoo_unlocked = st.zoo_quiet = "unlocks" in self.text_since(seq)
+            return True
+        tool = next((it for it in items if self.soko_unlock_tool(it)), None)
+        if tool is not None and st.zoo_unlock_tries < ZOO_UNLOCK_TRIES:
+            st.zoo_unlock_tries += 1
+            self.soko_stats["zoo_unlock_try"] += 1
+            self.cur_act = "unlock"
+            if not self.ask("a", "apply"):
+                return True
+            self.press(tool.letter, expect_prompt=True)
+            if "direction" in self.message().lower():
+                self.press(key, expect_prompt=True)
+            if "unlock it" in self.message().lower():
+                self.raw_step(ord("y"))
+            self.settle()
+            said = self.text_since(seq)
+            if "succeed in unlocking" in said or "is not locked" in said:
+                st.zoo_unlocked = st.zoo_quiet = True
+                self.soko_stats["zoo_unlocked"] += 1
+            return True
+        rays = sorted((DOOR_RAYS.index(k), l) for l, k in self.attack_wands() if k in DOOR_RAYS)
+        if rays and st.zoo_open_tries < ZOO_OPEN_TRIES:
+            st.zoo_open_tries += 1
+            self.soko_stats["zoo_open_ray"] += 1
+            self.zap(rays[0][1], key)
+            said = self.text_since(seq)
+            st.zoo_quiet = any(w in said for w in ("door freezes", "door is consumed", "door splinters"))
+            return True
+        self.soko_stats["zoo_kick"] += 1
+        return False
+
+    @staticmethod
+    def soko_unlock_tool(it):
+        return it.ocls == nh.TOOL_CLASS and not it.cursed and any(w in it.text for w in UNLOCK_TOOLS)
 
     def soko_zoo_volley(self, lv):
         """The zoo awake, nothing next to us: a ray wand along a line with ZOO_VOLLEY_MIN of its monsters on it
