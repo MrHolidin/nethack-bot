@@ -254,9 +254,14 @@ class ExploreMixin:
         """squeeze_plan: nothing left to walk to but what lies past a squeeze refused for our weight
         (Level.squeeze_shut): take the first one on the way to it and stand at it, trying it once a tick -- each
         refusal sheds one unit there (step_weight, squeeze_pending) -- till we get through; nothing left to shed:
-        it stays shut (step_weight blocks its square). True if it used the turn."""
+        it stays shut (step_weight blocks its square). squeeze_plan="stairs": only while this level's up or down
+        staircase is still unknown (the way on may lie past it). True if it used the turn."""
         if not self.opts.squeeze_plan or not lv.squeeze_shut:
             return False
+        if self.opts.squeeze_plan == "stairs" and self.squeeze_target is None:
+            k_mem = grids[0]
+            if (k_mem == G.UPSTAIR).any() and (k_mem == G.DOWNSTAIR).any():
+                return False
         tgt = self.squeeze_target
         if tgt is None or tgt[0] != lv.key or lv.blocked[tgt[2]]:
             k_mem, k_live, passable = grids

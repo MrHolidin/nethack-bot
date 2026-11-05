@@ -9,7 +9,8 @@ DEFAULTS = {
     "avoid_mines": False,      # True / False / "until_excalibur"
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
-                               #      refusal till through (explore.squeeze_open_step)
+                               #      refusal till through (explore.squeeze_open_step); "stairs": that only while
+                               #      the level's up or down staircase is unknown
     "hunt_easy": False,        # A/B: a number p: hostiles in view we would melee (not never_melee) and beat with
                                #      P(win) > p (danger.win_prob) are explore goals: the squares next to them
                                #      (combat.prey_mask, goal kind "prey")
