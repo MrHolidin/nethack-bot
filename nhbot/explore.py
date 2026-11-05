@@ -28,6 +28,7 @@ class ExploreMixin:
         self.trap_stats = Counter()
         self.door_stats = Counter()
         self.squeeze_pending = None       # (level key, square) a diagonal squeeze refused for our weight
+        self.squeeze_target = None        # squeeze_plan: (level key, from, to) the squeeze we shed weight for
         self.squeeze_stats = Counter()
         self.mines_kick_stats = Counter()
         self.revisit_done = set()        # revisit_up: level keys we climbed back to
@@ -37,6 +38,8 @@ class ExploreMixin:
     def explore(self, lv):
         self.cur_act = "explore"
         self.goal_observe(lv)
+        if self.opts.squeeze_plan:
+            self.squeeze_passed(lv)
         k_mem, k_live, passable = grids = self.grids(lv)
         start = self.pos()
         y, x = start
@@ -108,6 +111,8 @@ class ExploreMixin:
                 return
             if status == "here":
                 lv.visited[start] += 1
+            if status == "unreachable" and self.squeeze_open_step(lv, grids, targets):
+                return
 
         # nothing left to walk to here: go down if we know the way
         if downstairs.any() and self.go_down(lv, grids, downstairs):
@@ -236,6 +241,54 @@ class ExploreMixin:
             return int(self.last_bl[nh.NLE_BL_ALIGN]) == 1 and not self.excalibur \
                 and self.long_sword() is not None and self.turn() < 8000
         return bool(self.opts.avoid_mines)
+
+    def squeeze_passed(self, lv):
+        """squeeze_plan: through the squeeze we shed weight for -- it is open again, both ways."""
+        tgt = self.squeeze_target
+        if tgt is not None and tgt[0] == lv.key and self.pos() == tgt[2]:
+            lv.squeeze_shut -= {(tgt[1], tgt[2]), (tgt[2], tgt[1])}
+            self.squeeze_stats["opened"] += 1
+            self.squeeze_target = None
+
+    def squeeze_open_step(self, lv, grids, targets):
+        """squeeze_plan: nothing left to walk to but what lies past a squeeze refused for our weight
+        (Level.squeeze_shut): take the first one on the way to it and stand at it, trying it once a tick -- each
+        refusal sheds one unit there (step_weight, squeeze_pending) -- till we get through; nothing left to shed:
+        it stays shut (step_weight blocks its square). True if it used the turn."""
+        if not self.opts.squeeze_plan or not lv.squeeze_shut:
+            return False
+        tgt = self.squeeze_target
+        if tgt is None or tgt[0] != lv.key or lv.blocked[tgt[2]]:
+            k_mem, k_live, passable = grids
+            _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, self.pos(), targets, want_dist=False,
+                                             shut=False)
+            if reached is None:
+                return False
+            path, cur = [reached], reached
+            while cur != self.pos():
+                cur = prev.get(cur)
+                if cur is None:
+                    return False
+                path.append(cur)
+            path.reverse()
+            edge = next(((a, b) for a, b in zip(path, path[1:]) if (a, b) in lv.squeeze_shut), None)
+            if edge is None:
+                return False
+            tgt = self.squeeze_target = (lv.key,) + edge
+            self.squeeze_stats["planned"] += 1
+        _, a, b = tgt
+        self.cur_act = "squeeze"
+        if self.pos() == a:
+            self.squeeze_stats["tries"] += 1
+            self.move(b)
+            self.squeeze_passed(lv)
+            return True
+        mask = np.zeros_like(grids[2])
+        mask[a] = True
+        if self.walk_to(lv, mask, act="squeeze", grids=grids)[0] == "moved":
+            return True
+        self.squeeze_target = None
+        return False
 
     def mines_xl_open(self):
         """mines_xl: the Mines open from XL mines_xl on -- or once a main-dungeon level got desperate (no way on

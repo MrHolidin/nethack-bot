@@ -90,6 +90,7 @@ class Level:
         self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
         self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
+        self.squeeze_shut = set()  # squeeze_plan: (from, to) diagonal squeezes refused for our weight, both ways
         self.not_stairs = set()    # mines_xl: squares where the game said there is no staircase
         self.kill_piles = set()    # squares where we killed a monster that may carry things (monsters.CARRIERS)
         self.elbereth = set()     # positions where we engraved
@@ -311,7 +312,12 @@ class MapMixin:
         if lv and self.last_move_target and "You are carrying too much to get through" in m:
             # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit
             self.squeeze_stats["refused"] += 1
-            self.squeeze_pending = (lv.key, self.last_move_target)
+            if self.opts.squeeze_plan and self.squeeze_target != (lv.key, self.pos(), self.last_move_target):
+                a, b = self.pos(), self.last_move_target      # explore round it first (explore.squeeze_open_step)
+                lv.squeeze_shut |= {(a, b), (b, a)}
+                self.squeeze_stats["shut"] += 1
+            else:
+                self.squeeze_pending = (lv.key, self.last_move_target)
         elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",
                 "Perhaps that's why you cannot move past it",

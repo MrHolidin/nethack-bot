@@ -61,9 +61,11 @@ class PathPrev:
 
 
 class NavMixin:
-    def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True):
+    def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True,
+                 shut=True):
         """Shortest paths from start: (dist array or None without want_dist, prev, the first target square
-        reached or None). Stops at the first square of targets_mask popped, or past max_cost."""
+        reached or None). Stops at the first square of targets_mask popped, or past max_cost. squeeze_plan: the
+        diagonal squeezes refused for our weight (Level.squeeze_shut) are not taken, unless shut is False."""
         cost = _STEP_COST[k_mem]
         cost[(k_live == G.BOULDER) & (k_mem != G.TRAP)] = 15
         for p in lv.locked:
@@ -77,6 +79,8 @@ class NavMixin:
         # an item on a door hides it from k_mem: the doors remembered and the refused diagonals count too
         _pad_door[1:-1, 1:-1] = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
         door = _pad_door.ravel().tolist()
+        blocked = {((a[0] + 1) * _W + a[1] + 1, (b[0] + 1) * _W + b[1] + 1) for a, b in lv.squeeze_shut} \
+            if shut and lv.squeeze_shut else None
         tm = None
         if targets_mask is not None:
             _pad_target[1:-1, 1:-1] = targets_mask
@@ -101,7 +105,7 @@ class NavMixin:
             for off, diag in _STEPS:
                 j = i + off
                 c = cost[j]
-                if c < 0 or (diag and (di or door[j])):
+                if c < 0 or (diag and (di or door[j] or (blocked and (i, j) in blocked))):
                     continue
                 nd = d + c
                 if nd < dist[j]:
@@ -204,6 +208,8 @@ class NavMixin:
         if "intact doorway" in self.text_since(seq0) and not known:
             self.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
             return                                         # (a second refusal is counted: no loop without time)
+        if self.opts.squeeze_plan and "carrying too much to get through" in self.text_since(seq0):
+            return                    # refused for our weight, not the square's fault (explore.squeeze_open_step)
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
             if self.trapped is not None:
                 self.trap_stats["fail_not_counted"] += 1    # held by a trap: the square is not at fault
