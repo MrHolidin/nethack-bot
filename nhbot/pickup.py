@@ -173,10 +173,9 @@ class PickupMixin:
         return mask
 
     def corpse_piles(self, lv):
-        """kill_site: squares of our kills (Level.kill_piles) where a corpse lies on top -- what the monster
-        carried is under it, unseen."""
-        if not self.opts.kill_site:
-            return []
+        """Squares of our kills (Level.kill_piles) where a corpse lies on top -- what the monster carried is
+        under it, unseen. (A/B kill_site, with resuming an interrupted meal: +800 [-528, +2171], median
+        4146 -> 4645.)"""
         return [p for p in lv.kill_piles if G.KIND[lv.under[p]] == G.CORPSE]
 
     def pile_to_inspect(self, lv, y, x):

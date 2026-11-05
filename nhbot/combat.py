@@ -624,7 +624,7 @@ class CombatMixin:
         self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
             lvk = self.levels.get(self.cur_key)
-            if self.opts.kill_site and lvk is not None and mk.group(2) in CARRIERS:
+            if lvk is not None and mk.group(2) in CARRIERS:
                 lvk.kill_piles.add(self.last_attack_target)    # what it carried lies under its corpse (pickup.py)
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one

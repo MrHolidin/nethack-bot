@@ -151,8 +151,8 @@ class SurvivalMixin:
         if self.obs["misc"][0] and ("corpse here" in m or self.opts.eat_plural and "corpses here" in m):
             name = re.search(r"there (?:is|are) (?:an? |\d+ )?(.+?) corpses? here", m)
             kind = name.group(1) if name else None
-            if kind and self.opts.kill_site and kind.startswith("partly eaten "):
-                kind = kind[len("partly eaten "):]   # a meal we were interrupted in (kill_site resumes it)
+            if kind and kind.startswith("partly eaten "):
+                kind = kind[len("partly eaten "):]   # a meal we were interrupted in: resumed
             if kind and self.corpse_ok(kind):
                 seq0 = self.msg_seq
                 self.press("y")
@@ -160,7 +160,7 @@ class SurvivalMixin:
                 pm = PM_BY_NAME.get(kind)
                 self.nutrition_add(pm.cnutrit if pm is not None else 100)
                 self.eaten_by[kind] += 1
-                if self.opts.kill_site and "You stop eating" in self.text_since(seq0):
+                if "You stop eating" in self.text_since(seq0):
                     return "keep"                     # interrupted (monmove.c dochugw): the corpse stays a goal
                 return True
             self.press("n", expect_prompt=True)
