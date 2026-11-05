@@ -92,6 +92,8 @@ class Level:
         self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
         self.altar_align = {}      # sacrifice: altar square -> its alignment, read on stepping there
         self.stationary = {}       # square -> a never-melee monster that never moves, seen there
+        self.peace_shut = {}       # peace_shut: square -> turn until which it is closed (a peaceful stood there)
+        self.peace_waits = {}      # peace_shut: square -> waits for a peaceful monster standing on it
         self.squeeze_shut = set()  # squeeze_plan: (from, to) diagonal squeezes refused for our weight, both ways
         self.not_stairs = set()    # squares where the game said there is no staircase
         self.kill_piles = set()    # squares where we killed a monster that may carry things (monsters.CARRIERS)
@@ -183,6 +185,11 @@ class MapMixin:
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
+        if self.opts.peace_shut:
+            t = self.turn()
+            for sq, until in lv.peace_shut.items():
+                if until > t:
+                    p[sq] = False
         # stationary dangerous monsters block
         for (y, x) in self.avoid_cells:
             p[y, x] = False

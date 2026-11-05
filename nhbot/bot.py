@@ -330,7 +330,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "vault": [self.vault_drops, self.vault_moves],
             "items_first": self.items_first_holds,
             "mines_return_descents": self.mines_return_descents,
-            "peaceful_waits": self.peaceful_waits,
+            "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,
             "msg_audit": dict(self.msg_audit),
             "farlooks": self.farlooks,
             "peaceful_hits": dict(self.peaceful_hits),

@@ -12,6 +12,8 @@ from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 # Grotto Town (mines.des minetn-5, map (x, y) on screen (y, x + 2)): its down staircase lies behind the locked
 # door at map (50, 6) in every one of its terrain variants; the way to that door has closed doors only
 GROTTO_STAIR_DOOR = (6, 52)
+PEACE_SHUT_WAITS = 5     # peace_shut: waits for a peaceful monster on a square of our path ...
+PEACE_SHUT_TURNS = 200   # ... close the square for this many turns
 
 
 def line_clear(k_mem, glyphs, y, x, dy, dx, d):
@@ -195,10 +197,20 @@ class NavMixin:
             return
         if G.KIND[self.obs["glyphs"][target]] == G.MONSTER and self.peaceful_now(lv, target):
             # a peaceful monster in the way: wait for it to move (a shopkeeper in a doorway may never move;
-            # making the square impassable after a few waits was tried and not taken -- peaceful_waits counts)
+            # making the square impassable for good after a few waits was tried and not taken; peace_shut closes
+            # it for a while -- peaceful_waits counts)
             lv.fail[ty, tx] += 1
             self.peaceful_waits += 1
             self.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
+            if self.opts.peace_shut:
+                lv.peace_waits[target] = lv.peace_waits.get(target, 0) + 1
+                if lv.peace_waits[target] >= PEACE_SHUT_WAITS:
+                    # the peaceful one may never move (a shopkeeper keeping out an invisible customer, a gnome
+                    # king in a dead end: 80011, 80004 starved there): the square closed for a while, the rest of
+                    # the level explored meanwhile
+                    lv.peace_shut[target] = self.turn() + PEACE_SHUT_TURNS
+                    lv.peace_waits[target] = 0
+                    self.peace_shut_count += 1
             self.press("s")
             return
         seq0 = self.msg_seq
