@@ -31,6 +31,7 @@ from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
 SOKO_LEVEL_TURNS = 4000   # a level not solved in this many turns is given up
+SOKO_BEHIND_WAITS = 10    # waits for a monster beyond the boulder before we go round to attack it
 SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the plan
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
@@ -69,6 +70,7 @@ class SokoLevel:
         self.solved = False
         self.since = None             # turn the plan last advanced
         self.blocked = -1             # turn a push was refused for a monster beyond the boulder
+        self.behind_waits = 0         # turns waited in a row for a monster beyond the boulder to move
         self.retreat_until = -1       # soko_retreat: keep away from a peaceful monster in our way till then
         self.retreat_from = None
         self.last_i = -1
@@ -200,7 +202,11 @@ class SokobanMixin:
         terr = G.KIND[lv.terrain]
         oy, ox = st.off
         bs = frozenset(p for p in st.floor if top[p[0] + oy, p[1] + ox] == G.BOULDER)
-        ts = frozenset(tuple(t) for t in st.lv["traps"] if terr[t[0] + oy, t[1] + ox] == G.TRAP)
+        # an open trap: shown as one -- or remembered as one under an item or a monster (a filled pit or hole
+        # shows the floor; the terrain layer alone has been seen to keep the trap)
+        ts = frozenset(tuple(t) for t in st.lv["traps"]
+                       if top[t[0] + oy, t[1] + ox] == G.TRAP
+                       or (G.IS_COVERED[top[t[0] + oy, t[1] + ox]] and terr[t[0] + oy, t[1] + ox] == G.TRAP))
         return bs, ts
 
     def soko_match(self, st, bs, ts):
@@ -262,6 +268,31 @@ class SokobanMixin:
         self.move(mp)
         return True
 
+    def soko_attack_at(self, lv, st, target, bs, ts):
+        """Fight whatever is on target (variant coords): from a square next to it, 'F' toward it; else walk to
+        the nearest such square. Done (behind_waits reset) once a push works again or nothing answers."""
+        here = st.from_map(self.pos())
+        if max(abs(here[0] - target[0]), abs(here[1] - target[1])) == 1:
+            seq = self.msg_seq
+            self.soko_stats["behind_attack"] += 1
+            y, x = self.pos()
+            ty, tx = st.to_map(target)
+            self.press("F")
+            self.press(DELTA2KEY[(ty - y, tx - x)])
+            said = self.text_since(seq)
+            if "harmlessly" in said or "You attack thin air" in said or "nothing" in said.lower():
+                st.behind_waits = 0          # nothing there (any more): back to the plan
+            return True
+        for dr, dc in DIRS8:
+            n = (target[0] + dr, target[1] + dc)
+            if n in st.floor and n not in bs and n not in ts:
+                nxt = self.soko_walk(st, here, n, bs, ts)
+                if nxt is not None and nxt != here:
+                    self.move(st.to_map(nxt))
+                    return True
+        st.behind_waits = 0                  # no way to its side: wait at the push again
+        return self.soko_wait()
+
     def soko_retreat(self, lv, st, blocker, bs, ts):
         """A peaceful monster in the way: for SOKO_RETREAT turns stand at least 4 squares from it (the nearest
         such square we reach), then try again."""
@@ -310,7 +341,7 @@ class SokobanMixin:
             return self.soko_give_up(lv, st, "deviation")
         st.i = i
         if i != st.last_i or st.since is None:
-            st.since, st.last_i = self.turn(), i
+            st.since, st.last_i, st.behind_waits = self.turn(), i, 0
         stuck = self.turn() - st.since
         if stuck > SOKO_STUCK and i < len(st.lv["plan"]):
             return self.soko_give_up(lv, st, "stuck")
@@ -322,15 +353,22 @@ class SokobanMixin:
             b, d = tuple(b), tuple(d)
             stand = (b[0] - d[0], b[1] - d[1])
             here = st.from_map(self.pos())
+            beyond = (b[0] + d[0], b[1] + d[1])
+            if st.behind_waits > SOKO_BEHIND_WAITS:
+                # it doesn't go away (a mimic posing as an object, something stuck there): attack it from beside
+                return self.soko_attack_at(lv, st, beyond, bs, ts)
             if here == stand:
                 if st.blocked == self.turn():
                     self.soko_stats["wait_behind"] += 1
+                    st.behind_waits += 1
                     return self.soko_wait()          # a monster beyond the boulder: the push costs no time -- wait
                 seq = self.msg_seq
                 self.soko_stats["push"] += 1
                 self.move(st.to_map(b))
                 if any(w in self.text_since(seq) for w in BEHIND_RE):
                     st.blocked = self.turn()
+                else:
+                    st.behind_waits = 0
                 return True
             if self.soko_step_to(lv, st, stand, bs, ts, extra):
                 return True
