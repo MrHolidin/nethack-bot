@@ -43,6 +43,9 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
     "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
+    "loot_now": False,         # A/B: on the square where our things fell / a thief died (loot_sq): picked up at once, also
+                               #      with hostiles next to us or on Elbereth (one turn); bare-handed in a fight: the best
+                               #      weapon we carry is wielded; a weapon we lost may be wielded again
     "vault_rob": False,        # A/B: in a vault with a pick-axe / mattock / wand of digging: take the gold, dig down;
                                #      the guard, if he comes first, is told "Croesus" (nhbot.vault)
     "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c

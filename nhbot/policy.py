@@ -35,6 +35,7 @@ STEPS = (
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
     "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
+    "loot_here",         # loot_now: standing where our things fell -- picked up at once, fight or not
     "elbereth",
     "thieves",
     "regen",             # ring of regeneration on below full HP, off at full (nothing next to us)
@@ -305,6 +306,14 @@ class PolicyMixin:
     def step_regen(self, c):
         return not c.hostiles and self.regen_step()
 
+    def step_loot_here(self, c):
+        """loot_now: on the loot square (our armor fell there when we changed form, a thief died there): one turn
+        picks it all up, also with hostiles next to us or on Elbereth (a pick-up does not erase it)."""
+        if not self.opts.loot_now or self.polyd or self.loot_sq is None or self.loot_key != c.lv.key \
+                or (c.y, c.x) != self.loot_sq:
+            return False
+        return self.pursue("loot", c.lv, [self.loot_sq], self.loot_consume)
+
     def step_weapon(self, c):
         if self.rub_back is not None:            # a lamp wielded to rub it: the weapon back once a threat shows
             return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.rub_rewield()
@@ -314,6 +323,9 @@ class PolicyMixin:
             return True                          # the dagger was swapped in for a tin / a box; a threat: back
         # not while the dagger is swapped in for a tin / a box: wielding the main weapon then would make the job use
         # it (a long sword forcing a lock can break) and the later swap_back put the dagger in our hands
+        if self.opts.loot_now and c.hostiles and self.swapped_for is None and self.tin_slipped is None \
+                and not any(it.wielded for it in self.items()):
+            return self.weapon_check()           # loot_now: bare hands in a fight -- the best weapon we carry
         return not c.hostiles and self.tin_slipped is None and self.swapped_for is None and self.weapon_check()
 
     def step_wands(self, c):
