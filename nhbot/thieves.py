@@ -54,6 +54,7 @@ class ThievesMixin:
         self.lep_lost = []               # lep_stash: (square, turn) where awake ones went out of sight (lep_track)
         self.lep_assumed = set()         # lep_stash: the squares of ones taken for an awake one back in view
         self.lep_still = {}              # lep_stash: awake one's square -> ticks it stayed on it
+        self.lep_sure = set()            # lep_stash: the awake ones we hit (lep_track)
         self._lep_seen = (None, 0, 0, None)  # lep_stash: level key, leprechaun kills there, message counter, our square
         self.lep_bait = {}               # lep_stash: level key -> the baiting under way (lep_bait_step)
         self.lep_emptied = {}            # lep_stash: level key -> squares of the hall we picked the gold up from
@@ -137,7 +138,8 @@ class ThievesMixin:
         square, so the squares sleepers were seen on are kept (lep_sleep) and the others in view are awake: the
         one we hit; one that moved (while we stood: on a new square near one left -- our own step changes what we
         see); one seen anew near where an awake one went out of sight (lep_lost: it came back into view). One seen
-        anew otherwise sleeps; so does one taken for awake that stays still LEP_STILL ticks unfought."""
+        anew otherwise sleeps; so does one taken for awake that stays still LEP_STILL ticks unfought (not one we
+        hit: lep_sure)."""
         g = self.obs["glyphs"]
         now = {(int(a), int(b)) for a, b in zip(*np.nonzero(G.KIND[g] == G.MONSTER))
                if G.monster_name(int(g[a, b])) == "leprechaun"}
@@ -146,7 +148,7 @@ class ThievesMixin:
         key0, kills0, seq0, here0 = self._lep_seen
         if key != key0:
             self.lep_now, self.lep_awake, self.lep_lost, kills0 = set(), set(), [], kills
-            self.lep_assumed, self.lep_still = set(), {}
+            self.lep_assumed, self.lep_still, self.lep_sure = set(), {}, set()
         if any(w in self.text_since(seq0).lower() for w in LEP_GONE):
             self.lep_lost = []
         self.lep_lost = [(p, t) for p, t in self.lep_lost if turn - t <= LEP_LOST_TURNS]
@@ -164,6 +166,9 @@ class ThievesMixin:
                     moved.add(p)
                     sleep -= near                              # it was one of them: woke
         awake = moved | (now & (self.lep_awake | hit))
+        # known awake for sure: hit by us (followed as it moves) -- the stillness rule below is not for it
+        self.lep_sure = (now & (self.lep_sure | hit)) | {p for p in moved if any(
+            max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in self.lep_sure - now)}
         # awake ones gone out of view: not on a square now, not the one that moved from it, not the one killed
         out = [p for p in sorted(self.lep_awake - now)
                if not any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in moved)]
@@ -175,7 +180,7 @@ class ThievesMixin:
         recent = turn - (self.attack_turn or -9) <= LEP_STILL
         self.lep_still = {p: (self.lep_still.get(p, -1) + 1 if p in self.lep_now else 0) for p in awake}
         for p, n in self.lep_still.items():
-            if n >= LEP_STILL and not (recent and p == self.last_attack_target):
+            if n >= LEP_STILL and p not in self.lep_sure and not (recent and p == self.last_attack_target):
                 awake.discard(p)
                 sleep.add(p)
                 if p in self.lep_assumed:
