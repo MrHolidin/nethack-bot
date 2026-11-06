@@ -34,6 +34,7 @@ STEPS = (
     "blind",
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
+    "fountain_hide",     # fountain_elb: the Elbereth by the fountain -- written before a dip, hidden on after one
     "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
     "loot_here",         # loot_now: standing where our things fell -- picked up at once, fight or not
     "elbereth",
@@ -306,6 +307,9 @@ class PolicyMixin:
 
     def step_regen(self, c):
         return not c.hostiles and self.regen_step()
+
+    def step_fountain_hide(self, c):
+        return self.fountain_hide_step(c.lv, c.hostiles)
 
     def step_loot_here(self, c):
         """loot_now: on the loot square (our armor fell there when we changed form, a thief died there): one turn
