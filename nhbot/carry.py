@@ -218,6 +218,8 @@ class CarryMixin:
         looks = self.carried_by_look()
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         it = min(inv, key=lambda it: self.value_per_weight(it, same(it)))
+        if self.gold_bag_unload(it):
+            return True                      # gold_bag: the gold out of the bag first, loose gold is kept
         if it.on_body:
             if it.ocls == nh.ARMOR_CLASS and it.worn:
                 a = parse_armor(it.text) or {"slot": None}

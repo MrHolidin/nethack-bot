@@ -43,6 +43,16 @@ class GoldBagMixin:
             return self.bag_put_in(bag)
         return False
 
+    def gold_bag_unload(self, it):
+        """gold_bag: it, about to be dropped (carry_drop_step: Burdened, a squeeze refused for our weight), is
+        the bag with our gold in it -- the gold taken out first (coins are never what that step drops). True if
+        it used the turn."""
+        bag = self.gold_bag()
+        if bag is None or bag.letter != it.letter or self.bag_gold <= 0:
+            return False
+        self.bag_stats["unload_before_drop"] += 1
+        return self.bag_take_out(bag)
+
     def bag_open(self, bag):
         """Apply the bag: True if its "Do what with ..." menu is up. A bag that gives none (a bag of tricks
         makes a monster or bites) is not used again."""
