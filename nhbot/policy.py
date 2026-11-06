@@ -54,6 +54,7 @@ STEPS = (
     "hallu",             # hallu_wait: hallucinating, after fights / healing / food: wait -- no trips, no exploring
     "digger_stash",
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
+    "vault_find",        # vault_find: dig to a vault our map shows (nhbot.vault)
     "rest",
     "gold_here",
     "explore",
@@ -469,6 +470,9 @@ class PolicyMixin:
             if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
                 return True
         return False
+
+    def step_vault_find(self, c):
+        return self.vault_find_step(c.lv, c.vis)
 
     def step_rest(self, c):
         """Rest if hurt and nothing in view."""

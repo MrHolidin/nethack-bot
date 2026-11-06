@@ -49,6 +49,8 @@ DEFAULTS = {
                                #      be wielded again
     "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
+    "vault_find": False,       # A/B: a vault our map shows (magic mapping, gold detection) is dug to with a pick-axe /
+                               #      mattock / wand of digging; a vault heard: a known detection scroll read (nhbot.vault)
     "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c
                                #      TROUBLE_UNUSEABLE_HANDS: rehumanize); what fell from us then is taken back with
                                #      the rest when human again

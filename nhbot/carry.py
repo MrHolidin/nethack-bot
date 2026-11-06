@@ -22,6 +22,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.equipment import parse_armor
+from nhbot.vault import FIND_SCROLLS
 from nhbot.items import base_name
 from nhbot.pricemem import appearance
 
@@ -254,6 +255,9 @@ class CarryMixin:
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None
         if bag is not None and bag.letter == it.letter:
             return True                      # gold_bag: the bag our gold goes in (nhbot.goldbag)
+        if self.opts.vault_find and (c == nh.SCROLL_CLASS and any(n in s.replace("scrolls", "scroll") for n in FIND_SCROLLS)
+                                     or c == nh.WAND_CLASS and "wand of digging" in s):
+            return True                      # vault_find: to find a vault and dig to it (nhbot.vault)
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if self.wish_needed(it):
