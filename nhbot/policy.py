@@ -31,6 +31,7 @@ STEPS = (
     "stunned",
     "vault_guard",
     "blind",
+    "hallu",             # hallu_wait: hallucinating, nothing that attacked us next to us: wait it out
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
     "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
@@ -243,6 +244,17 @@ class PolicyMixin:
             # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
             # would look like the attacker when something else hits us in the same turn (61688)
             self.press("." if self.strike_scope_ok(c.lv) else "s")
+            return True
+        return False
+
+    def step_hallu(self, c):
+        """hallu_wait: hallucinating -- every monster looks random, peacefuls (shopkeepers, the watch) can't be
+        told apart and Elbereth won't come out right (engrave.c: each letter garbled 1 in 2): no exploring; with
+        nothing next to us that attacked us (hallu_attackers) and not Hungry, rest a turn."""
+        if self.opts.hallu_wait and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU \
+                and not c.hostiles and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
+            self.hallu_waits += 1
+            self.press(".")
             return True
         return False
 

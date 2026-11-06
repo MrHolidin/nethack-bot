@@ -381,7 +381,7 @@ class PerceptionMixin:
             known.add(adj[0])
         known &= set(adj)
         self.hallu_targets = known
-        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU or not self.strike_scope_ok(lv):
+        if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU or not self.hallu_scope_ok(lv):
             return hostiles
         out = [(p, n) for p, n in hostiles if p in known and not lv.shop[p]]
         if len(out) < len(hostiles):
@@ -392,7 +392,11 @@ class PerceptionMixin:
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
         from a peaceful (61520 threw a dagger into one)."""
         return bool(int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU
-                    and self.strike_scope_ok(self.levels.get(self.cur_key)))
+                    and self.hallu_scope_ok(self.levels.get(self.cur_key)))
+
+    def hallu_scope_ok(self, lv):
+        """hallu_strike's limits apply here: hallu_wait -- on every level; else only in Minetown (strike_scope_ok)."""
+        return self.opts.hallu_wait or self.strike_scope_ok(lv)
 
     def strike_scope_ok(self, lv):
         """blind_strike / hallu_strike only in Minetown -- a Mines level with an altar, a fountain or

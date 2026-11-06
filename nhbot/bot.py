@@ -121,6 +121,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.stun_waits = 0
         self.poison_res = False
         self.blind_waits = 0
+        self.hallu_waits = 0           # hallu_wait: turns rested hallucinating
         self.shop_kicks_avoided = 0
         self.seen_here = None
         self.ammo_pickups = 0
@@ -289,7 +290,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "boxes": dict(self.box_stats, welded=self.swap_welded),
             "enchant": dict(self.enchant_stats, log=self.enchant_log), "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
-            "blind_waits": self.blind_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
+            "blind_waits": self.blind_waits, "hallu_waits": self.hallu_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 
             "elb_fail_msgs": self.elb_fail_msgs[:5],
             "elb_rewrites": self.elb_rewrites,

@@ -40,6 +40,7 @@ DEFAULTS = {
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
+    "hallu_wait": False,       # A/B: hallucinating: hit only what attacked us (hallu_strike everywhere, not only Minetown); nothing such next to us: rest
     "keep_100": False,         # A/B: an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
                                #      "explored": only on a level explored (mapmem.Level.explored)
