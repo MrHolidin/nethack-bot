@@ -62,6 +62,8 @@ class ElberethMixin:
         return False
 
     def engrave_elbereth(self):
+        if self.opts.hallu_wait and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            return False                         # hallu_wait: hallucinating, each letter garbled 1 in 2 (engrave.c)
         if not self.engrave("-", "Elbereth"):
             return False
         self.elbereths += 1                      # lv.elbereth only once read back (elb_confirm)
@@ -136,6 +138,8 @@ class ElberethMixin:
         if self.kinds(lv)[self.pos()] in (G.UPSTAIR, G.DOWNSTAIR):
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if self.opts.hallu_wait and cond & nh.BL_MASK_HALLU:
+            return False                         # hallu_wait: Elbereth won't come out right (engrave_elbereth)
         return not cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF)
 
     def elb_confirm(self, lv):

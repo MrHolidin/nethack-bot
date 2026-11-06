@@ -40,7 +40,7 @@ DEFAULTS = {
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
-    "hallu_wait": False,       # A/B: hallucinating: fights as ever, but no exploring / going to another level -- rest instead
+    "hallu_wait": False,       # A/B: hallucinating: fights as ever, but no exploring / going to another level -- rest instead; no Elbereth
     "quaff_no_peace": False,   # A/B: quaff_test not on a level where a peaceful was seen (a look, a shop, Minetown)
     "keep_100": False,         # A/B: an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
     "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
