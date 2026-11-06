@@ -53,6 +53,8 @@ class PotionTestMixin:
         it, key = self.potion_to_test()
         if it is None or (lv.key, self.pos()) in self.quaff_refused or not self.elb_can_write(lv):
             return False
+        if self.opts.quaff_no_peace and self.peaceful_seen(lv):
+            return False                     # hallucinating or confused, we'd hit one: shopkeeper, watch, priest
         if not self.elb_confirm(lv):
             here = (lv.key, self.pos())
             if self.quaff_tries[here] >= 2:

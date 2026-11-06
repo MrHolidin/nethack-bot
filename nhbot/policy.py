@@ -31,7 +31,6 @@ STEPS = (
     "stunned",
     "vault_guard",
     "blind",
-    "hallu",             # hallu_wait: hallucinating, nothing that attacked us next to us: wait it out
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
     "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
@@ -54,6 +53,7 @@ STEPS = (
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
     "rest",
     "gold_here",
+    "hallu",             # hallu_wait: hallucinating, nothing else to do here: wait instead of exploring / going on
     "explore",
 )
 
@@ -248,11 +248,11 @@ class PolicyMixin:
         return False
 
     def step_hallu(self, c):
-        """hallu_wait: hallucinating -- every monster looks random, peacefuls (shopkeepers, the watch) can't be
-        told apart and Elbereth won't come out right (engrave.c: each letter garbled 1 in 2): no exploring; with
-        nothing next to us that attacked us (hallu_attackers) and not Hungry, rest a turn."""
+        """hallu_wait: hallucinating -- every monster looks random (a peaceful can't be told apart) and Elbereth
+        won't come out right (engrave.c: each letter garbled 1 in 2): fights go on as ever (the steps before),
+        but no exploring and no going to another level -- not Hungry, rest a turn instead."""
         if self.opts.hallu_wait and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU \
-                and not c.hostiles and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
+                and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.hallu_waits += 1
             self.press(".")
             return True
