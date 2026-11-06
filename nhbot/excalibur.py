@@ -300,11 +300,20 @@ class ExcaliburMixin:
             return False
         sq = st["sq"]
         if st["phase"] == "go":                          # standing on the fountain: a step onto the square
+            if self.square_taken(sq):                    # someone on it (the Oracle's centaurs: "Really attack?")
+                st["sq"] = sq = self.fountain_elb_square(lv, here)
+                if sq is None:
+                    st["phase"] = "none"
+                    self.fhide_stats["no_square"] += 1
+                    return False
             st["phase"] = "write"
             self.cur_act = "fountain_elb"
             self.press(DELTA2KEY[(sq[0] - here[0], sq[1] - here[1])])
             return True
         return False
+
+    def square_taken(self, q):
+        return G.KIND[self.obs["glyphs"][q]] in (G.MONSTER, G.PET, G.INVIS)
 
     def fountain_elb_square(self, lv, fountain):
         """A square next to the fountain to write Elbereth on: floor (no doorway: diagonal steps; no trap, stairs,
@@ -318,6 +327,8 @@ class ExcaliburMixin:
                     or int(ter[q]) == FOUNTAIN_GLYPH or (nh.glyph_is_cmap(int(ter[q]))
                                                          and nh.glyph_to_cmap(int(ter[q])) in NO_ENGRAVE_CMAP):
                 continue
+            if self.square_taken(q):
+                continue                                 # a monster on it: never a step into it
             if q in lv.elbereth:
                 return q
             best = best or q
@@ -356,6 +367,8 @@ class ExcaliburMixin:
             if here == ftn:
                 st["phase"] = "ready"
                 return False
+            if dist(here, ftn) == 1 and self.square_taken(ftn):
+                return False                             # someone on the fountain: as ever until it moves
             if dist(here, ftn) == 1:
                 self.cur_act = "fountain_elb"
                 self.press(DELTA2KEY[(ftn[0] - here[0], ftn[1] - here[1])])
@@ -376,8 +389,7 @@ class ExcaliburMixin:
                 return False
             st["hiding"], st["since"], st["calm"] = True, self.turn(), 0
             self.fhide_stats["hid"] += 1
-        g = self.obs["glyphs"]
-        taken = lambda q: G.KIND[g[q]] in (G.MONSTER, G.PET, G.INVIS)
+        taken = self.square_taken
         if here != sq:
             if dist(here, sq) == 1 and taken(sq):        # something came out onto it (makemon: next to us)
                 k = self.kinds(lv)
