@@ -45,8 +45,9 @@ DEFAULTS = {
     "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
     "vault_rob": False,        # A/B: in a vault with a pick-axe / mattock / wand of digging: take the gold, dig down;
                                #      the guard, if he comes first, is told "Croesus" (nhbot.vault)
-    "poly_recover": False,     # A/B: turned into a handless form -- pray when safe (pray.c TROUBLE_UNUSEABLE_HANDS:
-                               #      rehumanize); what fell from us then is taken back with the rest when human again
+    "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c
+                               #      TROUBLE_UNUSEABLE_HANDS: rehumanize); what fell from us then is taken back with
+                               #      the rest when human again
     "cloak_cover": "uncursed", # A/B +862 [-5, +1787] (True: +662 [-678, +1971]): a cloak over an empty cloak slot
                                #      counts CLOAK_COVER AC more (it takes destroy armor and erosion for the suit); mummy
                                #      wrapping, orcish / dwarvish cloak are worn -- True: any of them, "uncursed": only
