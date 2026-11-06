@@ -305,30 +305,9 @@ class ThievesMixin:
         return None
 
     def lep_exit_dist(self, lv, room, blocked=()):
-        """Square of the hall -> moves to its nearest way out seen (a door, a doorway, a corridor next to it),
-        through the hall but its blocked squares; none: not in it."""
-        k = G.KIND[lv.under]
-        h, w = lv.under.shape
-        exits = set()
-        for a, b in room:
-            for dy in (-1, 0, 1):
-                for dx in (-1, 0, 1):
-                    q = (a + dy, b + dx)
-                    if 0 <= q[0] < h and 0 <= q[1] < w and q not in room and \
-                            (k[q] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) or int(lv.under[q]) in CORRIDOR_GLYPHS):
-                        exits.add(q)
-        dist = {q: 0 for q in exits}
-        todo = list(exits)
-        while todo:
-            nxt = []
-            for a, b in todo:
-                for dy in (-1, 0, 1):
-                    for dx in (-1, 0, 1):
-                        q = (a + dy, b + dx)
-                        if q in room and q not in dist and q not in blocked:
-                            dist[q] = dist[(a, b)] + 1
-                            nxt.append(q)
-            todo = nxt
+        """Square of the hall -> moves to its nearest way out seen (lep_exits), through the hall but its blocked
+        squares; none: not in it."""
+        dist = self.lep_room_bfs(set(room) - set(blocked), self.lep_exits(lv, room))
         return {q: n for q, n in dist.items() if q in room}
 
     def lep_bait_walk(self, lv, squares):
@@ -347,34 +326,85 @@ class ThievesMixin:
         adj = {p for p in self.lep_now if max(abs(p[0] - y), abs(p[1] - x)) == 1}
         if adj & self.lep_awake or (adj and not self.lep_awake):
             return False                                       # the melee step (lep_focus_target)
+        if self.lep_awake and (y, x) in room:
+            return self.lep_chase(lv, room)
         mask = np.zeros(lv.under.shape, dtype=bool)
-        grids = None
-        if self.lep_awake and (y, x) in room:                  # the chase keeps to the hall
-            inside = np.zeros(lv.under.shape, dtype=bool)
-            for p in room:
-                inside[p] = True
-            k_mem, k_live, passable = self.grids(lv)
-            grids = (k_mem, k_live, passable & inside)
-            for a, b in self.lep_awake:
+        goal = self.lep_awake or [p for p in self.lep_now if p in room]
+        if goal:
+            for a, b in goal:
                 mask[max(0, a - 1):a + 2, max(0, b - 1):b + 2] = True
-            mask &= inside
         else:
-            goal = self.lep_awake or [p for p in self.lep_now if p in room]
-            if goal:
-                for a, b in goal:
-                    mask[max(0, a - 1):a + 2, max(0, b - 1):b + 2] = True
-            else:
-                for p in room:                                 # none in view (we stashed the gold out of
-                    mask[p] = True                             # sight of the hall): back into it
-        status, _ = self.walk_to(lv, mask, max_cost=80, act="lep_hall", grids=grids)
-        if status != "moved" and grids is not None:            # out of the hall: we wait in it
-            self.press("s")
-            self.thief_stats["lep_chase_wait"] += 1
-            return True
+            for p in room:                                     # none in view (we stashed the gold out of
+                mask[p] = True                                 # sight of the hall): back into it
+        status, _ = self.walk_to(lv, mask, max_cost=80, act="lep_hall")
         if status == "moved":
             self.thief_stats["lep_chase" if self.lep_awake else "lep_approach"] += 1
             return True
         return False
+
+    def lep_chase(self, lv, room):
+        """lep_stash, in the hall, an awake leprechaun in view and none next to us: a step after it, within the hall
+        -- of the steps (and staying) that leave us nearest to it, the one nearest to its nearest way out (staying
+        if as good); none (it is out of the hall, or no way to it in it): we wait. The one we hit is chased
+        first, else the nearest. Uses the turn."""
+        y, x = self.pos()
+        cheb = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]))
+        mon = G.KIND[self.obs["glyphs"]] == G.MONSTER
+        passable = self.grids(lv)[2]
+        lep = min(self.lep_sure & self.lep_awake or self.lep_awake, key=lambda p: cheb(p, (y, x)))
+        walk = {p for p in room if passable[p] and (not mon[p] or p == (y, x))}
+        to_lep = self.lep_room_bfs(walk, {p for p in walk if cheb(p, lep) == 1})
+        exits = self.lep_exits(lv, room)
+        from_lep = self.lep_room_bfs(room | exits, {lep})
+        out = [e for e in exits if e in from_lep]
+        to_exit = self.lep_room_bfs(room, {min(out, key=lambda e: from_lep[e])}) if out else {}
+        far = len(room) + 1
+        options = [p for p in walk if cheb(p, (y, x)) <= 1 and p in to_lep]     # a step, or staying
+        best = min(options, key=lambda p: (to_lep[p], to_exit.get(p, far), p != (y, x))) if options else None
+        if best is not None and sum(1 for p in options if to_lep[p] == to_lep[best]) > 1:
+            self.thief_stats["lep_chase_tie"] += 1             # statistics: the way out decided
+        if best is None or best == (y, x):
+            self.press("s")                                    # out of the hall, or no better: we wait in it
+            self.thief_stats["lep_chase_wait"] += 1
+            return True
+        self.cur_act = "lep_hall"
+        self.move(best)
+        self.thief_stats["lep_chase"] += 1
+        return True
+
+    @staticmethod
+    def lep_room_bfs(walk, sources):
+        """Square -> king moves from the nearest of sources, over the squares of walk (sources count as walked
+        on but are not walked through unless in walk)."""
+        dist = {q: 0 for q in sources}
+        todo = list(sources)
+        while todo:
+            nxt = []
+            for a, b in todo:
+                if (a, b) not in walk and dist[(a, b)] > 0:
+                    continue
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        q = (a + dy, b + dx)
+                        if q in walk and q not in dist:
+                            dist[q] = dist[(a, b)] + 1
+                            nxt.append(q)
+            todo = nxt
+        return dist
+
+    def lep_exits(self, lv, room):
+        """The hall's ways out seen: a door, a doorway or a corridor next to its floor."""
+        k = G.KIND[lv.under]
+        h, w = lv.under.shape
+        exits = set()
+        for a, b in room:
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    q = (a + dy, b + dx)
+                    if 0 <= q[0] < h and 0 <= q[1] < w and q not in room and \
+                            (k[q] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) or int(lv.under[q]) in CORRIDOR_GLYPHS):
+                        exits.add(q)
+        return exits
 
     def lep_focus_target(self, lv, hostiles):
         """lep_stash: the leprechaun to hit among those next to us -- an awake one (lep_track), the one we hit
