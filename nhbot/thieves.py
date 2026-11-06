@@ -12,7 +12,7 @@ import nle.nethack as nh
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, FLOOR_GLYPH, ROWS, ray_squares
+from nhbot.consts import COLS, ROWS, ray_squares
 from nhbot.monsters import THIEVES
 from nhbot.items import base_name
 from nhbot.nav import line_clear
@@ -48,6 +48,8 @@ class ThievesMixin:
         self.lep_now, self.lep_awake = set(), set()  # lep_stash: leprechauns' squares, the awake ones (lep_track)
         self.lep_seed = {}               # lep_stash: level key -> the seeding under way (lep_seed_step)
         self.lep_seeded = {}             # lep_stash: level key -> leprechauns killed there at the last seeding
+        self.lep_coins = {}              # lep_stash: level key -> squares we seeded a coin on
+        self.lep_emptied = {}            # lep_stash: level key -> squares of the hall we picked the gold up from
         self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
         self._gold_prev = None
         self._gold_seq = 0
@@ -138,37 +140,42 @@ class ThievesMixin:
     def lep_seed_step(self, lv, room):
         """lep_stash, in the hall: a leprechaun of it killed, no awake one in view, sleeping ones left -- before
         waking the next, a coin on every square of the hall's floor without a monster (a leprechaun picks up the
-        gold it finds, so a woken one stays to gather instead of running off with ours): the gold of the hall's
-        piles picked up (as much as the squares without gold need), one coin dropped on each, the rest dropped
+        gold it finds, so a woken one stays to gather instead of running off with ours): gold picked up (the
+        hall's piles, and the squares its leprechauns were killed on -- a killed one drops its gold, its corpse
+        on top hides it) as much as the squares without gold need, one coin dropped on each, the rest dropped
         where we stand; then the fight goes on. LEP_SEED_TURNS at most a time. True if it used the turn."""
         key = lv.key
-        kills = sum(1 for k in self.kills if k[1] == "leprechaun" and k[3] == key)
+        dead = [k[2] for k in self.kills if k[1] == "leprechaun" and k[3] == key]
         seed = self.lep_seed.get(key)
         if seed is None:
-            if kills <= self.lep_seeded.get(key, 0) or self.lep_awake or not (self.lep_now & room) \
+            if len(dead) <= self.lep_seeded.get(key, 0) or self.lep_awake or not (self.lep_now & room) \
                     or self.pos() not in room:
                 return False
             k = G.KIND[lv.under]
-            sq = {p for p in room if k[p] in (G.FLOOR, G.GOLD)}
+            sq = {p for p in room if k[p] in (G.FLOOR, G.GOLD, G.CORPSE, G.OBJECT)}
             seed = self.lep_seed[key] = {"squares": sq, "done": set(), "until": self.turn() + LEP_SEED_TURNS,
-                                         "kills": kills}
+                                         "kills": len(dead)}
             self.thief_stats["lep_seed"] += 1
         if self.lep_awake or self.turn() > seed["until"]:
             return self.lep_seed_end(lv, seed, "awake" if self.lep_awake else "timeout")
         g = self.obs["glyphs"]
         k = G.KIND[lv.under]
         here = self.pos()
+        coins = self.lep_coins.setdefault(key, set())          # our coins of the seedings before
+        emptied = self.lep_emptied.setdefault(key, set())      # picked up by us
         free = {p for p in seed["squares"] if G.KIND[int(g[p])] != G.MONSTER or p == here}
-        todo = [p for p in free if p not in seed["done"] and k[p] != G.GOLD]
-        piles = [p for p in free if p not in seed["done"] and k[p] == G.GOLD]
+        gold_on = {p for p in free if k[p] == G.GOLD or p in dead} - emptied
+        todo = [p for p in free - gold_on if p not in seed["done"]]
+        piles = [p for p in gold_on if p not in coins and p not in seed["done"]]
         if not todo:
             return self.lep_seed_end(lv, seed, "done")
         self.cur_act = "lep_seed"
         gold = int(self.bl(nh.NLE_BL_GOLD))
-        if gold < len(todo) and piles:                         # collect: the gold of a pile of the hall
+        if gold < len(todo) and piles:                         # collect
             if here in piles:
                 self.pickup_matching(("gold piece",))
-                lv.under[here] = FLOOR_GLYPH
+                emptied.add(here)
+                coins.discard(here)
                 self.thief_stats["lep_seed_pick"] += 1
                 return True
             return self.lep_seed_walk(lv, piles) or self.lep_seed_end(lv, seed, "no_path")
@@ -179,6 +186,8 @@ class ThievesMixin:
                 self.raw_step(ord("1"))
                 self.press("$")
             seed["done"].add(here)
+            coins.add(here)
+            emptied.discard(here)
             self.thief_stats["lep_seed_coin"] += 1
             return True
         return self.lep_seed_walk(lv, todo) or self.lep_seed_end(lv, seed, "no_path")
@@ -195,7 +204,7 @@ class ThievesMixin:
         self.lep_seed.pop(lv.key, None)
         self.lep_seeded[lv.key] = seed["kills"]
         self.thief_stats["lep_seed_" + why] += 1
-        if int(self.bl(nh.NLE_BL_GOLD)) > 0 and not self.lep_awake:
+        if int(self.bl(nh.NLE_BL_GOLD)) > 0:
             self.cur_act = "lep_seed"
             if self.ask("d", "drop"):
                 self.press("$")
