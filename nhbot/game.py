@@ -9,6 +9,7 @@ from nhbot.items import parse_item
 
 MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is on screen
 MENU_ITEM_RE = re.compile(r"^\s*([a-zA-Z]) - (.*)$")
+MENU_ITEM_GOLD_RE = re.compile(r"^\s*([a-zA-Z$]) - (.*)$")   # menu_gold: gold's line is "$ - 173 gold pieces"
 PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")       # a menu page: "(1 of 2)"
 ID_MENU = "What would you like to identify"         # invent.c menu_identify ("first" / "next")
 
@@ -218,11 +219,14 @@ class GameMixin:
         col = lines[hi].index(header)
         return [l[col:] for l in lines[hi + 1:]]
 
+    def menu_item_re(self):
+        return MENU_ITEM_GOLD_RE if self.opts.menu_gold else MENU_ITEM_RE
+
     def menu_items(self, tty, header):
         """(letter, text) of the selectable lines of a menu."""
         out = []
         for line in self.menu_lines(tty, header):
-            m = MENU_ITEM_RE.match(line.strip())
+            m = self.menu_item_re().match(line.strip())
             if m:
                 out.append((m.group(1), m.group(2)))
         return out
@@ -243,7 +247,7 @@ class GameMixin:
                 break
             self.raw_step(ord(">"))                  # the next page (no header there)
             items = [(m.group(1), m.group(2)) for l in self.tty_text().split("\n")
-                     for m in [MENU_ITEM_RE.match(l.strip())] if m]
+                     for m in [self.menu_item_re().match(l.strip())] if m]
         self.raw_step(13 if n else 27)
         return n
 
