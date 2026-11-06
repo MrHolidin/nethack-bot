@@ -44,6 +44,7 @@ class ThievesMixin:
         self.thief_stats = Counter()     # lep_drop, lep_hall, lep_stash
         self.lep_room = {}               # lep_stash: level key -> the leprechaun hall's floor (until cleared)
         self.lep_stash_at = {}           # lep_stash: level key -> squares we dropped our gold on
+        self.lep_prev, self.lep_now = set(), set()   # lep_stash: leprechauns' squares a tick ago / now (lep_track)
         self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
         self._gold_prev = None
         self._gold_seq = 0
@@ -87,9 +88,10 @@ class ThievesMixin:
             self.lep_room.pop(lv.key)                          # in the hall, no leprechaun left in view: done
             self.thief_stats["lep_hall_cleared"] += 1
             return False
-        if room is None or int(self.bl(nh.NLE_BL_GOLD)) <= 0 or lv.shop[self.pos()] \
-                or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+        if room is None or lv.shop[self.pos()] or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             return False
+        if int(self.bl(nh.NLE_BL_GOLD)) <= 0:
+            return self.lep_approach(lv, room)
         ry = np.array([p[0] for p in room])
         rx = np.array([p[1] for p in room])
         y, x = self.pos()
@@ -114,14 +116,52 @@ class ThievesMixin:
         self.lep_room.pop(lv.key, None)
         return False
 
+    def lep_track(self):
+        """lep_stash: the leprechauns' squares now and at the call before (one a tick, step_thieves): a sleeping
+        one stays put, the one we woke moves."""
+        g = self.obs["glyphs"]
+        now = {(int(a), int(b)) for a, b in zip(*np.nonzero(G.KIND[g] == G.MONSTER))
+               if G.monster_name(int(g[a, b])) == "leprechaun"}
+        self.lep_prev, self.lep_now = self.lep_now, now
+
+    def lep_approach(self, lv, room):
+        """lep_stash, our gold stashed and the hall not cleared: nothing next to us -- to the leprechaun we were
+        fighting (one that moved), else the nearest of the hall's. True if it used the turn."""
+        y, x = self.pos()
+        if any(max(abs(p[0] - y), abs(p[1] - x)) == 1 for p in self.lep_now):
+            return False                                       # one next to us: the melee step
+        leps = [p for p in self.lep_now if p in room or max(abs(p[0] - y), abs(p[1] - x)) <= 2]
+        mask = np.zeros(lv.under.shape, dtype=bool)
+        if leps:
+            # the one we woke if it stays near (faster than us, one that runs is let go), else the nearest
+            awake = [p for p in leps if p not in self.lep_prev and max(abs(p[0] - y), abs(p[1] - x)) <= 3]
+            for a, b in awake or leps:
+                mask[max(0, a - 1):a + 2, max(0, b - 1):b + 2] = True
+        else:
+            for p in room:                                     # none in view (we stashed the gold out of
+                mask[p] = True                                 # sight of the hall): back into it
+        status, _ = self.walk_to(lv, mask, max_cost=80, act="lep_hall")
+        if status == "moved":
+            self.thief_stats["lep_approach"] += 1
+            return True
+        return False
+
     def lep_focus_target(self, lv, hostiles):
-        """lep_stash: among the hostiles next to us, the leprechaun we hit last (on or next to where we hit it),
-        so one is fought until it dies instead of waking the next one; None if there is none."""
-        if not self.opts.lep_stash or self.last_attack_target is None or self.turn() - (self.attack_turn or 0) > 3:
+        """lep_stash: the leprechaun to hit among those next to us -- the one we hit last if it is still on its
+        square, else one that moved since the tick before (the one we woke: sleeping ones stay put), so one is
+        fought until it dies instead of waking the next one; None: no preference."""
+        if not self.opts.lep_stash:
             return None
-        ly, lx = self.last_attack_target
-        same = [p for p, n in hostiles if n == "leprechaun" and max(abs(p[0] - ly), abs(p[1] - lx)) <= 1]
-        return min(same, key=lambda p: max(abs(p[0] - ly), abs(p[1] - lx))) if same else None
+        adj = [p for p, n in hostiles if n == "leprechaun"]
+        if not adj:
+            return None
+        if self.last_attack_target in adj and self.turn() - (self.attack_turn or 0) <= 3:
+            return self.last_attack_target
+        moved = [p for p in adj if p not in self.lep_prev]
+        if moved:
+            self.thief_stats["lep_focus_moved"] += 1
+            return moved[0]
+        return None
 
     def lep_hall_mark(self, lv):
         """lep_hall: a leprechaun hall in view (lep_hall_room): its floor is closed to us from outside, like a shop

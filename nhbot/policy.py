@@ -90,6 +90,8 @@ class PolicyMixin:
         self.tick_seq = self.msg_seq
         self.threat_track()                      # threats.py: who is coming for us
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
+        if self.opts.lep_stash:
+            self.lep_track()                     # thieves.py: which leprechauns moved since the tick before
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return
