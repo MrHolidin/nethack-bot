@@ -74,6 +74,8 @@ class ShopMixin:
             return False
         if self.carry_sell_step(lv):
             return True
+        if self.shopping is not None and self.bag_buy_step(lv):
+            return True
         if self.shopping is not None and self.shop_buy_step(lv):
             return True
         if self.shopping is not None and self.opts.shop_browse and self.browse_step(lv, ITEM_GLYPH, "browse"):
