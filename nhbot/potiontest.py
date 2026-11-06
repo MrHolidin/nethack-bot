@@ -2,7 +2,8 @@
 shop prices: pricemem / value.type_posterior) -- healing, extra healing, restore ability, confusion,
 hallucination, sleeping -- is drunk with nothing threatening us, standing on Elbereth (sleeping: 25..34 helpless
 turns uncursed). Healing, extra healing, confusion, hallucination and sleeping name themselves when drunk;
-restore ability does not (potion.c peffects: unkn; the 'Call a ... potion' prompt is escaped by settle).
+restore ability does not (potion.c peffects: unkn; the 'Call a ... potion' prompt is escaped by settle) -- its
+"This makes you feel ..." marks the appearance restore ability (value.deduce_type).
 Each appearance is drunk once. quaff_test="explored": only on a level explored (Level.explored).
 
 """
@@ -29,7 +30,7 @@ class PotionTestMixin:
         """An unidentified potion whose possible types (by the prices seen) all cost TEST_PRICE: healing, extra
         healing, restore ability, confusion, hallucination, sleeping."""
         key = appearance(text)
-        if key is None:
+        if key is None or key in self.deduced:
             return False
         post = self.type_posterior(text)
         return bool(post) and all(OBJ[_INDEX[(_cls_of(n, key), n)]][3] == TEST_PRICE for n in post)
@@ -75,6 +76,9 @@ class PotionTestMixin:
             return True
         self.press(it.letter)
         msgs = self.text_since(seq0).lower()
+        if "this makes you feel" in msgs:      # "Wow! This makes you feel good!" / "Ulch! ... mediocre!"
+            self.deduce_type(nh.POTION_CLASS, key, "restore ability")
+            self.quaff_stats["deduced_restore_ability"] += 1
         what = next((n for s, n in EFFECTS if s in msgs), "unknown")
         self.quaff_stats["drunk"] += 1
         self.quaff_stats["got_" + what.replace(" ", "_")] += 1

@@ -50,6 +50,7 @@ class ValueMixin:
         self.known_types = set()     # (class, name) seen identified in our inventory this game
         self._known_inv = None       # the inventory note_known_types last read
         self.type_version = 0        # bumped whenever what type_posterior reads changes
+        self.deduced = {}            # appearance key -> type worked out though the game did not name it (deduce_type)
         self._post_memo = {}         # text -> (type_version, posterior)
 
     def note_known_types(self):
@@ -77,7 +78,17 @@ class ValueMixin:
         self._post_memo[text] = (self.type_version, post)
         return dict(post)
 
+    def deduce_type(self, ocls, key, name):
+        """We worked out that an appearance is this type (quaff_test: restore ability doesn't name itself, potion.c
+        unkn): its posterior is that type alone, and no other appearance is it."""
+        if self.deduced.get(key) != name:
+            self.deduced[key] = name
+            self.known_types.add((ocls, name))
+            self.type_version += 1
+
     def _type_posterior(self, key):
+        if key in self.deduced:
+            return {self.deduced[key]: 1.0}
         cands = [n for n in candidates(key) if (_cls_of(n, key), n) not in self.known_types] or list(candidates(key))
         engraved = self.wand_engraved.get(key)              # wandid: the engraving test narrowed the types
         if engraved:
