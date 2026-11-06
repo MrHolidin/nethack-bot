@@ -145,6 +145,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.guard_trail = []
         self.vault_moves = 0
         self.vault_drops = 0
+        self.guard_stepped = None        # the guard's last square we stepped onto while he was out of sight
+        self.vault_approach = 0          # steps toward a vault guard that waited for us (survival.vault_step)
         self.unblocks = self.unblock_throws = self.unblock_melee = 0
         self.items_first_holds = 0
         self.hunt = None
@@ -336,7 +338,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "shops": self.shops_seen, "shops_from_keeper": self.shops_from_keeper,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
-            "vault": [self.vault_drops, self.vault_moves], "vault_rob": dict(self.vault_stats),
+            "vault": [self.vault_drops, self.vault_moves, self.vault_approach], "vault_rob": dict(self.vault_stats),
             "items_first": self.items_first_holds,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,

@@ -288,18 +288,43 @@ class SurvivalMixin:
             if self.guard_trail and self.turn() - self.guard_trail[-1][1] > 20:
                 self.vault_follow_until = -1
                 return False
+            last = self.guard_trail[-1][0] if self.guard_trail else None
+            d = (last[0] - y, last[1] - x) if last else None
+            if self.opts.guard_follow and d in DELTA2KEY and last != self.guard_stepped:
+                self.guard_stepped = last     # guard_follow: he went on into his dark corridor -- onto the square he left
+                self.vault_moves += 1
+                self.cur_act = "vault"
+                self.press(DELTA2KEY[d])
+                return True
         else:
             gp = min(guards, key=lambda p: max(abs(p[0] - y), abs(p[1] - x)))
             if not self.guard_trail or self.guard_trail[-1][0] != gp:
                 self.guard_trail.append((gp, self.turn()))
         # step onto the newest square the guard has left that is next to us
         gnow = self.guard_trail[-1][0] if self.guard_trail else None
+        gd = (lambda p: max(abs(p[0] - gnow[0]), abs(p[1] - gnow[1]))) if gnow else None
         for p, _ in reversed(self.guard_trail[:-1]):
             d = (p[0] - y, p[1] - x)
-            if p != gnow and d in DELTA2KEY:
+            if p != gnow and d in DELTA2KEY and (not self.opts.guard_follow or gd(p) < gd((y, x))):
+                # guard_follow: forward only, never back
                 self.vault_moves += 1
                 self.cur_act = "vault"
                 self.press(DELTA2KEY[d])
+                return True
+        # guard_follow: he waits in the opening of the vault wall for us to come next to him (vault.c gd_move: he
+        # leads only a hero next to him; 7 warnings and he attacks) -- a step closer to him, never onto him
+        if self.opts.guard_follow and guards and max(abs(gnow[0] - y), abs(gnow[1] - x)) > 1:
+            dist = lambda p: max(abs(p[0] - gnow[0]), abs(p[1] - gnow[1]))
+            steps = [(y + dy, x + dx) for dy, dx in DELTA2KEY if (dy, dx) != (0, 0)
+                     and 0 <= y + dy < g.shape[0] and 0 <= x + dx < g.shape[1]
+                     and G.KIND[g[y + dy, x + dx]] in (G.FLOOR, G.DOORWAY, G.GOLD, G.OBJECT, G.CORPSE)
+                     and dist((y + dy, x + dx)) < dist((y, x))]
+            if steps:
+                q = min(steps, key=dist)
+                self.vault_moves += 1
+                self.vault_approach += 1
+                self.cur_act = "vault"
+                self.press(DELTA2KEY[(q[0] - y, q[1] - x)])
                 return True
         self.cur_act = "vault"
         self.press("s")
@@ -332,6 +357,9 @@ class SurvivalMixin:
         if "follow me" in m:
             self.vault_follow_until = self.turn() + 300
             self.guard_trail = []
+            self.guard_stepped = None
+        if self.opts.guard_follow and "the guard disappears" in m:
+            self.vault_follow_until = -1              # out of his corridor: the escort is over (vault.c)
         if "You feel feverish" in m:
             self.lycanthropy = True
             mk = re.search(r"\b(were(?:jackal|rat|wolf))\b", m)

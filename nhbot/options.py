@@ -50,6 +50,9 @@ DEFAULTS = {
                                #      be wielded again
     "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
+    "guard_follow": False,     # A/B: the vault guard's escort: a step next to him while he waits in the wall (vault.c:
+                               #      7 warnings, then he attacks), onto the square he left when he goes on out of sight,
+                               #      forward only; over when he disappears
     "vault_find": False,       # A/B: a vault our map shows (magic mapping, gold detection) is dug to with a pick-axe /
                                #      mattock / wand of digging; a vault heard: a known detection scroll read (nhbot.vault)
     "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c
