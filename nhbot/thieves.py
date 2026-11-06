@@ -25,6 +25,10 @@ NYMPH_RAY_RISK = 0.10
 LEP_HALL_MIN = 3          # lep_hall: leprechauns in view (and nothing else hostile) that make their room closed
 LEP_ROOM_MAX = 300        # a bigger flood is no room
 LEP_SEED_TURNS = 150      # lep_stash: turns at most for one seeding of the hall (lep_seed_step)
+LEP_LOST_TURNS = 20      # lep_stash: turns after which an awake leprechaun gone out of sight is not looked for any more
+LEP_STILL = 2             # lep_stash: ticks still (not fought) that make one taken for an awake leprechaun a sleeper
+LEP_GONE = ("escapes downstairs", "escapes upstairs", "snatches", "purse feels lighter", "cannot see the leprechaun",
+            "vanishes", "disappears")    # lep_stash: an awake leprechaun left the level, teleported or went unseen
 LEP_STASH_DIST = 7        # lep_stash: our gold dropped at least this far from the hall (monmove.c: gold seen near)
 
 
@@ -46,6 +50,11 @@ class ThievesMixin:
         self.lep_room = {}               # lep_stash: level key -> the leprechaun hall's floor (until cleared)
         self.lep_stash_at = {}           # lep_stash: level key -> squares we dropped our gold on
         self.lep_now, self.lep_awake = set(), set()  # lep_stash: leprechauns' squares, the awake ones (lep_track)
+        self.lep_sleep = {}              # lep_stash: level key -> the squares sleeping leprechauns are on (lep_track)
+        self.lep_lost = 0                # lep_stash: awake leprechauns gone out of sight (lep_track)
+        self.lep_assumed = set()         # lep_stash: the squares of ones taken for an awake one back in view
+        self.lep_still = {}              # lep_stash: awake one's square -> ticks it stayed on it
+        self._lep_seen = (None, 0, 0, 0)  # lep_stash: level key, leprechaun kills there, message counter, turn
         self.lep_seed = {}               # lep_stash: level key -> the seeding under way (lep_seed_step)
         self.lep_seeded = {}             # lep_stash: level key -> leprechauns killed there at the last seeding
         self.lep_coins = {}              # lep_stash: level key -> squares we seeded a coin on
@@ -124,18 +133,62 @@ class ThievesMixin:
         return False
 
     def lep_track(self):
-        """lep_stash, every tick: the leprechauns' squares, and which of them are awake -- one that moved since the
-        tick before, one still on a square an awake one was on, the one we hit (a sleeping one stays put)."""
+        """lep_stash, every tick: the leprechauns in view, and which of them are awake. A sleeping one stays on its
+        square, so the squares sleepers were seen on are kept (lep_sleep) and every other leprechaun in view is
+        awake: the one we hit, one that moved (on a new square near one left), one seen anew while an awake one is
+        out of sight (lep_lost: it came back into view). One seen anew otherwise sleeps; so does one taken for awake
+        that stays still LEP_STILL ticks without our fighting it."""
         g = self.obs["glyphs"]
         now = {(int(a), int(b)) for a, b in zip(*np.nonzero(G.KIND[g] == G.MONSTER))
                if G.monster_name(int(g[a, b])) == "leprechaun"}
-        hit = {self.last_attack_target} if self.turn() - (self.attack_turn or -9) <= 1 else set()
-        # moved: on a square no leprechaun was on, near one that was left (speed 15: up to 2 squares a turn); a
-        # leprechaun just come into view (no square left near it) is not known awake
+        key, turn = self.level().key, self.turn()
+        kills = self.lep_kills(key)
+        key0, kills0, seq0, turn0 = self._lep_seen
+        if key != key0:
+            self.lep_now, self.lep_awake, self.lep_lost, kills0 = set(), set(), 0, kills
+            self.lep_assumed, self.lep_still = set(), {}
+        text = self.text_since(seq0).lower()
+        if any(w in text for w in LEP_GONE) or turn - turn0 > LEP_LOST_TURNS:
+            self.lep_lost = 0
+        sleep = self.lep_sleep.setdefault(key, set())
+        hit = {self.last_attack_target} if turn - (self.attack_turn or -9) <= 1 else set()
+        hit &= self.lep_now | now
+        sleep -= hit
         left = self.lep_now - now
-        moved = {p for p in now - self.lep_now if any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in left)}
-        self.lep_awake = moved | (now & (self.lep_awake | hit))
+        new = now - self.lep_now
+        moved = set()
+        for p in new - sleep:                                  # speed 15: up to 2 squares a turn
+            near = {q for q in left if max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2}
+            if near:
+                moved.add(p)
+                sleep -= near                                  # it was one of them: woke
+        awake = moved | (now & (self.lep_awake | hit))
+        gone = len(self.lep_awake) - len(awake & (self.lep_awake | moved)) - (kills - kills0)
+        self.lep_lost = max(0, self.lep_lost + gone)
+        # an awake one moves (speed 15) unless we fight it: one taken for awake (moved: our view shifted; or the
+        # one back in view) still LEP_STILL ticks and not hit is a sleeper
+        recent = turn - (self.attack_turn or -9) <= LEP_STILL
+        self.lep_still = {p: (self.lep_still.get(p, -1) + 1 if p in self.lep_now else 0) for p in awake}
+        for p, n in self.lep_still.items():
+            if n >= LEP_STILL and not (recent and p == self.last_attack_target):
+                awake.discard(p)
+                sleep.add(p)
+                if p in self.lep_assumed:
+                    self.lep_lost += 1                         # the one out of sight is still out of it
+        self.lep_assumed &= awake
+        for p in sorted(new - sleep - awake):
+            if self.lep_lost:
+                awake.add(p)
+                self.lep_assumed.add(p)
+                self.lep_lost -= 1
+            else:
+                sleep.add(p)
+        self.lep_awake = awake
         self.lep_now = now
+        self._lep_seen = (key, kills, self.msg_seq, turn if (awake or not self.lep_lost) else turn0)
+
+    def lep_kills(self, key):
+        return sum(1 for k in self.kills if k[1] == "leprechaun" and k[3] == key)
 
     def lep_seed_step(self, lv, room):
         """lep_stash, in the hall: a leprechaun of it killed, no awake one in view, sleeping ones left -- before
