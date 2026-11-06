@@ -276,7 +276,7 @@ class PolicyMixin:
         self.lep_hall_mark(c.lv)
         if self.opts.lep_nogold and not self.opts.lep_stash:
             self.lep_hall_note(c.lv)                 # lep_stash notes it in lep_stash_step
-        return self.lep_stash_step(c.lv, c.hostiles) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
+        return self.gold_bag_step(c.lv, c.hostiles) or self.lep_stash_step(c.lv, c.hostiles) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
 
     def step_regen(self, c):
         return not c.hostiles and self.regen_step()

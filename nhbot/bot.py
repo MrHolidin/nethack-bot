@@ -19,6 +19,7 @@ from nhbot.game import GameMixin, GameOver
 from nhbot.charges import WandChargeMixin
 from nhbot.threats import ThreatMixin
 from nhbot.goals import GoalsMixin
+from nhbot.goldbag import GoldBagMixin
 from nhbot.mapmem import MapMixin
 from nhbot.nav import NavMixin
 from nhbot.options import Options
@@ -50,7 +51,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
-          SacrificeMixin, SokobanMixin):
+          SacrificeMixin, SokobanMixin, GoldBagMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -177,6 +178,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.combat_init()
         self.excal_init()
         self.thieves_init()
+        self.goldbag_init()
         self.weapons_init()
         self.elbereth_init()
         self.shop_init()
@@ -279,6 +281,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "pet_waited": self.pet_waited_total,
             "zaps": self.zaps, "zap_stats": dict(self.zap_stats), "wishes": self.wishes, "wishing": dict(self.wish_stats), "ray_risk": {"counts": dict(self.ray_risk_stats), "log": self.ray_risk_log}, "wand_pwin_log": self.wand_pwin_log, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "descent_rest": sum(self.descent_rest.values()), "revisit": dict(self.revisit_stats), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "protection": dict(self.prot_stats, ac=self.prot_bought), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),
             "thefts": self.thefts, "gold_flow": dict(self.gold_flow), "thief_stats": dict(self.thief_stats), "gold_by_xl": self._gold_xl,
+            "gold_bag": dict(self.bag_stats, in_bag=self.bag_gold),
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": self.elb_fail,

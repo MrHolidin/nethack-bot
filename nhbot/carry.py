@@ -244,6 +244,9 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS) and not self.horn_is_bad(it):
             return True                      # a horn that harmed us is cursed: sold
+        bag = self.gold_bag() if c == nh.TOOL_CLASS else None
+        if bag is not None and bag.letter == it.letter:
+            return True                      # gold_bag: the bag our gold goes in (nhbot.goldbag)
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if self.wish_needed(it):
