@@ -120,6 +120,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.deadly_prayers = 0
         self.stun_waits = 0
         self.poison_res = False
+        self.eaten_res = set()         # resistances a corpse gave us (survival.msg_survival): "fire", "cold"
         self.blind_waits = 0
         self.hallu_waits = 0           # hallu_wait: turns rested hallucinating
         self.shop_kicks_avoided = 0

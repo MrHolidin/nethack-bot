@@ -12,6 +12,7 @@ from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES, permonst_of
+from nhbot.rays import our_protection
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
 # (gas spore), the Oracle, a long worm's tail. No monster without one can move (mmove 0 for all that can't).
@@ -19,6 +20,15 @@ from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, T
 # one shriek in 10 creates a monster (1 in 13 of those a purple worm).
 NO_ACTIVE_ATTACK = {nh.permonst(i).mname for i in range(nh.NUMMONS)
                     if all(a[0] in ("NONE", "BOOM") for a in ATTACKS[i])} - {"shrieker"}
+
+# passive_immune: the monsters whose only attack is a passive cold / fire one -- uhitm.c passive(): with the
+# resistance it does no damage (shieldeff, "You feel a mild chill" / "You're not affected"), nothing else
+# (brown mold, blue jelly: cold; red mold: fire)
+PASSIVE_ELEMENT = {"COLD": "cold", "FIRE": "fire"}
+PASSIVE_KIND = {nh.permonst(i).mname: PASSIVE_ELEMENT[ATTACKS[i][0][1]] for i in range(nh.NUMMONS)
+                if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i]) and ATTACKS[i][0][1] in PASSIVE_ELEMENT}
+# monst.h MR_* bits of mconveys: the resistances eating the corpse may give (eat.c cpostfx: one of them at random)
+CONVEYS = ((0x01, "fire"), (0x02, "cold"), (0x04, "sleep"), (0x08, "disint"), (0x10, "shock"), (0x20, "poison"))
 
 
 M2_HUMAN, M2_ELF, M2_DWARF, M2_GNOME, M2_ORC = 0x8, 0x10, 0x20, 0x40, 0x80
@@ -198,7 +208,8 @@ class PerceptionMixin:
             if not here and not blind and max(abs(pos[0] - y), abs(pos[1] - x)) <= 1:
                 del lv.stationary[pos]
                 continue
-            if not here and pos not in self.avoid_cells and not (lv.desperate and name not in self.always_avoid()):
+            if not here and pos not in self.avoid_cells and self.never_melee(name) \
+                    and not (lv.desperate and name not in self.always_avoid()):
                 self.avoid_cells.append(pos)
 
     def adjacent_hostiles(self, lv):
@@ -230,7 +241,7 @@ class PerceptionMixin:
                                                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
-                if self.is_actively_dangerous(lv, (ny, nx)):
+                if self.is_actively_dangerous(lv, (ny, nx)) or self.passive_prey(name):
                     out.append(((ny, nx), name))
             elif k == G.INVIS and (ny, nx):
                 out.append(((ny, nx), "invisible"))
@@ -313,10 +324,29 @@ class PerceptionMixin:
             s = s | {"floating eye"}          # its passive gaze paralyses for up to ~127 turns
         return s
 
+    def our_resists(self):
+        """The resistances we know we have: role / race and what we wear (rays.our_protection), what corpses gave."""
+        out = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body]) | self.eaten_res
+        return out | {"poison"} if self.poison_res else out
+
+    def passive_immune(self, name):
+        """passive_immune: its only attack is a passive cold / fire one and we resist it -- hitting it is harmless."""
+        return self.opts.passive_immune and name in PASSIVE_KIND and PASSIVE_KIND[name] in self.our_resists()
+
+    def passive_prey(self, name):
+        """passive_immune: hitting it is harmless and its corpse may give a resistance we lack -- hunted
+        (combat.prey_mask) and hit next to us (adjacent_hostiles), though it never attacks."""
+        if not self.passive_immune(name):
+            return False
+        conveys = {r for bit, r in CONVEYS if PM_BY_NAME[name].mconveys & bit}
+        return bool(conveys - self.our_resists())
+
     def never_melee(self, name):
         """Don't hit what has only a passive attack (it never hurts us otherwise); desperate (stuck) still may."""
         if name in ("cockatrice", "chickatrice") and any(it.wielded for it in self.items()):
             return False       # hitting it with a wielded weapon is safe; standing by while it touches us is not
+        if self.passive_immune(name):
+            return False
         return name in NEVER_MELEE or name in PASSIVE_DMG
 
     def spore_ok(self, name):

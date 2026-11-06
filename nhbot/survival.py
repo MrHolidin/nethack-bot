@@ -310,6 +310,12 @@ class SurvivalMixin:
         # eat.c givit(POISON_RES): "You feel healthy."; eating poison while resistant: "You seem unaffected"
         if "You feel healthy" in m or "You seem unaffected by the poison" in m:
             self.poison_res = True
+        # eat.c givit: FIRE_RES "You feel a momentary chill." (hallucinating "You be chillin'."), COLD_RES
+        # "You feel full of hot air."
+        if "You feel a momentary chill" in m or "You be chillin'" in m:
+            self.eaten_res.add("fire")
+        if "You feel full of hot air" in m:
+            self.eaten_res.add("cold")
         if "more confident in your" in m:
             self.skill_msgs += 1
             self.want_enhance = True

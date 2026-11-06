@@ -458,7 +458,10 @@ class CombatMixin:
         once it is next to us the melee step hits it. (A/B hunt_easy 0.95: +1838 [+251, +3343], median
         4645 -> 5089.)"""
         mask = np.zeros_like(passable)
-        for (y, x), name in self.visible_hostiles(lv):
+        g = self.obs["glyphs"]
+        passive = [(p, n) for p in self.visible_monsters()
+                   if self.passive_prey(n := G.monster_name(int(g[p]))) and not self.peaceful_now(lv, p, far=True)]
+        for (y, x), name in self.visible_hostiles(lv) + passive:
             if name not in PM_BY_NAME or self.never_melee(name) or self.prey_win(name, (y, x)) <= PREY_PWIN:
                 continue
             if self.peaceful_now(lv, (y, x), far=True):
