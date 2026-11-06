@@ -85,7 +85,7 @@ class ThievesMixin:
         room = self._flood(ok, leps, cap=LEP_ROOM_MAX + 1)
         return room if len(room) <= LEP_ROOM_MAX else None
 
-    def lep_stash_step(self, lv):
+    def lep_stash_step(self, lv, hostiles=()):
         """lep_stash: a leprechaun hall in view and gold on us -- first take the gold where the hall can't see it
         (a square of ours at least LEP_STASH_DIST from every square of the room: a leprechaun goes for gold it sees
         near it, monmove.c) and drop it there; then the hall. It is picked back up once no leprechaun is in view
@@ -94,7 +94,7 @@ class ThievesMixin:
             return False
         room = self.lep_hall_room(lv)
         if room is not None:
-            self.lep_room[lv.key] = room
+            self.lep_room[lv.key] = room | self.lep_room.get(lv.key, set())   # seen part by part: kept
         room = self.lep_room.get(lv.key)
         if room is not None and self.pos() in room and not self.lep_visible():
             self.lep_room.pop(lv.key)                          # in the hall, no leprechaun left in view: done
@@ -102,6 +102,8 @@ class ThievesMixin:
             return False
         if room is None or lv.shop[self.pos()] or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             return False
+        if any(n != "leprechaun" for _, n in hostiles):
+            return False                                       # another one next to us: the melee step first
         if self.lep_bait_step(lv, room):
             return True
         if int(self.bl(nh.NLE_BL_GOLD)) <= 0:
@@ -292,21 +294,37 @@ class ThievesMixin:
 
     def lep_approach(self, lv, room):
         """lep_stash, our gold stashed and the hall not cleared: an awake leprechaun in view and none next to us
-        -- after it (sleepers next to us wait: hitting one wakes another); none awake in view and none next to us
-        -- to the nearest of the hall's (none in view: its floor). True if it used the turn."""
+        -- after it, within the hall (out of it: we wait); sleepers next to us wait (hitting one wakes another);
+        none awake in view and none next to us -- to the nearest of the hall's (none in view: its floor). True if
+        it used the turn."""
         y, x = self.pos()
         adj = {p for p in self.lep_now if max(abs(p[0] - y), abs(p[1] - x)) == 1}
         if adj & self.lep_awake or (adj and not self.lep_awake):
             return False                                       # the melee step (lep_focus_target)
         mask = np.zeros(lv.under.shape, dtype=bool)
-        goal = self.lep_awake or [p for p in self.lep_now if p in room]
-        if goal:
-            for a, b in goal:
+        grids = None
+        if self.lep_awake and (y, x) in room:                  # the chase keeps to the hall
+            inside = np.zeros(lv.under.shape, dtype=bool)
+            for p in room:
+                inside[p] = True
+            k_mem, k_live, passable = self.grids(lv)
+            grids = (k_mem, k_live, passable & inside)
+            for a, b in self.lep_awake:
                 mask[max(0, a - 1):a + 2, max(0, b - 1):b + 2] = True
+            mask &= inside
         else:
-            for p in room:                                     # none in view (we stashed the gold out of
-                mask[p] = True                                 # sight of the hall): back into it
-        status, _ = self.walk_to(lv, mask, max_cost=80, act="lep_hall")
+            goal = self.lep_awake or [p for p in self.lep_now if p in room]
+            if goal:
+                for a, b in goal:
+                    mask[max(0, a - 1):a + 2, max(0, b - 1):b + 2] = True
+            else:
+                for p in room:                                 # none in view (we stashed the gold out of
+                    mask[p] = True                             # sight of the hall): back into it
+        status, _ = self.walk_to(lv, mask, max_cost=80, act="lep_hall", grids=grids)
+        if status != "moved" and grids is not None:            # out of the hall: we wait in it
+            self.press("s")
+            self.thief_stats["lep_chase_wait"] += 1
+            return True
         if status == "moved":
             self.thief_stats["lep_chase" if self.lep_awake else "lep_approach"] += 1
             return True
@@ -326,6 +344,18 @@ class ThievesMixin:
                 return plan[0]                                 # the sleeper baited (lep_bait_step)
             return None
         return self.last_attack_target if self.last_attack_target in adj else adj[0]
+
+    def lep_melee_cands(self, hostiles):
+        """lep_stash: the hostiles next to us the melee step may hit -- any other one before a leprechaun; a
+        sleeping leprechaun not while an awake one is in view (one is woken at a time)."""
+        if not self.opts.lep_stash:
+            return hostiles
+        other = [(p, n) for p, n in hostiles if n != "leprechaun"]
+        if other:
+            return other
+        if self.lep_awake:
+            return [(p, n) for p, n in hostiles if p in self.lep_awake]
+        return hostiles
 
     def lep_hall_mark(self, lv):
         """lep_hall: a leprechaun hall in view (lep_hall_room): its floor is closed to us from outside, like a shop

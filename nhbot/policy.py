@@ -274,7 +274,7 @@ class PolicyMixin:
 
     def step_thieves(self, c):
         self.lep_hall_mark(c.lv)
-        return self.lep_stash_step(c.lv) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
+        return self.lep_stash_step(c.lv, c.hostiles) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
 
     def step_regen(self, c):
         return not c.hostiles and self.regen_step()
@@ -297,7 +297,9 @@ class PolicyMixin:
         """Attack the weakest-looking (lowest level) adjacent hostile; focus: Smith's rule among several."""
         if not c.hostiles:
             return False
-        cands = c.hostiles
+        cands = self.lep_melee_cands(c.hostiles)
+        if not cands:
+            return False
         awake = [t for t in cands if not self.asleep(c.lv, t[0])]
         cands = awake or cands                   # one put to sleep comes after every awake one
         target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
