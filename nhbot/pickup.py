@@ -283,8 +283,8 @@ class PickupMixin:
 
     def lift_answer(self, m):
         """lift_heavy: "You have a little trouble lifting X.  Continue?" (pickup.c lift_object: we'd be Burdened)
-        -- yes if the pick-up asked for X (worth_taking judged it worth more than what the drop step will shed
-        for it); much trouble (Stressed) or more: no."""
+        -- yes if the pick-up asked for X and worth_taking judges it worth more than what the drop step will shed
+        for it; much trouble (Stressed) or more: no."""
         mm = re.search(r"a little trouble lifting (.+?)\.\s+Continue\?", m)
         want = self.lift_want
         if not (self.opts.lift_heavy and mm and want is not None):
@@ -292,7 +292,10 @@ class PickupMixin:
         name = mm.group(1)
         tags = self.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for
         texts = [name] + ["%s (for sale, %d zorkmids)" % (t, pr) for t, pr in tags.items() if t in name or name in t]
-        ok = any(want(t) for t in texts)
+        ocls = floor_kind(name)[0]
+        # worth_taking: worth more per weight than what the drop step sheds for it -- not only "carry" picks pass
+        # it (armor to wear, food, weapons don't), and one that fails would be the first thing dropped again
+        ok = any(want(t) for t in texts) and ocls is not None and self.worth_taking(ocls, name)
         k = "lift_heavy_" + ("yes" if ok else "no")
         self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
         return ok
