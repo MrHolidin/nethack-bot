@@ -30,6 +30,7 @@ STEPS = (
     "unihorn",           # blind / confused / stunned / hallucinating, nothing next to us: the horn
     "stunned",
     "vault_guard",
+    "vault_rob",         # vault_rob: the gold of a vault we stand in, then down through the floor (nhbot.vault)
     "blind",
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
@@ -242,6 +243,9 @@ class PolicyMixin:
 
     def step_vault_guard(self, c):
         return self.vault_step(c.lv, c.hostiles)
+
+    def step_vault_rob(self, c):
+        return self.vault_rob_step(c.lv, c.hostiles)
 
     def step_blind(self, c):
         """Wandering blind walks into things we can't see: wait."""

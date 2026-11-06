@@ -75,7 +75,11 @@ class GameMixin:
                     self.answer_genocide(msg + " " + self.top_line())     # scrolls.py
                     continue
                 if "who are you" in (msg + self.top_line()).lower():
-                    for c in "Agent":                       # our real name (lawful: lying costs alignment)
+                    # our real name (lawful: lying costs alignment); vault_rob, about to dig out: "Croesus" -- the
+                    # guard leaves (vault.c invault)
+                    name = "Croesus" if self.vault_rob_ready() else "Agent"
+                    self.vault_stats["croesus"] += name == "Croesus"
+                    for c in name:
                         self.raw_step(ord(c))
                     self.raw_step(13)
                     continue

@@ -43,6 +43,8 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
     "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
+    "vault_rob": False,        # A/B: in a vault with a pick-axe / mattock / wand of digging: take the gold, dig down;
+                               #      the guard, if he comes first, is told "Croesus" (nhbot.vault)
     "poly_recover": False,     # A/B: turned into a handless form -- pray when safe (pray.c TROUBLE_UNUSEABLE_HANDS:
                                #      rehumanize); what fell from us then is taken back with the rest when human again
     "cloak_cover": True,       # A/B +662 [-678, +1971]: a cloak over an empty cloak slot counts CLOAK_COVER AC more (it

@@ -43,6 +43,7 @@ from nhbot.weapons import WeaponsMixin
 from nhbot.wishing import WishMixin
 from nhbot.sacrifice import SacrificeMixin
 from nhbot.sokoban import SokobanMixin
+from nhbot.vault import VaultMixin
 
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
@@ -51,7 +52,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
-          SacrificeMixin, SokobanMixin, GoldBagMixin):
+          SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -181,6 +182,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.excal_init()
         self.thieves_init()
         self.goldbag_init()
+        self.vault_init()
         self.weapons_init()
         self.elbereth_init()
         self.shop_init()
@@ -334,7 +336,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "shops": self.shops_seen, "shops_from_keeper": self.shops_from_keeper,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
-            "vault": [self.vault_drops, self.vault_moves],
+            "vault": [self.vault_drops, self.vault_moves], "vault_rob": dict(self.vault_stats),
             "items_first": self.items_first_holds,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,
