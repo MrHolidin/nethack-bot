@@ -42,7 +42,7 @@ class AltarMixin:
     def protection_step(self, lv):
         """Buy protection from a temple priest (priest.c priest_talk): a donation of 400 * XL (below 600 * XL)
         gives 2-4 points of AC the first time, one more each time after, every time while the protection is below
-        PROTECTION_MAX. Only on a level where we entered his temple (out of it he takes a chat for an insult and
+        PROTECTION_MAX -- buy_protection times at most; gold in our bag is taken out for it. Only on a level where we entered his temple (out of it he takes a chat for an insult and
         turns hostile), with the gold for it, nothing threatening us (the caller checks): to a square next to him,
         #chat, offer. True if it used the turn."""
         if not self.opts.buy_protection:
@@ -52,12 +52,18 @@ class AltarMixin:
         if any("enter a sacred place" in m for m in new):
             self.temple_levels.add(lv.key)
         if lv.key not in self.temple_levels or self.prot_bought >= PROTECTION_MAX \
+                or self.prot_stats["bought"] >= int(self.opts.buy_protection) \
                 or self.prot_tries[lv.key] >= PROTECTION_TRIES \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_HALLU | nh.BL_MASK_CONF
                                                              | nh.BL_MASK_STUN):
             return False
         offer = 400 * int(self.bl(nh.NLE_BL_XP))
-        if int(self.bl(nh.NLE_BL_GOLD)) < offer:
+        gold = int(self.bl(nh.NLE_BL_GOLD))
+        bag = self.gold_bag()
+        if gold < offer and bag is not None and gold + self.bag_gold >= offer:
+            self.prot_stats["bag_out"] += 1
+            return self.bag_take_out(bag)             # the gold we keep in the bag (nhbot.goldbag) counts too
+        if gold < offer:
             return False
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)

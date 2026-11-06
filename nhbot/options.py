@@ -24,7 +24,8 @@ DEFAULTS = {
     "lep_drop": False,         # A/B: a leprechaun in view: drop our gold where we stand, fight; take it back once none
                                #      is in view (nhbot.thieves.lep_step)
     "menu_gold": False,        # A/B: item menus (pick up, ...) take gold's "$ - ..." line too: gold lying with other things is picked up
-    "buy_protection": False,   # A/B: buy AC from a temple priest, 400 * XL gold a time while below 9 (nhbot.altar)
+    "buy_protection": False,   # A/B: buy AC from a temple priest, 400 * XL gold a time while below 9, this many times
+                               #      (an int; True: once) (nhbot.altar)
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "soko_zoo": True,          # with sokoban: open the top level's zoo for the prize (False: the four puzzles only --
