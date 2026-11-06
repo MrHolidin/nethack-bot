@@ -121,6 +121,11 @@ MC_OF = {"cloak of protection": 3, "plate mail": 2, "crystal plate mail": 2, "dw
          "elven mithril-coat": 2, "oilskin cloak": 2, "slippery cloak": 2, "robe": 2, "leather jacket": 0,
          "cornuthaum": 1}
 MC_VALUE = 1.75          # mc_value: AC a point of MC is worth
+# what a worn piece gives that its AC doesn't show: magic resistance, reflection -- PROP_VALUE AC each (mc_value)
+PROPS_OF = {"cloak of magic resistance": {"mr"}, "gray dragon scale mail": {"mr"}, "gray dragon scales": {"mr"},
+            "shield of reflection": {"refl"}, "polished silver shield": {"refl"},
+            "silver dragon scale mail": {"refl"}, "silver dragon scales": {"refl"}}
+PROP_VALUE = 3.0
 
 
 def armor_mc(a):
@@ -200,8 +205,8 @@ class EquipMixin:
     def wear_gain(self, a, worn):
         """What putting a on instead of what we wear in its slot gains: its AC over that one's; mc_value: plus
         MC_VALUE a point of MC the whole outfit gains (MC is the best of what we wear, the other slots as they
-        are) -- the gain of every swap is the gain of sum(AC) + MC_VALUE * MC, so swaps can't go round in a
-        circle."""
+        are) and PROP_VALUE for magic resistance / reflection it gains or loses -- the gain of every swap is the
+        gain of sum(AC) + MC_VALUE * MC + PROP_VALUE * properties, so swaps can't go round in a circle."""
         cur = worn.get(a["slot"])
         gain = value(a) - (value(cur) if cur is not None else 0)
         if self.opts.mc_value:
@@ -209,6 +214,12 @@ class EquipMixin:
             mc_with = max(others + [armor_mc(a)])
             mc_now = max(others + ([armor_mc(cur)] if cur is not None else []) + [0])
             gain += MC_VALUE * (mc_with - mc_now)
+            have = set().union(*[PROPS_OF.get(w["name"], set()) for s, w in worn.items() if s != a["slot"]])
+            if any(it.worn and it.ocls == nh.AMULET_CLASS and "reflection" in it.text for it in self.items()):
+                have.add("refl")                  # an amulet of reflection on: a second source adds nothing
+            props_with = have | PROPS_OF.get(a["name"], set())
+            props_now = have | (PROPS_OF.get(cur["name"], set()) if cur is not None else set())
+            gain += PROP_VALUE * (len(props_with) - len(props_now))
         return gain
 
     def improves(self, a, worn):
