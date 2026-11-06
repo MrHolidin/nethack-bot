@@ -24,8 +24,8 @@ DEFAULTS = {
     "lep_drop": False,         # A/B: a leprechaun in view: drop our gold where we stand, fight; take it back once none
                                #      is in view (nhbot.thieves.lep_step)
     "menu_gold": False,        # A/B: item menus (pick up, ...) take gold's "$ - ..." line too: gold lying with other things is picked up
-    "buy_protection": False,   # A/B: buy AC from a temple priest, 400 * XL gold a time while below 9, this many times
-                               #      (an int; True: once) (nhbot.altar)
+    "buy_protection": 1,       # A/B +40 [-155, +258]: buy AC from a temple priest, 400 * XL gold a time while below 9,
+                               #      this many times (an int; True: once) (nhbot.altar)
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "soko_zoo": True,          # with sokoban: open the top level's zoo for the prize (False: the four puzzles only --
@@ -52,9 +52,9 @@ DEFAULTS = {
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
     "vault_exit": False,       # A/B: in a vault we tunnelled into (vault_find): out by the tunnel with the gold, no hole
                                #      down (vault.c: the guard comes after 30 turns inside, told "Croesus" if he comes)
-    "guard_follow": False,     # A/B: the vault guard's escort: a step next to him while he waits in the wall (vault.c:
-                               #      7 warnings, then he attacks), onto the square he left when he goes on out of sight,
-                               #      forward only; over when he disappears
+    "guard_follow": True,      # A/B +443 [+246, +647]: the vault guard's escort: a step next to him while he waits in
+                               #      the wall (vault.c: 7 warnings, then he attacks), onto the square he left when he
+                               #      goes on out of sight, forward only; over when he disappears
     "vault_find": False,       # A/B: a vault our map shows (magic mapping, gold detection) is dug to with a pick-axe /
                                #      mattock / wand of digging; a vault heard: a known detection scroll read (nhbot.vault)
     "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c
