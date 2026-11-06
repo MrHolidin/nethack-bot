@@ -24,6 +24,7 @@ NYMPH_RAY_RISK = 0.10
 
 LEP_HALL_MIN = 3          # lep_hall: leprechauns in view (and nothing else hostile) that make their room closed
 LEP_ROOM_MAX = 300        # a bigger flood is no room
+LEP_STASH_DIST = 7        # lep_stash: our gold dropped at least this far from the hall (monmove.c: gold seen near)
 
 
 class ThievesMixin:
@@ -40,7 +41,9 @@ class ThievesMixin:
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
         self.nymph_zap_stats = Counter()
-        self.thief_stats = Counter()     # lep_drop
+        self.thief_stats = Counter()     # lep_drop, lep_hall, lep_stash
+        self.lep_room = {}               # lep_stash: level key -> the leprechaun hall's floor (until cleared)
+        self.lep_stash_at = {}           # lep_stash: level key -> squares we dropped our gold on
         self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
         self._gold_prev = None
         self._gold_seq = 0
@@ -54,21 +57,79 @@ class ThievesMixin:
         return any(G.monster_name(int(g[p])) == "leprechaun"
                    for p in zip(*np.nonzero(G.KIND[g] == G.MONSTER)))
 
-    def lep_hall_mark(self, lv):
-        """lep_hall: more than LEP_HALL_MIN - 1 leprechauns in view and no other hostile -- a leprechaun hall (or
-        their room): its floor is closed to us from outside, like a shop (mapmem.passable_grid); from inside we
-        walk as before, and it closes once we are out."""
-        if not self.opts.lep_hall or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
-            return
+    def lep_hall_room(self, lv):
+        """More than LEP_HALL_MIN - 1 leprechauns in view and no other hostile: the floor of their room (a set of
+        squares), else None."""
+        if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            return None
         vis = self.visible_hostiles(lv)
         leps = [p for p, n in vis if n == "leprechaun"]
         if len(leps) < LEP_HALL_MIN or len(leps) < len(vis):
-            return
+            return None
         ok = self.shop_floor(lv)
         for p in leps:
             ok[p] = True
         room = self._flood(ok, leps, cap=LEP_ROOM_MAX + 1)
-        if len(room) > LEP_ROOM_MAX:
+        return room if len(room) <= LEP_ROOM_MAX else None
+
+    def lep_stash_step(self, lv):
+        """lep_stash: a leprechaun hall in view and gold on us -- first take the gold where the hall can't see it
+        (a square of ours at least LEP_STASH_DIST from every square of the room: a leprechaun goes for gold it sees
+        near it, monmove.c) and drop it there; then the hall. It is picked back up once no leprechaun is in view
+        (lep_hold_gold). True if it used the turn."""
+        if not self.opts.lep_stash:
+            return False
+        room = self.lep_hall_room(lv)
+        if room is not None:
+            self.lep_room[lv.key] = room
+        room = self.lep_room.get(lv.key)
+        if room is not None and self.pos() in room and not self.lep_visible():
+            self.lep_room.pop(lv.key)                          # in the hall, no leprechaun left in view: done
+            self.thief_stats["lep_hall_cleared"] += 1
+            return False
+        if room is None or int(self.bl(nh.NLE_BL_GOLD)) <= 0 or lv.shop[self.pos()] \
+                or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
+            return False
+        ry = np.array([p[0] for p in room])
+        rx = np.array([p[1] for p in room])
+        y, x = self.pos()
+        if int(np.min(np.maximum(np.abs(ry - y), np.abs(rx - x)))) >= LEP_STASH_DIST and not lv.shop[y, x]:
+            self.cur_act = "lep_stash"
+            self.thief_stats["lep_stash"] += 1
+            self.thief_stats["lep_stash_gold"] += int(self.bl(nh.NLE_BL_GOLD))
+            if self.ask("d", "drop"):
+                self.press("$")
+            self.goal_closed_set("gold", lv.key).discard((y, x))
+            self.lep_stash_at.setdefault(lv.key, set()).add((y, x))
+            return True
+        near = np.zeros(lv.under.shape, dtype=bool)          # within LEP_STASH_DIST - 1 of the room
+        r = LEP_STASH_DIST - 1
+        for a, b in room:
+            near[max(0, a - r):a + r + 1, max(0, b - r):b + r + 1] = True
+        mask = ~near & ~lv.shop
+        status, _ = self.walk_to(lv, mask, max_cost=60, act="lep_stash")
+        if status == "moved":
+            return True
+        self.thief_stats["lep_stash_none"] += 1           # nowhere near: keep it on us, as before
+        self.lep_room.pop(lv.key, None)
+        return False
+
+    def lep_focus_target(self, lv, hostiles):
+        """lep_stash: among the hostiles next to us, the leprechaun we hit last (on or next to where we hit it),
+        so one is fought until it dies instead of waking the next one; None if there is none."""
+        if not self.opts.lep_stash or self.last_attack_target is None or self.turn() - (self.attack_turn or 0) > 3:
+            return None
+        ly, lx = self.last_attack_target
+        same = [p for p, n in hostiles if n == "leprechaun" and max(abs(p[0] - ly), abs(p[1] - lx)) <= 1]
+        return min(same, key=lambda p: max(abs(p[0] - ly), abs(p[1] - lx))) if same else None
+
+    def lep_hall_mark(self, lv):
+        """lep_hall: a leprechaun hall in view (lep_hall_room): its floor is closed to us from outside, like a shop
+        (mapmem.passable_grid); from inside we walk as before, and it closes once we are out."""
+        if not self.opts.lep_hall:
+            return
+        room = self.lep_hall_room(lv)
+        if room is None:
             return
         if not lv.lep_shut.any():
             self.thief_stats["lep_hall"] += 1
@@ -91,9 +152,13 @@ class ThievesMixin:
         self.goal_closed_set("gold", lv.key).discard(self.pos())      # ours again once it is safe
         return True
 
-    def lep_hold_gold(self):
-        """lep_drop: no gold picked up while a leprechaun is in view (it would be stolen again)."""
-        return self.opts.lep_drop and self.lep_visible()
+    def lep_hold_gold(self, lv=None):
+        """lep_drop, lep_stash: no gold picked up while a leprechaun is in view (it would be stolen again)."""
+        return (self.opts.lep_drop or self.opts.lep_stash) and self.lep_visible()
+
+    def lep_stash_held(self, lv):
+        """lep_stash: the squares of our stashed gold, left alone while their hall is not cleared."""
+        return self.lep_stash_at.get(lv.key, set()) if lv.key in self.lep_room else set()
 
     def gold_flow_tick(self):
         """Stats only: a change of the gold we carry since the last tick, by the messages that came with it --

@@ -272,7 +272,7 @@ class PolicyMixin:
 
     def step_thieves(self, c):
         self.lep_hall_mark(c.lv)
-        return self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
+        return self.lep_stash_step(c.lv) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
 
     def step_regen(self, c):
         return not c.hostiles and self.regen_step()
@@ -301,6 +301,7 @@ class PolicyMixin:
         target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
         if len(cands) > 1:
             target = self.focus_target(cands, target)
+        target = self.lep_focus_target(c.lv, cands) or target     # lep_stash: the leprechaun we were on
         self.attack(target)
         return True
 
@@ -439,6 +440,7 @@ class PolicyMixin:
         lv, y, x = c.lv, c.y, c.x
         if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in self.goal_closed_set("gold", lv.key) \
                 and not self.merch_risk(lv, (y, x)) and not self.lep_hold_gold() \
+                and (y, x) not in self.lep_stash_held(lv) \
                 and self.items_gate(lv):
             self.goal_done("gold", lv, (y, x))
             self.pickup_matching(("gold piece",))

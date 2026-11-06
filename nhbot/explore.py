@@ -61,6 +61,8 @@ class ExploreMixin:
             gold[p] = False
         if self.lep_hold_gold():
             gold[:] = False
+        for p in self.lep_stash_held(lv):
+            gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
