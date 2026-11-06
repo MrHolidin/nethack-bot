@@ -426,30 +426,19 @@ class ExcaliburMixin:
         return False
 
     def fountain_leave_step(self, lv, hostiles):
-        """fountain_elb, after a hide: down the stairs we know, nothing next to us (a fight comes first). True if
-        it used the turn."""
+        """fountain_elb, after a hide (what came out still roams this level): off it where we were headed anyway --
+        up to a fountain remembered above while we still dip for Excalibur (excal_go_up), else down the stairs
+        we know; neither: as ever. Nothing next to us (a fight comes first). True if it used the turn."""
         if self.fountain_leave != lv.key:
             self.fountain_leave = None
             return False
         if hostiles:
             return False
-        k = self.kinds(lv)
-        down = k == G.DOWNSTAIR
-        if down.any():
-            if self.go_down(lv, self.grids(lv), down):
-                self.fhide_stats["leave_steps"] += 1
-                return True
-            return False
-        up = k == G.UPSTAIR                              # no way down known yet: up the way we came (we come back
-        if not up.any():                                 # down later, by then most likely not next to it)
-            return False
-        if up[self.pos()]:
-            self.fhide_stats["left_up"] += 1
-            self.fountain_leave = None
-            self.cur_act = "fountain_leave"
-            self.press("<")
+        if self.excal_eligible() and self.excal_go_up(lv):
+            self.fhide_stats["leave_up"] += 1
             return True
-        if self.walk_to(lv, up, act="fountain_leave")[0] == "moved":
-            self.fhide_stats["leave_steps"] += 1
+        down = self.kinds(lv) == G.DOWNSTAIR
+        if down.any() and self.go_down(lv, self.grids(lv), down):
+            self.fhide_stats["leave_down"] += 1
             return True
         return False
