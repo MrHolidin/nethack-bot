@@ -42,6 +42,8 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
     "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
+    "cloak_cover": False,      # A/B: a cloak over an empty cloak slot counts CLOAK_COVER AC more (it takes destroy armor and
+                               #      erosion for the suit); mummy wrapping, orcish / dwarvish cloak are worn
     "passive_immune": False,   # A/B: a monster with only a passive cold / fire attack (brown / red mold, blue jelly) that we
                                #      resist is no longer avoided; hunted and hit while it gives a resistance we lack
     "hallu_wait": True,        # hallucinating: fights / healing / food as ever, no trips / exploring / level change -- rest instead; no Elbereth
