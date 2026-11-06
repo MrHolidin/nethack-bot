@@ -91,6 +91,8 @@ class PolicyMixin:
         self.tick_seq = self.msg_seq
         self.threat_track()                      # threats.py: who is coming for us
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
+        if self.opts.restore_fix:
+            self.attr_track()                    # potiontest.py: the best each attribute has been
         if self.opts.lep_stash:
             self.lep_track()                     # thieves.py: which leprechauns moved since the tick before
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
@@ -222,7 +224,7 @@ class PolicyMixin:
         return self.unihorn_step(HORN_SICK)
 
     def step_unihorn(self, c):
-        return not c.hostiles and self.unihorn_step(HORN_FIXES)
+        return not c.hostiles and (self.unihorn_step(HORN_FIXES) or self.restore_step(c.hostiles))
 
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""

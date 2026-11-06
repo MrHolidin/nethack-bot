@@ -247,6 +247,8 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS) and not self.horn_is_bad(it):
             return True                      # a horn that harmed us is cursed: sold
+        if c == nh.POTION_CLASS and self.opts.restore_fix and self.restore_potion(it):
+            return True                      # restore_fix: mends what poison took (potiontest.restore_step)
         if c == nh.POTION_CLASS and self.opts.keep_100 and self.potion_100(s):
             return True                      # keep_100: maybe healing / extra healing -- kept for quaff_test
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None

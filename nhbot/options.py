@@ -40,6 +40,8 @@ DEFAULTS = {
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
+    "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
+    "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
     "hallu_wait": True,        # hallucinating: fights / healing / food as ever, no trips / exploring / level change -- rest instead; no Elbereth
     "quaff_no_peace": True,   # quaff_test not on a level where a peaceful was seen (a look, a shop, Minetown)
     "keep_100": True,         # an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
