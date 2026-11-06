@@ -42,6 +42,8 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
     "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
+    "poly_recover": False,     # A/B: turned into a handless form -- pray when safe (pray.c TROUBLE_UNUSEABLE_HANDS:
+                               #      rehumanize); what fell from us then is taken back with the rest when human again
     "cloak_cover": False,      # A/B: a cloak over an empty cloak slot counts CLOAK_COVER AC more (it takes destroy armor and
                                #      erosion for the suit); mummy wrapping, orcish / dwarvish cloak are worn -- True:
                                #      any of them, "uncursed": only one known uncursed / blessed (a cursed one locks the suit)

@@ -93,6 +93,8 @@ class PolicyMixin:
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
         if self.opts.restore_fix:
             self.attr_track()                    # potiontest.py: the best each attribute has been
+        if self.opts.poly_recover:
+            self.poly_track()                    # thieves.py: what fell from us when we changed form
         if self.opts.lep_stash:
             self.lep_track()                     # thieves.py: which leprechauns moved since the tick before
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
@@ -188,6 +190,9 @@ class PolicyMixin:
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
                 self.faint_since is not None and t - self.faint_since > self.opts.faint_wait), weak=True):
             self.pray(); return True
+        if self.opts.poly_recover and self.polyd and self.handless() and self.can_pray():
+            self.poly_stats["prayed"] += 1
+            self.pray(); return True           # pray.c: a handless form is major trouble, fixed by rehumanize()
         if self.lycanthropy and self.can_pray() and \
                 not any(n.startswith("were") for _, n in self.visible_hostiles(c.lv)):
             self.pray(); return True           # not while a lycanthrope in view can bite us again right after

@@ -45,6 +45,9 @@ class ThievesMixin:
         self._theft_turn = None
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
+        self.poly_inv = set()          # poly_recover: bare names of what we carried at the tick before
+        self.poly_new = False          # poly_recover: we just turned into something (poly_track compares)
+        self.poly_stats = Counter()
         self.nymph_zap_stats = Counter()
         self.thief_stats = Counter()     # lep_drop, lep_hall, lep_stash
         self.lep_room = {}               # lep_stash: level key -> the leprechaun hall's floor (until cleared)
@@ -530,6 +533,7 @@ class ThievesMixin:
             self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
         if re.search(r"You turn into an? ", m):
             self.polyd = True                                 # weapons: no wielding in a borrowed body
+            self.poly_new = True
         if re.search(r"You return to \w+ form|You feel like a new ", m):
             self.polyd = False
         if re.search(r"You return to \w+ form", m) and self.were_drop:   # dwarves: "dwarven form"
@@ -652,6 +656,19 @@ class ThievesMixin:
                         if best is None or d < best[0]:
                             best = (d, (ny, nx))
         return best[1] if best else None
+
+    def poly_track(self):
+        """poly_recover, every tick: what left us when we turned into something (polyself.c break_armor /
+        drop_weapon: worn armor and the weapon fall where we stood -- were_drop) is named like stolen loot, so
+        the loot pickup there takes it all back (take_reason alone leaves an artifact such as Excalibur)."""
+        names = {base_name(it.text)[2] for it in self.items()}
+        if self.poly_new:
+            lost = self.poly_inv - names
+            self.stolen_names |= lost
+            self.poly_stats["turned"] += 1
+            self.poly_stats["lost_items"] += len(lost)
+            self.poly_new = False
+        self.poly_inv = names
 
     def loot_step(self, lv):
         if self.loot_sq is None or self.loot_key != lv.key:
