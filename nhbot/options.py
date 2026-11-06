@@ -47,9 +47,10 @@ DEFAULTS = {
                                #      the guard, if he comes first, is told "Croesus" (nhbot.vault)
     "poly_recover": False,     # A/B: turned into a handless form -- pray when safe (pray.c TROUBLE_UNUSEABLE_HANDS:
                                #      rehumanize); what fell from us then is taken back with the rest when human again
-    "cloak_cover": True,       # A/B +662 [-678, +1971]: a cloak over an empty cloak slot counts CLOAK_COVER AC more (it
-                               #      takes destroy armor and erosion for the suit); mummy wrapping, orcish / dwarvish
-                               #      cloak are worn -- True: any of them, "uncursed": only one known uncursed / blessed
+    "cloak_cover": "uncursed", # A/B +862 [-5, +1787] (True: +662 [-678, +1971]): a cloak over an empty cloak slot
+                               #      counts CLOAK_COVER AC more (it takes destroy armor and erosion for the suit); mummy
+                               #      wrapping, orcish / dwarvish cloak are worn -- True: any of them, "uncursed": only
+                               #      one known uncursed / blessed
     "passive_immune": True,    # A/B +296 [-978, +1553], max depth +0.2: a monster with only a passive cold / fire attack
                                #      (brown / red mold, blue jelly) that we resist is no longer avoided; hunted and hit
                                #      while it gives a resistance we lack
