@@ -278,7 +278,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
             "zaps": self.zaps, "zap_stats": dict(self.zap_stats), "wishes": self.wishes, "wishing": dict(self.wish_stats), "ray_risk": {"counts": dict(self.ray_risk_stats), "log": self.ray_risk_log}, "wand_pwin_log": self.wand_pwin_log, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "descent_rest": sum(self.descent_rest.values()), "revisit": dict(self.revisit_stats), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "protection": dict(self.prot_stats, ac=self.prot_bought), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),
-            "thefts": self.thefts,
+            "thefts": self.thefts, "gold_flow": dict(self.gold_flow), "gold_by_xl": self._gold_xl,
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": self.elb_fail,

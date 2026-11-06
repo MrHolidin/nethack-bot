@@ -8,6 +8,8 @@ order) -- a ray only when our own ray would come back and hit us with probabilit
 import re
 from collections import Counter
 
+import nle.nethack as nh
+
 from nhbot import glyphs as G
 from nhbot.consts import COLS, ROWS, ray_squares
 from nhbot.monsters import THIEVES
@@ -33,6 +35,31 @@ class ThievesMixin:
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
         self.nymph_zap_stats = Counter()
+        self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
+        self._gold_prev = None
+        self._gold_seq = 0
+        self._gold_xl = {}               # XL -> most gold carried at it
+
+    def gold_flow_tick(self):
+        """Stats only: a change of the gold we carry since the last tick, by the messages that came with it --
+        a leprechaun's touch ("Your purse feels lighter."), a foocubus, a vault guard, a shop, a fountain."""
+        g = int(self.bl(nh.NLE_BL_GOLD))
+        if self._gold_prev is not None and g != self._gold_prev:
+            d = g - self._gold_prev
+            m = self.text_since(self._gold_seq)
+            if d > 0:
+                self.gold_flow["got_sold" if "You sold" in m else "got_other"] += d
+            else:
+                why = ("leprechaun" if "purse feels lighter" in m else
+                       "foocubus" if ("attracted" in m or "seduc" in m or "prettier" in m) else
+                       "vault" if self.vault_drops and "drop" in m and "gold" in m else
+                       "shop" if ("bought" in m or "zorkmid" in m or "pay" in m.lower()) else
+                       "fountain" if "fountain" in m else
+                       "drop" if "You drop" in m else "other")
+                self.gold_flow["lost_" + why] -= d
+        xl = int(self.bl(nh.NLE_BL_XP))
+        self._gold_xl[xl] = max(self._gold_xl.get(xl, 0), g)
+        self._gold_prev, self._gold_seq = g, self.msg_seq
 
     # ================================================================== nymphs
     def msg_thieves(self, m):
