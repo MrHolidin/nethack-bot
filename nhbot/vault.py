@@ -8,7 +8,8 @@ dwarvish mattock (two-handed: the shield comes off first) applied down -- the we
 
 vault_find: a vault on our map -- its walls drawn by magic mapping, or its four piles of gold shown by gold detection
 (a 2x2 of gold in the rock) -- is dug to: a tunnel through the rock from the square nearest to it we can reach, into
-the vault, where vault_rob goes on. A wand of digging digs it in one zap when a straight line is short enough. On a
+the vault, where vault_rob goes on; a wand of digging digs it zap by zap (a straight line each, the tunnel planned
+with few turns), walking to the end of each line. On a
 level whose vault we heard ("someone counting money", "the footsteps of a guard on patrol": sounds.c) and could dig
 to, a scroll of gold detection / magic mapping we know is read; those scrolls and a wand of digging are kept."""
 
@@ -25,7 +26,8 @@ VAULT_GRAB_TURNS = 12          # turns inside spent on the gold at most: the dig
 VAULT_SOUNDS = ("counting money", "footsteps of a guard on patrol")
 FIND_SCROLLS = ("scroll of gold detection", "scroll of magic mapping")
 MAX_TUNNEL = 30                # squares of rock and wall dug at most toward a vault (a pick: ~6 turns each)
-WAND_RANGE = 8                 # zap.c zap_dig: digdepth rn1(18, 8) at least; a wall takes 2 of it
+TURN_COST = 0.1                # vault_tunnel: what a turn of the tunnel costs more, a pick (straighter at no cost)
+TURN_COST_WAND = 6             # ... a wand of digging: a turn is a zap more (zap.c zap_dig: one line, rn1(18, 8) deep)
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIG_TRIES = 4                  # tries at one square before the tunnel is given up
 VAULT_RETRY = 100              # turns before a tunnel whose start we could not reach is planned again
@@ -223,10 +225,11 @@ class VaultMixin:
         return found
 
     def vault_tunnel(self, lv, inner, wand):
-        """The tunnel to dig: (start, path) -- start a square we know as passable, path the squares from it to the
-        vault, in order (rock, its wall, then a square inside), orthogonal steps only (a squeeze between rock on a
-        diagonal fails when we carry much: hack.c test_move). The fewest squares to dig, then the nearest start;
-        wand: one straight line digdepth reaches. None."""
+        """The tunnel to dig: (start, path) -- start a square we know as passable, its floor seen, path the squares
+        from it to the vault, in order (rock or the wall of an ordinary room, the vault's wall, then a square
+        inside), orthogonal steps only (a squeeze between rock on a diagonal fails when we carry much: hack.c
+        test_move). The fewest squares to dig, a turn counting TURN_COST more (a wand of digging digs a straight
+        line a zap: zap.c zap_dig), then the nearest start. None."""
         k = G.KIND[lv.under]
         # a start: passable, its floor seen (detected gold lies in the rock too: mklev.c mineralize)
         passable = self.grids(lv)[2] & (G.KIND[lv.terrain] != G.UNKNOWN)
@@ -234,69 +237,52 @@ class VaultMixin:
         y0, x0 = min(inner)
         ring_ok = {(y0 - 1, x0), (y0 - 1, x0 + 1), (y0 + 2, x0), (y0 + 2, x0 + 1),
                    (y0, x0 - 1), (y0 + 1, x0 - 1), (y0, x0 + 2), (y0 + 1, x0 + 2)}    # not the corners
+        ring = {(y0 + i, x0 + j) for i in range(-1, 3) for j in range(-1, 3)} - inner_set
         shopish = np.zeros_like(passable)
         if lv.shop.any():
             ys, xs = np.nonzero(lv.shop)
             for y, x in zip(ys, xs):
                 shopish[max(0, y - 2):y + 3, max(0, x - 2):x + 3] = True          # never a shop's wall
         me = self.pos()
+        turn = TURN_COST_WAND if wand else TURN_COST
 
-        def rock(p):
-            return k[p] == G.UNKNOWN and not shopish[p]
+        def diggable(q):                                  # rock, or the wall of a room that is not a shop
+            return (k[q] == G.UNKNOWN or k[q] == G.WALL and q not in ring) and not shopish[q]
 
-        best = None
-        if wand:
-            for p in inner:
-                for dy, dx in ORTHO:
-                    path, cost, q = [], 0, p
-                    while True:
-                        q = (q[0] + dy, q[1] + dx)
-                        if not (0 <= q[0] < ROWS and 0 <= q[1] < COLS) or q in inner_set:
-                            break
-                        if passable[q]:
-                            if path and (path[0] in ring_ok) and cost <= WAND_RANGE:
-                                d = max(abs(q[0] - me[0]), abs(q[1] - me[1]))
-                                if best is None or d < best[0]:
-                                    best = (d, q, list(reversed(path)) + [p])
-                            break
-                        if q in ring_ok and not path:
-                            cost += 2
-                        elif rock(q) and path:
-                            cost += 1
-                        else:
-                            break
-                        path.append(q)
-            return None if best is None else (best[1], best[2])
-        dist = {p: 0 for p in inner}
-        prev = {}
-        heap = [(0, p) for p in inner]
-        ends = []
-        while heap:
-            c, p = heapq.heappop(heap)
-            if c > dist.get(p, 10 ** 9) or c > MAX_TUNNEL:
-                continue
-            for dy, dx in ORTHO:
+        dist, prev, heap, ends = {}, {}, [], []
+        for p in inner:
+            for di, (dy, dx) in enumerate(ORTHO):
                 q = (p[0] + dy, p[1] + dx)
-                if not (0 <= q[0] < ROWS and 0 <= q[1] < COLS) or q in inner_set:
+                if q in ring_ok:
+                    dist[(q, di)] = 1
+                    prev[(q, di)] = (p, None)
+                    heapq.heappush(heap, (1, q, di))
+        while heap:
+            c, p, di = heapq.heappop(heap)
+            if c > dist.get((p, di), 10 ** 9) or c > MAX_TUNNEL:
+                continue
+            for dj, (dy, dx) in enumerate(ORTHO):
+                q = (p[0] + dy, p[1] + dx)
+                if not (0 <= q[0] < ROWS and 0 <= q[1] < COLS) or q in inner_set or q in ring:
                     continue
-                if passable[q] and p not in inner_set:
-                    ends.append((c, max(abs(q[0] - me[0]), abs(q[1] - me[1])), q, p))
+                if passable[q]:
+                    ends.append((c, max(abs(q[0] - me[0]), abs(q[1] - me[1])), q, (p, di)))
                     continue
-                if p in inner_set and q not in ring_ok:
+                if not diggable(q):
                     continue
-                if p not in inner_set and not rock(q):
-                    continue
-                if c + 1 < dist.get(q, 10 ** 9):
-                    dist[q] = c + 1
-                    prev[q] = p
-                    heapq.heappush(heap, (c + 1, q))
+                c2 = c + 1 + (turn if dj != di else 0)
+                if c2 < dist.get((q, dj), 10 ** 9):
+                    dist[(q, dj)] = c2
+                    prev[(q, dj)] = (p, di)
+                    heapq.heappush(heap, (c2, q, dj))
         if not ends:
             return None
-        _, _, start, first = min(ends)
-        path, p = [first], first
-        while p in prev:
-            p = prev[p]
-            path.append(p)
+        _, _, start, st = min(ends)
+        path = []
+        while st[1] is not None:
+            path.append(st[0])
+            st = prev[st]
+        path.append(st[0])                                # the square inside
         return start, path
 
     def vault_find_step(self, lv, hostiles_in_view):
