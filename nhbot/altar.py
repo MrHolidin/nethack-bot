@@ -10,8 +10,10 @@ import re
 from collections import Counter
 
 import nle.nethack as nh
+import numpy as np
 
-from nhbot.consts import ALTAR_GLYPH
+from nhbot import glyphs as G
+from nhbot.consts import ALTAR_GLYPH, DELTA2KEY, NEIGH
 from nhbot.items import base_name
 
 BUC_RE = re.compile(r"\b(?:uncursed|cursed|blessed)\b")
@@ -22,11 +24,100 @@ def buc_key(text):
     return f"{ench}:{name}"
 
 
+PROTECTION_MAX = 9           # priest.c priest_talk: below this much protection a donation of 400*XL always adds
+PROTECTION_TRIES = 6         # donations at most on one level (one that didn't pay: something we don't see is off)
+
+
 class AltarMixin:
     def altar_init(self):
         self.altar_known = set()         # buc_key of items whose status we learned (or saw)
         self.altar_dropped = None        # (level key, square, {buc_key}) lying on an altar, to pick back up
         self.altar_stats = Counter()
+        self.prot_bought = 0             # AC the temple priests' protection gave us
+        self.prot_stats = Counter()
+        self.temple_levels = set()       # levels where we entered a temple ("Pilgrim, you enter a sacred place!")
+        self.prot_tries = Counter()      # level key -> donations there
+        self._temple_seq = 0
+
+    def protection_step(self, lv):
+        """Buy protection from a temple priest (priest.c priest_talk): a donation of 400 * XL (below 600 * XL)
+        gives 2-4 points of AC the first time, one more each time after, every time while the protection is below
+        PROTECTION_MAX. Only on a level where we entered his temple (out of it he takes a chat for an insult and
+        turns hostile), with the gold for it, nothing threatening us (the caller checks): to a square next to him,
+        #chat, offer. True if it used the turn."""
+        if not self.opts.buy_protection:
+            return False
+        new = self.msgs_since(self._temple_seq) if self._temple_seq else []
+        self._temple_seq = self.msg_seq
+        if any("enter a sacred place" in m for m in new):
+            self.temple_levels.add(lv.key)
+        if lv.key not in self.temple_levels or self.prot_bought >= PROTECTION_MAX \
+                or self.prot_tries[lv.key] >= PROTECTION_TRIES \
+                or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_HALLU | nh.BL_MASK_CONF
+                                                             | nh.BL_MASK_STUN):
+            return False
+        offer = 400 * int(self.bl(nh.NLE_BL_XP))
+        if int(self.bl(nh.NLE_BL_GOLD)) < offer:
+            return False
+        g = self.obs["glyphs"]
+        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
+        priests = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "aligned priest"]
+        if not priests:
+            return False
+        y, x = self.pos()
+        p = min(priests, key=lambda q: max(abs(q[0] - y), abs(q[1] - x)))
+        if max(abs(p[0] - y), abs(p[1] - x)) == 1:
+            if not self.peaceful_now(lv, p):
+                self.prot_tries[lv.key] = PROTECTION_TRIES     # angered: leave him be
+                self.prot_stats["hostile"] += 1
+                return False
+            return self.donate(lv, p, offer)
+        mask = np.zeros_like(lv.under, dtype=bool)
+        for dy, dx in NEIGH:
+            if 0 <= p[0] + dy < mask.shape[0] and 0 <= p[1] + dx < mask.shape[1]:
+                mask[p[0] + dy, p[1] + dx] = True
+        status, _ = self.walk_to(lv, mask, max_cost=200, act="protection")
+        return status == "moved"
+
+    def donate(self, lv, p, offer):
+        """#chat toward the priest at p, offer `offer` gold (typed into the 'How much will you offer?' line --
+        the generic prompt handling would escape it, an offer of 0: "Thou shalt regret thine action!")."""
+        self.cur_act = "protection"
+        self.prot_tries[lv.key] += 1
+        self.prot_stats["donate"] += 1
+        ac0 = int(self.bl(nh.NLE_BL_AC))
+        seq = self.msg_seq
+        y, x = self.pos()
+        self.press("#", expect_prompt=True)
+        for c in "chat":
+            self.raw_step(ord(c))
+        self.raw_step(13)
+        self.raw_step(ord(DELTA2KEY[(p[0] - y, p[1] - x)]))
+        for _ in range(6):
+            tty = self.tty_text()
+            if "--More--" in tty.replace("\n", ""):
+                self.log_msg(self.top_line().replace("--More--", ""))
+                self.raw_step(13)
+                continue
+            if self.obs["misc"][1] and "offer" in (self.message() + self.top_line()).lower():
+                for c in str(offer):
+                    self.raw_step(ord(c))
+                self.raw_step(13)
+                self.prot_stats["offered"] += 1
+            break
+        self.settle()
+        said = self.text_since(seq)
+        if "rewarded for thy devotion" in said:
+            gain = max(1, ac0 - int(self.bl(nh.NLE_BL_AC)))
+            self.prot_bought += gain
+            self.prot_stats["bought"] += 1
+            self.prot_stats["ac"] += gain
+        elif "selfless generosity" in said or "pious individual" in said or "Cheapskate" in said:
+            self.prot_stats["no_protection"] += 1
+        else:
+            self.prot_stats["other"] += 1
+            self.prot_tries[lv.key] = PROTECTION_TRIES          # not what we expected: no more here
+        return True
 
     def altar_untested(self):
         return [it for it in self.items()

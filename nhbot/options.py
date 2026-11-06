@@ -10,6 +10,7 @@ DEFAULTS = {
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
     "peace_shut": False,       # A/B: PEACE_SHUT_WAITS waits for a peaceful monster on a square of our path close it
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
+    "buy_protection": False,   # A/B: buy AC from a temple priest, 400 * XL gold a time while below 9 (nhbot.altar)
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "soko_zoo": True,          # with sokoban: open the top level's zoo for the prize (False: the four puzzles only --
