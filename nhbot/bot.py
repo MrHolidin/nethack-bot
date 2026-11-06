@@ -316,7 +316,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "excalibur": self.excal_turn,
             "dips": self.dips,
             "excal_trips": self.excal_trips,
-            "dip_events": self.dip_events, "fountain_elb": dict(self.fhide_stats),
+            "dip_events": self.dip_events, "fountain_elb": dict(self.fhide_stats), "backup_weapon": dict(self.backup_stats),
             "fountain_levels": len(self.fountain_levels),
             "align": int(self.last_bl[nh.NLE_BL_ALIGN]),
             "ammo_pickups": self.ammo_pickups,
