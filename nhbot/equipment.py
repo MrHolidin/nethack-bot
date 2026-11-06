@@ -108,6 +108,7 @@ def parse_armor(s):
 
 
 BLESSED_RE = re.compile(r"\bblessed\b")
+UNCURSED_RE = re.compile(r"\b(?:uncursed|blessed)\b")
 
 # A wish (wand of wishing, a djinni from a lamp or a smoky potion, a water demon from a fountain): armor, the first
 # of these we don't carry yet -- what the gift experiment found worth most to the bot (AC above all), one per slot.
@@ -228,8 +229,15 @@ class EquipMixin:
             gain += PROP_VALUE * (len(props_with) - len(props_now))
         return gain
 
+    def cover_cloak_ok(self, a):
+        """cloak_cover: a mummy wrapping / orcish / dwarvish cloak may be worn ("uncursed": only one known
+        uncursed or blessed -- objnam.c always names "uncursed" on armor whose curse status we know)."""
+        if not self.opts.cloak_cover or a["slot"] != CLOAK:
+            return False
+        return self.opts.cloak_cover != "uncursed" or bool(UNCURSED_RE.search(a.get("text", "")))
+
     def improves(self, a, worn):
-        safe = a.get("safe") or self.opts.cloak_cover and a["slot"] == CLOAK   # mummy wrapping, orcish / dwarvish cloak
+        safe = a.get("safe") or self.cover_cloak_ok(a)
         if a["slot"] is None or not safe or not self.slot_allowed(a["slot"]):
             return False
         if (a["name"], a.get("letter")) in self.wear_failed:
