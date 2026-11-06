@@ -72,6 +72,7 @@ class Level:
         self.locked = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
+        self.lep_shut = np.zeros((ROWS, COLS), dtype=bool)   # lep_hall: a room of leprechauns, closed from outside
         self.grotto = False        # Grotto Town (is_grotto)
         self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
@@ -185,6 +186,8 @@ class MapMixin:
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
+        if self.opts.lep_hall and not lv.lep_shut[self.pos()]:
+            p[lv.lep_shut] = False
         if self.opts.peace_shut:
             t = self.turn()
             for sq, until in lv.peace_shut.items():

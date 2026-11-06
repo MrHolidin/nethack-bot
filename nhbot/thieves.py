@@ -22,6 +22,10 @@ from nhbot.combat import RAY_WANDS
 NYMPH_RAY_RISK = 0.10
 
 
+LEP_HALL_MIN = 3          # lep_hall: leprechauns in view (and nothing else hostile) that make their room closed
+LEP_ROOM_MAX = 300        # a bigger flood is no room
+
+
 class ThievesMixin:
     def thieves_init(self):
         self.thefts = 0
@@ -49,6 +53,27 @@ class ThievesMixin:
         g = self.obs["glyphs"]
         return any(G.monster_name(int(g[p])) == "leprechaun"
                    for p in zip(*np.nonzero(G.KIND[g] == G.MONSTER)))
+
+    def lep_hall_mark(self, lv):
+        """lep_hall: more than LEP_HALL_MIN - 1 leprechauns in view and no other hostile -- a leprechaun hall (or
+        their room): its floor is closed to us from outside, like a shop (mapmem.passable_grid); from inside we
+        walk as before, and it closes once we are out."""
+        if not self.opts.lep_hall or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            return
+        vis = self.visible_hostiles(lv)
+        leps = [p for p, n in vis if n == "leprechaun"]
+        if len(leps) < LEP_HALL_MIN or len(leps) < len(vis):
+            return
+        ok = self.shop_floor(lv)
+        for p in leps:
+            ok[p] = True
+        room = self._flood(ok, leps, cap=LEP_ROOM_MAX + 1)
+        if len(room) > LEP_ROOM_MAX:
+            return
+        if not lv.lep_shut.any():
+            self.thief_stats["lep_hall"] += 1
+        for c in room:
+            lv.lep_shut[c] = True
 
     def lep_step(self, lv):
         """lep_drop: a leprechaun in view and gold on us -- drop it all where we stand (steal.c stealgold takes a

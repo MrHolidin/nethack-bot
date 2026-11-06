@@ -271,6 +271,7 @@ class PolicyMixin:
         return self.elb_step(c.lv, c.hostiles)
 
     def step_thieves(self, c):
+        self.lep_hall_mark(c.lv)
         return self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
 
     def step_regen(self, c):

@@ -10,6 +10,8 @@ DEFAULTS = {
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
     "peace_shut": False,       # A/B: PEACE_SHUT_WAITS waits for a peaceful monster on a square of our path close it
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
+    "lep_hall": False,         # A/B: 3+ leprechauns in view and no other hostile: their room closed to us from outside
+                               #      like a shop (nhbot.thieves.lep_hall_mark, mapmem.passable_grid)
     "lep_drop": False,         # A/B: a leprechaun in view: drop our gold where we stand, fight; take it back once none
                                #      is in view (nhbot.thieves.lep_step)
     "buy_protection": False,   # A/B: buy AC from a temple priest, 400 * XL gold a time while below 9 (nhbot.altar)
