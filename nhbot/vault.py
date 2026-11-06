@@ -45,6 +45,7 @@ class VaultMixin:
         self.vault_heard = set()       # vault_find: level keys whose vault we heard
         self.vault_done = set()        # vault_find: level keys whose vault we reached or gave up
         self.vault_plan = None         # vault_find: {key, inner, start, path (squares to dig, in order), wand}
+        self.vault_out = None          # vault_exit: (level key, square) where the tunnel into the vault we are in begins
         self.vault_tries = Counter()   # vault_find: tries at digging each square of the plan
         self.vault_loc_at = {}         # vault_find: level key -> (lv.under bytes hash, located interior or None)
         self.vault_wait = {}           # vault_find: level key -> turn before which no tunnel is planned again
@@ -112,6 +113,7 @@ class VaultMixin:
             return self.vault_plan is None and self.swap_back("dig")
         if self.vault_plan is not None and self.vault_plan["key"] == lv.key:
             self.vault_done.add(lv.key)               # vault_find: the tunnel is through
+            self.vault_out = (lv.key, self.vault_plan["start"])
             self.vault_plan = None
             self.vault_stats["tunnel_in"] += 1
         if hostiles and any(n != "guard" for _, n in hostiles) or lv.key in self.dig_refused:
@@ -135,6 +137,13 @@ class VaultMixin:
             p = gold[0]                               # every square of the 2x2 is next to us
             self.press(DELTA2KEY[(p[0] - here[0], p[1] - here[1])])
             return True
+        if self.opts.vault_exit and self.vault_out is not None and self.vault_out[0] == lv.key:
+            mask = np.zeros(lv.under.shape, dtype=bool)
+            mask[self.vault_out[1]] = True
+            if self.walk_to(lv, mask, act="vault_exit")[0] == "moved":
+                self.vault_stats["walk_out"] += 1     # vault_exit: out by our own tunnel, not down a hole
+                return True
+            self.vault_out = None                     # the way back is shut: down after all
         return self.dig_down(lv, means)
 
     def dig_down(self, lv, means):

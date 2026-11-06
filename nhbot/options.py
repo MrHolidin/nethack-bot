@@ -50,6 +50,8 @@ DEFAULTS = {
                                #      be wielded again
     "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
+    "vault_exit": False,       # A/B: in a vault we tunnelled into (vault_find): out by the tunnel with the gold, no hole
+                               #      down (vault.c: the guard comes after 30 turns inside, told "Croesus" if he comes)
     "guard_follow": False,     # A/B: the vault guard's escort: a step next to him while he waits in the wall (vault.c:
                                #      7 warnings, then he attacks), onto the square he left when he goes on out of sight,
                                #      forward only; over when he disappears
