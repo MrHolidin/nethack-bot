@@ -15,7 +15,8 @@ DEFAULTS = {
     "gold_bag": True,          # gold put in a bag (one kept, not a bag of tricks) while a leprechaun is in view, taken out in shops (nhbot.goldbag; A/B goldbag_v1 +1076)
     "mc_value": True,          # armor choice counts magic cancellation (MC_VALUE AC a point the outfit gains) and magic resistance / reflection (PROP_VALUE each) (nhbot.equipment; A/B mc_v1 +289 [-191, +792])
     "no_dagger_need": False,   # A/B: daggers are not needed (carry.needed): valued at their price like any loot, sold
-    "lift_heavy": False,       # A/B: a pick-up into Burdened is let through when we asked for that item (worth_taking: worth more than what the drop step sheds next)
+    "lift_heavy": True,        # A/B +248 (lawful +784, neutral -1566): a pick-up into Burdened is let through when we
+                               #      asked for that item (worth_taking: worth more than what the drop step sheds next)
     "bag_buy": False,          # A/B: gold_bag and no bag of ours: the cheapest bag for sale we can pay for is bought (nhbot.goldbag)
     "lep_nogold": False,       # A/B: no gold picked up (nor gone for) on the floor of a leprechaun hall until it is cleared (nhbot.thieves)
     "lep_stash": False,        # A/B: a leprechaun hall in view: our gold dropped out of its sight first (taken back once no
