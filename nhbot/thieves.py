@@ -123,7 +123,11 @@ class ThievesMixin:
         now = {(int(a), int(b)) for a, b in zip(*np.nonzero(G.KIND[g] == G.MONSTER))
                if G.monster_name(int(g[a, b])) == "leprechaun"}
         hit = {self.last_attack_target} if self.turn() - (self.attack_turn or -9) <= 1 else set()
-        self.lep_awake = (now - self.lep_now) | (now & (self.lep_awake | hit))
+        # moved: on a square no leprechaun was on, near one that was left (speed 15: up to 2 squares a turn); a
+        # leprechaun just come into view (no square left near it) is not known awake
+        left = self.lep_now - now
+        moved = {p for p in now - self.lep_now if any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in left)}
+        self.lep_awake = moved | (now & (self.lep_awake | hit))
         self.lep_now = now
 
     def lep_approach(self, lv, room):
