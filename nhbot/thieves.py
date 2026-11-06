@@ -25,6 +25,9 @@ NYMPH_RAY_RISK = 0.10
 LEP_HALL_MIN = 3          # lep_hall: leprechauns in view (and nothing else hostile) that make their room closed
 LEP_ROOM_MAX = 300        # a bigger flood is no room
 LEP_SEED_TURNS = 150      # lep_stash: turns at most for one seeding of the hall (lep_seed_step)
+LEP_LOST_TURNS = 20      # lep_stash: turns out of sight after which the leprechaun fought (lep_target) is given up
+LEP_GONE = ("escapes downstairs", "escapes upstairs", "snatches", "purse feels lighter", "cannot see the leprechaun",
+            "vanishes", "disappears")    # lep_stash: the leprechaun fought left the level, teleported or went unseen
 LEP_STASH_DIST = 7        # lep_stash: our gold dropped at least this far from the hall (monmove.c: gold seen near)
 
 
@@ -46,6 +49,8 @@ class ThievesMixin:
         self.lep_room = {}               # lep_stash: level key -> the leprechaun hall's floor (until cleared)
         self.lep_stash_at = {}           # lep_stash: level key -> squares we dropped our gold on
         self.lep_now, self.lep_awake = set(), set()  # lep_stash: leprechauns' squares, the awake ones (lep_track)
+        self.lep_target = None           # lep_stash: the leprechaun we woke and fight until it dies (lep_track)
+        self._lep_msg_seq = 0
         self.lep_seed = {}               # lep_stash: level key -> the seeding under way (lep_seed_step)
         self.lep_seeded = {}             # lep_stash: level key -> leprechauns killed there at the last seeding
         self.lep_coins = {}              # lep_stash: level key -> squares we seeded a coin on
@@ -135,7 +140,38 @@ class ThievesMixin:
         left = self.lep_now - now
         moved = {p for p in now - self.lep_now if any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in left)}
         self.lep_awake = moved | (now & (self.lep_awake | hit))
+        hit &= self.lep_now | now
         self.lep_now = now
+        self.lep_target_track(hit)
+
+    def lep_kills(self, key):
+        return sum(1 for k in self.kills if k[1] == "leprechaun" and k[3] == key)
+
+    def lep_target_track(self, hit):
+        """The leprechaun we woke: no other is hit until it dies -- followed while in view (the awake one nearest
+        its last square), looked for where it was last seen while not; given up when it left the level,
+        teleported or went unseen (LEP_GONE), or LEP_LOST_TURNS out of sight."""
+        key, turn = self.level().key, self.turn()
+        kills = self.lep_kills(key)
+        t = self.lep_target
+        text = self.text_since(self._lep_msg_seq).lower()
+        self._lep_msg_seq = self.msg_seq
+        if t is not None:
+            if t["key"] != key or kills > t["kills"]:
+                t = None                                       # killed, or we left the level
+            elif any(w in text for w in LEP_GONE):
+                self.thief_stats["lep_target_gone"] += 1
+                t = None
+            elif self.lep_awake:
+                a, b = t["pos"]
+                t["pos"] = min(self.lep_awake, key=lambda p: max(abs(p[0] - a), abs(p[1] - b)))
+                t["seen"] = turn
+            elif turn - t["seen"] > LEP_LOST_TURNS:
+                self.thief_stats["lep_target_lost"] += 1
+                t = None
+        if t is None and hit:
+            t = {"key": key, "kills": kills, "pos": next(iter(hit)), "seen": turn}
+        self.lep_target = t
 
     def lep_seed_step(self, lv, room):
         """lep_stash, in the hall: a leprechaun of it killed, no awake one in view, sleeping ones left -- before
@@ -148,7 +184,8 @@ class ThievesMixin:
         dead = [k[2] for k in self.kills if k[1] == "leprechaun" and k[3] == key]
         seed = self.lep_seed.get(key)
         if seed is None:
-            if len(dead) <= self.lep_seeded.get(key, 0) or self.lep_awake or not (self.lep_now & room) \
+            if len(dead) <= self.lep_seeded.get(key, 0) or self.lep_awake or self.lep_target is not None \
+                    or not (self.lep_now & room) \
                     or self.pos() not in room:
                 return False
             k = G.KIND[lv.under]
@@ -156,7 +193,7 @@ class ThievesMixin:
             seed = self.lep_seed[key] = {"squares": sq, "done": set(), "until": self.turn() + LEP_SEED_TURNS,
                                          "kills": len(dead)}
             self.thief_stats["lep_seed"] += 1
-        if self.lep_awake or self.turn() > seed["until"]:
+        if self.lep_awake or self.lep_target is not None or self.turn() > seed["until"]:
             return self.lep_seed_end(lv, seed, "awake" if self.lep_awake else "timeout")
         g = self.obs["glyphs"]
         k = G.KIND[lv.under]
@@ -217,9 +254,23 @@ class ThievesMixin:
         -- to the nearest of the hall's (none in view: its floor). True if it used the turn."""
         y, x = self.pos()
         adj = {p for p in self.lep_now if max(abs(p[0] - y), abs(p[1] - x)) == 1}
-        if adj & self.lep_awake or (adj and not self.lep_awake):
+        t = self.lep_target
+        if adj & self.lep_awake or (adj and not self.lep_awake and t is None):
             return False                                       # the melee step (lep_focus_target)
         mask = np.zeros(lv.under.shape, dtype=bool)
+        if t is not None and not self.lep_awake:               # the one we fight out of sight: where it was
+            if (y, x) == t["pos"]:
+                self.press("s")                                # there: look around, a turn
+                self.thief_stats["lep_target_wait"] += 1
+                return True
+            mask[t["pos"]] = True
+            status, _ = self.walk_to(lv, mask, max_cost=80, act="lep_hall")
+            if status != "moved":
+                self.press("s")
+                self.thief_stats["lep_target_wait"] += 1
+            else:
+                self.thief_stats["lep_target_seek"] += 1
+            return True
         goal = self.lep_awake or [p for p in self.lep_now if p in room]
         if goal:
             for a, b in goal:
@@ -242,6 +293,13 @@ class ThievesMixin:
         if not adj:
             return None
         return self.last_attack_target if self.last_attack_target in adj else adj[0]
+
+    def lep_melee_cands(self, hostiles):
+        """lep_stash: the hostiles next to us the melee step may hit -- a sleeping leprechaun not while the one we
+        woke is alive (lep_target)."""
+        if not self.opts.lep_stash or self.lep_target is None:
+            return hostiles
+        return [(p, n) for p, n in hostiles if n != "leprechaun" or p in self.lep_awake]
 
     def lep_hall_mark(self, lv):
         """lep_hall: a leprechaun hall in view (lep_hall_room): its floor is closed to us from outside, like a shop
