@@ -274,6 +274,8 @@ class PolicyMixin:
 
     def step_thieves(self, c):
         self.lep_hall_mark(c.lv)
+        if self.opts.lep_nogold and not self.opts.lep_stash:
+            self.lep_hall_note(c.lv)                 # lep_stash notes it in lep_stash_step
         return self.lep_stash_step(c.lv, c.hostiles) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
 
     def step_regen(self, c):
@@ -444,7 +446,7 @@ class PolicyMixin:
         lv, y, x = c.lv, c.y, c.x
         if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in self.goal_closed_set("gold", lv.key) \
                 and not self.merch_risk(lv, (y, x)) and not self.lep_hold_gold() \
-                and (y, x) not in self.lep_stash_held(lv) \
+                and (y, x) not in self.lep_gold_shut(lv) \
                 and self.items_gate(lv):
             self.goal_done("gold", lv, (y, x))
             self.pickup_matching(("gold piece",))

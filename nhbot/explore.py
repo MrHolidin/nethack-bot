@@ -61,7 +61,7 @@ class ExploreMixin:
             gold[p] = False
         if self.lep_hold_gold():
             gold[:] = False
-        for p in self.lep_stash_held(lv):
+        for p in self.lep_gold_shut(lv):
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)

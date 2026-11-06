@@ -93,14 +93,7 @@ class ThievesMixin:
         (lep_hold_gold). True if it used the turn."""
         if not self.opts.lep_stash:
             return False
-        room = self.lep_hall_room(lv)
-        if room is not None:
-            self.lep_room[lv.key] = room | self.lep_room.get(lv.key, set())   # seen part by part: kept
-        room = self.lep_room.get(lv.key)
-        if room is not None and self.pos() in room and not self.lep_visible():
-            self.lep_room.pop(lv.key)                          # in the hall, no leprechaun left in view: done
-            self.thief_stats["lep_hall_cleared"] += 1
-            return False
+        room = self.lep_hall_note(lv)
         if room is None or lv.shop[self.pos()] or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             return False
         if any(n != "leprechaun" for _, n in hostiles):
@@ -461,6 +454,27 @@ class ThievesMixin:
             self.press("$")
         self.goal_closed_set("gold", lv.key).discard(self.pos())      # ours again once it is safe
         return True
+
+    def lep_hall_note(self, lv):
+        """lep_stash, lep_nogold, every tick: the floor of this level's leprechaun hall (lep_room: seen part by
+        part, kept) until it is cleared -- we are in it and no leprechaun is in view. The floor, or None."""
+        room = self.lep_hall_room(lv)
+        if room is not None:
+            self.lep_room[lv.key] = room | self.lep_room.get(lv.key, set())
+        room = self.lep_room.get(lv.key)
+        if room is not None and self.pos() in room and not self.lep_visible():
+            self.lep_room.pop(lv.key)                          # in the hall, no leprechaun left in view: done
+            self.thief_stats["lep_hall_cleared"] += 1
+            return None
+        return room
+
+    def lep_gold_shut(self, lv):
+        """Squares whose gold is not picked up: lep_stash -- our stashed gold while its hall is not cleared;
+        lep_nogold -- the hall's floor while it is not (its leprechauns would steal it from us)."""
+        shut = self.lep_stash_held(lv)
+        if self.opts.lep_nogold and lv.key in self.lep_room:
+            shut = shut | self.lep_room[lv.key]
+        return shut
 
     def lep_hold_gold(self, lv=None):
         """lep_drop, lep_stash: no gold picked up while a leprechaun is in view (it would be stolen again)."""
