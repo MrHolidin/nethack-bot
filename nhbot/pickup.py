@@ -306,6 +306,9 @@ class PickupMixin:
         """lift_heavy: "You have a little trouble lifting X.  Continue?" (pickup.c lift_object: we'd be Burdened)
         -- yes if the pick-up asked for X and worth_taking judges it worth more than what the drop step will shed
         for it; much trouble (Stressed) or more: no."""
+        if re.search(r"a little trouble lifting \d+ gold pieces?\.", m):
+            return True                       # coins: 100 weigh 1, worth more than anything we carry (a vault's
+            #                                   gold left lying had vault_rob / vault_exit walk back for it)
         mm = re.search(r"a little trouble lifting (.+?)\.\s+Continue\?", m)
         want = self.lift_want
         if not (self.opts.lift_heavy and mm and want is not None):

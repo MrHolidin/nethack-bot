@@ -50,13 +50,15 @@ DEFAULTS = {
                                #      be wielded again
     "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
-    "vault_exit": False,       # A/B: in a vault we tunnelled into (vault_find): out by the tunnel with the gold, no hole
-                               #      down (vault.c: the guard comes after 30 turns inside, told "Croesus" if he comes)
+    "vault_exit": True,        # A/B -222 [-411, -47] (it looped over gold it would not lift): in a vault we tunnelled
+                               #      into (vault_find): out by the tunnel with the gold, no hole down (vault.c: the
+                               #      guard comes after 30 turns inside, told "Croesus" if he comes)
     "guard_follow": True,      # A/B +443 [+246, +647]: the vault guard's escort: a step next to him while he waits in
                                #      the wall (vault.c: 7 warnings, then he attacks), onto the square he left when he
                                #      goes on out of sight, forward only; over when he disappears
-    "vault_find": False,       # A/B: a vault our map shows (magic mapping, gold detection) is dug to with a pick-axe /
-                               #      mattock / wand of digging; a vault heard: a known detection scroll read (nhbot.vault)
+    "vault_find": True,        # A/B -34 [-708, +601]: a vault our map shows (magic mapping, gold detection) is dug to
+                               #      with a pick-axe / mattock / wand of digging; a vault heard: a known detection
+                               #      scroll read (nhbot.vault)
     "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c
                                #      TROUBLE_UNUSEABLE_HANDS: rehumanize); what fell from us then is taken back with
                                #      the rest when human again
