@@ -24,7 +24,7 @@ NYMPH_RAY_RISK = 0.10
 
 LEP_HALL_MIN = 3          # lep_hall: leprechauns in view (and nothing else hostile) that make their room closed
 LEP_ROOM_MAX = 300        # a bigger flood is no room
-LEP_SEED_TURNS = 150      # lep_stash: turns at most for one seeding of the hall (lep_seed_step)
+LEP_BAIT_TURNS = 150      # lep_stash: turns at most for one baiting before a sleeper is hit (lep_bait_step)
 LEP_LOST_TURNS = 20      # lep_stash: turns an awake leprechaun gone out of sight is expected back into view
 LEP_STILL = 2             # lep_stash: ticks still (not fought) that make one taken for an awake leprechaun a sleeper
 LEP_GONE = ("escapes downstairs", "escapes upstairs", "snatches", "purse feels lighter", "cannot see the leprechaun",
@@ -55,9 +55,7 @@ class ThievesMixin:
         self.lep_assumed = set()         # lep_stash: the squares of ones taken for an awake one back in view
         self.lep_still = {}              # lep_stash: awake one's square -> ticks it stayed on it
         self._lep_seen = (None, 0, 0, None)  # lep_stash: level key, leprechaun kills there, message counter, our square
-        self.lep_seed = {}               # lep_stash: level key -> the seeding under way (lep_seed_step)
-        self.lep_seeded = {}             # lep_stash: level key -> leprechauns killed there at the last seeding
-        self.lep_coins = {}              # lep_stash: level key -> squares we seeded a coin on
+        self.lep_bait = {}               # lep_stash: level key -> the baiting under way (lep_bait_step)
         self.lep_emptied = {}            # lep_stash: level key -> squares of the hall we picked the gold up from
         self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
         self._gold_prev = None
@@ -104,7 +102,7 @@ class ThievesMixin:
             return False
         if room is None or lv.shop[self.pos()] or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND:
             return False
-        if self.lep_seed_step(lv, room):
+        if self.lep_bait_step(lv, room):
             return True
         if int(self.bl(nh.NLE_BL_GOLD)) <= 0:
             return self.lep_approach(lv, room)
@@ -197,79 +195,100 @@ class ThievesMixin:
     def lep_kills(self, key):
         return sum(1 for k in self.kill_log if k[1] == "leprechaun" and k[3] == key)
 
-    def lep_seed_step(self, lv, room):
-        """lep_stash, in the hall: a leprechaun of it killed, no awake one in view, sleeping ones left -- before
-        waking the next, a coin on every square of the hall's floor without a monster (a leprechaun picks up the
-        gold it finds, so a woken one stays to gather instead of running off with ours): gold picked up (the
-        hall's piles, and the squares its leprechauns were killed on -- a killed one drops its gold, its corpse
-        on top hides it) as much as the squares without gold need, one coin dropped on each, the rest dropped
-        where we stand; then the fight goes on. LEP_SEED_TURNS at most a time. True if it used the turn."""
+    def lep_bait_step(self, lv, room):
+        """lep_stash, in the hall, no awake leprechaun in view and a sleeping one there -- before waking one: all
+        the gold we can get at in the hall picked up (its piles in view without a monster on them, the squares its
+        leprechauns were killed on: what one carried drops there), all of it dropped next to the sleeper to hit
+        (lep_bait: the bait square), then a step to a square next to both it and the sleeper with no gold on it
+        (a leprechaun hitting us snatches the gold under us and teleports, steal.c) -- the sleeper is hit from
+        there (lep_focus_target). LEP_BAIT_TURNS at most a time. True if it used the turn."""
         key = lv.key
-        dead = [k[2] for k in self.kill_log if k[1] == "leprechaun" and k[3] == key]
-        seed = self.lep_seed.get(key)
-        if seed is None:
-            if len(dead) <= self.lep_seeded.get(key, 0) or self.lep_awake or not (self.lep_now & room) \
-                    or self.pos() not in room:
-                return False
-            k = G.KIND[lv.under]
-            sq = {p for p in room if k[p] in (G.FLOOR, G.GOLD, G.CORPSE, G.OBJECT)}
-            seed = self.lep_seed[key] = {"squares": sq, "done": set(), "until": self.turn() + LEP_SEED_TURNS,
-                                         "kills": len(dead)}
-            self.thief_stats["lep_seed"] += 1
-        if self.lep_awake or self.turn() > seed["until"]:
-            return self.lep_seed_end(lv, seed, "awake" if self.lep_awake else "timeout")
+        bait = self.lep_bait.get(key)
+        sleep = self.lep_sleep.get(key, set())
+        sleepers = self.lep_now & sleep & room
+        if self.lep_awake or not sleepers:
+            self.lep_bait.pop(key, None)
+            return False
+        if bait is None:
+            bait = self.lep_bait[key] = {"until": self.turn() + LEP_BAIT_TURNS, "plan": None}
+            self.thief_stats["lep_bait"] += 1
         g = self.obs["glyphs"]
         k = G.KIND[lv.under]
         here = self.pos()
-        coins = self.lep_coins.setdefault(key, set())          # our coins of the seedings before
-        emptied = self.lep_emptied.setdefault(key, set())      # picked up by us
-        free = {p for p in seed["squares"] if G.KIND[int(g[p])] != G.MONSTER or p == here}
-        gold_on = {p for p in free if k[p] == G.GOLD or p in dead} - emptied
-        todo = [p for p in free - gold_on if p not in seed["done"]]
-        piles = [p for p in gold_on if p not in coins and p not in seed["done"]]
-        if not todo:
-            return self.lep_seed_end(lv, seed, "done")
-        self.cur_act = "lep_seed"
-        gold = int(self.bl(nh.NLE_BL_GOLD))
-        if gold < len(todo) and piles:                         # collect
+        dead = {q[2] for q in self.kill_log if q[1] == "leprechaun" and q[3] == key}
+        emptied = self.lep_emptied.setdefault(key, set())
+        mon = G.KIND[g] == G.MONSTER
+        gold_sq = {p for p in room if (k[p] == G.GOLD or p in dead) and p not in emptied}
+        self.cur_act = "lep_bait"
+        late = self.turn() > bait["until"]
+        bait_sq = bait["plan"][1] if bait["plan"] else None      # the bait down already stays there
+        piles = [p for p in gold_sq if (not mon[p] or p == here) and p != bait_sq]
+        if piles and not late:                                 # collect
             if here in piles:
                 self.pickup_matching(("gold piece",))
                 emptied.add(here)
-                coins.discard(here)
-                self.thief_stats["lep_seed_pick"] += 1
+                self.thief_stats["lep_bait_pick"] += 1
                 return True
-            return self.lep_seed_walk(lv, piles) or self.lep_seed_end(lv, seed, "no_path")
-        if gold <= 0:
-            return self.lep_seed_end(lv, seed, "no_gold")
-        if here in todo:                                       # place: one coin
-            if self.ask("d", "drop"):
-                self.raw_step(ord("1"))
+            if self.lep_bait_walk(lv, piles):
+                return True
+            self.thief_stats["lep_bait_no_path"] += 1
+            bait["until"] = -1
+        plan = bait["plan"]
+        if plan is None or plan[0] not in sleepers:
+            plan = bait["plan"] = self.lep_bait_plan(lv, room, sleepers, gold_sq)
+            if plan is None:
+                self.thief_stats["lep_bait_no_square"] += 1
+                self.lep_bait.pop(key, None)
+                return False
+        target, drop, stand = plan
+        gold = int(self.bl(nh.NLE_BL_GOLD))
+        if gold > 0:
+            if here != drop:
+                if self.lep_bait_walk(lv, [drop]):
+                    return True
+                bait["plan"] = None
+                self.thief_stats["lep_bait_no_path"] += 1
+                return False
+            if self.ask("d", "drop"):                          # the bait
                 self.press("$")
-            seed["done"].add(here)
-            coins.add(here)
             emptied.discard(here)
-            self.thief_stats["lep_seed_coin"] += 1
+            self.thief_stats["lep_bait_drop"] += 1
+            self.thief_stats["lep_bait_gold"] += gold
             return True
-        return self.lep_seed_walk(lv, todo) or self.lep_seed_end(lv, seed, "no_path")
+        if here != stand:
+            if self.lep_bait_walk(lv, [stand]):
+                return True
+            bait["plan"] = None
+            return False
+        self.thief_stats["lep_bait_hit"] += 1
+        return False                                           # the melee step hits the target (lep_focus_target)
 
-    def lep_seed_walk(self, lv, squares):
+    def lep_bait_plan(self, lv, room, sleepers, gold_sq):
+        """(sleeper, bait square, our square): the bait square and ours next to the sleeper and to each other, no
+        monster on either, no gold on ours; the nearest of them to us. None: no such squares."""
+        g = self.obs["glyphs"]
+        k = G.KIND[lv.under]
+        y, x = self.pos()
+        free = {p for p in room if k[p] in (G.FLOOR, G.GOLD, G.CORPSE, G.OBJECT)
+                and (G.KIND[int(g[p])] != G.MONSTER or p == (y, x))}
+        best = None
+        for t in sleepers:
+            near = [p for p in free if max(abs(p[0] - t[0]), abs(p[1] - t[1])) == 1]
+            for d in near:
+                for a in near:
+                    if a == d or a in gold_sq or max(abs(a[0] - d[0]), abs(a[1] - d[1])) != 1:
+                        continue
+                    cost = max(abs(d[0] - y), abs(d[1] - x))
+                    if best is None or cost < best[0]:
+                        best = (cost, (t, d, a))
+        return best[1] if best else None
+
+    def lep_bait_walk(self, lv, squares):
         mask = np.zeros(lv.under.shape, dtype=bool)
         for p in squares:
             mask[p] = True
-        status, _ = self.walk_to(lv, mask, max_cost=60, act="lep_seed")
+        status, _ = self.walk_to(lv, mask, max_cost=60, act="lep_bait")
         return status == "moved"
-
-    def lep_seed_end(self, lv, seed, why):
-        """The seeding over: the gold left on us dropped where we stand (it would be stolen)."""
-        self.lep_seed.pop(lv.key, None)
-        self.lep_seeded[lv.key] = seed["kills"]
-        self.thief_stats["lep_seed_" + why] += 1
-        if int(self.bl(nh.NLE_BL_GOLD)) > 0:
-            self.cur_act = "lep_seed"
-            if self.ask("d", "drop"):
-                self.press("$")
-            return True
-        return False
 
     def lep_approach(self, lv, room):
         """lep_stash, our gold stashed and the hall not cleared: an awake leprechaun in view and none next to us
@@ -295,11 +314,16 @@ class ThievesMixin:
 
     def lep_focus_target(self, lv, hostiles):
         """lep_stash: the leprechaun to hit among those next to us -- an awake one (lep_track), the one we hit
-        last first, so one is fought until it dies instead of waking the next; None: no preference."""
+        last first, so one is fought until it dies instead of waking the next; none awake: the sleeper baited, from
+        our square of the bait plan (lep_bait_step); None: no preference."""
         if not self.opts.lep_stash:
             return None
         adj = [p for p, n in hostiles if n == "leprechaun" and p in self.lep_awake]
         if not adj:
+            bait = self.lep_bait.get(lv.key)
+            plan = bait and bait["plan"]
+            if plan and self.pos() == plan[2] and any(p == plan[0] for p, _ in hostiles):
+                return plan[0]                                 # the sleeper baited (lep_bait_step)
             return None
         return self.last_attack_target if self.last_attack_target in adj else adj[0]
 
