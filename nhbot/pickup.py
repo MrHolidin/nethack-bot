@@ -91,6 +91,7 @@ class PickupMixin:
         self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
         self.pickup_stats = Counter()  # why things were taken / refused
         self._take_state = None        # (food count, encumbrance) frozen while one pickup is judged
+        self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
 
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
@@ -261,10 +262,12 @@ class PickupMixin:
         """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
         without a menu). Returns "menu", or "lone" when there was no menu."""
         seq0 = self.msg_seq
+        self.lift_want = want                  # lift_heavy: a lone item lifted into Burdened, if want takes it
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
         if "Pick up what?" not in tty:
             self.settle()
+            self.lift_want = None
             for t in self.msgs_since(seq0):
                 mm = re.match(r"^[a-zA-Z] - (.+?)\.?$", t)
                 if mm and not want(mm.group(1)):
@@ -272,9 +275,27 @@ class PickupMixin:
             return "lone"
         if re.search(r"\(1 of \d+\)", tty):
             self.msg_audit["pickup_multipage_" + site] += 1
+        self.lift_want = lambda t: True        # what the menu selected is what want took
         self.menu_pick("Pick up what?", want)
         self.settle()
+        self.lift_want = None
         return "menu"
+
+    def lift_answer(self, m):
+        """lift_heavy: "You have a little trouble lifting X.  Continue?" (pickup.c lift_object: we'd be Burdened)
+        -- yes if the pick-up asked for X (worth_taking judged it worth more than what the drop step will shed
+        for it); much trouble (Stressed) or more: no."""
+        mm = re.search(r"a little trouble lifting (.+?)\.\s+Continue\?", m)
+        want = self.lift_want
+        if not (self.opts.lift_heavy and mm and want is not None):
+            return False
+        name = mm.group(1)
+        tags = self.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for
+        texts = [name] + ["%s (for sale, %d zorkmids)" % (t, pr) for t, pr in tags.items() if t in name or name in t]
+        ok = any(want(t) for t in texts)
+        k = "lift_heavy_" + ("yes" if ok else "no")
+        self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
+        return ok
 
     def pickup_matching(self, words, no_sale=False, own=False):
         if not own and self.merch_risk(self.level(), self.pos()):

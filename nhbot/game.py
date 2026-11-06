@@ -140,6 +140,8 @@ class GameMixin:
             self.raw_step(ord("n"))
         elif "sell it?" in m:
             self.raw_step(ord("y"))
+        elif "trouble lifting" in m and self.lift_answer(msg):
+            self.raw_step(ord("y"))                              # lift_heavy (pickup.py)
         elif m.rstrip().endswith("pay? [yn] (n)") or "pay?" in m:
             self.raw_step(ord("y"))
         elif "possessions identified" in m:
