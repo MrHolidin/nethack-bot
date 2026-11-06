@@ -45,7 +45,9 @@ BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster 
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
 ZOO_QUIET = 8             # turns with the zoo's monsters in view all where they were: the wave is over (the rest sleep)
 ZOO_HOLD_MAX = 300        # turns at most spent holding the zoo's doorway
-ZOO_BACK_HP = 0.5         # in the zoo below this share of HP with its monsters moving: back to the doorway
+ZOO_BACK_HP = 0.7         # in the zoo below this share of HP with its monsters moving: back to the doorway
+ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
+ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -97,6 +99,7 @@ class SokoLevel:
         self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
+        self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
         rows = self.lv["map"]
@@ -420,9 +423,24 @@ class SokobanMixin:
         st.behind_waits = SOKO_BEHIND_WAITS - 3
         return True
 
+    def soko_zap_over(self, st, d):
+        """Nothing left to throw: a ray along the push at the monster beyond the boulder (a ray passes over
+        boulders; striking's force bolt would break the boulder, sleep coming back would put us down) -- cold
+        first (a Valkyrie resists it). True if zapped."""
+        if self.hallu_blind_ranged():
+            return False
+        order = {"cold": 0, "magic missile": 1, "fire": 2, "lightning": 3}
+        wands = sorted((order[k], l) for l, k in self.attack_wands() if k in order)
+        if not wands:
+            return False
+        self.soko_stats["behind_zap"] += 1
+        self.zap(wands[0][1], DELTA2KEY[d])
+        st.behind_waits = SOKO_BEHIND_WAITS - 3
+        return True
+
     def soko_retreat(self, lv, st, blocker, bs, ts):
-        """A peaceful monster in the way: for SOKO_RETREAT turns stand at least 4 squares from it (the nearest such
-        square we reach), then try again."""
+        """A monster in the way (a peaceful one on our path, one beyond the boulder that won't go): for
+        SOKO_RETREAT turns stand at least 4 squares from it (the nearest such square we reach), then try again."""
         if st.retreat_until < self.turn():
             st.retreat_until = self.turn() + SOKO_RETREAT
             st.retreat_from = st.from_map(blocker)
@@ -480,7 +498,16 @@ class SokobanMixin:
             st.since, st.last_i, st.behind_waits = self.turn(), i, 0
         stuck = self.turn() - st.since
         if stuck > SOKO_STUCK and i < len(st.plan):
-            return self.soko_give_up(lv, st, "stuck")
+            # the push won't go (a monster stays beyond the boulder): a plan that leaves that square alone
+            b, d = st.plan[i]
+            if self.soko_replan(st, bs, ts, walls=((b[0] + d[0], b[1] + d[1]),)):
+                return self.soko_wait()
+            if not self.soko_trapped(st, bs, ts):
+                return self.soko_give_up(lv, st, "stuck")
+            # the way back down is shut behind us (Sokoban's pushes go one way): giving up would leave us here
+            # for good -- wait on, the monster may yet go or die
+            st.since = self.turn()
+            self.soko_stats["trapped_wait"] += 1
         extra = bs - st.states[i][0]
         if st.retreat_until >= self.turn():
             return self.soko_retreat_step(lv, st, bs, ts)
@@ -497,10 +524,13 @@ class SokobanMixin:
                 # trap): attack it from beside, else throw over the boulder at it (missiles fly over boulders)
                 if self.soko_attack_at(lv, st, beyond, bs, ts):
                     return True
-                if here == stand and self.soko_throw_over(st, d):
+                if here == stand and (self.soko_throw_over(st, d) or self.soko_zap_over(st, d)):
                     return True
+                # nothing to throw: walk away for a while -- it stays there to get at us; gone from its sight it
+                # may move off, and the push goes
                 st.behind_waits = 0
-                return self.soko_wait()
+                self.soko_stats["behind_retreat"] += 1
+                return self.soko_retreat(lv, st, st.to_map(beyond), bs, ts)
             if here == stand:
                 if st.blocked == self.turn():
                     self.soko_stats["wait_behind"] += 1
@@ -522,7 +552,13 @@ class SokobanMixin:
             return self.soko_give_up(lv, st, "no_way_to_push") if stuck > SOKO_STUCK // 2 else self.soko_wait()
         return self.soko_finish(lv, st, bs, ts, extra)
 
-    def soko_replan(self, st, bs, ts):
+    def soko_trapped(self, st, bs, ts):
+        """No way back to the staircase we arrived on (by Sokoban's rules)."""
+        here = st.from_map(self.pos())
+        arrive = tuple(st.lv["arrive"])
+        return here != arrive and self.soko_walk(st, here, arrive, bs, ts) is None
+
+    def soko_replan(self, st, bs, ts, walls=()):
         """The level no longer matches the plan (a monster's scroll of earth dropped boulders, a wand of striking
         broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_SECS of compute), at most
         SOKO_REPLANS times a level. True if a new plan was found -- we follow it from its start."""
@@ -533,7 +569,7 @@ class SokobanMixin:
         if solver is None:
             solver = SOLVERS[st.name] = soko_solver.Level(st.lv)
         here = st.from_map(self.pos())
-        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here)) if here in st.floor else None
+        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here), walls=walls) if here in st.floor else None
         if plan is None:
             self.soko_stats["replan_fail"] += 1
             return False
@@ -559,6 +595,10 @@ class SokobanMixin:
                 self.press("<")
                 return True
             return self.soko_step_to(lv, st, goal, bs, ts, extra) or self.soko_wait()
+        if not self.opts.soko_zoo:
+            self.soko_done = True
+            self.soko_stats["zoo_skipped"] += 1
+            return self.soko_leave(lv, st)
         return self.soko_prize(lv, st, bs, ts, extra)
 
     def soko_prize(self, lv, st, bs, ts, extra):
@@ -568,13 +608,24 @@ class SokobanMixin:
         if st.prize_inv0 is None:
             st.prize_inv0 = self.soko_prize_items()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED and hp < maxhp and not self.visible_hostiles(lv):
-            self.soko_stats["zoo_rest"] += 1          # the zoo wakes when its door is kicked: full HP first
+        here = st.from_map(self.pos())
+        shut = self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED
+        if st.solved_turn is None:
+            st.solved_turn = self.turn()
+        y, x = self.pos()
+        vis = self.visible_hostiles(lv)
+        near = any(max(abs(p[0] - y), abs(p[1] - x)) <= 2 for p, _ in vis)
+        # the zoo wakes all at once when its door is kicked (dokick.c wake_nearby): full HP and a prayer in hand
+        # first (waiting ZOO_PRAY_WAIT turns at most for the prayer); once open, into the zoo only fit -- rest
+        # outside it first (its monsters still asleep in view don't stop that)
+        if (shut and not vis and (hp < maxhp or (not self.can_pray()
+                                                 and self.turn() - st.solved_turn < ZOO_PRAY_WAIT))) \
+                or (not shut and not near and here not in st.zoo and hp < maxhp * ZOO_ENTER_HP):
+            self.soko_stats["zoo_rest"] += 1
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return True
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
-        here = st.from_map(self.pos())
         # a monster of the zoo may have carried the prize off (they go for an amulet of reflection) and dropped
         # it where it died -- under its corpse, the pile shows its top: the piles in the zoo and on its door
         # are looked into too
