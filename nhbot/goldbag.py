@@ -62,10 +62,10 @@ class GoldBagMixin:
         return self.bag_take_out(bag)
 
     def bag_buy_step(self, lv):
-        """gold_bag, on a shop visit (shop.shop_step), no bag of ours to use and nothing unpaid: a bag for sale we
+        """bag_buy, on a shop visit (shop.shop_step), no bag of ours to use and nothing unpaid: a bag for sale we
         can pay for -- the cheapest (a 2-zorkmid one is a sack, never a bag of tricks) -- picked up (paid for
         by shop_buy_step); bags whose tags we have not read: walked onto. True if it acted."""
-        if not self.opts.gold_bag or self.gold_bag() is not None or any("unpaid" in it.text for it in self.items()):
+        if not self.opts.bag_buy or self.gold_bag() is not None or any("unpaid" in it.text for it in self.items()):
             return False
         gold = int(self.bl(nh.NLE_BL_GOLD))
         here = self.pos()

@@ -12,7 +12,8 @@ DEFAULTS = {
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
     "lep_hall": False,         # A/B: 3+ leprechauns in view and no other hostile: their room closed to us from outside
                                #      like a shop (nhbot.thieves.lep_hall_mark, mapmem.passable_grid)
-    "gold_bag": False,         # A/B: gold put in a bag (one kept, not a bag of tricks) while a leprechaun is in view, taken out in shops (nhbot.goldbag)
+    "gold_bag": True,          # gold put in a bag (one kept, not a bag of tricks) while a leprechaun is in view, taken out in shops (nhbot.goldbag; A/B goldbag_v1 +1076)
+    "bag_buy": False,          # A/B: gold_bag and no bag of ours: the cheapest bag for sale we can pay for is bought (nhbot.goldbag)
     "lep_nogold": False,       # A/B: no gold picked up (nor gone for) on the floor of a leprechaun hall until it is cleared (nhbot.thieves)
     "lep_stash": False,        # A/B: a leprechaun hall in view: our gold dropped out of its sight first (taken back once no
                                #      leprechaun is in view); next to us, the leprechaun we hit last is hit on (nhbot.thieves)
