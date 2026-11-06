@@ -25,6 +25,15 @@ class PotionTestMixin:
         self.quaff_tries = Counter()     # (level key, square) -> Elbereth engravings for a test there
         self.quaff_stats = Counter()
 
+    def potion_100(self, text):
+        """An unidentified potion whose possible types (by the prices seen) all cost TEST_PRICE: healing, extra
+        healing, restore ability, confusion, hallucination, sleeping."""
+        key = appearance(text)
+        if key is None:
+            return False
+        post = self.type_posterior(text)
+        return bool(post) and all(OBJ[_INDEX[(_cls_of(n, key), n)]][3] == TEST_PRICE for n in post)
+
     def potion_to_test(self):
         for it in self.items():
             if it.ocls != nh.POTION_CLASS or "unpaid" in it.text:
@@ -32,8 +41,7 @@ class PotionTestMixin:
             key = appearance(it.text)
             if key is None or key in self.quaff_tested:
                 continue
-            post = self.type_posterior(it.text)
-            if post and all(OBJ[_INDEX[(_cls_of(n, key), n)]][3] == TEST_PRICE for n in post):
+            if self.potion_100(it.text):
                 return it, key
         return None, None
 

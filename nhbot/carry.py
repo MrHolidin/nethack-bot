@@ -247,6 +247,8 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS) and not self.horn_is_bad(it):
             return True                      # a horn that harmed us is cursed: sold
+        if c == nh.POTION_CLASS and self.opts.keep_100 and self.potion_100(s):
+            return True                      # keep_100: maybe healing / extra healing -- kept for quaff_test
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None
         if bag is not None and bag.letter == it.letter:
             return True                      # gold_bag: the bag our gold goes in (nhbot.goldbag)
@@ -271,11 +273,15 @@ class CarryMixin:
                 and not it.on_body and not it.alternate and not it.quivered and "unpaid" not in it.text]
 
     def keep_after_offer(self):
-        """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it."""
+        """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it;
+        keep_100: likewise a potion of the 100 group."""
         c, s = self.selling_item
         if c == nh.SCROLL_CLASS and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
+        if c == nh.POTION_CLASS and self.opts.keep_100 and self.potion_100(s):
+            self.carry_stats["kept_100"] = self.carry_stats.get("kept_100", 0) + 1
+            return True                    # keep_100: the offer just showed it is of the 100 group
         return False
 
     def carry_shop_greeted(self, lv, stype):
