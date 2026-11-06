@@ -266,32 +266,42 @@ class ThievesMixin:
         return False                                           # the melee step hits the target (lep_focus_target)
 
     def lep_bait_plan(self, lv, room, sleepers, gold_sq):
-        """(sleeper, bait square, our square): the sleeper farthest from the hall's way out (a woken one runs off
-        through it: lep_exit_dist), then nearest to us; the bait square and ours next to it and to each other, no
-        monster on either, no gold on ours. None: no such squares."""
+        """(sleeper, bait square, our square). The sleeper: the farthest from the hall's way out (a woken one runs
+        off through it: lep_exit_dist) of those with squares for us. Our square: next to it, no monster, no gold
+        (a leprechaun hitting us snatches the gold under us and teleports, steal.c); best one that cuts it off from
+        every way out (the other leprechauns stay where they sleep), else the one that leaves it the longest way
+        out, then the nearest to the way out. The bait: next to our square, no monster; the farthest from the way
+        out. None: no such squares."""
         g = self.obs["glyphs"]
         k = G.KIND[lv.under]
-        y, x = self.pos()
+        here = self.pos()
         free = {p for p in room if k[p] in (G.FLOOR, G.GOLD, G.CORPSE, G.OBJECT)
-                and (G.KIND[int(g[p])] != G.MONSTER or p == (y, x))}
+                and (G.KIND[int(g[p])] != G.MONSTER or p == here)}
         out = self.lep_exit_dist(lv, room)
-        best = None
-        for t in sleepers:
-            near = [p for p in free if max(abs(p[0] - t[0]), abs(p[1] - t[1])) == 1]
-            for d in near:
-                for a in near:
-                    if a == d or a in gold_sq or max(abs(a[0] - d[0]), abs(a[1] - d[1])) != 1:
-                        continue
-                    cost = (-out.get(t, 0), max(abs(d[0] - y), abs(d[1] - x)))
-                    if best is None or cost < best[0]:
-                        best = (cost, (t, d, a))
-        if best:
-            self.thief_stats["lep_bait_exit_dist"] += -best[0][0]
-        return best[1] if best else None
+        if not out:
+            return None
+        far = len(room) + 1                                    # no way out left
+        for t in sorted(sleepers, key=lambda t: -out.get(t, 0)):
+            best = None
+            for a in free:
+                if a in gold_sq or max(abs(a[0] - t[0]), abs(a[1] - t[1])) != 1:
+                    continue
+                baits = [d for d in free if d != a and max(abs(d[0] - a[0]), abs(d[1] - a[1])) == 1]
+                if not baits:
+                    continue
+                left = self.lep_exit_dist(lv, room, blocked=(self.lep_now - {t}) | {a}).get(t, far)
+                score = (-left, out.get(a, far))
+                if best is None or score < best[0]:
+                    best = (score, a, max(baits, key=lambda d: out.get(d, 0)))
+            if best:
+                self.thief_stats["lep_bait_exit_dist"] += out.get(t, 0)
+                self.thief_stats["lep_bait_cut_off" if -best[0][0] == far else "lep_bait_not_cut_off"] += 1
+                return t, best[2], best[1]
+        return None
 
-    def lep_exit_dist(self, lv, room):
+    def lep_exit_dist(self, lv, room, blocked=()):
         """Square of the hall -> moves to its nearest way out seen (a door, a doorway, a corridor next to it),
-        through the hall; none seen: empty."""
+        through the hall but its blocked squares; none: not in it."""
         k = G.KIND[lv.under]
         h, w = lv.under.shape
         exits = set()
@@ -310,7 +320,7 @@ class ThievesMixin:
                 for dy in (-1, 0, 1):
                     for dx in (-1, 0, 1):
                         q = (a + dy, b + dx)
-                        if q in room and q not in dist:
+                        if q in room and q not in dist and q not in blocked:
                             dist[q] = dist[(a, b)] + 1
                             nxt.append(q)
             todo = nxt
