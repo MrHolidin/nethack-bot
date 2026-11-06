@@ -45,8 +45,9 @@ DEFAULTS = {
     "cloak_cover": False,      # A/B: a cloak over an empty cloak slot counts CLOAK_COVER AC more (it takes destroy armor and
                                #      erosion for the suit); mummy wrapping, orcish / dwarvish cloak are worn -- True:
                                #      any of them, "uncursed": only one known uncursed / blessed (a cursed one locks the suit)
-    "passive_immune": False,   # A/B: a monster with only a passive cold / fire attack (brown / red mold, blue jelly) that we
-                               #      resist is no longer avoided; hunted and hit while it gives a resistance we lack
+    "passive_immune": True,    # A/B +296 [-978, +1553], max depth +0.2: a monster with only a passive cold / fire attack
+                               #      (brown / red mold, blue jelly) that we resist is no longer avoided; hunted and hit
+                               #      while it gives a resistance we lack
     "hallu_wait": True,        # hallucinating: fights / healing / food as ever, no trips / exploring / level change -- rest instead; no Elbereth
     "quaff_no_peace": True,   # quaff_test not on a level where a peaceful was seen (a look, a shop, Minetown)
     "keep_100": True,         # an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
