@@ -32,6 +32,7 @@ class ExcaliburMixin:
         self.fountain_shut = set()       # fountain_elb: (level key, square) of fountains left after a hide
         self.fhide = None                # fountain_elb: {key, fountain, sq, phase, hiding, calm, since, dip_turn}
         self.fhide_stats = Counter()
+        self.fountain_leave = None       # fountain_elb: level key to leave by the stairs down after a hide
 
     def long_sword(self):
         for it in self.items():
@@ -328,6 +329,8 @@ class ExcaliburMixin:
         squares for FOUNTAIN_CALM turns, then this fountain is left (another one, or on and down). True if it used
         the turn."""
         st = self.fhide
+        if self.opts.fountain_elb and self.fountain_leave is not None and st is None:
+            return self.fountain_leave_step(lv, hostiles)
         if not self.opts.fountain_elb or st is None or st["key"] != lv.key or not st["sq"]:
             return False
         here, sq, ftn = self.pos(), st["sq"], st["fountain"]
@@ -415,7 +418,38 @@ class ExcaliburMixin:
             self.cur_act = "fountain_hide"
             self.press("s")
             return True
-        self.fountain_shut.add((lv.key, ftn))            # this fountain is left: another one, or on and down
+        self.fountain_shut.add((lv.key, ftn))            # this fountain is left
         self.fhide_stats["left"] += 1
         self.fhide = None
+        self.excal_skip.add(lv.key)                      # what came out still roams here: no more dips on this
+        self.fountain_leave = lv.key                     # level, and off it by the stairs down
+        return False
+
+    def fountain_leave_step(self, lv, hostiles):
+        """fountain_elb, after a hide: down the stairs we know, nothing next to us (a fight comes first). True if
+        it used the turn."""
+        if self.fountain_leave != lv.key:
+            self.fountain_leave = None
+            return False
+        if hostiles:
+            return False
+        k = self.kinds(lv)
+        down = k == G.DOWNSTAIR
+        if down.any():
+            if self.go_down(lv, self.grids(lv), down):
+                self.fhide_stats["leave_steps"] += 1
+                return True
+            return False
+        up = k == G.UPSTAIR                              # no way down known yet: up the way we came (we come back
+        if not up.any():                                 # down later, by then most likely not next to it)
+            return False
+        if up[self.pos()]:
+            self.fhide_stats["left_up"] += 1
+            self.fountain_leave = None
+            self.cur_act = "fountain_leave"
+            self.press("<")
+            return True
+        if self.walk_to(lv, up, act="fountain_leave")[0] == "moved":
+            self.fhide_stats["leave_steps"] += 1
+            return True
         return False
