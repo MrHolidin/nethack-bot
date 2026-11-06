@@ -23,6 +23,8 @@ class VaultMixin:
                                        # opens its wall (vault.c fake corridor), so it is known by its squares then
         self.dig_refused = set()       # level keys whose floor would not be dug ("too hard to dig in")
         self.vault_stats = Counter()
+        self.vault_portal = None       # level key of a vault where we found a magic portal (the Fort Ludios one,
+                                       # mkmaze.c): no more gold picked there -- a step onto it takes us to the fort
 
     def vault_box(self):
         """The 4 floor squares of the 2x2 room we stand in, closed all round by wall (no door): a vault -- or
@@ -51,12 +53,16 @@ class VaultMixin:
 
     def dig_means(self):
         """How we can dig down: ("wand", item) a wand of digging with charges left, ("pick", item) a pick-axe,
-        ("mattock", item) a dwarvish mattock -- none known cursed (a cursed digger applied stays welded). None."""
+        ("mattock", item) a dwarvish mattock -- none known cursed (a cursed digger applied stays welded), no
+        digger while a cursed weapon is welded to our hand. None."""
         items = self.items()
         wand = next((it for it in items if it.ocls == nh.WAND_CLASS and "wand of digging" in it.text
                      and ":0)" not in it.text and "cancelled" not in it.text), None)
-        pick = next((it for it in items if "pick-axe" in it.text and not it.cursed), None)
-        mattock = next((it for it in items if "dwarvish mattock" in it.text and not it.cursed), None)
+        welded = any(it.wielded and it.cursed and "pick-axe" not in it.text and "mattock" not in it.text
+                     for it in items)             # a cursed weapon in hand: no digger can be wielded (wield.c)
+        pick = None if welded else next((it for it in items if "pick-axe" in it.text and not it.cursed), None)
+        mattock = None if welded else next((it for it in items if "dwarvish mattock" in it.text and not it.cursed),
+                                           None)
         if pick is not None:
             return "pick", pick
         if wand is not None:
@@ -90,7 +96,7 @@ class VaultMixin:
             self.vault_stats["entered"] += 1
         here = self.pos()
         gold = [p for p in box if G.KIND[self.obs["glyphs"][p]] == G.GOLD or (p == here and G.KIND[lv.under[p]] == G.GOLD)]
-        if gold and self.turn() - self.vault_since[1] < VAULT_GRAB_TURNS:
+        if gold and self.turn() - self.vault_since[1] < VAULT_GRAB_TURNS and self.vault_portal != lv.key:
             self.cur_act = "vault_rob"
             if here in gold:
                 g0 = int(self.bl(nh.NLE_BL_GOLD))
@@ -131,6 +137,11 @@ class VaultMixin:
             self.settle()
         self.dig_note(lv, self.text_since(seq0))
         return True
+
+    def msg_vault(self, m):
+        if "You find a magic portal" in m and self.vault_since is not None:
+            self.vault_portal = self.cur_key
+            self.vault_stats["portal"] += 1
 
     def dig_note(self, lv, msgs):
         if "too hard to" in msgs or "cannot reach the" in msgs:
