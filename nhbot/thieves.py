@@ -12,7 +12,7 @@ import nle.nethack as nh
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, ROWS, ray_squares
+from nhbot.consts import COLS, CORRIDOR_GLYPHS, ROWS, ray_squares
 from nhbot.monsters import THIEVES
 from nhbot.items import base_name
 from nhbot.nav import line_clear
@@ -266,13 +266,15 @@ class ThievesMixin:
         return False                                           # the melee step hits the target (lep_focus_target)
 
     def lep_bait_plan(self, lv, room, sleepers, gold_sq):
-        """(sleeper, bait square, our square): the bait square and ours next to the sleeper and to each other, no
-        monster on either, no gold on ours; the nearest of them to us. None: no such squares."""
+        """(sleeper, bait square, our square): the sleeper farthest from the hall's way out (a woken one runs off
+        through it: lep_exit_dist), then nearest to us; the bait square and ours next to it and to each other, no
+        monster on either, no gold on ours. None: no such squares."""
         g = self.obs["glyphs"]
         k = G.KIND[lv.under]
         y, x = self.pos()
         free = {p for p in room if k[p] in (G.FLOOR, G.GOLD, G.CORPSE, G.OBJECT)
                 and (G.KIND[int(g[p])] != G.MONSTER or p == (y, x))}
+        out = self.lep_exit_dist(lv, room)
         best = None
         for t in sleepers:
             near = [p for p in free if max(abs(p[0] - t[0]), abs(p[1] - t[1])) == 1]
@@ -280,10 +282,39 @@ class ThievesMixin:
                 for a in near:
                     if a == d or a in gold_sq or max(abs(a[0] - d[0]), abs(a[1] - d[1])) != 1:
                         continue
-                    cost = max(abs(d[0] - y), abs(d[1] - x))
+                    cost = (-out.get(t, 0), max(abs(d[0] - y), abs(d[1] - x)))
                     if best is None or cost < best[0]:
                         best = (cost, (t, d, a))
+        if best:
+            self.thief_stats["lep_bait_exit_dist"] += -best[0][0]
         return best[1] if best else None
+
+    def lep_exit_dist(self, lv, room):
+        """Square of the hall -> moves to its nearest way out seen (a door, a doorway, a corridor next to it),
+        through the hall; none seen: empty."""
+        k = G.KIND[lv.under]
+        h, w = lv.under.shape
+        exits = set()
+        for a, b in room:
+            for dy in (-1, 0, 1):
+                for dx in (-1, 0, 1):
+                    q = (a + dy, b + dx)
+                    if 0 <= q[0] < h and 0 <= q[1] < w and q not in room and \
+                            (k[q] in (G.DOOR_OPEN, G.DOOR_CLOSED, G.DOORWAY) or int(lv.under[q]) in CORRIDOR_GLYPHS):
+                        exits.add(q)
+        dist = {q: 0 for q in exits}
+        todo = list(exits)
+        while todo:
+            nxt = []
+            for a, b in todo:
+                for dy in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        q = (a + dy, b + dx)
+                        if q in room and q not in dist:
+                            dist[q] = dist[(a, b)] + 1
+                            nxt.append(q)
+            todo = nxt
+        return {q: n for q, n in dist.items() if q in room}
 
     def lep_bait_walk(self, lv, squares):
         mask = np.zeros(lv.under.shape, dtype=bool)
