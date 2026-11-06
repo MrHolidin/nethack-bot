@@ -9,6 +9,7 @@ import re
 from collections import Counter
 
 import nle.nethack as nh
+import numpy as np
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, ROWS, ray_squares
@@ -35,10 +36,39 @@ class ThievesMixin:
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
         self.nymph_zap_stats = Counter()
+        self.thief_stats = Counter()     # lep_drop
         self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
         self._gold_prev = None
         self._gold_seq = 0
         self._gold_xl = {}               # XL -> most gold carried at it
+
+    def lep_visible(self):
+        """A leprechaun in view (not hallucinating: then any letter may be one)."""
+        if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
+            return False
+        g = self.obs["glyphs"]
+        return any(G.monster_name(int(g[p])) == "leprechaun"
+                   for p in zip(*np.nonzero(G.KIND[g] == G.MONSTER)))
+
+    def lep_step(self, lv):
+        """lep_drop: a leprechaun in view and gold on us -- drop it all where we stand (steal.c stealgold takes a
+        part of the gold carried with every hit, the leprechaun teleporting off with it), then fight on; it is
+        picked back up only once no leprechaun is in view (step_gold_here, the gold goal). Not in a shop (the
+        keeper would take it) nor blind. True if it used the turn."""
+        if not self.opts.lep_drop or int(self.bl(nh.NLE_BL_GOLD)) <= 0 or lv.shop[self.pos()] \
+                or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND or not self.lep_visible():
+            return False
+        self.cur_act = "lep_drop"
+        self.thief_stats["lep_drop"] += 1
+        self.thief_stats["lep_drop_gold"] += int(self.bl(nh.NLE_BL_GOLD))
+        if self.ask("d", "drop"):
+            self.press("$")
+        self.goal_closed_set("gold", lv.key).discard(self.pos())      # ours again once it is safe
+        return True
+
+    def lep_hold_gold(self):
+        """lep_drop: no gold picked up while a leprechaun is in view (it would be stolen again)."""
+        return self.opts.lep_drop and self.lep_visible()
 
     def gold_flow_tick(self):
         """Stats only: a change of the gold we carry since the last tick, by the messages that came with it --

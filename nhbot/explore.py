@@ -59,6 +59,8 @@ class ExploreMixin:
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
         for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
+        if self.lep_hold_gold():
+            gold[:] = False
         downstairs = k_mem == G.DOWNSTAIR
         on_level = self.turn() - (lv.entered_turn or 0)
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
