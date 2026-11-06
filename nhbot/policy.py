@@ -49,11 +49,11 @@ STEPS = (
     "eat",
     "sacrifice",         # sacrifice: a fresh corpse of a kill to an altar of our alignment, in time
     "eat_corpse",
+    "hallu",             # hallu_wait: hallucinating, after fights / healing / food: wait -- no trips, no exploring
     "digger_stash",
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
     "rest",
     "gold_here",
-    "hallu",             # hallu_wait: hallucinating, nothing else to do here: wait instead of exploring / going on
     "explore",
 )
 
@@ -249,8 +249,9 @@ class PolicyMixin:
 
     def step_hallu(self, c):
         """hallu_wait: hallucinating -- every monster looks random (a peaceful can't be told apart) and Elbereth
-        won't come out right (engrave.c: each letter garbled 1 in 2): fights go on as ever (the steps before),
-        but no exploring and no going to another level -- not Hungry, rest a turn instead."""
+        won't come out right (engrave.c: each letter garbled 1 in 2): fights, healing and food go on as ever (the
+        steps before), but no trips (shop, Excalibur, loot, ...), no exploring, no going to another level -- not
+        Hungry, rest a turn instead."""
         if self.opts.hallu_wait and int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
             self.hallu_waits += 1

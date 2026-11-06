@@ -40,10 +40,10 @@ DEFAULTS = {
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
                                #      its price tag (nhbot.pricemem)
-    "hallu_wait": False,       # A/B: hallucinating: fights as ever, but no exploring / going to another level -- rest instead; no Elbereth
-    "quaff_no_peace": False,   # A/B: quaff_test not on a level where a peaceful was seen (a look, a shop, Minetown)
-    "keep_100": False,         # A/B: an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
-    "quaff_test": False,       # A/B: drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
+    "hallu_wait": True,        # hallucinating: fights / healing / food as ever, no trips / exploring / level change -- rest instead; no Elbereth
+    "quaff_no_peace": True,   # quaff_test not on a level where a peaceful was seen (a look, a shop, Minetown)
+    "keep_100": True,         # an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
+    "quaff_test": "explored",  # (with keep_100, hallu_wait, quaff_no_peace: A/B q2_v1 on seeds 81000 -1083 [-2216, +113]) drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
                                #      "explored": only on a level explored (mapmem.Level.explored)
     "eat_plural": False,       # A/B: "There are 2 jackal corpses here; eat one?" is answered as for one corpse (else no)
     "read_explored": False,    # A/B: untested scrolls are read only on a level explored (mapmem.Level.explored)
