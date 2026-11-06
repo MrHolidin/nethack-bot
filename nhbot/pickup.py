@@ -86,12 +86,16 @@ def floor_kind(text):
     return None, name
 
 
+LIFT_UNDO_TURNS = 30     # lift_heavy: turns after a pick-up into Burdened its drops are watched (lift_undo)
+
+
 class PickupMixin:
     def pickup_init(self):
         self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
         self.pickup_stats = Counter()  # why things were taken / refused
         self._take_state = None        # (food count, encumbrance) frozen while one pickup is judged
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
+        self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
 
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
@@ -281,6 +285,23 @@ class PickupMixin:
         self.lift_want = None
         return "menu"
 
+    def lift_undo(self, it, inv, same):
+        """lift_heavy: it, the next thing the drop step would shed, while we are Burdened after letting a pick-up
+        through -- worth as much per weight as what we lifted, or more (our weight estimate missed: more has to
+        go than worth_taking reckoned): the lifted thing goes instead. it otherwise."""
+        if self.lift_last is None or self.turn() - self.lift_last[1] > LIFT_UNDO_TURNS:
+            self.lift_last = None
+            return it
+        lifted = next((x for x in inv if floor_kind(x.text)[1] == self.lift_last[0]), None)
+        if lifted is None or lifted.letter == it.letter:
+            return it
+        if self.value_per_weight(it, same(it)) >= self.value_per_weight(lifted, same(lifted)):
+            self.lift_last = None
+            k = "lift_heavy_undone"
+            self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
+            return lifted
+        return it
+
     def lift_answer(self, m):
         """lift_heavy: "You have a little trouble lifting X.  Continue?" (pickup.c lift_object: we'd be Burdened)
         -- yes if the pick-up asked for X and worth_taking judges it worth more than what the drop step will shed
@@ -296,6 +317,8 @@ class PickupMixin:
         # worth_taking: worth more per weight than what the drop step sheds for it -- not only "carry" picks pass
         # it (armor to wear, food, weapons don't), and one that fails would be the first thing dropped again
         ok = any(want(t) for t in texts) and ocls is not None and self.worth_taking(ocls, name)
+        if ok:
+            self.lift_last = (floor_kind(name)[1], self.turn())
         k = "lift_heavy_" + ("yes" if ok else "no")
         self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
         return ok

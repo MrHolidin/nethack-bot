@@ -218,6 +218,7 @@ class CarryMixin:
         looks = self.carried_by_look()
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         it = min(inv, key=lambda it: self.value_per_weight(it, same(it)))
+        it = self.lift_undo(it, inv, same)
         if self.gold_bag_unload(it):
             return True                      # gold_bag: the gold out of the bag first, loose gold is kept
         if it.on_body:
@@ -257,7 +258,8 @@ class CarryMixin:
             return True                      # jewelry: identify scrolls, amulets and rings to identify
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
-            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
+            keep = [k for k in KEEP_WEAPONS if not (self.opts.no_dagger_need and k == "dagger")]
+            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in keep):
                 return True                  # wield candidates (valk.weapon_rank) and missiles we throw
         return False
 
