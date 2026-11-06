@@ -88,7 +88,9 @@ class GoldBagMixin:
                 taken = []
                 self.pickup(lambda t: not taken and price(t) == offers[best] and not taken.append(t), "buy_bag")
                 self.for_sale.pop((lv.key, here), None)
-                self.bag_stats["picked_up_for_sale"] += 1
+                self.shop_browsed.add((lv.key, here))     # not walked onto again to read its tag
+                got = any("unpaid" in it.text and any(w in it.text for w in BAG_WORDS) for it in self.items())
+                self.bag_stats["picked_up_for_sale" if got else "not_lifted"] += 1   # too heavy: Burdened
                 return True
             mask = np.zeros(lv.under.shape, dtype=bool)
             mask[best] = True
