@@ -125,16 +125,16 @@ class ThievesMixin:
         self.lep_prev, self.lep_now = self.lep_now, now
 
     def lep_approach(self, lv, room):
-        """lep_stash, our gold stashed and the hall not cleared: nothing next to us -- to the leprechaun we were
-        fighting (one that moved), else the nearest of the hall's. True if it used the turn."""
+        """lep_stash, our gold stashed and the hall not cleared: nothing next to us -- after a leprechaun we woke
+        (one that moved) while one is in view, else to the nearest of the hall's. True if it used the turn."""
         y, x = self.pos()
         if any(max(abs(p[0] - y), abs(p[1] - x)) == 1 for p in self.lep_now):
             return False                                       # one next to us: the melee step
         leps = [p for p in self.lep_now if p in room or max(abs(p[0] - y), abs(p[1] - x)) <= 2]
         mask = np.zeros(lv.under.shape, dtype=bool)
         if leps:
-            # the one we woke if it stays near (faster than us, one that runs is let go), else the nearest
-            awake = [p for p in leps if p not in self.lep_prev and max(abs(p[0] - y), abs(p[1] - x)) <= 3]
+            # one we woke (it moved since the tick before) while it is in view, else the nearest
+            awake = [p for p in self.lep_now if p not in self.lep_prev]
             for a, b in awake or leps:
                 mask[max(0, a - 1):a + 2, max(0, b - 1):b + 2] = True
         else:
