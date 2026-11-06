@@ -115,6 +115,18 @@ BLESSED_RE = re.compile(r"\bblessed\b")
 ARMOR_WISHES = ("blessed +2 gray dragon scale mail", "blessed +2 gauntlets of power", "blessed +2 speed boots",
                 "blessed +2 shield of reflection", "blessed +2 cloak of protection", "blessed +2 dwarvish iron helm")
 
+# objects.c a_can: magic cancellation (mhitu.c: an attack's extra effect lands if rn2(10) >= 3 * MC, MC the best of
+# what we wear); suits and cloaks give 1 unless named here, everything else 0
+MC_OF = {"cloak of protection": 3, "plate mail": 2, "crystal plate mail": 2, "dwarvish mithril-coat": 2,
+         "elven mithril-coat": 2, "oilskin cloak": 2, "slippery cloak": 2, "robe": 2, "leather jacket": 0,
+         "cornuthaum": 1}
+MC_VALUE = 1.75          # mc_value: AC a point of MC is worth
+
+
+def armor_mc(a):
+    return MC_OF.get(a["name"], 1 if a["slot"] in (SUIT, CLOAK) else 0)
+
+
 def value(a):
     """AC the piece gives: do_wear.c ARM_BONUS = a_ac + spe - min(greatest erosion, a_ac); an unknown
     enchantment counts UNKNOWN_ENCH. (A/B erosion_value: +257 [-298, +877].)"""
@@ -185,20 +197,35 @@ class EquipMixin:
     def two_handed(self):
         return any(it.two_hands for it in self.items())
 
+    def wear_gain(self, a, worn):
+        """What putting a on instead of what we wear in its slot gains: its AC over that one's; mc_value: plus
+        MC_VALUE a point of MC the whole outfit gains (MC is the best of what we wear, the other slots as they
+        are) -- the gain of every swap is the gain of sum(AC) + MC_VALUE * MC, so swaps can't go round in a
+        circle."""
+        cur = worn.get(a["slot"])
+        gain = value(a) - (value(cur) if cur is not None else 0)
+        if self.opts.mc_value:
+            others = [armor_mc(w) for s, w in worn.items() if s != a["slot"]]
+            mc_with = max(others + [armor_mc(a)])
+            mc_now = max(others + ([armor_mc(cur)] if cur is not None else []) + [0])
+            gain += MC_VALUE * (mc_with - mc_now)
+        return gain
+
     def improves(self, a, worn):
         if a["slot"] is None or not a.get("safe") or not self.slot_allowed(a["slot"]):
             return False
         if (a["name"], a.get("letter")) in self.wear_failed:
             return False
         cur = worn.get(a["slot"])
+        gain = self.wear_gain(a, worn)
         if cur is None:
-            return value(a) > 0.5
+            return gain > 0.5
         if cur.get("cursed") or a["slot"] in self.cursed_slots:
             return False
-        if abs(value(a) - value(cur)) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
+        if abs(gain) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
                 and not BLESSED_RE.search(cur.get("text", "")):
             return True                       # as good, and blessed: resists erosion and a curse (altar test)
-        return value(a) > value(cur) + 0.5
+        return gain > 0.5
 
     # ---------------------------------------------------------- main hook
     def equip_step(self, lv):
@@ -210,8 +237,7 @@ class EquipMixin:
         # 1) wear something better we already carry
         cands = [a for a in inv if not a["worn"] and self.improves(a, worn)]
         if cands:
-            best = max(cands, key=lambda a: value(a)
-                       - (value(worn[a["slot"]]) if a["slot"] in worn else 0))
+            best = max(cands, key=lambda a: self.wear_gain(a, worn))
             self.wear(best, worn)
             return True
         return False                  # armor we won't wear is carried for selling (the value decides drops)
