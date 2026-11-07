@@ -38,7 +38,8 @@ DEFAULTS = {
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
                                #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
                                #      Orcish Town: its watch is dead), by shops
-    "trap_noblock": False,     # A/B: a step that failed but took a turn (held by a trap, ...) counts against no square
+    "trap_noblock": False,     # A/B: a step that failed in the trap we were caught in (bear trap, pit, web) and took its
+                               #      turn counts against no square, however long we are held (not only 30 tries)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while

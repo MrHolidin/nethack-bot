@@ -232,11 +232,12 @@ class NavMixin:
                 lv.squeeze_dead |= {edge, (target, (y, x))}
                 self.squeeze_stats["edge_shut"] += 1
             return
-        if self.opts.trap_noblock and after[:2] == before[:2] and after[2] > before[2]:
-            self.trap_stats["fail_timed"] += 1            # trap_noblock: it took a turn -- held (a trap, a grab), slow:
-            return                                         # the square is not at fault
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
-            if self.trapped is not None:
+            if self.opts.trap_noblock:
+                if self.trapped is not None and self.trapped[1:] == (lv.key, (y, x)) and after[2] > before[2]:
+                    self.trap_stats["fail_not_counted"] += 1    # trap_noblock: in the trap we were caught in, the
+                    return                                       # step took its turn -- held, for however long
+            elif self.trapped is not None:
                 self.trap_stats["fail_not_counted"] += 1    # held by a trap: the square is not at fault
                 return
             lv.fail[ty, tx] += 1
@@ -248,7 +249,7 @@ class NavMixin:
         30 attempts (a missed 'free' message must not keep failed steps uncounted for ever)."""
         if self.trapped is None:
             return False
-        if self.trapped[1:] != (lv.key, self.pos()) or self.trap_stats["_tries"] >= 30:
+        if self.trapped[1:] != (lv.key, self.pos()) or self.trap_stats["_tries"] >= 30 and not self.opts.trap_noblock:
             self.trapped = None
             self.trap_stats["_tries"] = 0
             return False
