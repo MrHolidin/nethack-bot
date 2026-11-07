@@ -187,8 +187,9 @@ class SurvivalMixin:
         for kt, name, pos, key in self.kills:
             if key != lv.key or not self.corpse_ok(name):
                 continue
-            if G.KIND[lv.under[pos]] != G.CORPSE:
-                continue
+            if G.KIND[lv.under[pos]] != G.CORPSE or self.merch_risk(lv, pos):
+                continue                          # on a shop's floor it is merchandise ("You bite that, you pay
+                #                                   for it!"): where the corpse lies decides, not where we stand
             d = max(abs(pos[0] - self.pos()[0]), abs(pos[1] - self.pos()[1]))
             if d <= kind.max_dist and pos not in [p for _, p in cands]:
                 cands.append((d, pos))
