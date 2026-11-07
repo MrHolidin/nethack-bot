@@ -1005,20 +1005,23 @@ class SokobanMixin:
                 return self.soko_wait()                    # waiting for the awake ones to come through the door
             st.zoo_back_turn = None
             st.zoo_active.clear()                          # none came: they cannot -- fought where they stand
-        todo, closets = self.soko_zoo_todo(lv, st)
-        if not todo or here in todo:
-            return False                                   # soko_prize: pick up here / done
         if active:
             return False                                   # one awake next to us: the fight steps take it on
-        if c.hp < c.maxhp * ZOO_ENTER_HP and not active:
+        # from here on soko_prize, not the fight steps, has the turn: those attack whatever sleeps next to us
+        # (79016: at a pile in the zoo a panther, then a zruty beside it, at the door a rope golem -- woken, they
+        # mauled it, four retreats)
+        todo, closets = self.soko_zoo_todo(lv, st)
+        extra = bs - st.states[st.i][0]
+        if not todo or here in todo:
+            return self.soko_prize(lv, st, bs, ts, extra)  # pick up here / done
+        if c.hp < c.maxhp * ZOO_ENTER_HP:
             if here in inside:
                 self.soko_stats["zoo_back_rest"] += 1
                 return self.soko_zoo_to(lv, st, here, goal, bs, ts)
-            return False                                   # soko_prize rests outside the zoo
-        extra = bs - st.states[st.i][0]
+            return self.soko_prize(lv, st, bs, ts, extra)  # it rests outside the zoo
         nxt = self.soko_zoo_next(lv, st, here, todo, closets, bs, ts, extra)
         if nxt is None:
-            return False                                   # soko_prize waits, then gives the rest up
+            return self.soko_prize(lv, st, bs, ts, extra)  # it waits, then gives the rest up
         return self.soko_zoo_step(lv, st, nxt, extra - st.real_extra)
 
     def soko_give_up(self, lv, st, why):
