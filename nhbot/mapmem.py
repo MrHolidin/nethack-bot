@@ -59,6 +59,8 @@ TRAP_MSGS = (("bear", ("A bear trap closes on your foot", "You are caught in a b
 BARS_GLYPH = nh.GLYPH_CMAP_OFF + 17   # S_bars (iron bars)
 # sounds.c dosounds: a level's shopkeeper, temple, fountains, sinks heard from afar -- on Mines level 3-4 (where
 # Minetown lies: dungeon.def minetn @ (3, 2)) only Minetown has any of them (filler levels are caves, no rooms)
+# the watch's warnings (dig.c watch_dig, dokick.c, fountain.c, monmove.c watch_on_duty): only Minetown has a watch
+WATCH_WARNINGS = ("Hey, stop damaging that", "Hey, stop picking that lock", "Hey, stop using that fountain")
 TOWN_SOUNDS = ("cursing shoplifters", "chime of a cash register", "Neiman and Marcus arguing",
                "strident plea for donations", "carcass being offered in sacrifice", "someone praising",
                "someone beseeching", "bubbling water", "water falling on coins", "splashing of a naiad",
@@ -309,7 +311,7 @@ class MapMixin:
         filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
-        if self.opts.minetown_sounds and lv.town_heard:
+        if lv.town_heard and (self.opts.minetown_sounds or self.opts.minetown_watch):
             return True
         return bool(lv.shop.any() or np.isin(self.terrain_glyphs(lv), (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
 
@@ -327,6 +329,8 @@ class MapMixin:
         if self.opts.minetown_sounds and lv is not None and lv.key[0] == 2 and lv.key[1] in (3, 4) \
                 and "You hear" in m and any(t in m for t in TOWN_SOUNDS):
             lv.town_heard = True                              # minetown_sounds: Minetown, before we see it
+        if self.opts.minetown_watch and lv is not None and lv.key[0] == 2 and any(w in m for w in WATCH_WARNINGS):
+            lv.town_heard = True                              # minetown_watch: the watch warned us -- Minetown
         if "under arrest" in m:
             self.mines_kick_stats["arrest"] += 1
         if "stop damaging that door" in m and lv and self.last_move_target:

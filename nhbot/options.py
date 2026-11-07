@@ -36,6 +36,8 @@ DEFAULTS = {
     "lock_tools": False,       # A/B: the best unlocking tool we carry (skeleton key > lock pick > credit card) kept,
                                #      better ones picked up; locked doors and boxes unlocked with it, silently, before
                                #      any kick / #force -- not in Minetown, Orcish Town yes (nhbot.locktools)
+    "minetown_watch": False,   # A/B: a watch warning on a Mines level ("Hey, stop damaging that wall!", "... picking
+                               #      that lock!", "... using that fountain!") makes it Minetown at once
     "minetown_sounds": True,   # accepted (no A/B): on Mines level 3-4 a shop / temple / fountain / sink heard
                                #      (sounds.c dosounds) makes it Minetown (mapmem.is_minetown) before any is seen
     "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step

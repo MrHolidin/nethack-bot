@@ -63,6 +63,10 @@ class DigThroughMixin:
         if key != lv.key or self.pos() != here or hostiles:
             self.dig_job = None                        # moved off (or a fight): explore meets it again if need be
             return False
+        if self.is_minetown(lv) and not self.is_orctown(lv):
+            self.dig_job = None                        # known as Minetown only now (a watch warning): stop
+            self.dig_note_stat("town_stop")
+            return False
         k = self.kinds(lv)
         open_now = (not (self.grids(lv)[1][sq] == G.BOULDER or k[sq] == G.BOULDER)) if kind == "boulder" \
             else G.PASSABLE[k[sq]]
