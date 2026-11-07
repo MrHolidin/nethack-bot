@@ -665,8 +665,8 @@ class ThievesMixin:
         if self.poly_new:
             lost = self.poly_inv - names
             self.stolen_names |= lost
-            if self.opts.loot_now:                    # weapons.weapon_upgrade tries each once: a lost one may come back
-                self._wield_tried = {(l, t) for l, t in self._wield_tried if base_name(t)[2] not in lost}
+            # weapons.weapon_upgrade tries each once: a lost one may come back
+            self._wield_tried = {(l, t) for l, t in self._wield_tried if base_name(t)[2] not in lost}
             self.poly_stats["turned"] += 1
             self.poly_stats["lost_items"] += len(lost)
             self.poly_new = False

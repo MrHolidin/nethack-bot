@@ -200,9 +200,9 @@ class MapMixin:
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
-        shut = self.vault_shut.get(lv.key) if self.opts.vault_clear else None
+        shut = self.vault_shut.get(lv.key)
         if shut and self.pos() not in shut:
-            p[tuple(zip(*shut))] = False      # vault_clear: a vault we left -- no walk back in (the guard's count)
+            p[tuple(zip(*shut))] = False      # a vault we left -- no walk back in (the guard's count)
         if self.opts.lep_hall and not lv.lep_shut[self.pos()]:
             p[lv.lep_shut] = False
         if self.opts.peace_shut:
@@ -336,7 +336,7 @@ class MapMixin:
         filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
-        if lv.town_heard and (self.opts.minetown_sounds or self.opts.minetown_watch or self.opts.minetown_folk):
+        if lv.town_heard:
             return True
         return bool(lv.shop.any() or np.isin(self.terrain_glyphs(lv), (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
 
@@ -351,9 +351,9 @@ class MapMixin:
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
-        if self.opts.minetown_sounds and lv is not None and lv.key[0] == 2 and lv.key[1] in (3, 4) \
+        if lv is not None and lv.key[0] == 2 and lv.key[1] in (3, 4) \
                 and "You hear" in m and any(t in m for t in TOWN_SOUNDS):
-            lv.town_heard = True                              # minetown_sounds: Minetown, before we see it
+            lv.town_heard = True                              # Minetown, before we see it (accepted without A/B)
         if self.opts.minetown_watch and lv is not None and lv.key[0] == 2 and any(w in m for w in WATCH_WARNINGS):
             lv.town_heard = True                              # minetown_watch: the watch warned us -- Minetown
         if "under arrest" in m:

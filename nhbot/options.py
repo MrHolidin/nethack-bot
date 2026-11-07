@@ -12,11 +12,7 @@ DEFAULTS = {
                                #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
     "lep_hall": False,         # A/B: 3+ leprechauns in view and no other hostile: their room closed to us from outside
                                #      like a shop (nhbot.thieves.lep_hall_mark, mapmem.passable_grid)
-    "gold_bag": True,          # gold put in a bag (one kept, not a bag of tricks) while a leprechaun is in view, taken out in shops (nhbot.goldbag; A/B goldbag_v1 +1076)
-    "mc_value": True,          # armor choice counts magic cancellation (MC_VALUE AC a point the outfit gains) and magic resistance / reflection (PROP_VALUE each) (nhbot.equipment; A/B mc_v1 +289 [-191, +792])
     "no_dagger_need": False,   # A/B: daggers are not needed (carry.needed): valued at their price like any loot, sold
-    "lift_heavy": True,        # A/B +248 (lawful +784, neutral -1566): a pick-up into Burdened is let through when we
-                               #      asked for that item (worth_taking: worth more than what the drop step sheds next)
     "bag_buy": False,          # A/B: gold_bag and no bag of ours: the cheapest bag for sale we can pay for is bought (nhbot.goldbag)
     "lep_nogold": False,       # A/B: no gold picked up (nor gone for) on the floor of a leprechaun hall until it is cleared (nhbot.thieves)
     "lep_stash": False,        # A/B: a leprechaun hall in view: our gold dropped out of its sight first (taken back once no
@@ -33,10 +29,6 @@ DEFAULTS = {
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
-    "lock_tools": True,        # A/B +350 [-966, +1591], median +274 (box kicks halved): the best unlocking tool we
-                               #      carry (skeleton key > lock pick > credit card) kept, better ones picked up; locked
-                               #      doors and boxes unlocked with it, silently, before any kick / #force -- not in
-                               #      Minetown, Orcish Town yes (nhbot.locktools)
     "shop_regrow": False,      # A/B: a shop greeted while dark grows as its floor becomes known (the flood from its
                                #      door again each tick until nothing unknown is next to it) -- mapmem.shop_regrow
     "stun_peace": False,       # A/B: stunned / confused in Minetown with a peaceful next to us: no melee (a blow goes
@@ -45,17 +37,12 @@ DEFAULTS = {
                                #      it Minetown at once (perception.town_folk_visible)
     "minetown_watch": False,   # A/B: a watch warning on a Mines level ("Hey, stop damaging that wall!", "... picking
                                #      that lock!", "... using that fountain!") makes it Minetown at once
-    "minetown_sounds": True,   # accepted (no A/B): on Mines level 3-4 a shop / temple / fountain / sink heard
-                               #      (sounds.c dosounds) makes it Minetown (mapmem.is_minetown) before any is seen
     "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step
                                #      (both ways), not its square -- reached straight from another side it is open
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
                                #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
                                #      Orcish Town: its watch is dead), by shops
-    "trap_noblock": True,      # A/B +76 [-1081, +1220], median +404, starvation 36 -> 24: a step that failed in the
-                               #      trap we were caught in (bear trap, pit, web) and took its turn counts against no
-                               #      square, however long we are held (not only 30 tries)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while
@@ -68,14 +55,6 @@ DEFAULTS = {
                                #      its price tag (nhbot.pricemem)
     "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
     "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
-    "loot_now": True,          # A/B +1481 [+671, +2300]: on the square where our things fell / a thief died (loot_sq):
-                               #      picked up at once, also with hostiles next to us or on Elbereth (one turn);
-                               #      bare-handed in a fight: the best weapon we carry is wielded; a weapon we lost may
-                               #      be wielded again
-    "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
-                               #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
-    "vault_bag_out": True,     # A/B +316 [+84, +574] (9 of 10 guard deaths gone): the vault guard asks for every coin,
-                               #      the bag's too (vault.c hidden_gold): taken out of the bag before the gold is dropped
     "backup_weapon": False,    # A/B: lawful without Excalibur -- the weapon that hits hardest now is wielded (and kept)
                                #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
     "fountain_rehide": False,  # A/B (with fountain_elb): leaving the level after a hide, caught by what beats us --
@@ -86,31 +65,10 @@ DEFAULTS = {
                                #      fountains are still dipped (nothing in view), caught on the way: a hide again
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
                                #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
-    "vault_clear": True,       # A/B +129 [-3, +274]: a vault we tunnelled into and are leaving: out past its wall (the
-                               #      dug opening is still the vault: in_rooms, the guard comes there), then no other walk
-                               #      back in
-    "vault_exit": True,        # A/B -222 [-411, -47] (it looped over gold it would not lift): in a vault we tunnelled
-                               #      into (vault_find): out by the tunnel with the gold, no hole down (vault.c: the
-                               #      guard comes after 30 turns inside, told "Croesus" if he comes)
-    "guard_follow": True,      # A/B +443 [+246, +647]: the vault guard's escort: a step next to him while he waits in
-                               #      the wall (vault.c: 7 warnings, then he attacks), onto the square he left when he
-                               #      goes on out of sight, forward only; over when he disappears
-    "vault_find": True,        # A/B -34 [-708, +601]: a vault our map shows (magic mapping, gold detection) is dug to
-                               #      with a pick-axe / mattock / wand of digging; a vault heard: a known detection
-                               #      scroll read (nhbot.vault)
-    "poly_recover": True,      # A/B +1066 [+675, +1502]: turned into a handless form -- pray when safe (pray.c
-                               #      TROUBLE_UNUSEABLE_HANDS: rehumanize); what fell from us then is taken back with
-                               #      the rest when human again
     "cloak_cover": "uncursed", # A/B +862 [-5, +1787] (True: +662 [-678, +1971]): a cloak over an empty cloak slot
                                #      counts CLOAK_COVER AC more (it takes destroy armor and erosion for the suit); mummy
                                #      wrapping, orcish / dwarvish cloak are worn -- True: any of them, "uncursed": only
                                #      one known uncursed / blessed
-    "passive_immune": True,    # A/B +296 [-978, +1553], max depth +0.2: a monster with only a passive cold / fire attack
-                               #      (brown / red mold, blue jelly) that we resist is no longer avoided; hunted and hit
-                               #      while it gives a resistance we lack
-    "hallu_wait": True,        # hallucinating: fights / healing / food as ever, no trips / exploring / level change -- rest instead; no Elbereth
-    "quaff_no_peace": True,   # quaff_test not on a level where a peaceful was seen (a look, a shop, Minetown)
-    "keep_100": True,         # an unknown potion of the 100 zm group is never sold (needed; an offer showing it: kept)
     "quaff_test": "explored",  # (with keep_100, hallu_wait, quaff_no_peace: A/B q2_v1 on seeds 81000 -1083 [-2216, +113]) drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
                                #      "explored": only on a level explored (mapmem.Level.explored)
     "eat_plural": False,       # A/B: "There are 2 jackal corpses here; eat one?" is answered as for one corpse (else no)

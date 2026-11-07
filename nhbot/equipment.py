@@ -208,7 +208,7 @@ class EquipMixin:
         return any(it.two_hands for it in self.items())
 
     def wear_gain(self, a, worn):
-        """What putting a on instead of what we wear in its slot gains: its AC over that one's; mc_value: plus
+        """What putting a on instead of what we wear in its slot gains: its AC over that one's; plus
         MC_VALUE a point of MC the whole outfit gains (MC is the best of what we wear, the other slots as they
         are) and PROP_VALUE for magic resistance / reflection it gains or loses -- the gain of every swap is the
         gain of sum(AC) + MC_VALUE * MC + PROP_VALUE * properties, so swaps can't go round in a circle."""
@@ -216,17 +216,17 @@ class EquipMixin:
         gain = value(a) - (value(cur) if cur is not None else 0)
         if self.opts.cloak_cover and a["slot"] == CLOAK and cur is None:
             gain += CLOAK_COVER
-        if self.opts.mc_value:
-            others = [armor_mc(w) for s, w in worn.items() if s != a["slot"]]
-            mc_with = max(others + [armor_mc(a)])
-            mc_now = max(others + ([armor_mc(cur)] if cur is not None else []) + [0])
-            gain += MC_VALUE * (mc_with - mc_now)
-            have = set().union(*[PROPS_OF.get(w["name"], set()) for s, w in worn.items() if s != a["slot"]])
-            if any(it.worn and it.ocls == nh.AMULET_CLASS and "reflection" in it.text for it in self.items()):
-                have.add("refl")                  # an amulet of reflection on: a second source adds nothing
-            props_with = have | PROPS_OF.get(a["name"], set())
-            props_now = have | (PROPS_OF.get(cur["name"], set()) if cur is not None else set())
-            gain += PROP_VALUE * (len(props_with) - len(props_now))
+        # magic cancellation and magic resistance / reflection count (A/B mc_v1 +289 [-191, +792])
+        others = [armor_mc(w) for s, w in worn.items() if s != a["slot"]]
+        mc_with = max(others + [armor_mc(a)])
+        mc_now = max(others + ([armor_mc(cur)] if cur is not None else []) + [0])
+        gain += MC_VALUE * (mc_with - mc_now)
+        have = set().union(*[PROPS_OF.get(w["name"], set()) for s, w in worn.items() if s != a["slot"]])
+        if any(it.worn and it.ocls == nh.AMULET_CLASS and "reflection" in it.text for it in self.items()):
+            have.add("refl")                  # an amulet of reflection on: a second source adds nothing
+        props_with = have | PROPS_OF.get(a["name"], set())
+        props_now = have | (PROPS_OF.get(cur["name"], set()) if cur is not None else set())
+        gain += PROP_VALUE * (len(props_with) - len(props_now))
         return gain
 
     def cover_cloak_ok(self, a):

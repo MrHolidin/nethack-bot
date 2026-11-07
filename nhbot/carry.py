@@ -250,22 +250,22 @@ class CarryMixin:
             return True                      # a horn that harmed us is cursed: sold
         if c == nh.POTION_CLASS and self.opts.restore_fix and self.restore_potion(it):
             return True                      # restore_fix: mends what poison took (potiontest.restore_step)
-        if c == nh.POTION_CLASS and self.opts.keep_100 and self.potion_100(s):
-            return True                      # keep_100: maybe healing / extra healing -- kept for quaff_test
+        if c == nh.POTION_CLASS and self.potion_100(s):
+            return True                      # maybe healing / extra healing -- kept for quaff_test
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None
         if bag is not None and bag.letter == it.letter:
             return True                      # gold_bag: the bag our gold goes in (nhbot.goldbag)
-        if self.opts.vault_find and (c == nh.SCROLL_CLASS and any(n in s.replace("scrolls", "scroll") for n in FIND_SCROLLS)
-                                     or c == nh.WAND_CLASS and "wand of digging" in s):
-            return True                      # vault_find: to find a vault and dig to it (nhbot.vault)
+        if c == nh.SCROLL_CLASS and any(n in s.replace("scrolls", "scroll") for n in FIND_SCROLLS) \
+                or c == nh.WAND_CLASS and "wand of digging" in s:
+            return True                      # to find a vault and dig to it (nhbot.vault)
         if self.opts.backup_weapon and c == nh.WEAPON_CLASS:
             bk = self.backup_best()
             if bk is not None and bk[1].letter == it.letter:
                 return True                  # backup_weapon: what we fight with while the sword is dipped / rusty
-        if c == nh.TOOL_CLASS and self.opts.lock_tools:
+        if c == nh.TOOL_CLASS:
             lt = self.lock_tool()
             if lt is not None and lt.letter == it.letter:
-                return True                  # lock_tools: the unlocking tool we keep (nhbot.locktools)
+                return True                  # the unlocking tool we keep (nhbot.locktools)
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if self.wish_needed(it):
@@ -293,9 +293,9 @@ class CarryMixin:
         if c == nh.SCROLL_CLASS and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
-        if c == nh.POTION_CLASS and self.opts.keep_100 and self.potion_100(s):
+        if c == nh.POTION_CLASS and self.potion_100(s):
             self.carry_stats["kept_100"] = self.carry_stats.get("kept_100", 0) + 1
-            return True                    # keep_100: the offer just showed it is of the 100 group
+            return True                    # the offer just showed it is of the 100 group
         return False
 
     def carry_shop_greeted(self, lv, stype):

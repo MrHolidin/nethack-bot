@@ -1,10 +1,10 @@
-"""lock_tools: one unlocking tool kept (carry.needed) -- the best we carry: skeleton key > lock pick > credit card
+"""One unlocking tool kept (carry.needed) -- the best we carry: skeleton key > lock pick > credit card
 -- and locked doors and boxes opened with it, silently, before any kick or #force. lock.c pick_lock: a chance a
 turn of 70 + Dex (key), 3 x Dex (lock pick), 2 x Dex (credit card) at a door, 75 + Dex / 4 x Dex / Dex at a box
 (halved for a cursed tool, boxes only); an occupation the game runs until done, given up after 50 turns. The tool
 never breaks (#force with a blade can; a kick wakes everything near: dokick.c wake_nearby). Not in Minetown (the
 watch: "Hey, stop picking that lock!", then an arrest -- monmove.c watch_on_duty) but in Orcish Town (its watch
-lies dead)."""
+lies dead). A/B lock_tools +350 [-966, +1591], median +274, box kicks halved."""
 import re
 from collections import Counter
 
@@ -28,16 +28,12 @@ class LockToolMixin:
         return LOCK_RANK[m.group(1).lower()] if m else 0
 
     def lock_tool(self):
-        """lock_tools: the unlocking tool we would use -- the best kind, a known-cursed one last."""
-        if not self.opts.lock_tools:
-            return None
+        """The unlocking tool we would use -- the best kind, a known-cursed one last."""
         cands = [it for it in self.items() if it.ocls == nh.TOOL_CLASS and self.lock_rank(it.text)]
         return max(cands, key=lambda it: (self.lock_rank(it.text), not it.cursed), default=None)
 
     def lock_tool_wanted(self, text):
-        """lock_tools: a floor tool that beats the one we carry (or the first one)."""
-        if not self.opts.lock_tools:
-            return False
+        """A floor tool that beats the one we carry (or the first one)."""
         r = self.lock_rank(text)
         best = self.lock_tool()
         return r > 0 and (best is None or r > self.lock_rank(best.text))

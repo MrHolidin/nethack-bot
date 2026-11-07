@@ -272,9 +272,10 @@ class SurvivalMixin:
     def vault_step(self, lv, hostiles):
         """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
         if self.vault_drop:
-            bag = self.gold_bag() if self.opts.vault_bag_out else None
+            bag = self.gold_bag()
             if bag is not None and self.bag_gold > 0:
                 self.vault_bag_outs += 1          # he wants the gold in our bag too (vault.c hidden_gold): out first
+                #                                   (A/B vault_bag_out +316 [+84, +574]: 9 of 10 guard deaths gone)
                 return self.bag_take_out(bag)
             self.vault_drop = False
             self.vault_drops += 1
@@ -295,8 +296,8 @@ class SurvivalMixin:
                 return False
             last = self.guard_trail[-1][0] if self.guard_trail else None
             d = (last[0] - y, last[1] - x) if last else None
-            if self.opts.guard_follow and d in DELTA2KEY and last != self.guard_stepped:
-                self.guard_stepped = last     # guard_follow: he went on into his dark corridor -- onto the square he left
+            if d in DELTA2KEY and last != self.guard_stepped:
+                self.guard_stepped = last     # he went on into his dark corridor -- onto the square he left
                 self.vault_moves += 1
                 self.cur_act = "vault"
                 self.press(DELTA2KEY[d])
@@ -310,15 +311,16 @@ class SurvivalMixin:
         gd = (lambda p: max(abs(p[0] - gnow[0]), abs(p[1] - gnow[1]))) if gnow else None
         for p, _ in reversed(self.guard_trail[:-1]):
             d = (p[0] - y, p[1] - x)
-            if p != gnow and d in DELTA2KEY and (not self.opts.guard_follow or gd(p) < gd((y, x))):
-                # guard_follow: forward only, never back
+            if p != gnow and d in DELTA2KEY and gd(p) < gd((y, x)):
+                # forward only, never back
                 self.vault_moves += 1
                 self.cur_act = "vault"
                 self.press(DELTA2KEY[d])
                 return True
-        # guard_follow: he waits in the opening of the vault wall for us to come next to him (vault.c gd_move: he
-        # leads only a hero next to him; 7 warnings and he attacks) -- a step closer to him, never onto him
-        if self.opts.guard_follow and guards and max(abs(gnow[0] - y), abs(gnow[1] - x)) > 1:
+        # he waits in the opening of the vault wall for us to come next to him (vault.c gd_move: he leads only a
+        # hero next to him; 7 warnings and he attacks) -- a step closer to him, never onto him (the escort:
+        # A/B guard_follow +443 [+246, +647])
+        if guards and max(abs(gnow[0] - y), abs(gnow[1] - x)) > 1:
             dist = lambda p: max(abs(p[0] - gnow[0]), abs(p[1] - gnow[1]))
             steps = [(y + dy, x + dx) for dy, dx in DELTA2KEY if (dy, dx) != (0, 0)
                      and 0 <= y + dy < g.shape[0] and 0 <= x + dx < g.shape[1]
@@ -357,14 +359,13 @@ class SurvivalMixin:
         if recent and any(p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
                                            "Then die, mortal", "Thou durst")):
             self.god_angry = True
-        if "drop that gold" in m or "drop that money" in m \
-                or self.opts.vault_bag_out and "drop that hidden money" in m:
+        if "drop that gold" in m or "drop that money" in m or "drop that hidden money" in m:
             self.vault_drop = True
         if "follow me" in m:
             self.vault_follow_until = self.turn() + 300
             self.guard_trail = []
             self.guard_stepped = None
-        if self.opts.guard_follow and "the guard disappears" in m:
+        if "the guard disappears" in m:
             self.vault_follow_until = -1              # out of his corridor: the escort is over (vault.c)
         if "You feel feverish" in m:
             self.lycanthropy = True

@@ -104,16 +104,15 @@ class VaultMixin:
         return None
 
     def vault_rob_ready(self):
-        """vault_rob: in a vault, a way to dig, the floor here not refused. (game.py: the guard is told
-        "Croesus" then.)"""
-        return self.opts.vault_rob and self.cur_key not in self.dig_refused and self.vault_box() is not None \
+        """In a vault, a way to dig, the floor here not refused. (game.py: the guard is told "Croesus" then.)"""
+        return self.cur_key not in self.dig_refused and self.vault_box() is not None \
             and self.dig_means() is not None
 
     def vault_rob_step(self, lv, hostiles):
-        """vault_rob: out of the vault after a dig -- the weapon back (not while tunnelling toward one); in one
-        with a way to dig -- the gold (VAULT_GRAB_TURNS at most), then down. True if it used the turn."""
-        if not self.opts.vault_rob:
-            return False
+        """Out of the vault after a dig -- the weapon back (not while tunnelling toward one); in one with a way to
+        dig -- the gold (VAULT_GRAB_TURNS at most), then down -- or out by our tunnel. True if it used the turn.
+        A/B vault_rob +316 [+92, +566]; vault_exit -222 [-411, -47] (with the gold-lift fix taken); vault_clear
+        +129 [-3, +274]."""
         box = self.vault_box()
         if box is None and self.vault_leaving(lv):
             return self.vault_walk_out(lv)
@@ -146,17 +145,16 @@ class VaultMixin:
             p = gold[0]                               # every square of the 2x2 is next to us
             self.press(DELTA2KEY[(p[0] - here[0], p[1] - here[1])])
             return True
-        if self.opts.vault_exit and self.vault_out is not None and self.vault_out[0] == lv.key:
-            if self.opts.vault_clear:
-                self.vault_shut[lv.key] = self.vault_walls(box)
+        if self.vault_out is not None and self.vault_out[0] == lv.key:
+            self.vault_shut[lv.key] = self.vault_walls(box)
             if self.vault_walk_out(lv):
                 return True
         return self.dig_down(lv, means)
 
     def vault_leaving(self, lv):
-        """vault_clear: on the wall of the vault we are leaving -- in its dug opening, still in the vault for the
-        game (in_rooms counts a door with the room: the guard's count goes on)."""
-        return self.opts.vault_clear and self.vault_out is not None and self.vault_out[0] == lv.key \
+        """On the wall of the vault we are leaving -- in its dug opening, still in the vault for the game (in_rooms
+        counts a door with the room: the guard's count goes on)."""
+        return self.vault_out is not None and self.vault_out[0] == lv.key \
             and self.pos() in self.vault_shut.get(lv.key, ())
 
     def vault_walk_out(self, lv):
@@ -326,9 +324,9 @@ class VaultMixin:
         return start, path
 
     def vault_find_step(self, lv, hostiles_in_view):
-        """vault_find, nothing in view: read a detection scroll where we heard a vault; dig to a vault our map
-        shows. True if it used the turn."""
-        if not self.opts.vault_find or hostiles_in_view or lv.key in self.vault_done or lv.key[0] != 0:
+        """Nothing in view: read a detection scroll where we heard a vault; dig to a vault our map shows. True if it
+        used the turn. (A/B vault_find -34 [-708, +601], taken with vault_exit.)"""
+        if hostiles_in_view or lv.key in self.vault_done or lv.key[0] != 0:
             return False
         means = self.dig_means()
         if means is None or lv.key in self.dig_refused:

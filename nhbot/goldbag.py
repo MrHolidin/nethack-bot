@@ -29,9 +29,8 @@ class GoldBagMixin:
 
     def gold_bag(self):
         """The bag our gold goes in: carried, not a bag of tricks, not known cursed (a cursed bag of holding
-        loses what is in it, pickup.c boh_loss) -- a bag of holding first. None: no such bag."""
-        if not self.opts.gold_bag:
-            return None
+        loses what is in it, pickup.c boh_loss) -- a bag of holding first. None: no such bag. (A/B goldbag_v1
+        +1076.)"""
         bags = [it for it in self.items() if it.ocls == nh.TOOL_CLASS and any(w in it.text for w in BAG_WORDS)
                 and "tricks" not in it.text and not it.cursed and it.key not in self.bag_bad]
         rank = lambda it: next((i for i, w in enumerate(BAG_RANK) if w in it.text), len(BAG_RANK))

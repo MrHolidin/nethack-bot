@@ -314,7 +314,7 @@ class PickupMixin:
             #                                   the bag -- pickup.c out_container -- for the vault guard / a priest)
         mm = re.search(r"a little trouble lifting (.+?)\.\s+Continue\?", m)
         want = self.lift_want
-        if not (self.opts.lift_heavy and mm and want is not None):
+        if not (mm and want is not None):           # (A/B lift_heavy +248)
             return False
         name = mm.group(1)
         tags = self.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for

@@ -338,8 +338,9 @@ class PerceptionMixin:
         return out | {"poison"} if self.poison_res else out
 
     def passive_immune(self, name):
-        """passive_immune: its only attack is a passive cold / fire one and we resist it -- hitting it is harmless."""
-        return self.opts.passive_immune and name in PASSIVE_KIND and PASSIVE_KIND[name] in self.our_resists()
+        """Its only attack is a passive cold / fire one and we resist it -- hitting it is harmless: no longer avoided,
+        hunted while it gives a resistance we lack (A/B passive_immune +296 [-978, +1553], max depth +0.2)."""
+        return name in PASSIVE_KIND and PASSIVE_KIND[name] in self.our_resists()
 
     def passive_prey(self, name):
         """passive_immune: hitting it is harmless and its corpse may give a resistance we lack -- hunted
