@@ -54,6 +54,8 @@ DEFAULTS = {
                                #      the bag's too (vault.c hidden_gold): taken out of the bag before the gold is dropped
     "backup_weapon": False,    # A/B: lawful without Excalibur -- the weapon that hits hardest now is wielded (and kept)
                                #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
+    "fountain_rehide": False,  # A/B (with fountain_elb): leaving the level after a hide, caught by what beats us --
+                               #      Elbereth written there, a hide again, then on our way (not a fight)
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
                                #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
     "vault_clear": True,       # A/B +129 [-3, +274]: a vault we tunnelled into and are leaving: out past its wall (the

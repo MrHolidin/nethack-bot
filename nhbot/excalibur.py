@@ -17,6 +17,7 @@ DEMON_WIN = 0.7      # dip for a wish only while P(we beat a water demon) is abo
 FOUNTAIN_PWIN = 0.75  # fountain_elb: what a dip brought out we fight below this P(win) only from our Elbereth
 FOUNTAIN_CALM = 3     # fountain_elb: turns with nothing within 2 squares before we leave the Elbereth
 FOUNTAIN_HIDE_MAX = 300   # fountain_elb: turns at most on it
+FOUNTAIN_REHIDE_MAX = 20  # fountain_rehide: hides at most on one level while we leave it
 
 
 class ExcaliburMixin:
@@ -33,6 +34,7 @@ class ExcaliburMixin:
         self.fhide = None                # fountain_elb: {key, fountain, sq, phase, hiding, calm, since, dip_turn}
         self.fhide_stats = Counter()
         self.fountain_leave = None       # fountain_elb: level key to leave by the stairs down after a hide
+        self.fountain_rehides = Counter()  # fountain_rehide: level key -> hides on the way off it
 
     def long_sword(self):
         for it in self.items():
@@ -430,12 +432,34 @@ class ExcaliburMixin:
             self.cur_act = "fountain_hide"
             self.press("s")
             return True
-        self.fountain_shut.add((lv.key, ftn))            # this fountain is left
+        if ftn is not None:
+            self.fountain_shut.add((lv.key, ftn))        # this fountain is left
         self.fhide_stats["left"] += 1
         self.fhide = None
         self.excal_skip.add(lv.key)                      # what came out still roams here: no more dips on this
         self.fountain_leave = lv.key                     # level, and off it by the stairs down
         return False
+
+    def fountain_rehide_step(self, lv, hostiles):
+        """fountain_rehide, on the way off the level after a hide: caught (something next to us) by what beats us
+        with P(win) below FOUNTAIN_PWIN -- Elbereth written where we stand and a hide there as by the fountain
+        (fountain_hide_step: until nothing is within 2 squares for FOUNTAIN_CALM turns), then on our way again.
+        Not where it can't be written (stairs, ...), not against what ignores it. True if it used the turn."""
+        if not self.opts.fountain_rehide or self.fountain_rehides[lv.key] >= FOUNTAIN_REHIDE_MAX \
+                or not self.elb_can_write(lv):
+            return False
+        here = self.pos()
+        dist = lambda p: max(abs(p[0] - here[0]), abs(p[1] - here[1]))
+        vis = [(p, n) for p, n in self.visible_hostiles(lv) if dist(p) <= 6]
+        if not vis or any(not self.respects(p, n) for p, n in vis):
+            return False
+        if self.win_prob(vis, approach={p: max(0, dist(p) - 1) for p, _ in vis}) >= FOUNTAIN_PWIN:
+            return False
+        self.fountain_rehides[lv.key] += 1
+        self.fhide_stats["rehid"] += 1
+        self.fhide = {"key": lv.key, "fountain": None, "sq": here, "phase": "ready", "hiding": True, "calm": 0,
+                      "since": self.turn(), "dip_turn": -99, "fresh": True}
+        return self.fountain_hide_step(lv, hostiles)
 
     def fountain_leave_step(self, lv, hostiles):
         """fountain_elb, after a hide (what came out still roams this level): off it where we were headed anyway --
@@ -444,6 +468,8 @@ class ExcaliburMixin:
         if self.fountain_leave != lv.key:
             self.fountain_leave = None
             return False
+        if hostiles and self.fountain_rehide_step(lv, hostiles):
+            return True
         if hostiles:
             return False
         if self.excal_eligible() and self.excal_go_up(lv):
