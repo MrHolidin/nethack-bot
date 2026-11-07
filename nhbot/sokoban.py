@@ -76,10 +76,9 @@ ZOO_EXPLODERS = frozenset(i for i, atts in enumerate(ATTACKS) if any(a[0] in ("E
 # a monster that was hidden shows itself next to us: under the gold every zoo square has (mkroom.c fill_zoo), on the
 # ceiling, as a mimic posing as gold -- awake (uhitm.c wakeup) the moment it shows
 ZOO_REVEAL_RE = re.compile(r"hiding under|drops from the ceiling|was an? [a-z ]*mimic")
-# monsters that do not stay asleep: an ettin wakes 9 times in 10 even when we are stealthy (monmove.c disturb), a
-# chameleon never sleeps and takes a new shape every few turns ("The X turns into a Y!") -- 79288: frozen next to one,
-# killed. Both followed, counted awake and fought first
-ZOO_SHIFT_RE = re.compile(r"turns into an? ([a-z][a-z' -]*?)!")
+# an ettin does not stay asleep: it wakes 9 times in 10 even when we are stealthy (monmove.c disturb) -- counted awake
+# and fought first. (A chameleon's "The X turns into a Y!" is no sign of it: mon.c m_calcdistress changes its shape
+# asleep too -- 79288's slept through the bot's death.)
 ZOO_ATTACK_RE = re.compile(r"The ([a-z][a-z' -]*?) (?:hits|bites|misses|just misses|stings|butts|kicks|claws|touches|"
                            r"thrusts|swings|strikes|grabs|engulfs|spits|breathes|gazes)")
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
@@ -132,9 +131,7 @@ class SokoLevel:
         self.closet_done = set()      # top level: the prize closets and the zoo piles looked into
         self.zoo_last = frozenset()   # top level: squares of the hostiles in view on the last zoo tick (map) ...
         self.zoo_seq = None           # ... and the message count then (soko_zoo_track reads what came since)
-        self.zoo_glyphs = {}          # ... and their glyphs (a shape change shows as a new glyph)
-        self.zoo_shifters = set()     # squares of the chameleons seen changing shape, followed as they move (map)
-        self.zoo_first = set()        # those and the ettins in view: fought first (soko_zoo_fight)
+        self.zoo_first = set()        # the ettins in view (map): fought first (soko_zoo_fight)
         self.zoo_active = set()       # ... and of those awake: seen moving, or next to us when we were hurt
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
         self.zoo_unseen = set()       # zoo way: squares where the map showed an unseen monster ('I') -- kept after the
@@ -1014,8 +1011,8 @@ class SokobanMixin:
         return self.soko_exploder_at(pos) and self.soko_zoo_level(lv) is not None
 
     def soko_zoo_fight(self, cands, first=frozenset()):
-        """Attack the weakest (lowest level) of cands (map squares next to us) -- of those in first (a chameleon, an
-        ettin) if any is among them -- monsters that explode aside. False: none to attack."""
+        """Attack the weakest (lowest level) of cands (map squares next to us) -- of those in first (an ettin) if any
+        is among them -- monsters that explode aside. False: none to attack."""
         g = self.obs["glyphs"]
         cands = [p for p in cands if G.KIND[int(g[p])] == G.MONSTER and not self.soko_exploder_at(p)]
         if not cands:
@@ -1058,24 +1055,9 @@ class SokobanMixin:
         revealed = (adj - st.zoo_last) if ZOO_REVEAL_RE.search(said) else set()
         names = set(ZOO_ATTACK_RE.findall(said))
         attackers = {p for p in adj if G.monster_name(int(g[p])) in names} if names else set()
-        # a chameleon: the square whose glyph turned into the named shape; one we follow that moved: the new
-        # hostile within 2 of where it stood
-        shapes = set(ZOO_SHIFT_RE.findall(said))
-        names_at = {p: G.monster_name(int(g[p])) for p in now}
-        seen = {p for p in now if names_at[p] in shapes and st.zoo_glyphs.get(p) != int(g[p])}
-        follow = set()
-        for q in st.zoo_shifters:
-            if q in now:
-                follow.add(q)
-                continue
-            near = [p for p in now - st.zoo_last if max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2]
-            if near:
-                follow.add(min(near, key=lambda p: max(abs(p[0] - q[0]), abs(p[1] - q[1]))))
-        st.zoo_shifters = follow | seen
-        st.zoo_first = st.zoo_shifters | {p for p in now if names_at[p] == "ettin"}
+        st.zoo_first = {p for p in now if G.monster_name(int(g[p])) == "ettin"}
         st.zoo_active = (st.zoo_active & now) | moved | hit | revealed | attackers | st.zoo_first
         st.zoo_last, st.zoo_hp, st.zoo_seq = now, c.hp, self.msg_seq
-        st.zoo_glyphs = {p: int(g[p]) for p in now}
         st.zoo_unseen |= {p for p in st.floor if G.KIND[int(g[st.to_map(p)])] == G.INVIS}
         st.zoo_unseen.discard(st.from_map((y, x)))
         return [p for p in st.zoo_active if max(abs(p[0] - y), abs(p[1] - x)) <= ZOO_NEAR]
