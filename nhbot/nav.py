@@ -181,6 +181,8 @@ class NavMixin:
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
                 return
+            if self.lock_door_step(lv, target):
+                return                        # lock_tools: unlocked with the tool, silently (nhbot.locktools)
             if target == GROTTO_STAIR_DOOR and self.is_grotto(lv) \
                     and target not in lv.watch_warned:
                 if self.law_nearby():         # dokick.c: the watch minds only a kick one of them can see

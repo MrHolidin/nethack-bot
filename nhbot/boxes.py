@@ -109,6 +109,8 @@ class BoxMixin:
         if r != "locked":
             self.box_done(lv, pos, "no_box" if r == "none" else "failed")
             return True
+        if self.swapped_for is None and self.lock_box_step(key):
+            return True                          # lock_tools: unlocked with the tool, nothing broken
         if self.swapped_for == "box" and self.box_forces[key] < FORCE_TRIES:
             return self.box_force(key)
         opener = self.box_opener() if self.swapped_for is None and self.box_forces[key] < FORCE_TRIES else None

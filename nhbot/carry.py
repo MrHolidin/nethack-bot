@@ -262,6 +262,10 @@ class CarryMixin:
             bk = self.backup_best()
             if bk is not None and bk[1].letter == it.letter:
                 return True                  # backup_weapon: what we fight with while the sword is dipped / rusty
+        if c == nh.TOOL_CLASS and self.opts.lock_tools:
+            lt = self.lock_tool()
+            if lt is not None and lt.letter == it.letter:
+                return True                  # lock_tools: the unlocking tool we keep (nhbot.locktools)
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if self.wish_needed(it):

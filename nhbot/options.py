@@ -33,6 +33,9 @@ DEFAULTS = {
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
+    "lock_tools": False,       # A/B: the best unlocking tool we carry (skeleton key > lock pick > credit card) kept,
+                               #      better ones picked up; locked doors and boxes unlocked with it, silently, before
+                               #      any kick / #force -- not in Minetown, Orcish Town yes (nhbot.locktools)
     "minetown_sounds": True,   # accepted (no A/B): on Mines level 3-4 a shop / temple / fountain / sink heard
                                #      (sounds.c dosounds) makes it Minetown (mapmem.is_minetown) before any is seen
     "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step

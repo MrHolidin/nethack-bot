@@ -141,6 +141,8 @@ class PickupMixin:
             no_tools = NO_TOOLS - {"pick-axe"}
             if typ in LAMP_NAMES and not cursed:
                 return "lamp"                            # maybe a magic lamp: rubbed (nhbot.wishing)
+            if not cursed and self.lock_tool_wanted(text):
+                return "carry"                           # lock_tools: a better unlocking tool, whatever it weighs
             if typ not in no_tools:
                 reason = "carry"
         elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS):
