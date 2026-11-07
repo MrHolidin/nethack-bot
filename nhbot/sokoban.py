@@ -154,7 +154,10 @@ class SokobanMixin:
         one we know leads to the level above."""
         if self.soko_ent is not None:
             key, got = self.soko_ent
-            if not got & self.levels[key].not_stairs:      # found once: it stays, unless it proved no staircase
+            lv = self.levels[key]
+            # found once: it stays -- unless it proved no staircase, or taking it led to a main level (79927: up
+            # to Dlvl 6 and straight back down to "the entrance" on 7, 30000 turns)
+            if not got & lv.not_stairs and not any(lv.stairs_to.get(p, (SOKO_DNUM,))[0] != SOKO_DNUM for p in got):
                 return self.soko_ent
             self.soko_ent = None
         for key, lv in self.levels.items():
