@@ -53,7 +53,7 @@ ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share o
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
 ZOO_PEACE_TURNS = 50      # a square a look found a peaceful monster on stays closed to the zoo way this long
-ZOO_PEACE_WAIT_MAX = 300  # ticks waited, every way to what is left closed by peaceful monsters, before giving it up
+ZOO_PEACE_WAIT_MAX = 300  # ticks waited with no way to what is left (peaceful monsters on it), before giving it up
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -690,16 +690,17 @@ class SokobanMixin:
             # the zoo open: of the places left, the one with the easiest way (soko_zoo_walk) -- a peaceful monster
             # sleeping before a closet's door closes that closet, not the hunt (79059: a pony by the first closet,
             # the bot backed off from it for 6000 turns)
-            ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts)) for p in todo]
+            mimics = extra - st.real_extra
+            ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts, mimics)) for p in todo]
             ways = [(p, w) for p, w in ways if w[0] is not None]
             if ways:
                 tgt, (nxt, _) = min(ways, key=lambda pw: (pw[0] not in like, pw[0] not in closets, pw[1][1]))
-                return self.soko_zoo_step(lv, st, nxt)
+                return self.soko_zoo_step(lv, st, nxt, mimics)
             st.zoo_peace_waits += 1
             if st.zoo_peace_waits <= ZOO_PEACE_WAIT_MAX:
-                self.soko_stats["zoo_peace_wait"] += 1
-                return self.soko_wait()                  # every way closed by peaceful monsters: they may move
-            self.soko_stats["zoo_peace_gave_up"] += 1
+                self.soko_stats["zoo_no_way_wait"] += 1
+                return self.soko_wait()                  # every way closed (peaceful monsters): they may move
+            self.soko_stats["zoo_no_way_gave_up"] += 1
             st.closet_done.update(todo)
             return True
         todo.sort(key=lambda p: (p not in like, p not in closets, abs(p[0] - here[0]) + abs(p[1] - here[1])))
@@ -747,10 +748,11 @@ class SokobanMixin:
                     self.soko_stats["amulet_worn"] += 1
             return
 
-    def soko_zoo_walk(self, lv, st, start, goal, bs, ts):
+    def soko_zoo_walk(self, lv, st, start, goal, bs, ts, mimics=frozenset()):
         """(first step (variant coords), cost) of the way from start to goal with the fewest and weakest monsters
         to kill on it -- a hostile's square costs ZOO_KILL_COST plus its level, a pet's two steps (we swap), a
-        peaceful's is closed -- by Sokoban's rules (soko_walk). (None, None): no way."""
+        peaceful's is closed, a boulder the plan doesn't know (mimics: the top level's giant mimics pose as
+        boulders) costs a kill -- by Sokoban's rules (soko_walk). (None, None): no way."""
         g = self.obs["glyphs"]
         t = self.turn()
         cost = {}
@@ -765,6 +767,9 @@ class SokobanMixin:
                     cost[p] = None
                 else:
                     cost[p] = ZOO_KILL_COST + nh.permonst(nh.glyph_to_mon(int(g[mp]))).mlevel
+        for p in mimics:
+            cost[p] = ZOO_KILL_COST + 8                    # giant mimic: level 8
+        bs = bs - mimics
         free = lambda p: p in st.floor and p not in bs
         dist, prev = {start: 0}, {start: None}
         q = [(0, start)]
@@ -789,7 +794,7 @@ class SokobanMixin:
                     heapq.heappush(q, (nd, n))
         return None, None
 
-    def soko_zoo_step(self, lv, st, nxt):
+    def soko_zoo_step(self, lv, st, nxt, mimics=frozenset()):
         """The zoo's door open (unlocked quietly its monsters still sleep; kicked, the wave is over): one step nxt
         (variant coords) along the way with the fewest and weakest monsters to the prize (soko_zoo_walk), killing
         them one at a time -- the one on the next square is attacked ('F'), the others sleep on. A peaceful one
@@ -797,6 +802,19 @@ class SokobanMixin:
         if nxt == st.from_map(self.pos()):
             return self.soko_wait()
         mp = st.to_map(nxt)
+        y, x = self.pos()
+        if nxt in mimics:
+            # a boulder the plan doesn't know: a giant mimic shows itself when hit -- one that answers no attack is
+            # a real boulder (st.real_extra), the way chosen without it
+            seq = self.msg_seq
+            self.soko_stats["zoo_mimic_attack"] += 1
+            self.cur_act = "fight"
+            self.press("F")
+            self.press(DELTA2KEY[(mp[0] - y, mp[1] - x)])
+            said = self.text_since(seq)
+            if "harmlessly" in said or "thin air" in said or "nothing" in said.lower():
+                st.real_extra.add(nxt)
+            return True
         k = G.KIND[int(self.obs["glyphs"][mp])]
         self.cur_act = "soko_zoo"
         if k == G.MONSTER:
@@ -806,7 +824,6 @@ class SokobanMixin:
                 return self.soko_wait()
             self.soko_stats["zoo_attack"] += 1
             self.cur_act = "fight"
-            y, x = self.pos()
             self.press("F")
             self.press(DELTA2KEY[(mp[0] - y, mp[1] - x)])
             return True
