@@ -15,7 +15,7 @@ from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
-from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, our_protection, ray_harm, ray_walk,
+from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, ray_harm, ray_walk,
                         self_hit_prob, zap_hit_prob, ROOM as ROOM_CODE, STONE as STONE_CODE)
 
 
@@ -183,6 +183,7 @@ class CombatMixin:
         else:
             self.settle()
         self.throws += 1
+        self.elb_scuffed()                       # elb_stale: a throw scuffs the engraving under us
         self.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
         self.goal_event("retrieve", "created")
 
@@ -566,7 +567,7 @@ class CombatMixin:
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
             self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
-        prot = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body])
+        prot = self.protection()
         our_p = zap_hit_prob(self.bl(nh.NLE_BL_AC))
         reflect = "reflection" in prot
         resisted = RAY_RESIST.get("death" if maybe_death else kind) in prot
@@ -635,9 +636,7 @@ class CombatMixin:
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
             self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
-        worn = [i.text for i in self.items() if i.on_body]
-        harm = ray_harm("death" if maybe_death else kind, our_protection(self.role, self.race, worn),
-                        self.bl(nh.NLE_BL_HP))
+        harm = ray_harm("death" if maybe_death else kind, self.protection(), self.bl(nh.NLE_BL_HP))
         return p, harm
 
     def ray_risk_note(self, lv, step, d, kind, letter, safe):

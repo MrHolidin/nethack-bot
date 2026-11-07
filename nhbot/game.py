@@ -309,5 +309,6 @@ class GameMixin:
         self.msg_sacrifice(m, lv)
         self.msg_threat(m)
         self.msg_vault(m)
+        self.msg_elbereth(m, lv)
         if "You die" in m or "You starve" in m:
             self.death_msgs = [mm for _, mm in list(self.messages)[-8:]]

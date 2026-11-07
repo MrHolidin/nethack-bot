@@ -30,7 +30,7 @@ from nhbot.items import base_name, erosion
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
-from nhbot.rays import RAY_RESIST, our_protection, zap_hit_prob
+from nhbot.rays import RAY_RESIST, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
 NO_DAMAGE = {"RUST", "CORR", "DCAY", "SGLD", "SEDU", "SSEX", "SLIM", "ENCH", "CURS", "STON", "COLD"}
@@ -599,7 +599,7 @@ class DangerMixin:
             aim = 1.0
         its = self.items()
         free = any(i.ring_on and "free action" in i.text for i in its)
-        prot = our_protection(self.role, self.race, [i.text for i in its if i.on_body])
+        prot = self.protection()
         sp = self.our_speed()
         slow = 12 * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else 12
         return {"aim": aim, "free_action": free, "int": self.bl(nh.NLE_BL_INT), "speed": sp,
@@ -650,7 +650,7 @@ class DangerMixin:
         if profile is None:
             return None
         ac = self.bl(nh.NLE_BL_AC)
-        prot = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body])
+        prot = self.protection()
         plan = {"wand": next((k for k in WAND_ORDER if k in profile["wands"]), None), "missile": None,
                 "breath": None, "ray_p": zap_hit_prob(ac), "ac": ac, "prot": prot, "pack": self.pack_profile()}
         mis = profile["missile"]

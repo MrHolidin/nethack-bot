@@ -336,6 +336,13 @@ class PerceptionMixin:
         out = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body]) | self.eaten_res
         return out | {"poison"} if self.poison_res else out
 
+    def protection(self):
+        """What protects us in the ray / fight sums (danger, combat): resist_eaten -- all we know (our_resists, eaten
+        corpses included); else the role / race intrinsics and what we wear (rays.our_protection)."""
+        if self.opts.resist_eaten:
+            return self.our_resists()
+        return our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body])
+
     def passive_immune(self, name):
         """Its only attack is a passive cold / fire one and we resist it -- hitting it is harmless: no longer avoided,
         hunted while it gives a resistance we lack (A/B passive_immune +296 [-978, +1553], max depth +0.2)."""
