@@ -15,6 +15,7 @@ NetHack 3.6.6 facts (mkobj.c, lock.c, dokick.c, trap.c):
   mimics       a mimic can look like a box, but we stand on the box to open it, and nothing stands on a mimic.
 Not opened: boxes in shops (the contents are merchandise), ice boxes (corpses).
 """
+import re
 from collections import Counter
 
 import numpy as np
@@ -163,8 +164,8 @@ class BoxMixin:
         said = self.text_since(seq0)
         if "trigger a trap" in said or "set it off" in said:
             self.box_stats["trap"] += 1
-        if "locked" in said:
-            return "locked"
+        if re.search(r"\blocked\b", said):
+            return "locked"                      # not "There is an unlocked chest here" (lock_tools opened it)
         if "is empty" in said:
             return "empty"
         if took is not None:

@@ -54,7 +54,8 @@ class LockToolMixin:
         self.lock_tries[key] += 1
         self.lock_stats["door_try"] += 1
         said = self.lock_apply(it, DELTA2KEY[(target[0] - y, target[1] - x)])
-        if "succeed in unlocking" in said or "no door" in said or "is broken" in said or "open door" in said:
+        if "You succeed in" in said or "Lock it?" in said or "no door" in said or "is broken" in said \
+                or "open door" in said:                       # lock.c: "unlocking the door" / "picking the lock"
             lv.locked.discard(target)
             self.lock_stats["door_open"] += 1
         elif "stop picking that lock" in said or "under arrest" in said:
@@ -72,7 +73,8 @@ class LockToolMixin:
         self.lock_tries[key] += 1
         self.lock_stats["box_try"] += 1
         self.cur_act = "box"
-        if "succeed in unlocking" in self.lock_apply(it, None):
+        said = self.lock_apply(it, None)
+        if "You succeed in" in said:
             self.lock_stats["box_open"] += 1
         return True
 
@@ -88,8 +90,10 @@ class LockToolMixin:
             m = self.message()
             if "direction" in m.lower():
                 self.press(dirkey or ".", expect_prompt=True)   # lock.c get_adjacent_loc: '.' is the box here
-            elif "nlock it?" in m:                              # "Unlock it?" / "There is a chest here; unlock it?"
-                self.press("y", expect_prompt=True)
+            elif "nlock it?" in m or "pick its lock?" in m:     # lock.c: "Unlock it?", "There is a locked chest
+                self.press("y", expect_prompt=True)             # here; pick its lock?" (a lock pick, a card)
+            elif "ock it?" in m:
+                self.press("n", expect_prompt=True)             # "Lock it?": it is unlocked already
             else:
                 break
         self.settle()
