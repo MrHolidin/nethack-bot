@@ -81,6 +81,7 @@ class Level:
         self.locked = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
+        self.shop_anchors = []     # shop_regrow: [door, square we came from (outside), closed] of each greeting
         self.lep_shut = np.zeros((ROWS, COLS), dtype=bool)   # lep_hall: a room of leprechauns, closed from outside
         self.grotto = False        # Grotto Town (is_grotto)
         self.town_heard = False    # Minetown told before seen: heard (minetown_sounds), warned by the watch
@@ -253,13 +254,21 @@ class MapMixin:
         self.shops_from_keeper += 1
 
     def mark_shop(self, lv, door):
+        came = self._cur_pos          # map memory is not updated yet for the door square
+        if came == door:
+            came = self.prev_pos
+        for c in self.shop_flood(lv, door, came):
+            lv.shop[c] = True
+        if self.opts.shop_regrow:
+            lv.shop_anchors.append([door, came, False])
+
+    def shop_flood(self, lv, door, came):
+        """The shop's squares behind its door as far as the map knows them: room floor from the door, not the side
+        we came from."""
         inside_ok = self.shop_floor(lv)
         seen = set()
         q = deque()
         y, x = door
-        came = self._cur_pos          # map memory is not updated yet for the door square
-        if came == door:
-            came = self.prev_pos
         if came is not None and max(abs(came[0] - y), abs(came[1] - x)) == 1:
             # the greeting comes as we step onto the door from outside: the square we came from is outside.
             # Flooding both sides marked a room beyond the door as shop and left us stuck on the door.
@@ -278,8 +287,23 @@ class MapMixin:
                 ny, nx = cy + dy, cx + dx
                 if 0 <= ny < ROWS and 0 <= nx < COLS and (ny, nx) not in seen and inside_ok[ny, nx]:
                     seen.add((ny, nx)); q.append((ny, nx))
-        for c in seen:
-            lv.shop[c] = True
+        return seen
+
+    def shop_regrow(self, lv):
+        """shop_regrow, every tick: a shop greeted while dark (its floor not yet in our map: the flood from the door
+        found little or nothing) grows as its squares become known -- the flood from its door again, squares
+        added, none taken away -- until nothing unknown is next to it (79607: Izchak's dark shop never marked, a
+        corpse on its floor eaten and not paid for)."""
+        k = None
+        for a in lv.shop_anchors:
+            if a[2]:
+                continue
+            room = self.shop_flood(lv, a[0], a[1])
+            for c in room:
+                lv.shop[c] = True
+            k = self.kinds(lv) if k is None else k
+            a[2] = bool(room) and not any((k[max(0, cy - 1):cy + 2, max(0, cx - 1):cx + 2] == G.UNKNOWN).any()
+                                          for cy, cx in room)
 
     def _flood(self, ok, seeds, cap=300):
         seen = set(seeds)

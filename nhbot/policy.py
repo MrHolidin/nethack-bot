@@ -115,6 +115,8 @@ class PolicyMixin:
 
     # ------------------------------------------------------------------ emergencies
     def step_level_arrival(self, lv):
+        if self.opts.shop_regrow and lv.shop_anchors:
+            self.shop_regrow(lv)
         if self.pending_mines_mark:
             self.pending_mines_mark = False
             if lv.key[0] == 0:
