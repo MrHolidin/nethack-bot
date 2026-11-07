@@ -7,8 +7,7 @@ from nhbot.monattacks import ATTACKS
 NEVER_MELEE = {"floating eye", "gas spore", "cockatrice", "chickatrice",
                "blue jelly", "spotted jelly", "ochre jelly", "brown mold", "green mold"}
 
-PASSIVE_MOLDS = {"yellow mold", "green mold", "brown mold", "red mold", "lichen" and "", "violet fungus" and ""}
-PASSIVE_MOLDS.discard("")
+PASSIVE_MOLDS = {"yellow mold", "green mold", "brown mold", "red mold"}
 
 ALWAYS_AVOID = {"gas spore", "cockatrice", "chickatrice", "brown mold", "green mold"}   # even when desperate
 
@@ -51,15 +50,14 @@ PASSIVE_DMG = {nh.permonst(i).mname for i in range(nh.NUMMONS)
 
 THIEVES = ("water nymph", "wood nymph", "mountain nymph", "monkey")
 
-NYMPHS = ("water nymph", "wood nymph", "mountain nymph")
-
 SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
 
 # =====================================================================================
 # elb2: Elbereth as measured in NLE 3.6.6 wizard mode
 #   - while you stand on a correctly spelled Elbereth, monsters that respect it never melee you
 #   - it survives waiting; your first melee attack (and usually a throw) erases it
-#   - ~1 in 5 finger engravings is misspelled and does nothing -> always read it back
+#   - each letter engraved in the dust is garbled 1 in 25 (engrave.c doengrave): ~28% of Elbereths are misspelled
+#     and do nothing -> always read it back
 # =====================================================================================
 ELB_IGNORE_NAMES = {"minotaur", "shopkeeper", "guard", "watchman", "watch captain", "aligned priest",
                     "high priest", "Oracle"}

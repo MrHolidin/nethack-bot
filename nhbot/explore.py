@@ -55,7 +55,7 @@ class ExploreMixin:
         for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
         downstairs = k_mem == G.DOWNSTAIR
-        on_level = self.turn() - (lv.entered_turn or 0)
+        on_level = self.turn() - lv.entered_turn
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)
         hatch = self.turn() - self.mines_done_turn if self.mines_done else on_level
@@ -139,7 +139,6 @@ class ExploreMixin:
                 return True
             if self.rest_before_descent(lv):
                 return True
-            self.descents += 1
             self.mines_return_descents += self.mines_return_on
             self.took_stairs = True
             self.press(">")
@@ -156,7 +155,7 @@ class ExploreMixin:
             return False
         t0 = self.turn()
         self.cur_act = "rest"
-        self.press("2"); self.press("0"); self.press("s")
+        self.search_turns(20)
         self.descent_rest[lv.key] += max(1, self.turn() - t0)
         return True
 
@@ -195,7 +194,7 @@ class ExploreMixin:
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time
             lv.searched[start] += 10
-            self.press("1"); self.press("0"); self.press("s")
+            self.search_turns(10)
             return
         step = self.first_step(prev, start, best)
         if step:
@@ -243,7 +242,7 @@ class ExploreMixin:
                 return False
             self.cur_act = "rest"                # excal_step dips from excal_hp of max HP on
             self.mines_trip_stats["excal_rest"] += 1
-            self.press("2"); self.press("0"); self.press("s")
+            self.search_turns(20)
             return True
         if lv.key != branch:
             if self.level_travel_step(lv, grids, branch, "mines", "travel"):

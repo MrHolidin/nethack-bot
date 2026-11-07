@@ -68,7 +68,7 @@ class BoxMixin:
         box = self.box_targets(lv)
         if not box.any():
             return box
-        if self.view_threats(lv):
+        if self.visible_hostiles(lv):
             if self.turn() - self.box_chase_turn <= 2:
                 until = self.turn() + BOX_PAUSE
                 for p in zip(*np.nonzero(box)):
@@ -146,11 +146,11 @@ class BoxMixin:
                 self.raw_step(13)
                 continue
             if "Take out what?" in tty:
-                self._take_state = (self.food_count(), self.bl(nh.NLE_BL_CAP))
+                self._take_food = self.food_count()
                 try:
                     took = self.menu_pick("Take out what?", lambda t: self.take_reason(t) is not None)
                 finally:
-                    self._take_state = None
+                    self._take_food = None
                 continue
             break
         self.settle()

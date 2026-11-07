@@ -148,15 +148,13 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.vault_moves = 0
         self.vault_drops = 0
         self.guard_stepped = None        # the guard's last square we stepped onto while he was out of sight
-        self.vault_approach = 0
-        self.vault_bag_outs = 0          # vault_bag_out: gold taken out of the bag for the guard          # steps toward a vault guard that waited for us (survival.vault_step)
+        self.vault_approach = 0          # steps toward a vault guard that waited for us (survival.vault_step)
+        self.vault_bag_outs = 0          # vault_bag_out: gold taken out of the bag for the guard
         self.unblocks = self.unblock_throws = self.unblock_melee = 0
         self.items_first_holds = 0
         self.hunt = None
         self.shot_event = None
         self.hunts = self.hunt_steps = 0
-        self.ward_since = None
-        self.ward_writes = self.ward_waits = 0
         self.resets = 0
         self.god_angry = False
         self.pending_mines_mark = False
@@ -170,13 +168,12 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.took_stairs = False
         self.retrieve = []
         self.elbereths = 0
-        self.descents = 0
         self.corpses_eaten = 0
         self.kills = []
         self.avoid_cells = []
         self.max_depth = 1
+        self.start_ac = None             # AC once the game is set up (summary)
         self.death_msgs = []
-        self.intro = self.message()
         self.equip_init()
         self.last_stair_dir = None
         self.stair_from = None           # (level key, square) of the staircase we last took
@@ -359,7 +356,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "really_attacks": self.really_attacks,
             "empty_looks": self.empty_looks,
             "pickup_stats": dict(self.pickup_stats),
-            "trap_stats": {k: v for k, v in self.trap_stats.items() if not k.startswith("_")},
+            "trap_stats": dict(self.trap_stats),
             "door_stats": dict(self.door_stats),
             "squeeze_stats": dict(self.squeeze_stats),
             "mines_kick_stats": dict(self.mines_kick_stats),
@@ -368,7 +365,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "kill_by": dict(self.kill_by.most_common(15)),
             "peaceful_wait_by": dict(self.peaceful_wait_by.most_common(8)),
             "hunt": [self.hunts, self.hunt_steps, self.hunt_offline_steps],
-            "ward": [self.ward_writes, self.ward_waits],
             "blind_held": self.blind_held,
             "mines_return": self.mines_return_log, "mines_trip": dict(self.mines_trip_stats), "sacrifice": dict(self.sac_stats), "sokoban": dict(self.soko_stats, secs=round(self.soko_secs, 1), work=self.soko_work),
             "minetown_seen": self.minetown_seen,

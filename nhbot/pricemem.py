@@ -11,7 +11,9 @@ Arithmetic (NetHack 3.6.6, shk.c):
   set_cost  = getprice * units / 2  (/3 with a dunce cap / visible shirt) * [3/4 for unidentified items at
               shopkeepers with m_id % 4 == 0], same rounding
 Appearances (o_init.c) are a random permutation inside each shuffled group, so before any evidence every type
-of the group is equally likely for a given appearance. Posterior = uniform prior x likelihood of all readings.
+of the group is equally likely for a given appearance. price_posterior (scrolls, the summary's report) = uniform prior
+x likelihood of all readings; value.type_posterior starts from the generation odds (oc_prob) instead, the types
+identified this game left out.
 Armor enchantment odds come from mkobj.c (armorid.spe_dist). Unknowns that are fixed per object or per
 shopkeeper (o_id % 4, m_id % 4) are treated as independent 1-in-4 events per reading.
 
@@ -67,7 +69,6 @@ def _pool(cls):
 
 
 POOLS = {cls: [OBJ[i][0] for i in _pool(cls)] for cls in SHUFFLED_CLASSES}
-POTION_PROB = {OBJ[i][0]: nh.objclass(i).oc_prob for i in _pool(nh.POTION_CLASS)}
 _AR = nh.ARMOR_CLASS
 for _a, _b in ARMOR_GROUPS:
     _grp = [OBJ[i][0] for i in range(_INDEX[(_AR, _a)], _INDEX[(_AR, _b)] + 1)]
@@ -185,9 +186,6 @@ class PriceMemoryMixin:
         self.price_stats = {"buy": 0, "sell": 0}
         self.for_sale = {}           # (level key, square) -> {floor text: price} from the tags read there
 
-    def _sucker(self):
-        return self.sucker()
-
     def _record(self, text, kind, price, rid, qty=None):
         key = appearance(text)
         if key is None:
@@ -197,7 +195,7 @@ class PriceMemoryMixin:
             qty = int(m.group(1))
         elif qty is None:
             qty = 1
-        r = (kind, price, qty, self.bl(nh.NLE_BL_CHA), self._sucker())
+        r = (kind, price, qty, self.bl(nh.NLE_BL_CHA), self.sucker())
         bucket = self.price_reads.setdefault(key, {})
         if rid not in bucket:
             bucket[rid] = r

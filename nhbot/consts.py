@@ -25,7 +25,10 @@ def ray_squares(y, x, dy, dx, n=9):
 # hunger states
 SATIATED, NOT_HUNGRY, HUNGRY, WEAK, FAINTING = 0, 1, 2, 3, 4
 
-# stairs/ladders, altar, grave, throne, sink, fountain, water, lava, air, cloud: the game refuses to engrave there
+# squares the bot never engraves on (elbereth.can_engrave_here; cmap S_ indices): stairs / ladders, altar, grave,
+# throne, sink, fountain, pool, lava, air, cloud, water. NetHack 3.6.6 engrave.c doengrave refuses only lava, pool /
+# water, a fountain and the Planes of Air / Water; on an altar the attempt angers its god and writes nothing, and a
+# finger only smudges a grave -- stairs, ladders, a throne and a sink take an engraving.
 NO_ENGRAVE_CMAP = {23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34, 39, 40, 41}
 
 # cmap glyphs (display.h / drawing.c S_ indices)

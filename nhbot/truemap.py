@@ -29,7 +29,6 @@ import numpy as np
 
 COLNO, ROWNO, RM_SIZE = 80, 21, 8
 STONE, SDOOR, SCORR, DOOR, CORR, ROOM, STAIRS = 0, 14, 15, 22, 23, 24, 25
-WALLS = range(1, 13)
 WALKABLE = frozenset((DOOR, CORR, ROOM, STAIRS) + tuple(range(26, 36)))   # ladder .. cloud
 
 

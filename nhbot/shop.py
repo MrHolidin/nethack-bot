@@ -35,7 +35,6 @@ class ShopMixin:
         if not mm:
             return
         stype = mm.group(1)
-        lv.shop_type = stype
         if self.shopping is None:
             self.carry_shop_greeted(lv, stype)
 

@@ -43,6 +43,12 @@ class GameMixin:
         self.raw_step(code)
         self.settle(expect_prompt)
 
+    def search_turns(self, n):
+        """Rest / search n turns: the count, then 's' ("20s"); the game stops early when something shows up."""
+        for c in str(n):
+            self.press(c)
+        self.press("s")
+
     def settle(self, expect_prompt=False):
         for _ in range(50):
             tty = self.tty_text()
@@ -167,7 +173,7 @@ class GameMixin:
             self.raw_step(ord("y"))
         elif ("trouble lifting" in m or "trouble removing" in m) and self.lift_answer(msg):
             self.raw_step(ord("y"))                              # lift_heavy (pickup.py)
-        elif m.rstrip().endswith("pay? [yn] (n)") or "pay?" in m:
+        elif "pay?" in m:
             self.raw_step(ord("y"))
         elif "possessions identified" in m:
             self.raw_step(ord("q"))
@@ -201,7 +207,7 @@ class GameMixin:
         return int(self.last_bl[idx])
 
     def turn(self):
-        return int(self.last_bl[nh.NLE_BL_TIME]) if self.last_bl is not None else 0
+        return self.bl(nh.NLE_BL_TIME)
 
     def pos(self):
         return self.bl(nh.NLE_BL_Y), self.bl(nh.NLE_BL_X)

@@ -3,7 +3,7 @@
 Identity comes from item text (appearance or identified name), never from the
 glyph number (in NLE the glyph leaks the true object type).
 
-Policy (from NetHack wiki guidance, see notes in the chat):
+Policy (from NetHack wiki guidance):
   * wear only armor whose appearance is NOT randomized, i.e. known-mundane;
     randomized helmets/gloves/boots can be opposite-alignment helm, fumbling,
     levitation (mostly cursed) -> skip them unless formally identified as safe.
@@ -79,8 +79,6 @@ for n in ("mummy wrapping", "orcish cloak", "coarse mantelet", "dwarvish cloak",
     UNSAFE[n] = (CLOAK, 0)
 for n in ("Hawaiian shirt", "T-shirt"):
     UNSAFE[n] = (SHIRT, 0)
-
-HEAVY = {"bronze plate mail", "plate mail", "crystal plate mail", "splint mail", "banded mail"}
 
 # unknown enchantment of a floor item: ~79% uncursed (+0 mostly), ~12% cursed (often -1..-3)
 UNKNOWN_ENCH = -0.15
@@ -163,7 +161,6 @@ class EquipMixin:
         self.test_strip_refused = set()   # letters of pieces that would not come off
         self.wear_failed = set()
         self.equip_events = []        # (turn, action, name)
-        self.start_ac = None
         self.wishes = []              # (turn, what we asked for, what came)
         self.armor_called = {}        # appearance -> type, for armor we wished for ("fencing gloves" -> power)
         self.food_picked = 0
@@ -373,14 +370,6 @@ class EquipMixin:
             return False
         self.equip_events.append((self.turn(), "takeoff", a["name"]))
         return True
-
-    def drop_letter(self, letter):
-        s = next((s for l, _, s in self.inventory() if l == letter), "")
-        m = re.match(r"^(\d+) ", s)
-        self.last_drop_qty = int(m.group(1)) if m else 1
-        self.goal_close("pile", self.level().key, self.pos())
-        if self.ask("d", "drop"):
-            self.press(letter)
 
     # ---------------------------------------------------------- floor items
     def look_here(self):

@@ -5,8 +5,6 @@ square becomes a passage; a wand of digging zapped that way), a boulder broken b
 at it (dig.c dig: "you hit the boulder with all your might" -- fracture_rock). Not in Sokoban (boulders are the
 puzzle), not on a Minetown level (the watch minds dug walls: dig.c watch_dig) but Orcish Town (all of them dead),
 not next to a shop (shopdig)."""
-import numpy as np
-
 from nhbot import glyphs as G
 from nhbot.nav import DELTA2KEY
 

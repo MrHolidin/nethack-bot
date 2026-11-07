@@ -11,11 +11,12 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES, permonst_of
+from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES
 from nhbot.rays import our_protection
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
-# (gas spore), the Oracle, a long worm's tail. No monster without one can move (mmove 0 for all that can't).
+# (gas spore), the Oracle, a long worm's tail. Most of them never move (mmove 0); the floating eye (speed 1), gas
+# spore and acid blob (speed 3) do, slowly.
 # Not the shrieker: no attack, but next to us it shrieks every move (mon.c m_respond): wakes the level, and
 # one shriek in 10 creates a monster (1 in 13 of those a purple worm).
 NO_ACTIVE_ATTACK = {nh.permonst(i).mname for i in range(nh.NUMMONS)
@@ -242,15 +243,9 @@ class PerceptionMixin:
                     continue
                 if self.is_actively_dangerous(lv, (ny, nx)) or self.passive_prey(name):
                     out.append(((ny, nx), name))
-            elif k == G.INVIS and (ny, nx):
+            elif k == G.INVIS:
                 out.append(((ny, nx), "invisible"))
         return out
-
-    def view_threats(self, lv):
-        """Visible hostiles that should stop housekeeping (pickups, equipment, shopping) and resting: the
-        visible hostiles (no active attack / peaceful: all in is_actively_dangerous; no monster without an
-        active attack can move, so a far immobile one never counts)."""
-        return self.visible_hostiles(lv)
 
     def items_gate(self, lv):
         """May item goals be pursued / piles inspected now? Not in combat: nothing in melee range and not shot
@@ -373,22 +368,6 @@ class PerceptionMixin:
         m = nh.glyph_to_mon(g)
         return nh.permonst(m).mlevel if 0 <= m < nh.NUMMONS else 0
 
-    def threat(self, g):
-        pm = permonst_of(g)
-        return 0 if pm is None else pm.difficulty - self.bl(nh.NLE_BL_XP)
-
-    def est_dmg(self, g, name=None):
-        """Rough expected damage per player turn from one adjacent monster.
-        to-hit from the wiki formula d20 < 10 + AC + level; per-hit damage ~ 1 + 1.5*level
-        (attack tables are not exposed by NLE, so this is a level-based proxy)."""
-        pm = permonst_of(g)
-        if pm is None or name == "invisible":
-            return 3.0
-        lvl = pm.mlevel
-        ac = self.bl(nh.NLE_BL_AC)
-        hit = min(max((10 + ac + lvl - 1) / 20.0, 0.05), 1.0)
-        return (1.0 + 1.5 * lvl) * hit * max(pm.mmove, 1) / 12.0
-
     def blind_attackers(self, lv, hostiles):
         """blind_strike: while blind, an adjacent 'I' is only a target if it attacked us. mhitu.c marks the square
         of an unseen attacker with 'I' in the same turn as its "It hits!"; 'I' also appears when we bump into or
@@ -435,7 +414,7 @@ class PerceptionMixin:
 
     def hallu_blind_ranged(self):
         """hallu_strike: no throwing / zapping / hunting at range while hallucinating -- the target can't be told
-        from a peaceful (61520 threw a dagger into one)."""
+        from a peaceful (61520 threw a dagger into one). Only in Minetown (strike_scope_ok)."""
         return bool(int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU
                     and self.strike_scope_ok(self.levels.get(self.cur_key)))
 

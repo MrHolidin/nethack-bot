@@ -389,7 +389,6 @@ class VaultMixin:
             kind, it = means
             if kind == "wand":
                 self.vault_stats["tunnel_zap"] += 1
-                seq0 = self.msg_seq
                 self.zap(it.letter, DELTA2KEY[d])
                 return True
             if self.dig_wield(lv, means):

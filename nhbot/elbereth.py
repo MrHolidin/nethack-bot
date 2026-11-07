@@ -1,5 +1,5 @@
-"""Elbereth: engrave it, read it back (about 1 in 5 dust engravings is misspelled), stand on it
-while hurt and the monsters around respect it.
+"""Elbereth: engrave it, read it back (engrave.c doengrave garbles each letter in the dust 1 in 25: about 28% of
+Elbereths come out misspelled), stand on it while hurt and the monsters around respect it.
 
 Measured in NLE 3.6.6 wizard mode: while you stand on a correctly spelled Elbereth, monsters that respect
 it never melee you; it survives waiting; your first melee attack (and usually a throw) erases it."""

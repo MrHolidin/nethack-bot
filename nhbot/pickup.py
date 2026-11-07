@@ -93,7 +93,7 @@ class PickupMixin:
     def pickup_init(self):
         self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
         self.pickup_stats = Counter()  # why things were taken / refused
-        self._take_state = None        # (food count, encumbrance) frozen while one pickup is judged
+        self._take_food = None         # the food count, frozen while one pickup is judged
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
@@ -108,11 +108,10 @@ class PickupMixin:
     def take_reason(self, text, worn=None):
         """Why we'd take this floor item: "armor" (an upgrade), "missile", "weapon" (a wield candidate), "food",
         "carry" (worth carrying to sell / use); None: leave it. Never merchandise, known-cursed armor / weapons,
-        ammunition without a launcher, rocks / boulders / iron balls; "carry" not while Burdened (the drop step
-        would put it down again)."""
+        ammunition without a launcher, rocks / boulders / iron balls."""
         if "for sale" in text or base_name(text)[2] in self.never_take:
             return None
-        food_n, cap = self._take_state or (self.food_count(), self.bl(nh.NLE_BL_CAP))
+        food_n = self._take_food if self._take_food is not None else self.food_count()
         ocls, typ = floor_kind(text)
         cursed = bool(CURSED_RE.search(text))
         reason = None
@@ -139,12 +138,11 @@ class PickupMixin:
                 if wc and wc[1] >= wc[0]:
                     reason = "carry"                     # worth >= 1 zorkmid per weight unit
         elif ocls == nh.TOOL_CLASS:
-            no_tools = NO_TOOLS - {"pick-axe"}
             if typ in LAMP_NAMES and not cursed:
                 return "lamp"                            # maybe a magic lamp: rubbed (nhbot.wishing)
             if not cursed and self.lock_tool_wanted(text):
                 return "carry"                           # lock_tools: a better unlocking tool, whatever it weighs
-            if typ not in no_tools:
+            if typ not in NO_TOOLS:
                 reason = "carry"
         elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS):
             if ocls == nh.SPBOOK_CLASS or not (typ == "gray stone" or typ in THROW_STONE_TYPES):
@@ -245,7 +243,7 @@ class PickupMixin:
         """Pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it
         straight back down if want rejects it."""
         seq0 = self.msg_seq
-        self._take_state = (self.food_count(), self.bl(nh.NLE_BL_CAP))    # judged as before the pickup
+        self._take_food = self.food_count()    # judged as before the pickup
         try:
             how = self.pickup(want, site)
             lone = None
@@ -256,7 +254,7 @@ class PickupMixin:
                         break
             bad = lone is not None and not want(lone.group(2))
         finally:
-            self._take_state = None
+            self._take_food = None
         if bad:
             self.pickup_stats["lone_dropped"] += 1
             self.drop_units(lone.group(1))

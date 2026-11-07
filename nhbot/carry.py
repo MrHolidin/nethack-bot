@@ -74,8 +74,8 @@ for _i in range(nh.NUM_OBJECTS):
     _oc = nh.objclass(_i)
     if ord(_oc.oc_class) == nh.WEAPON_CLASS and nh.OBJ_DESCR(_oc):
         WEAPON_NAME_OF.setdefault(nh.OBJ_DESCR(_oc), nh.OBJ_NAME(_oc))
-KEEP_WEAPONS = ("dagger", "knife", "dart", "shuriken", "javelin", "spear")   # bot.THROWABLE: thrown, kept
-NO_TOOLS = {"pick-axe", "chest", "large box", "ice box", "beartrap", "land mine"}
+KEEP_WEAPONS = ("dagger", "knife", "dart", "shuriken", "javelin", "spear")   # combat.THROWABLE: thrown, kept
+NO_TOOLS = {"chest", "large box", "ice box", "beartrap", "land mine"}
 # also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks), and diggers
 DIGGER_WORDS = ("pick-axe", "dwarvish mattock", "broad pick")
 LEAVE_RE = re.compile(r"[Ll]eave (?:your|the) .*outside")
@@ -118,7 +118,6 @@ for _i in range(nh.NUM_OBJECTS):
         APPEAR_WEIGHT[_d] = max(APPEAR_WEIGHT.get(_d, 0), _oc.oc_weight)
 
 ID_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s? of ([a-zA-Z' -]+?)(?: \(|$| called| named)")
-SOLD_RE = re.compile(r"You sold .*? for (\d+) gold pieces?")
 
 
 def singular(w):
@@ -269,7 +268,7 @@ class CarryMixin:
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
             if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
-                return True                  # wield candidates (valk.weapon_rank) and missiles we throw
+                return True                  # wield candidates (weapons.weapon_rank) and missiles we throw
         return False
 
     def sellables(self, lv, stype):
@@ -343,8 +342,8 @@ class CarryMixin:
 
     def stash_request(self):
         """shk.c: 'Will you please leave your pick-axe outside?' -- the keeper blocks the way in while one is
-        in the open inventory: put it down next to the door, outside the shop. Always on (with carry): a
-        mattock also comes in through the weapons pipeline."""
+        in the open inventory: put it down next to the door, outside the shop (a dwarvish mattock too:
+        DIGGER_WORDS)."""
         if self.cur_key is None:
             return
         self.stash_stats["asked"] += 1

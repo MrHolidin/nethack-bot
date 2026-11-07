@@ -7,7 +7,6 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.items import WAND_SPENT_RE
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
 from nhbot.danger import adj_level, dice_pmf
 from nhbot.goals import GOALS
@@ -151,7 +150,9 @@ class CombatMixin:
         return [(l, s) for _, l, s in out]
 
     def ranged_target(self, lv):
-        """Floating eyes / gas spores in a clear straight line -> (dir_key, dist, pos)."""
+        """A monster we never melee that a missile may kill (RANGED_TARGETS: floating eye, gas spore -- not closer
+        than 3 --, the jellies, brown / green mold, cockatrice, chickatrice) among avoid_cells, within 6 in a clear
+        straight line -> (dir_key, dist, pos, step)."""
         if not self.avoid_cells:
             return None
         y, x = self.pos()
@@ -239,7 +240,7 @@ class CombatMixin:
         k_mem, k_live, passable = grids
         p2 = passable.copy()
         for c in self.avoid_cells:
-            p2[c] = bool(G.PASSABLE[k_mem[c]]) or k_mem[c] == G.DOORWAY
+            p2[c] = bool(G.PASSABLE[k_mem[c]])
         start = self.pos()
         blocker = None
         if goal.any():
@@ -489,8 +490,8 @@ class CombatMixin:
         return self.prey_cache[key]
 
     def wand_targets(self, lv, hostiles):
-        """Hostiles in a line within 6 we may zap, nearest first (a generator: the peaceful check looks only as
-        far as needed)."""
+        """Hostiles in a line within 6 we may zap, nearest first: next to us one of the hostiles, farther away one a
+        look finds not peaceful."""
         for key, d, pos, step, name in self.line_targets(lv, max_d=6):
             if d == 1 and pos not in [p for p, _ in hostiles]:
                 continue
@@ -654,20 +655,19 @@ class CombatMixin:
         self.focus_note(m)
         if re.search(r"You (kill|destroy) ", m):
             self.kill_count += 1
-            mk0 = re.search(r"You (?:kill|destroy) (?:the |an? )?(.+?)!", m)
-            if mk0:
-                self.kill_by[mk0.group(1)] += 1
-        mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
-        self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
+        mk = re.search(r"You (?:kill|destroy) (?:the |an? )?(.+?)!", m)
+        if mk:
+            self.kill_by[mk.group(1)] += 1
+        self.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
             lvk = self.levels.get(self.cur_key)
             if lvk is not None:
                 lvk.stationary.pop(self.last_attack_target, None)   # killed it (a missile at a mold)
-            if lvk is not None and mk.group(2) in CARRIERS:
+            if lvk is not None and mk.group(1) in CARRIERS:
                 lvk.kill_piles.add(self.last_attack_target)    # what it carried lies under its corpse (pickup.py)
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
-                self.kills.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
+                self.kills.append((self.turn(), mk.group(1), self.last_attack_target, self.cur_key))
                 self.goal_event("corpse", "created")
         if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
             self.last_shot_turn = self.turn()

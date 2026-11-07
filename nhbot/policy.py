@@ -73,7 +73,7 @@ class Tick:
     maxhp: int
     hunger: int
     hostiles: list = None        # set by the perceive step
-    vis: list = None             # set by the housekeeping step (view_threats)
+    vis: list = None             # set by the housekeeping step (visible_hostiles)
 
 
 class PolicyMixin:
@@ -124,10 +124,9 @@ class PolicyMixin:
                     and self.prev_key in self.levels:
                 self.levels[self.prev_key].stairs_to[self.stair_from[1]] = lv.key
                 lv.stairs_to[self.pos()] = self.prev_key
-            self.note_stair_arrival(lv, True)
+            self.note_stair_arrival(lv)
             self.prev_key = lv.key
-        else:
-            self.last_stair_dir = None
+        self.last_stair_dir = None
         self.took_stairs = False
         if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines_bounced \
                 and arrived_by_stairs:
@@ -161,14 +160,14 @@ class PolicyMixin:
             self.loop_steps = self.steps
             self.raw_step(27); self.press("s")
             return True
-        stall = t - max(lv.last_progress, lv.entered_turn or 0)
+        stall = t - max(lv.last_progress, lv.entered_turn)
         if stall > 500 and t - lv.last_reset > 500:
             # forget learned obstacles: they are often transient (monsters, misreads)
             lv.fail[:] = 0
             lv.blocked[:] = False
             lv.last_reset = t
             self.resets += 1
-        if not lv.desperate and (stall > 1500 or (t - (lv.entered_turn or t) > 2500 and
+        if not lv.desperate and (stall > 1500 or (t - lv.entered_turn > 2500 and
                                                  not (self.kinds(lv) == G.DOWNSTAIR).any())):
             lv.desperate = True
             self.desperations += 1
@@ -247,10 +246,11 @@ class PolicyMixin:
                 self.press("s")
                 return True
             if self.is_minetown(c.lv) and self.peaceful_next(c.lv, c.hostiles):
-                self.stun_peace_waits += 1        # a blow could go to the watch (uhitm.c: stunned, confused -- a
-                self.press("s")                   # random direction): no melee in Minetown. A/B stun_peace +164
-                return True                       # [-345, +656]; in the 10 games it fired +141 a game, 4 deaths to
-                                                  # the watch gone
+                # a blow could go to the watch (cmd.c getdir confdir: stunned, or confused 1 in 5 -- a random
+                # direction): no melee in Minetown. A/B stun_peace +164 [-345, +656]; in the 10 games it fired +141
+                # a game, 4 deaths to the watch gone
+                self.stun_peace_waits += 1
+                self.press("s")
                 return True
         return False
 
@@ -325,29 +325,28 @@ class PolicyMixin:
             return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.rub_rewield()
         if self.tin_glib():
             return False                         # tins: slippery fingers, whatever we wield now slips too
-        if self.swapped_for and (c.hostiles or self.visible_hostiles(c.lv)) and self.swap_back():
-            return True                          # the dagger was swapped in for a tin / a box; a threat: back
-        # not while the dagger is swapped in for a tin / a box: wielding the main weapon then would make the job use
-        # it (a long sword forcing a lock can break) and the later swap_back put the dagger in our hands
-        if c.hostiles and self.swapped_for is None and self.tin_slipped is None \
-                and not any(it.wielded for it in self.items()):
-            return self.weapon_check()           # bare hands in a fight -- the best weapon we carry
-        return not c.hostiles and self.tin_slipped is None and self.swapped_for is None and self.weapon_check()
+        if self.swapped_for is not None:
+            # the dagger was swapped in for a tin / a box / digging; a threat: back. No other wielding meanwhile:
+            # the main weapon in hand would make the job use it (a long sword forcing a lock can break) and the
+            # later swap_back put the dagger in our hands
+            return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.swap_back()
+        if self.tin_slipped is not None:
+            return False
+        if c.hostiles:
+            return not any(it.wielded for it in self.items()) and self.weapon_check()   # bare hands in a fight
+        return self.weapon_check()
 
     def step_wands(self, c):
         return not self.hallu_blind_ranged() and self.wand_step(c.lv, c.hostiles)
 
     def step_melee(self, c):
-        """Attack the weakest-looking (lowest level) adjacent hostile; focus: Smith's rule among several."""
+        """Attack the adjacent hostile; among several, the one focus picks (Smith's rule)."""
         hostiles = [t for t in c.hostiles if not self.soko_no_melee(c.lv, t[0])]   # Sokoban's zoo: no exploder
         if not hostiles:
             return False
         awake = [t for t in hostiles if not self.asleep(c.lv, t[0])]
         cands = awake or hostiles                # one put to sleep comes after every awake one
-        target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
-        if len(cands) > 1:
-            target = self.focus_target(cands, target)
-        self.attack(target)
+        self.attack(cands[0][0] if len(cands) == 1 else self.focus_target(cands))
         return True
 
     def step_hunt_shooter(self, c):
@@ -360,7 +359,7 @@ class PolicyMixin:
             return False
         self.elb_stats["rest_confirmed"] += 1
         self.cur_act = "rest"
-        self.press("2"); self.press("0"); self.press("s")
+        self.search_turns(20)
         return True
 
     def step_throw_at_blocker(self, c):
@@ -425,7 +424,7 @@ class PolicyMixin:
         """No hostile in view: pay, shop visit, Excalibur, recover stolen loot, read good scrolls, wear armor,
         inspect the pile here. Hostiles in view but not in combat (pickup_calm): loot and the pile only."""
         lv, y, x = c.lv, c.y, c.x
-        c.vis = self.view_threats(lv)
+        c.vis = self.visible_hostiles(lv)
         if not c.vis:
             if self.need_pay:
                 self.need_pay = False
@@ -483,7 +482,7 @@ class PolicyMixin:
         """Rest if hurt and nothing in view."""
         if c.hp < c.maxhp * self.opts.rest_frac and not c.vis:
             self.cur_act = "rest"
-            self.press("2"); self.press("0"); self.press("s")
+            self.search_turns(20)
             return True
         return False
 

@@ -78,7 +78,7 @@ class Level:
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
         self.locked = set()
-        self.avoid_down = set()
+        self.avoid_down = set()    # downstairs leading into the Gnomish Mines
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.shop_anchors = []     # [door, square we came from (outside), closed] of each greeting (shop_regrow)
         self.grotto = False        # Grotto Town (is_grotto)
@@ -95,7 +95,7 @@ class Level:
         self.turns_here = 0
         self.progress_count = 0
         self.last_progress = 0
-        self.last_reset = 0   # downstairs leading into the Gnomish Mines
+        self.last_reset = 0        # turn the learned obstacles were last forgotten (step_progress)
         self.entered_turn = None
         self.entered_xl = None     # experience level at the first arrival (stats)
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
@@ -108,7 +108,6 @@ class Level:
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
         self.search_goal = None   # square chosen for searching, kept until reached
         self.mapped = False       # a magic mapping scroll was read here
-        self.shop_type = None     # from the shopkeeper's greeting
 
     def set_terrain(self, pos, glyph):
         """What we learned is at pos now (a dried-up fountain, a staircase that isn't): both layers."""
@@ -175,12 +174,6 @@ class MapMixin:
     def terrain_glyphs(self, lv):
         """Remembered glyphs with the terrain layer where we know it: fountains, altars under items."""
         return np.where(lv.terrain != G.STONE_GLYPH, lv.terrain, lv.under)
-
-    def kind_grid(self, lv):
-        """Terrain kind map from memory, with live monsters/objects overlaid."""
-        g = self.obs["glyphs"]
-        k_live = G.KIND[g]
-        return self.kinds(lv), k_live
 
     def passable_grid(self, lv, k_mem, k_live):
         p = G.PASSABLE[k_mem].copy()
@@ -300,10 +293,10 @@ class MapMixin:
         k = self.kinds(lv)[self.pos()]
         return k if k in (G.UPSTAIR, G.DOWNSTAIR) else None
 
-    def note_stair_arrival(self, lv, arrived):
-        if arrived and self.last_stair_dir:
+    def note_stair_arrival(self, lv):
+        """On a new level by a staircase we took: the other end of it is under us."""
+        if self.last_stair_dir:
             lv.set_terrain(self.pos(), UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH)
-        self.last_stair_dir = None
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
@@ -327,7 +320,6 @@ class MapMixin:
             if any(c in m for c in caught) and self.cur_key:
                 if self.trapped is None:
                     self.trap_stats[kind] += 1
-                    self.trap_stats["_tries"] = 0
                 self.trapped = (kind, self.cur_key, self.pos())
             elif any(f in m for f in freed):
                 self.trapped = None
@@ -348,7 +340,7 @@ class MapMixin:
             if not self.dig_through_note(lv, self.pos(), self.last_move_target, "boulder"):
                 lv.blocked[self.last_move_target] = True
         if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:
-            # can't kick from here (a form without legs; in a pit): kicking the door again would loop
+            # can't kick from here (wounded legs: dokick.c; in a pit): kicking the door again would loop
             lv.blocked[self.last_move_target] = True
         if lv and ("Closed for inventory" in m or any(engraving_says(t, "Closed for inventory")
                                                          for t in CFI_RE.findall(m))):

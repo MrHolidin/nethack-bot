@@ -24,7 +24,6 @@ CMAP = nh.GLYPH_CMAP_OFF
 ROOM_FLOOR = (19, 20)                                   # S_room, S_darkroom
 ROOM_FEATURE = (19, 20, 23, 24, 25, 26, 27, 28, 29, 30, 31, 33)   # floor, stairs, ladders, altar .. sink, ice
 CORRIDOR = (21, 22)
-DOORS = (12, 13, 14, 15, 16)
 ITEM_KINDS = (G.OBJECT, G.GOLD, G.CORPSE, G.BOULDER)
 SIDES = ("N", "E", "S", "W")
 VAULT_AREA = 4

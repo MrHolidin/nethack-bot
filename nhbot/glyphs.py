@@ -102,14 +102,6 @@ def monster_name(g):
     return name
 
 
-def monster_letter(g):
-    m = nh.glyph_to_mon(g)
-    return chr(nh.permonst(m).mlet + 0) if 0 <= m < nh.NUMMONS else "?"
-
-
-def trap_name(g):
-    return nh.symdef.from_idx(nh.glyph_to_cmap(g)).explanation
-
 # '[' piles: armor class is visible to a human (symbol), the exact type is not used
 ARMOR_GLYPH = np.zeros(N, dtype=bool)
 for g in range(N):

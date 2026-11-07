@@ -57,7 +57,8 @@ class SurvivalMixin:
         self.press(13)
 
     def critically_low_hp(self, hp, maxhp):
-        """pray.c critically_low_hp: major trouble TROUBLE_HIT (not polymorphed)."""
+        """pray.c critically_low_hp: major trouble TROUBLE_HIT. The status line shows the HP the game tests (u.mh and
+        u.mhmax while polymorphed)."""
         xl = self.bl(nh.NLE_BL_XP)
         rank = 0 if xl <= 2 else (xl + 2) // 4                 # botl.c xlev_to_rank
         div = 5 if rank <= 1 else 6 if rank <= 3 else 7 if rank <= 5 else 8 if rank <= 7 else 9
@@ -70,7 +71,8 @@ class SurvivalMixin:
             return False
         t = self.turn()
         if self.last_pray is None:
-            return t > 100            # every caller is in major trouble: u.ublesscnt = 300 - (moves - 1) <= 200
+            return t > 100            # u.ublesscnt = 300 - (moves - 1) <= 200: a prayer in major trouble is safe (the
+                                      # steps that pray are; step_history, heal_step, Sokoban only ask)
         gap = t - self.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300

@@ -130,7 +130,7 @@ class NavMixin:
         The arrays are read-only: copy before changing."""
         key = (self.tick_no, self.steps, lv.key, self.shop_active(lv), tuple(self.avoid_cells))
         if self._grids_key != key:
-            k_mem, k_live = self.kind_grid(lv)
+            k_mem, k_live = self.kinds(lv), G.KIND[self.obs["glyphs"]]
             passable = self.passable_grid(lv, k_mem, k_live)
             for a in (k_mem, k_live, passable):
                 a.setflags(write=False)
@@ -169,7 +169,7 @@ class NavMixin:
         self.last_move_target = target
         before = (y, x, self.turn())
         lv = self.level()
-        self.trap_held(lv)                    # forgets the trap once we are out of it (or after 30 tries)
+        self.trap_held(lv)                    # forgets the trap once we are out of it
         if target in lv.locked:
             if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
                 lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
@@ -227,9 +227,7 @@ class NavMixin:
             return False
         if self.trapped[1:] != (lv.key, self.pos()):
             self.trapped = None
-            self.trap_stats["_tries"] = 0
             return False
-        self.trap_stats["_tries"] += 1
         return True
 
     def kick(self, key):

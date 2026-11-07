@@ -1,4 +1,7 @@
-"""Our own ray coming back at us, and what a hit would do (statistics only: wand_step logs them, decides nothing).
+"""Our own ray coming back at us, and what a hit would do; the walk of a ray / beam square by square.
+
+self_hit_prob and ray_harm are statistics only (wand_step logs them: combat.ray_risk_note). ray_walk and beam_walk
+decide: they play out a zap inside win_prob (combat.zap_opening), which picks the attack wand and its direction.
 
 self_hit_prob follows zap.c buzz() (3.6.6) square by square over the map we remember, every random branch weighed:
   * range rn1(7, 7) = 7..13; each square costs 1 (`while (range-- > 0)`), a bounce 1 more (`--range`);

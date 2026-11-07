@@ -13,8 +13,6 @@ import _ctypes
 import ctypes
 import re
 
-import nle.nethack as nh
-
 
 SPE_OFFSET = 48                  # struct obj: nobj, v, cobj (8 each), o_id (4), ox, oy (1 each), otyp (2), owt (4),
                                  # quan (8), spe

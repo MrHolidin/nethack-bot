@@ -158,9 +158,10 @@ class FocusMixin:
         ttk = rem / max(p * dmg, 0.05)
         return mon_dpt(idx, self.bl(nh.NLE_BL_AC)) / max(ttk, 0.5)
 
-    def focus_target(self, hostiles, fallback):
+    def focus_target(self, hostiles):
+        """The (pos, name) hostile to hit among several: the highest focus_score."""
         self.focus_calls += 1
         best = max(hostiles, key=lambda t: self.focus_score(t[0]))[0]
-        if best != fallback:
+        if best != min(hostiles, key=lambda t: self.mon_level(t[0]))[0]:
             self.focus_picks += 1
         return best

@@ -60,7 +60,8 @@ class WeaponsMixin:
             self.press(letter)
 
     def weapon_check(self):
-        """Remember the starting weapon; re-wield it if we got it back after a theft."""
+        """Wield the best weapon we carry (weapon_upgrade). The first call with a weapon in hand only notes it
+        (main_weapon: its base name); before that nothing is wielded here."""
         inv = self.inventory()
         wielded = [it.text for it in self.items() if it.wielded]
         if self.main_weapon is None:

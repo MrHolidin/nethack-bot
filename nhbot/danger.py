@@ -1,4 +1,4 @@
-"""Melee danger estimate (logging only for now): from the monsters next to us, the distribution of the damage we
+"""Melee danger estimate: from the monsters next to us, the distribution of the damage we
 take in the next game turn, and so the chance it kills us (NetHack 3.6.6 mhitu.c / makemon.c / mon.c).
 
 Per adjacent hostile, per action it gets this turn (mcalcmove: mmove / 12 actions, the remainder a random
@@ -15,7 +15,9 @@ dice (dmgval + enchantment + dbon) over the hits we already landed on it.
 Standing on Elbereth (read back) a monster that respects it doesn't melee us -- unless we attack, which
 erases it (mon.c setmangry).
 P(death) = P(total damage >= HP) combined with the instant deaths. Calibration (summary 'danger'): predicted
-mean damage and P(death) against what the next turn did.
+mean damage and P(death) against what the next turn did -- statistics only.
+win_prob (sampled whole fights) decides: the prey explore walks up to (combat.prey_mask), whether and which attack
+wand to zap (combat.wand_ev_pairs), a fountain dip that may bring a water demon (excalibur).
 """
 import re
 from bisect import bisect_right
@@ -603,8 +605,7 @@ class DangerMixin:
         sp = self.our_speed()
         slow = 12 * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else 12
         return {"aim": aim, "free_action": free, "int": self.bl(nh.NLE_BL_INT), "speed": sp,
-                "speed_slow": min(sp, slow), "sleep_res": "sleep" in prot,
-                "helmet": any(a["worn"] and a["slot"] == "helm" for a in self.armor_inventory())}
+                "speed_slow": min(sp, slow), "sleep_res": "sleep" in prot}
 
     def pack_profile(self):
         """What a ray hitting us can blow up in our pack (zap.c zhitu -> destroy_item): the potion stacks'
@@ -717,6 +718,7 @@ class DangerMixin:
 
     # ------------------------------------------------------------ our speed
     def our_speed(self):
-        """12; a Valkyrie is intrinsically Fast from XL 7 (2 moves in 3 get +6: 16 on average); Burdened 3/4."""
+        """12; a Valkyrie is intrinsically Fast from XL 7 (allmain.c: a full extra move 1 turn in 3 -- 16 on
+        average); Burdened 3/4."""
         sp = 16 if self.bl(nh.NLE_BL_XP) >= 7 else 12
         return sp * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else sp
