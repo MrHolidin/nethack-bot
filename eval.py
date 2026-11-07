@@ -16,6 +16,44 @@ def play(args):
     return s
 
 
+def _child(seed, kw, conn):
+    conn.send(play((seed, kw)))
+    conn.close()
+
+
+def play_all(seeds, kw, j):
+    """play() for every seed, j at a time, each game in a process of its own: a game that kills its process (a
+    crash in the game's C code: 79670, a bus error) is recorded as a crash -- under a Pool its task was lost and
+    the pool waited for it for ever, the shard never finished. Waits on the pipes and the process sentinels only
+    (no timed sleep: libfaketime breaks those)."""
+    from multiprocessing.connection import wait
+    ctx = mp.get_context("fork")
+    todo, running, out = list(seeds), {}, {}
+    while todo or running:
+        while todo and len(running) < j:
+            s = todo.pop(0)
+            r, w = ctx.Pipe(duplex=False)
+            p = ctx.Process(target=_child, args=(s, kw, w))
+            p.start()
+            w.close()
+            running[s] = (p, r)
+        ready = set(wait([o for p, r in running.values() for o in (r, p.sentinel)]))
+        for s, (p, r) in list(running.items()):
+            if r in ready:
+                try:
+                    out[s] = r.recv()
+                except EOFError:
+                    out[s] = None
+            elif p.sentinel not in ready:
+                continue
+            p.join()
+            if out.get(s) is None:
+                out[s] = {"seed": s, "crash": f"the game's process died (exit code {p.exitcode})",
+                          "score": 0, "max_depth": 0}
+            del running[s]
+    return [out[s] for s in seeds]
+
+
 def death_cause(msgs):
     txt = " ".join(msgs[-4:])
     for pat, lab in [(r"faint from lack of food|starve", "starvation"),
@@ -42,13 +80,10 @@ def main():
     a = ap.parse_args()
     kw = {"character": a.char, **json.loads(a.kw)}
     t = time.monotonic()
-    with mp.Pool(a.j) as pool:
-        res = pool.map(play, [(s, kw) for s in range(a.start, a.start + a.n)], chunksize=1)
-        # written before the pool exits: its terminate() has failed under libfaketime (time.sleep(0):
-        # OSError EINVAL) and took a whole shard's results with it
-        with open(a.out, "w") as f:
-            for r in res:
-                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+    res = play_all(list(range(a.start, a.start + a.n)), kw, a.j)
+    with open(a.out, "w") as f:
+        for r in res:
+            f.write(json.dumps(r, ensure_ascii=False) + "\n")
     crashes = [r for r in res if "crash" in r]
     ok = [r for r in res if "crash" not in r]
     sc = [r["score"] for r in ok]
