@@ -212,6 +212,10 @@ class SokobanMixin:
             return False
         if self.bl(nh.NLE_BL_XP) < self.opts.soko_xl:
             return False                                   # soko_xl: not before this experience level
+        if self.lock_tool() is None:
+            # no key, lock pick or credit card: the zoo's locked door would be kicked -- the whole zoo awake at
+            # once (dokick.c wake_nearby), where the deaths are; unlocked quietly its monsters sleep
+            return False
         ent = self.soko_entrance()
         if ent is None:
             return self.soko_search_step(lv, grids, nothing_left)
