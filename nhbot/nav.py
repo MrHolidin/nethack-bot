@@ -2,6 +2,7 @@
 monsters in the way, failed moves), walking toward a square or a set of squares."""
 import heapq
 from array import array
+from collections import Counter
 
 import numpy as np
 import nle.nethack as nh
@@ -61,6 +62,16 @@ class PathPrev:
 
 
 class NavMixin:
+    def nav_init(self):
+        self._grids_key, self._grids = None, None    # grids: the cache and its key
+        self.last_move_target = None     # the square our last step went for (msg_map reads what it said)
+        self.peaceful_waits = 0          # turns waited for a peaceful monster in our way
+        self.shop_kicks_avoided = 0
+        self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us (msg_map)
+        self.trap_stats = Counter()
+        self.door_stats = Counter()
+        self.mines_kick_stats = Counter()
+
     def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True):
         """Shortest paths from start: (dist array or None without want_dist, prev, the first target square
         reached or None). Stops at the first square of targets_mask popped, or past max_cost."""

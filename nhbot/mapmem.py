@@ -116,6 +116,14 @@ class Level:
 
 
 class MapMixin:
+    def map_init(self):
+        self.levels = {}                 # level key (dungeon number, level) -> Level
+        self.cur_key = None              # the key of the level this tick is on
+        self.prev_key = None             # ... of the level at the last tick (note_arrival)
+        self.arrived_by_stairs = False   # this tick: a staircase brought us onto this level (note_arrival)
+        self._cur_pos = self.prev_pos = None    # our square, and the one before it we last stood on
+        self.max_depth = 1
+
     def level(self):
         key = (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL))
         lv = self.levels.get(key)
@@ -126,6 +134,8 @@ class MapMixin:
         return lv
 
     def update_memory(self):
+        """First thing every tick: what the screen shows now into this level's memory; a shop greeted in the dark grows
+        as its floor shows (shop_regrow); the arrival on another level noted (note_arrival). The level."""
         lv = self.level()
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
@@ -156,6 +166,9 @@ class MapMixin:
         if pc > lv.progress_count:
             lv.progress_count = pc
             lv.last_progress = self.turn()
+        if lv.shop_anchors:
+            self.shop_regrow(lv)
+        self.arrived_by_stairs = self.note_arrival(lv)
         return lv
 
     def kinds(self, lv):
@@ -293,6 +306,23 @@ class MapMixin:
         k = self.kinds(lv)[self.pos()]
         return k if k in (G.UPSTAIR, G.DOWNSTAIR) else None
 
+    def note_arrival(self, lv):
+        """On another level than at the last tick: where the staircase we took leads, both ways (Level.stairs_to), and
+        its other end under us (note_stair_arrival). The stairs bookkeeping of the last action (actions.take_stairs)
+        is used up here. True if a staircase brought us onto this level."""
+        arrived_by_stairs = False
+        if lv.key != self.prev_key:
+            arrived_by_stairs = self.took_stairs
+            if self.last_stair_dir and self.stair_from and self.stair_from[0] == self.prev_key \
+                    and self.prev_key in self.levels:
+                self.levels[self.prev_key].stairs_to[self.stair_from[1]] = lv.key
+                lv.stairs_to[self.pos()] = self.prev_key
+            self.note_stair_arrival(lv)
+            self.prev_key = lv.key
+        self.last_stair_dir = None
+        self.took_stairs = False
+        return arrived_by_stairs
+
     def note_stair_arrival(self, lv):
         """On a new level by a staircase we took: the other end of it is under us."""
         if self.last_stair_dir:
@@ -325,13 +355,8 @@ class MapMixin:
                 self.trapped = None
         if "This door is locked" in m and self.last_move_target and lv:
             lv.locked.add(self.last_move_target)
-        if lv and self.last_move_target and "You are carrying too much to get through" in m:
-            # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit
-            self.squeeze_stats["refused"] += 1
-            if self.dig_through_note(lv, self.pos(), self.last_move_target, "squeeze"):
-                pass                                          # dig_through: a corner dug instead of shedding
-            else:
-                self.squeeze_pending = (lv.key, self.last_move_target)
+        if self.squeeze_msg(m, lv):                           # carry.py: a diagonal squeeze refused for our weight
+            pass
         elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",
                 "Perhaps that's why you cannot move past it",

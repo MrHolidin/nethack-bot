@@ -1,10 +1,12 @@
 """The decision order: one tick = one action.
 
-tick() updates the map memory, then runs the steps in STEPS in order; the first step that acts (returns
-True) ends the tick. A step that only updates bookkeeping returns False. The order is the policy: emergencies
-first, then fighting, then food and items, then exploring.
+tick() updates the map memory (and what the arrival on a level tells), the per-tick trackers and the Mines
+bookkeeping (which may bounce us back up a staircase), then runs the steps in STEPS in order; the first step that
+acts (returns True) ends the tick. A step that only updates bookkeeping returns False. The order is the policy:
+emergencies first, then fighting, then food and items, then exploring.
 """
 import re
+from collections import deque
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -21,12 +23,11 @@ from nhbot.survival import HORN_FIXES, HORN_SICK
 
 
 STEPS = (
-    "level_arrival",     # bounce off the Mines staircase (mines_blocked); Mines-return bookkeeping
     "progress",          # no-time loop guard; forget obstacles / go desperate on a stalled level
     "engulfed",
     "unihorn_sick",      # food poisoning / illness: a unicorn horn before a prayer
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
-    "weight",            # never Burdened (carry), shed weight when Strained
+    "weight",            # a squeeze refused for our weight: shed a unit (carry.squeeze_step); never Burdened
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
     "unihorn",           # blind / confused / stunned / hallucinating, nothing next to us: the horn
     "stunned",
@@ -63,6 +64,31 @@ STEPS = (
 )
 
 
+# step_housekeeping: (name, job(bot, tick) -> True if it acted), in order -- with no hostile in view
+HOUSEKEEPING = (
+    ("pay", lambda b, c: b.pay_step()),
+    ("tin_wait", lambda b, c: b.tin_wait_step(c.lv)),
+    ("shop", lambda b, c: b.shop_step(c.lv)),
+    ("fountain_plan", lambda b, c: b.fountain_plan_step(c.lv)),
+    ("loot", lambda b, c: b.loot_step(c.lv)),
+    ("wishwand", lambda b, c: not b.soko_wands_shut(c.lv) and b.wishwand_step()),   # no wand in Sokoban before its
+                                                                                    # level is solved
+    ("lamp", lambda b, c: not b.soko_stealth(c.lv) and b.lamp_step()),              # no lamp's djinni by a sleeping zoo
+    ("read_scroll", lambda b, c: b.read_scroll_step(c.lv)),
+    ("jewelry_id", lambda b, c: b.jewelry_id_step(c.lv)),
+    ("wandid", lambda b, c: b.wandid_step(c.lv)),
+    ("quaff_test", lambda b, c: b.quaff_test_step(c.lv)),
+    ("tin", lambda b, c: b.tin_step(c.lv)),
+    ("equip", lambda b, c: b.equip_step(c.lv)),
+    ("jewelry_wear", lambda b, c: b.jewelry_wear_step(c.lv)),
+    ("altar", lambda b, c: b.altar_step(c.lv)),
+    ("protection", lambda b, c: b.protection_step(c.lv)),
+    ("box", lambda b, c: b.box_step(c.lv)),
+    ("pile", lambda b, c: b.pile_to_inspect(c.lv, c.y, c.x) and b.armor_pickup_here(c.lv)),
+)
+HOUSEKEEPING_CALM = ("loot", "pile")    # hostiles in view, but none in reach and nobody shooting (items_gate)
+
+
 @dataclass
 class Tick:
     """What every step of one tick sees."""
@@ -86,6 +112,20 @@ class PolicyMixin:
     def policy_init(self):
         self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in STEPS]
         self.last_step = None
+        self.tick_no = 0
+        self.tick_seq = 0                # msg_seq at the start of this tick
+        self.hist = deque()              # step_history: the fight state of the last 40 ticks (summary 'hist')
+        self.loop_turn, self.loop_steps, self.loops = -1, 0, 0     # step_progress: the no-time loop guard
+        self.resets = 0
+        self.desperations = 0
+        self.pet_last_seen = 0
+        self.faint_since = None          # step_pray: the turn Fainting began
+        self.deadly_prayers = 0
+        self.stun_waits = 0
+        self.stun_peace_waits = 0
+        self.blind_waits = 0
+        self.hallu_waits = 0             # hallu_wait: turns rested hallucinating
+        self.ammo_pickups = 0
 
     def tick(self):
         lv = self.update_memory()
@@ -93,68 +133,25 @@ class PolicyMixin:
         self.last_step = None
         self.chasing = None
         self.tick_no += 1
-        t0, h0 = self._hunger_at
-        t, h = self.turn(), self.bl(nh.NLE_BL_HUNGER)
-        self.hunger_turns[h0] += t - t0
-        self._hunger_at = (t, h)
-        self.nutrition_tick()
+        self.nutrition_tick()                    # survival.py: hunger
         self.tick_seq = self.msg_seq
         self.threat_track()                      # threats.py: who is coming for us
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
         self.poly_track()                        # thieves.py: what fell from us when we changed form
         if self.opts.sokoban:
             self.soko_track(lv)                  # sokoban.py: what we carried on coming onto this square
-        if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
-            self.last_step = "level_arrival"
+        if self.mines_tick(lv):                  # explore.py; before the tick state is read: it may change level
+            self.last_step = "level_arrival"     # its time_by label
             return
         y, x = self.pos()
-        c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP), maxhp=self.bl(nh.NLE_BL_HPMAX),
-                 hunger=self.bl(nh.NLE_BL_HUNGER))
-        for name, step in self.steps_by_name[1:]:
+        c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP),
+                 maxhp=self.bl(nh.NLE_BL_HPMAX), hunger=self.bl(nh.NLE_BL_HUNGER))
+        for name, step in self.steps_by_name:
             if step(c):
                 self.last_step = name
                 return
 
     # ------------------------------------------------------------------ emergencies
-    def step_level_arrival(self, lv):
-        if lv.shop_anchors:
-            self.shop_regrow(lv)
-        if self.pending_mines_mark:
-            self.pending_mines_mark = False
-            if lv.key[0] == 0:
-                lv.avoid_down.add(self.pos())
-        arrived_by_stairs = False
-        if lv.key != self.prev_key:
-            arrived_by_stairs = self.took_stairs
-            if self.last_stair_dir and self.stair_from and self.stair_from[0] == self.prev_key \
-                    and self.prev_key in self.levels:
-                self.levels[self.prev_key].stairs_to[self.stair_from[1]] = lv.key
-                lv.stairs_to[self.pos()] = self.prev_key
-            self.note_stair_arrival(lv)
-            self.prev_key = lv.key
-        self.last_stair_dir = None
-        self.took_stairs = False
-        if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines_bounced \
-                and arrived_by_stairs:
-            self.mines_bounced.add(lv.key)
-            self.pending_mines_mark = True
-            self.take_stairs("<")
-            return True
-        if lv.key[0] == 2:
-            folk = self.town_folk_visible()
-            if folk and lv.key[1] in (3, 4):
-                lv.town_heard = True                  # its watch / priest / shopkeeper in view (minetown_folk,
-                                                      # accepted before its A/B was in)
-            if self.is_minetown(lv) or folk:
-                self.minetown_seen = True
-            if not self.minetown_seen and lv.key[1] >= 5:
-                self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
-        elif self.mines_return_on:
-            self.mines_return_on = False
-            self.mines_done = True
-            self.mines_done_turn = self.turn()
-        return False
-
     def step_progress(self, c):
         lv, t = c.lv, c.t
         if (G.KIND[self.obs["glyphs"]] == G.PET).any():
@@ -217,16 +214,7 @@ class PolicyMixin:
         return False
 
     def step_weight(self, c):
-        if self.squeeze_pending is not None:
-            key, target = self.squeeze_pending
-            self.squeeze_pending = None
-            if key == c.lv.key:
-                if self.carry_drop_step(force=True, max_tier=3):
-                    self.squeeze_stats["dropped"] += 1
-                    return True
-                self.squeeze_stats["nothing_to_drop"] += 1
-                c.lv.blocked[target] = True       # nothing left to shed: the squeeze stays shut
-        return self.carry_drop_step()
+        return self.squeeze_step(c.lv) or self.carry_drop_step()
 
     # ------------------------------------------------------------------ monsters around
     def step_perceive(self, c):
@@ -426,55 +414,16 @@ class PolicyMixin:
         return self.stash_step(c.lv)
 
     def step_housekeeping(self, c):
-        """No hostile in view: pay, shop visit, Excalibur, recover stolen loot, read good scrolls, wear armor,
-        inspect the pile here. Hostiles in view but not in combat (pickup_calm): loot and the pile only."""
-        lv, y, x = c.lv, c.y, c.x
+        """No hostile in view: the HOUSEKEEPING jobs in order (pay, shop visit, Excalibur, stolen loot, good scrolls,
+        armor, the pile here, ...). Hostiles in view but not in combat (pickup_calm, items_gate): loot and the pile
+        only. The first job that acts ends the tick."""
         if not c.vis:
-            if self.need_pay:
-                self.need_pay = False
-                self.pay()
-                return True
-            if self.tin_wait_step(lv):
-                return True
-            if self.shop_step(lv):
-                return True
-            if self.fountain_plan_step(lv):
-                return True
-            if self.loot_step(lv):
-                return True
-            if not self.soko_wands_shut(lv) and self.wishwand_step():
-                return True                          # no wand in Sokoban before its level is solved
-            if not self.soko_stealth(lv) and self.lamp_step():
-                return True                          # no lamp's djinni by a sleeping zoo
-            if self.read_scroll_step(lv):
-                return True
-            if self.jewelry_id_step(lv):
-                return True
-            if self.wandid_step(lv):
-                return True
-            if self.quaff_test_step(lv):
-                return True
-            if self.tin_step(lv):
-                return True
-            if self.equip_step(lv):
-                return True
-            if self.jewelry_wear_step(lv):
-                return True
-            if self.altar_step(lv):
-                return True
-            if self.protection_step(lv):
-                return True
-            if self.box_step(lv):
-                return True
-            if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
-                return True
-        elif self.items_gate(lv):
-            # monsters in view but none in reach and nobody shooting: still collect what lies here
-            if self.loot_step(lv):
-                return True
-            if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
-                return True
-        return False
+            jobs = HOUSEKEEPING
+        elif self.items_gate(c.lv):
+            jobs = [j for j in HOUSEKEEPING if j[0] in HOUSEKEEPING_CALM]
+        else:
+            return False
+        return any(job(self, c) for _, job in jobs)
 
     def step_dig_through(self, c):
         return self.dig_through_step(c.lv, c.hostiles)

@@ -25,13 +25,15 @@ class ExploreMixin:
         self.mines_trip_stats = Counter()  # ticks of the trip to the Mines by what they did
         self.two_down_levels = set()       # branch levels whose Mines staircase we inferred (two_down_mines)
         self.mines_trip_retry = 0          # no trip to the Mines before this turn (the staircase was out of reach)
-        self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us
-        self.trap_stats = Counter()
-        self.door_stats = Counter()
-        self.squeeze_pending = None       # (level key, square) a diagonal squeeze refused for our weight
-        self.squeeze_stats = Counter()
-        self.mines_kick_stats = Counter()
         self.descent_rest = Counter()    # level key -> turns rested on its down staircase
+        self.items_first_holds = 0       # descents held for an item goal still on the level
+        self.pending_mines_mark = False  # next tick: mark the Mines staircase we stand by (mines_tick)
+        self.mines_bounced = set()       # Mines levels we went straight back up from (mines_tick)
+        self.mines_return_on = False     # mines_return: climbing out of the Mines
+        self.mines_done = False          # ... and out: the Mines are finished
+        self.mines_done_turn = 0
+        self.minetown_seen = False
+        self.mines_return_log = []       # (turn, level key, why, depth) per mines_return
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -352,6 +354,36 @@ class ExploreMixin:
         if mask[self.pos()]:
             self.mines_trip_stats[stat + ("_up" if up_way else "_down")] += 1
         return self.stairs_step(lv, grids, mask, "<" if up_way else ">")
+
+    def mines_tick(self, lv):
+        """Every tick, before the steps: the branch level's Mines staircase marked (avoid_down) where mines_return or a
+        bounce brought us back up; on a Mines level reached by a staircase while the Mines are closed (mines_blocked)
+        -- straight back up (once a level); Minetown seen (or passed: mines_return); out of the Mines after
+        mines_return -- the Mines are done. True if it took the stairs."""
+        if self.pending_mines_mark:
+            self.pending_mines_mark = False
+            if lv.key[0] == 0:
+                lv.avoid_down.add(self.pos())
+        if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines_bounced \
+                and self.arrived_by_stairs:
+            self.mines_bounced.add(lv.key)
+            self.pending_mines_mark = True
+            self.take_stairs("<")
+            return True
+        if lv.key[0] == 2:
+            folk = self.town_folk_visible()
+            if folk and lv.key[1] in (3, 4):
+                lv.town_heard = True                  # its watch / priest / shopkeeper in view (minetown_folk,
+                                                      # accepted before its A/B was in)
+            if self.is_minetown(lv) or folk:
+                self.minetown_seen = True
+            if not self.minetown_seen and lv.key[1] >= 5:
+                self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
+        elif self.mines_return_on:
+            self.mines_return_on = False
+            self.mines_done = True
+            self.mines_done_turn = self.turn()
+        return False
 
     def mines_return_start(self, lv, why):
         if not self.mines_return_on:

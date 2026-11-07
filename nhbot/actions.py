@@ -10,7 +10,7 @@ from nhbot.goals import GOALS
 class ActionsMixin:
     def actions_init(self):
         self.last_attack_target = None   # the square we last attacked (melee, missile, wand): kills are noted there
-        self.took_stairs = False         # this tick's action was a staircase (step_level_arrival reads it)
+        self.took_stairs = False         # the last action was a staircase (mapmem.note_arrival reads it)
         self.last_stair_dir = None       # '<' / '>' of the staircase we took this tick
         self.stair_from = None           # (level key, square) of the staircase we last took
         self.throws = 0
@@ -38,7 +38,7 @@ class ActionsMixin:
         self.press("h")
 
     def take_stairs(self, key):
-        """Up ('<') or down ('>') the staircase we stand on. Where it led is noted next tick (step_level_arrival:
+        """Up ('<') or down ('>') the staircase we stand on. Where it led is noted next tick (mapmem.note_arrival:
         Level.stairs_to, the staircase under us on arrival)."""
         self.last_stair_dir = key
         self.stair_from = (self.cur_key, self.pos())

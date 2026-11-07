@@ -11,15 +11,16 @@ import nle.nethack as nh
 from nhbot import elb_rules as ELB
 from nhbot import glyphs as G
 from nhbot.consts import NO_ENGRAVE_CMAP
-from nhbot.elb_rules import M1_NOHANDS
 from nhbot.messages import ELB_WIPED_RE
-from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
+from nhbot.monsters import (ELB_IGNORE_NAMES, M1_NOHANDS, PM_BY_NAME, PM_INDICES, S_ANGEL, S_HUMAN, SWARMERS,
+                            VALK_RANKS)
 
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
 
 class ElberethMixin:
     def elbereth_init(self):
+        self.elbereths = 0
         self.elb_state = None        # dict(pos, key, since, last_read, hp_hist)
         self.elb_engraves = 0
         self.elb_misspelled = 0
@@ -67,8 +68,7 @@ class ElberethMixin:
         if form not in _HANDLESS:
             pm = PM_BY_NAME.get(form)
             if form.startswith("were"):      # lycanthrope: the status line names it, the body is the animal
-                pm = next(nh.permonst(i) for i in range(nh.NUMMONS)
-                          if nh.permonst(i).mname == form and nh.permonst(i).mlet != B_HUMAN_MLET)
+                pm = next(nh.permonst(i) for i in PM_INDICES.get(form, ()) if nh.permonst(i).mlet != S_HUMAN)
             _HANDLESS[form] = pm is None or bool(pm.mflags1 & M1_NOHANDS) or pm.msize == 0
         return _HANDLESS[form]
 
@@ -87,7 +87,7 @@ class ElberethMixin:
         pm = PM_BY_NAME.get(name)
         if pm is None:
             return False
-        return pm.mlet not in (B_HUMAN_MLET, B_ANGEL_MLET)
+        return pm.mlet not in (S_HUMAN, S_ANGEL)
 
     def elb_blocked(self, lv):
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""

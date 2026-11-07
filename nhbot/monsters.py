@@ -20,24 +20,41 @@ WERE_KIN = {"werejackal": {"jackal", "fox", "coyote", "werejackal"},
             "werewolf": {"wolf", "warg", "winter wolf", "werewolf"}}
 
 # monflag.h (NetHack 3.6)
+M1_NOHANDS, M1_MINDLESS, M1_ANIMAL = 0x00002000, 0x00010000, 0x00040000
+M1_REGEN = 0x00800000
 M1_ACID, M1_POIS = 0x08000000, 0x10000000
 
-M2_UNDEAD, M2_WERE, M2_SHAPESHIFTER = 0x2, 0x4, 0x4000
+M2_UNDEAD, M2_WERE = 0x2, 0x4
+M2_HUMAN, M2_ELF, M2_DWARF, M2_GNOME, M2_ORC = 0x8, 0x10, 0x20, 0x40, 0x80
+M2_MINION, M2_SHAPESHIFTER = 0x1000, 0x4000
+M2_HOSTILE, M2_PEACEFUL = 0x00100000, 0x00200000
 M2_STALK = 0x01000000          # follows you up and down stairs
-M1_NOHANDS = 0x00002000
+# a liking for objects: M2_GREEDY | M2_JEWELS | M2_COLLECT | M2_MAGIC
+M2_LIKES_OBJS = 0x10000000 | 0x20000000 | 0x40000000 | 0x80000000
 
-RACE_FLAG = {"human": 0x8, "elf": 0x10, "elven": 0x10, "dwarf": 0x20, "dwarven": 0x20,
-             "gnome": 0x40, "gnomish": 0x40, "orc": 0x80, "orcish": 0x80}
+MS_LEADER, MS_NEMESIS, MS_GUARDIAN = 31, 32, 33     # monflag.h msound: the quest's leader, nemesis, guardians
+
+# monst.h mresists / mconveys bits
+MR_FIRE, MR_COLD, MR_SLEEP, MR_DISINT, MR_ELEC, MR_POISON = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
+
+RACE_FLAG = {"human": M2_HUMAN, "elf": M2_ELF, "elven": M2_ELF, "dwarf": M2_DWARF, "dwarven": M2_DWARF,
+             "gnome": M2_GNOME, "gnomish": M2_GNOME, "orc": M2_ORC, "orcish": M2_ORC}
 
 NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
              "kitten", "housecat", "large cat", "Death", "Pestilence", "Famine"}
 
-PM_BY_NAME = {nh.permonst(i).mname: nh.permonst(i) for i in range(nh.NUMMONS)}
+# name -> permonst index. The three lycanthropes have two kinds of one name (the animal, then the @): PM_INDEX and
+# PM_BY_NAME hold the last of them (the @), PM_INDICES every one in index order.
+PM_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
+PM_INDICES = {}
+for _i in range(nh.NUMMONS):
+    PM_INDICES.setdefault(nh.permonst(_i).mname, []).append(_i)
+PM_BY_NAME = {name: nh.permonst(i) for name, i in PM_INDEX.items()}
+
+S_HUMAN, S_ANGEL = PM_BY_NAME["human"].mlet, PM_BY_NAME["Angel"].mlet      # monster classes '@' and 'A'
 
 # Monsters that may carry things -- dropped where they die, under the corpse (mon.c: relobj, then make_corpse):
-# a weapon attack (makemon.c m_initweap arms them) or a liking for objects (monflag.h M2_GREEDY | M2_JEWELS |
-# M2_COLLECT | M2_MAGIC).
-M2_LIKES_OBJS = 0x10000000 | 0x20000000 | 0x40000000 | 0x80000000
+# a weapon attack (makemon.c m_initweap arms them) or a liking for objects (M2_LIKES_OBJS).
 CARRIERS = {nh.permonst(i).mname for i in range(nh.NUMMONS)
             if nh.permonst(i).mflags2 & M2_LIKES_OBJS or any(a[0] == "WEAP" for a in ATTACKS[i])}
 
@@ -61,10 +78,6 @@ SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
 # =====================================================================================
 ELB_IGNORE_NAMES = {"minotaur", "shopkeeper", "guard", "watchman", "watch captain", "aligned priest",
                     "high priest", "Oracle"}
-
-B_HUMAN_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "human")
-
-B_ANGEL_MLET = next(nh.permonst(i).mlet for i in range(nh.NUMMONS) if nh.permonst(i).mname == "Angel")
 
 VALK_RANKS = {"stripling", "skirmisher", "fighter", "man-at-arms", "woman-at-arms", "warrior",
               "swashbuckler", "hero", "heroine", "champion", "lord", "lady"}

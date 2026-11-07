@@ -12,7 +12,8 @@ from nhbot.danger import adj_level, dice_pmf
 from nhbot.messages import (KILL_RE, KILLED_RE, MELEE_ON_US_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE,
                             UNSEEN_ATTACK_RE)
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import CARRIERS, PM_BY_NAME, RANGED_TARGETS, permonst_of
+from nhbot.monsters import (CARRIERS, MR_COLD, MR_ELEC, MR_FIRE, MR_SLEEP, PM_BY_NAME, PM_INDEX, RANGED_TARGETS,
+                            permonst_of)
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
 from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, ray_harm, ray_walk,
@@ -36,8 +37,7 @@ BEAM_WANDS = ("striking",)                                            # no bounc
 
 SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
 SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
-MR_BIT = {"sleep": 0x04, "fire": 0x01, "cold": 0x02, "lightning": 0x10}    # monst.c mresists: MR_SLEEP, ...
-_PM_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
+MR_BIT = {"sleep": MR_SLEEP, "fire": MR_FIRE, "cold": MR_COLD, "lightning": MR_ELEC}    # mresists of each ray
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
 PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
 
@@ -52,7 +52,7 @@ def wand_resisted(kind, name):
     if kind in MR_BIT:
         return bool(pm.mresists & MR_BIT[kind])
     if kind in ("magic missile", "striking"):
-        return name == "baby gray dragon" or any(a[1] in ("MAGM", "RBRE") for a in ATTACKS[_PM_INDEX[name]])
+        return name == "baby gray dragon" or any(a[1] in ("MAGM", "RBRE") for a in ATTACKS[PM_INDEX[name]])
     return False
 
 
@@ -92,6 +92,16 @@ def wand_effect(kind, name, depth, xl):
 class CombatMixin:
     def combat_init(self):
         self.kill_by = Counter()       # our kills, by kind
+        self.kill_count = 0
+        self.kills = []                # (turn, name, square, level key) of our kills (fresh corpses)
+        self.killed = None             # msg_combat: what the message being handled says we killed
+        self.retrieve = []             # (level key, ray squares, until turn) of our throws (retrieve_goals)
+        self.last_shot_turn = -99      # something shot at us (msg_combat)
+        self.shot_event = None         # (turn, shooter name or None) for hunt_shooter
+        self.hunt = None               # hunt_shooter: the shooter we close in on
+        self.hunts = self.hunt_steps = 0
+        self.hunt_offline_steps = 0
+        self.unblocks = self.unblock_throws = self.unblock_melee = 0
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
         self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)

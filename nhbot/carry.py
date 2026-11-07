@@ -16,6 +16,7 @@ Identity comes from the item text only: an unidentified potion/scroll/ring/wand/
 by its appearance ("bubbly potion", "scroll labeled FOO"); identified ones by "... of X".
 """
 import re
+from collections import Counter
 
 import numpy as np
 import nle.nethack as nh
@@ -174,6 +175,8 @@ def describe(ocls, s):
 class CarryMixin:
     def carry_init(self):
         self.cant_drop = set()     # Item.key of items the game refused to drop (a cursed loadstone): never again
+        self.squeeze_pending = None  # (level key, square) a diagonal squeeze refused for our weight (squeeze_step)
+        self.squeeze_stats = Counter()
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.selling = False
         self.sell_tried = set()      # (shop level key, item text) the shopkeeper would not take
@@ -188,6 +191,32 @@ class CarryMixin:
 
     # ------------------------------------------------------------ pick up
     # ------------------------------------------------------------ never Burdened
+    def squeeze_msg(self, m, lv):
+        """msg_map: a diagonal squeeze refused for our weight -- it needs inventory weight <= 600 (hack.c test_move):
+        squeeze_step sheds a unit next tick, unless dig_through digs a corner instead. True if m said so."""
+        if not (lv and self.last_move_target and "You are carrying too much to get through" in m):
+            return False
+        self.squeeze_stats["refused"] += 1
+        if not self.dig_through_note(lv, self.pos(), self.last_move_target, "squeeze"):
+            self.squeeze_pending = (lv.key, self.last_move_target)
+        return True
+
+    def squeeze_step(self, lv):
+        """The squeeze refused last tick on this level: drop one unit (nothing on the body); nothing left to shed --
+        the squeeze stays shut (Level.blocked). True if it used the turn."""
+        if self.squeeze_pending is None:
+            return False
+        key, target = self.squeeze_pending
+        self.squeeze_pending = None
+        if key != lv.key:
+            return False
+        if self.carry_drop_step(force=True, max_tier=3):
+            self.squeeze_stats["dropped"] += 1
+            return True
+        self.squeeze_stats["nothing_to_drop"] += 1
+        lv.blocked[target] = True
+        return False
+
     def carry_drop_step(self, force=False, max_tier=4):
         """Encumbered (or force): drop one unit of the item of lowest value per weight (nhbot.value: what we
         wear / wield / need comes last, being worth VALUE_MAX); max_tier < 4: nothing on the body. True if it

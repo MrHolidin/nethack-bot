@@ -38,7 +38,6 @@ class VaultMixin:
         self.vault_since = None        # (level key, turn) we were first seen in this vault
         self.vault_seen = None         # (level key, its 4 squares): the vault we were last in -- the guard's way in
                                        # opens its wall (vault.c fake corridor), so it is known by its squares then
-        self.dig_refused = set()       # level keys whose floor would not be dug ("too hard to dig in")
         self.vault_stats = Counter()
         self.vault_portal = None       # level key of a vault where we found a magic portal (the Fort Ludios one,
                                        # mkmaze.c): no more gold picked there -- a step onto it takes us to the fort
@@ -83,26 +82,6 @@ class VaultMixin:
                     return inner
         return None
 
-    def dig_means(self):
-        """How we can dig down: ("wand", item) a wand of digging with charges left, ("pick", item) a pick-axe,
-        ("mattock", item) a dwarvish mattock -- none known cursed (a cursed digger applied stays welded), no
-        digger while a cursed weapon is welded to our hand. None."""
-        items = self.items()
-        wand = next((it for it in items if it.ocls == nh.WAND_CLASS and "wand of digging" in it.text
-                     and ":0)" not in it.text and "cancelled" not in it.text), None)
-        welded = any(it.wielded and it.cursed and "pick-axe" not in it.text and "mattock" not in it.text
-                     for it in items)             # a cursed weapon in hand: no digger can be wielded (wield.c)
-        pick = None if welded else next((it for it in items if "pick-axe" in it.text and not it.cursed), None)
-        mattock = None if welded else next((it for it in items if "dwarvish mattock" in it.text and not it.cursed),
-                                           None)
-        if pick is not None:
-            return "pick", pick
-        if wand is not None:
-            return "wand", wand
-        if mattock is not None:
-            return "mattock", mattock
-        return None
-
     def vault_rob_ready(self):
         """In a vault, a way to dig, the floor here not refused (answer_guard: the guard is told "Croesus" then)."""
         return self.cur_key not in self.dig_refused and self.vault_box() is not None \
@@ -127,7 +106,7 @@ class VaultMixin:
             return self.vault_walk_out(lv)
         if box is None:
             self.vault_since = None
-            return self.vault_plan is None and self.dig_job is None and self.swap_back("dig")
+            return self.vault_plan is None and self.dig_job is None and self.dig_unwield()
         if self.vault_plan is not None and self.vault_plan["key"] == lv.key:
             self.vault_done.add(lv.key)               # vault_find: the tunnel is through
             self.vault_out = (lv.key, self.vault_plan["start"])
@@ -190,32 +169,6 @@ class VaultMixin:
             return True
         self.vault_stats["apply"] += 1
         return self.dig_apply(lv, it, ">")
-
-    def dig_wield(self, lv, means):
-        """The pick-axe / mattock into our hands (the weapon back later: swap_back "dig"; a mattock: the shield off
-        first). True if it used the turn."""
-        kind, it = means
-        if it.wielded:
-            return False
-        shield = next((a for a in self.armor_inventory() if a["worn"] and a["slot"] == "shield"), None)
-        if kind == "mattock" and shield is not None:
-            if not self.take_off(shield):             # a two-handed digger: not with a shield on (wield.c)
-                self.dig_refused.add(lv.key)          # a cursed shield: no mattock
-            return True
-        self.swap_in("dig", it)
-        return True
-
-    def apply_digger(self, it, key):
-        """Apply the wielded digger in direction key (">" down). The text the game answered; None: no apply."""
-        seq0 = self.msg_seq
-        if not self.ask("a", "apply"):
-            return None
-        self.press(it.letter, expect_prompt=True)
-        if "direction" in self.message().lower():
-            self.press(key)
-        else:
-            self.settle()
-        return self.text_since(seq0)
 
     def dig_apply(self, lv, it, key):
         """Apply the wielded digger in direction key (">" down), noting what the game said. True if it used the
@@ -393,7 +346,7 @@ class VaultMixin:
                 self.vault_done.add(lv.key)           # it won't give way: given up
                 self.vault_plan = None
                 self.vault_stats["stuck"] += 1
-                return self.swap_back("dig")
+                return self.dig_unwield()
             self.cur_act = "vault_tunnel"
             kind, it = means
             if kind == "wand":

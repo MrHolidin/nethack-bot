@@ -2,7 +2,6 @@
 
 Objective: in-game score; also tracks max depth."""
 import re
-from collections import Counter, deque
 
 import nle.nethack as nh
 
@@ -46,6 +45,7 @@ from nhbot.wishing import WishMixin
 from nhbot.sacrifice import SacrificeMixin
 from nhbot.sokoban import SokobanMixin
 from nhbot.vault import VaultMixin
+from nhbot.digging import DiggingMixin
 from nhbot.digthrough import DigThroughMixin
 from nhbot.locktools import LockToolMixin
 
@@ -56,7 +56,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
-          SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DigThroughMixin, LockToolMixin):
+          SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, LockToolMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -85,104 +85,27 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         obs, _ = self.env.reset()
         self.obs = obs
         self.last_bl = obs["blstats"].copy()
-        self._grids_key, self._grids = None, None
-        self.tick_no = 0
-        self.peaceful_waits = 0
-        self._cur_pos = self.prev_pos = None
-        self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn
-        self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
-        self.blind_held = self.hallu_held = 0
-        self.last_shot_turn = -99
-        self.hunt_offline_steps = 0
-        self.lyc_kind = None
-        self.steps = 0
-        self.reward = 0.0
-        self.done = False
-        self.truncated = False
-        self.levels = {}
-        self.messages = deque()
-        self.msg_seq = 0          # total messages logged so far (the deque keeps only the last 60)
-        self.focus_init()
-        self.all_msgs = []
-        self._last_logged, self._last_logged_step = None, -1
-        self.killed = None        # msg_combat: what the message being handled says we killed
-        self.asked = ""          # game.ask: the last question's message
-        self.really_attacks = 0   # "Really attack?" questions (answered no)
-        self._items, self._items_at = [], -1
-        self._items_parsed, self._items_inv = [], None
-        self._inv, self._inv_at = (), -1
-        self.msg_audit = Counter()  # cases where message reading may go wrong (game.audit, pickup, ...)
-        self.here_window = None   # (turn, pos, text) of the last 'Things that are here' window
-        self.tick_seq = 0         # msg_seq at the start of this tick
-        self.cur_key = None
-        self.last_move_target = None
-        self.last_pray = None
-        self.prayers = 0
-        self.pray_failed = 0
-        self.lycanthropy = False
-        self.deadly_prayers = 0
-        self.stun_waits = 0
-        self.poison_res = False
-        self.eaten_res = set()         # resistances a corpse gave us (survival.msg_survival): "fire", "cold"
-        self.blind_waits = 0
-        self.hallu_waits = 0           # hallu_wait: turns rested hallucinating
-        self.shop_kicks_avoided = 0
-        self.seen_here = None
-        self.ammo_pickups = 0
         self.time_by = {}
         self.cur_act = "other"
-        self.skill_msgs = 0
-        self.kill_count = 0
-        self.pet_last_seen = 0
         self.snaps, self.next_snap = [], SNAP_EVERY
-        self.faint_since = None
-        self.hist = deque()
-        self.no_eat_until = 0
-        self.shops_seen = 0
-        self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
-        self.desperations = 0
-        self.vault_drop = False
-        self.vault_follow_until = -1
-        self.guard_trail = []
-        self.vault_moves = 0
-        self.vault_drops = 0
-        self.guard_stepped = None        # the guard's last square we stepped onto while he was out of sight
-        self.vault_approach = 0          # steps toward a vault guard that waited for us (survival.vault_step)
-        self.vault_bag_outs = 0          # vault_bag_out: gold taken out of the bag for the guard
-        self.unblocks = self.unblock_throws = self.unblock_melee = 0
-        self.items_first_holds = 0
-        self.hunt = None
-        self.shot_event = None
-        self.hunts = self.hunt_steps = 0
-        self.resets = 0
-        self.god_angry = False
-        self.pending_mines_mark = False
-        self.mines_bounced = set()
-        self.mines_return_on = False
-        self.mines_done = False
-        self.mines_done_turn = 0
-        self.minetown_seen = False
-        self.mines_return_log = []
-        self.prev_key = None
-        self.retrieve = []
-        self.elbereths = 0
-        self.corpses_eaten = 0
-        self.kills = []
-        self.avoid_cells = []
-        self.max_depth = 1
         self.start_ac = None             # AC once the game is set up (summary)
         self.death_msgs = []
+        self.game_init()
+        self.map_init()
+        self.nav_init()
+        self.focus_init()
         self.equip_init()
         self.actions_init()
         self.perception_init()
         self.survival_init()
         self.explore_init()
+        self.hidden_init()
         self.combat_init()
         self.excal_init()
         self.thieves_init()
         self.goldbag_init()
         self.vault_init()
-        self.stun_peace_waits = 0
+        self.digging_init()
         self.dig_through_init()
         self.lock_init()
         self.weapons_init()
@@ -200,9 +123,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         self.sacrifice_init()
         self.sokoban_init()
         self.gift_init()
-        self.search_logged = set()       # search_log: level keys already logged
-        self.search_log = []             # search_log: one record per level (nhbot.hidden)
-        self.search_v2_stats = Counter()
         self.potiontest_init()
         self.jewelry_init()
         self.box_init()
@@ -211,8 +131,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         self.policy_init()
         self.goals_init()
         self.pickup_init()
-        self.shops_done = set()
-        self.need_pay = False
         self.role = self.race = None
         try:
             self.settle()

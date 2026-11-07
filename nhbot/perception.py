@@ -11,7 +11,9 @@ from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.messages import MELEE_BY_NAME_RE
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES
+from nhbot.monsters import (ALWAYS_AVOID, M2_DWARF, M2_ELF, M2_GNOME, M2_HOSTILE, M2_HUMAN, M2_ORC, M2_PEACEFUL,
+                            MR_COLD, MR_DISINT, MR_ELEC, MR_FIRE, MR_POISON, MR_SLEEP, MS_GUARDIAN, MS_LEADER,
+                            MS_NEMESIS, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES)
 from nhbot.rays import our_protection
 
 # no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
@@ -29,12 +31,9 @@ PASSIVE_ELEMENT = {"COLD": "cold", "FIRE": "fire"}
 PASSIVE_KIND = {nh.permonst(i).mname: PASSIVE_ELEMENT[ATTACKS[i][0][1]] for i in range(nh.NUMMONS)
                 if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i]) and ATTACKS[i][0][1] in PASSIVE_ELEMENT}
 # monst.h MR_* bits of mconveys: the resistances eating the corpse may give (eat.c cpostfx: one of them at random)
-CONVEYS = ((0x01, "fire"), (0x02, "cold"), (0x04, "sleep"), (0x08, "disint"), (0x10, "shock"), (0x20, "poison"))
+CONVEYS = ((MR_FIRE, "fire"), (MR_COLD, "cold"), (MR_SLEEP, "sleep"), (MR_DISINT, "disint"), (MR_ELEC, "shock"),
+           (MR_POISON, "poison"))
 
-
-M2_HUMAN, M2_ELF, M2_DWARF, M2_GNOME, M2_ORC = 0x8, 0x10, 0x20, 0x40, 0x80
-M2_MINION, M2_HOSTILE, M2_PEACEFUL = 0x1000, 0x00100000, 0x00200000
-MS_LEADER, MS_NEMESIS, MS_GUARDIAN = 31, 32, 33
 # role.c races[]: (lovemask, hatemask)
 RACE_MASKS = {"human": (0, M2_GNOME | M2_ORC), "elf": (M2_ELF, M2_ORC), "elven": (M2_ELF, M2_ORC),
               "dwarf": (M2_DWARF | M2_GNOME, M2_ORC), "dwarven": (M2_DWARF | M2_GNOME, M2_ORC),
@@ -53,6 +52,10 @@ class PerceptionMixin:
         self.empty_looks = 0           # looks whose description came back empty
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
         self._adjacent, self._adjacent_at = [], None     # adjacent_hostiles: the answer and (tick, steps, level) of it
+        self.avoid_cells = []          # squares of never-melee monsters, walked round (adjacent_hostiles)
+        self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn (msg_combat)
+        self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
+        self.blind_held = self.hallu_held = 0
 
     # ------------------------------------------------------------------ peacefulness
     def peace_class(self, idx):

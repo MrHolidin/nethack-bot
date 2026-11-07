@@ -36,8 +36,27 @@ FOOD_NUTRITION = {"food ration": 800, "cram ration": 600, "lembas wafer": 800, "
 class SurvivalMixin:
     def survival_init(self):
         self.eaten_by = Counter()      # corpses eaten, by kind
+        self.corpses_eaten = 0
+        self.no_eat_until = 0          # no eating from the inventory before this turn ("carrying so much": msg_survival)
+        self.last_pray = None
+        self.prayers = 0
+        self.pray_failed = 0
+        self.god_angry = False
+        self.lycanthropy = False
+        self.lyc_kind = None           # the were that infected us (None: unseen)
+        self.poison_res = False
+        self.eaten_res = set()         # resistances a corpse gave us (msg_survival): "fire", "cold"
+        self.skill_msgs = 0
+        # the vault guard protocol (vault_step)
+        self.vault_drop = False
+        self.vault_follow_until = -1
+        self.guard_trail = []
+        self.vault_moves = 0
+        self.vault_drops = 0
+        self.guard_stepped = None      # the guard's last square we stepped onto while he was out of sight
+        self.vault_approach = 0        # steps toward a vault guard that waited for us
+        self.vault_bag_outs = 0        # vault_bag_out: gold taken out of the bag for the guard
         self.hunger_turns = Counter()  # turns spent per hunger state (status line)
-        self._hunger_at = (0, 0)
         self.want_enhance = False
         self.enhances = 0
         self.quaffs = 0
@@ -45,7 +64,7 @@ class SurvivalMixin:
         self.horn_bad = set()          # letters of unicorn horns that harmed us (cursed): not applied, sold
         self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
         self.horn_stats = Counter()
-        self._nut_at = (0, NOT_HUNGRY)
+        self._hunger_at = (0, NOT_HUNGRY)    # (turn, status line hunger) at the last tick (nutrition_tick)
 
     def pray(self):
         self.cur_act = "pray"
@@ -84,17 +103,19 @@ class SurvivalMixin:
         return not re.search(r"\btins?\b", s) and "corpse" not in s and "egg" not in s
 
     def nutrition_tick(self):
-        """Estimate u.uhunger: 1 a turn, plus what we ate (nutrition_add); the status line pins it --
+        """Every tick: the turns since the last one counted to the hunger state they passed in (hunger_turns), and
+        u.uhunger estimated: 1 a turn, plus what we ate (nutrition_add); the status line pins it --
         Satiated > 1000, Not Hungry 150..1000, Hungry 50..149, Weak 1..49, Fainting <= 0 (eat.c newuhs), and
         a step down sets it to the edge just crossed."""
-        t0, h0 = self._nut_at
+        t0, h0 = self._hunger_at
         t, h = self.turn(), self.bl(nh.NLE_BL_HUNGER)
+        self.hunger_turns[h0] += t - t0
         n = self.nutrition - max(0, t - t0)
         if h > h0:                                   # a step down: right at the edge
             n = {NOT_HUNGRY: 1000, HUNGRY: 149, WEAK: 49, FAINTING: 0}.get(h, n)
         lo, hi = NUTRITION_BOUNDS.get(h, (-10 ** 6, 10 ** 6))
         self.nutrition = min(max(n, lo), hi)
-        self._nut_at = (t, h)
+        self._hunger_at = (t, h)
 
     def nutrition_add(self, n):
         self.nutrition += n

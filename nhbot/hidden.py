@@ -12,7 +12,7 @@ map (nhbot.truemap), whether a hidden square is there and whether it lies on a w
 fewest hidden squares -- one record per level in the summary ("search_log").
 """
 import heapq
-from collections import deque
+from collections import Counter, deque
 
 import numpy as np
 import nle.nethack as nh
@@ -89,6 +89,11 @@ def neighbours8(y, x):
 
 
 class HiddenMixin:
+    def hidden_init(self):
+        self.search_logged = set()       # search_log: level keys already logged
+        self.search_log = []             # search_log: one record per level
+        self.search_v2_stats = Counter()
+
     # ------------------------------------------------------------------ the known map
     def known_rooms(self, lv):
         """Rooms of the known map: 4-connected squares of room floor (or a room feature, or an item on a square

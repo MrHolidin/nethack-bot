@@ -21,6 +21,9 @@ class ShopMixin:
         self.shopping = None
         self.shop_browsed = set()        # (level key, square) of shop squares we stood on to read the tags
         self.browse_stats = {"steps": 0, "looks": 0}
+        self.shops_seen = 0
+        self.shops_done = set()          # level keys whose shop visit is over (carry.py)
+        self.need_pay = False            # a shopkeeper asked us to pay (step_housekeeping: pay_step)
 
     def shop_welcome(self, m):
         """A shopkeeper's greeting in m (the regex match, its group 1 the shop type), or None. zoo_not_shop: the
@@ -41,6 +44,14 @@ class ShopMixin:
     def shop_active(self, lv):
         s = self.shopping
         return s is not None and s["key"] == lv.key and self.turn() < s["until"]
+
+    def pay_step(self):
+        """The shopkeeper wants paying (need_pay, msg_shop): pay. True if it acted."""
+        if not self.need_pay:
+            return False
+        self.need_pay = False
+        self.pay()
+        return True
 
     def pay(self):
         self.press("p", expect_prompt=True)

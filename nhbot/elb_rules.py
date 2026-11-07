@@ -16,12 +16,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.monattacks import ATTACK_TYPES
-
-M1_NOHANDS, M1_MINDLESS, M1_ANIMAL = 0x00002000, 0x00010000, 0x00040000
-M2_MINION = 0x00001000
-
-_MLET = {nh.permonst(i).mname: nh.permonst(i).mlet for i in range(nh.NUMMONS)}
-S_HUMAN, S_ANGEL = _MLET["human"], _MLET["Angel"]
+from nhbot.monsters import M1_ANIMAL, M1_MINDLESS, M1_NOHANDS, M2_MINION, PM_INDICES, S_ANGEL, S_HUMAN
 
 IGNORES_BY_NAME = {
     "minotaur": "minotaur",
@@ -104,5 +99,5 @@ if __name__ == "__main__":
     for n in ("killer bee", "soldier ant", "jackal", "gnome lord", "dwarf", "hill orc", "Uruk-hai", "bugbear",
               "kobold lord", "black unicorn", "dwarf zombie", "wood nymph", "giant beetle", "rothe",
               "homunculus", "imp", "floating eye", "werewolf", "wererat", "gnome mummy", "cave spider"):
-        idx = [i for i in range(nh.NUMMONS) if nh.permonst(i).mname == n]
+        idx = PM_INDICES.get(n, [])
         print(f"{n:15s}", [(chr(nh.permonst(i).mlet + 64) if False else "", _REASON[i] or "protected") for i in idx])

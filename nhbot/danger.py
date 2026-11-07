@@ -31,7 +31,7 @@ from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name, erosion
 from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import PM_BY_NAME
+from nhbot.monsters import M1_REGEN, PM_BY_NAME, PM_INDEX, PM_INDICES
 from nhbot.weapondice import WEAPON_DICE
 from nhbot.rays import RAY_RESIST, zap_hit_prob
 
@@ -43,16 +43,11 @@ TAINT_AD = {"BLND": 1.0, "WERE": 0.25, "SEDU": 1.0, "SITM": 1.0, "SSEX": 1.0, "S
 # passes lycanthropy (mhitu.c AD_WERE: 1 in 4) / charms and robs us / steals our gold (a leprechaun: steal.c
 # somegold, most of what we carry; only when we carry some): a fight won that way counts half (walk_fight)
 TAINTED_WIN = 0.5
-M1_REGEN = 0x00800000                    # monflag.h
 WAND_ORDER = ("death", "sleep", "fire", "cold", "lightning", "magic missile", "striking")   # muse.c find_offensive
 MISSILE_DIE = {"arrow": 6, "elven arrow": 7, "orcish arrow": 5, "silver arrow": 6, "ya": 7, "crossbow bolt": 4,
                "rock": 3, "flint stone": 6, "boulder": 20}        # objects.c, small monsters' die
 BREATH_KIND = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning", "SLEE": "sleep", "MAGM": "magic missile",
                "DISN": "death", "ACID": "fire", "DRST": "fire", "RBRE": "fire"}
-MON_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
-MON_INDICES = {}                         # name -> every kind of that name (a were's human and animal forms)
-for _i in range(nh.NUMMONS):
-    MON_INDICES.setdefault(nh.permonst(_i).mname, []).append(_i)
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
 WIN_SIMS = 200                   # win_prob: sampled fights
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
@@ -146,7 +141,7 @@ class DangerMixin:
 
     def monster_turn_pmf(self, name, bonus=0):
         """(damage pmf of one action of this monster, P(instant death) per action); bonus: to its to-hit."""
-        idx = MON_INDEX.get(name)
+        idx = PM_INDEX.get(name)
         if idx is None:
             return np.array([1.0]), 0.0
         pm = nh.permonst(idx)
@@ -546,7 +541,7 @@ class DangerMixin:
         attack's dice; AD_CONF 1 in 4, confused the same; AD_SLOW 1 in 4, we lose intrinsic speed; AD_STON
         (a cockatrice's touch) 1 in 3 hissing, then 1 in 10: stoned; AD_DRIN (a mind flayer's tentacle) unless
         our helmet blocks it (7 in 8): Int -rnd(2), at Int 3 our last thought fades."""
-        idx = MON_INDEX.get(name)
+        idx = PM_INDEX.get(name)
         if idx is None:
             return []
         level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
@@ -577,7 +572,7 @@ class DangerMixin:
         dice of its passive paralysis when we hit it and it lives -- uhitm.c passive, 2 in 3: d(level + 1, die)
         turns -- or None)."""
         keep, passive = 1.0, None
-        idx = MON_INDEX.get(name)
+        idx = PM_INDEX.get(name)
         if idx is None:
             return 0.0, None
         level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
@@ -636,7 +631,7 @@ class DangerMixin:
         """(P(one move of its melee blinds us, gives us lycanthropy, charms and robs us or takes our gold) -- TAINT_AD over the
         attacks of every kind of that name: a were's animal form bites -- , it explodes blinding: a yellow light)."""
         keep, explodes = 1.0, False
-        for idx in MON_INDICES.get(name, ()):
+        for idx in PM_INDICES.get(name, ()):
             level = adj_level(nh.permonst(idx).mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             for i, (at, ad, _, _) in enumerate(ATTACKS[idx]):
                 if at == "EXPL" and ad in ("BLND", "HALU"):
@@ -660,7 +655,7 @@ class DangerMixin:
             plan["missile"] = (MISSILE_DIE.get(mis["kind"], WEAPON_DICE.get(mis["kind"], (6,))[0]), mis["counts"],
                                mis["poisoned"] and not self.poison_res)
         if profile["breath"]:
-            idx = MON_INDEX.get(name)
+            idx = PM_INDEX.get(name)
             br = next((a for a in ATTACKS[idx] if a[0] == "BREA"), None) if idx is not None else None
             if br is not None:
                 plan["breath"] = (BREATH_KIND.get(br[1], "fire"), br[2])

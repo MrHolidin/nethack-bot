@@ -1,5 +1,6 @@
 """Talking to the game: keys, prompts, messages, the status line and the inventory text."""
 import re
+from collections import Counter, deque
 
 import nle.nethack as nh
 
@@ -18,6 +19,24 @@ class GameOver(Exception):
 
 
 class GameMixin:
+    def game_init(self):
+        self.steps = 0                   # keys sent so far
+        self.reward = 0.0
+        self.done = False
+        self.truncated = False
+        self.messages = deque()
+        self.msg_seq = 0                 # total messages logged so far (the deque keeps only the last 60)
+        self.all_msgs = []               # every message (verbose)
+        self._last_logged, self._last_logged_step = None, -1
+        self.asked = ""                  # ask: the last question's message
+        self.really_attacks = 0          # "Really attack?" questions (answered no)
+        self._items, self._items_at = [], -1
+        self._items_parsed, self._items_inv = [], None
+        self._inv, self._inv_at = (), -1
+        self.msg_audit = Counter()       # cases where message reading may go wrong (game.audit, pickup, ...)
+        self.here_window = None          # (turn, pos, text) of the last 'Things that are here' window
+        self.seen_here = None            # (turn, pos, message) of the last message listing what lies here
+
     def raw_step(self, code):
         if code not in self.key2act:
             raise ValueError(f"key {code!r} not in action set")
