@@ -41,14 +41,18 @@ SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the p
 SOKO_SEARCH_TURNS = 500  # turns spent searching for hidden passages on the level below the Oracle (no entrance seen)
 SOKO_REPLANS = 3          # re-plans (soko_replan) a level at most
 SOKO_REPLAN_SECS = 2.0    # compute for one re-plan
+SOKO_TRAPPED_SECS = 10.0  # compute for one re-plan when the way back down is shut (giving up is no way out)
+SOKO_TRAPPED_REPLANS = 5  # ... re-plans at most a level, one every SOKO_TRAPPED_RETRY turns
+SOKO_TRAPPED_RETRY = 200
 SOKO_DOOR_WAITS = 50      # turns between kicks at a locked door that refused one (wounded legs)
 SOKO_LEAVE_EXPLORE = 500  # ticks of the generic explore to leave a level given up, then we only search
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
 ZOO_QUIET = 8             # turns with the zoo's monsters in view all where they were: the wave is over (the rest sleep)
+ZOO_NEAR = 2              # hurt in the zoo with a hostile this close ...
+ZOO_HURT_TURNS = 3        # ... in the last this many turns: back to the corridor (step_soko_zoo)
 ZOO_HOLD_MAX = 300        # turns at most spent holding the zoo's doorway
-ZOO_BACK_HP = 0.7         # in the zoo below this share of HP with its monsters moving: back to the doorway
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
@@ -106,10 +110,16 @@ class SokoLevel:
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
+        self.zoo_hurt = -99           # turn something by us in the zoo last hurt us
+        self.zoo_hp = None            # our HP on the last zoo tick
         self.zoo_peace_waits = 0      # ticks waited with every way closed by peaceful monsters
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
-        self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
+        self.filled = set()           # traps our pushes filled (the message said so): closed unless the map shows a trap
+        self.seen_traps = set()       # traps the map shows that the variant has none of (a monster's wand of digging
+                                      # made a hole: 79366 fell through one 60 times) -- never walked onto
+        self.trapped_replans = 0      # soko_trapped_replan: re-plans made with the way down shut ...
+        self.trapped_retry = -1       # ... and the turn of the next
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
         self.doors = set(map(tuple, self.lv["doors"]))
@@ -299,10 +309,20 @@ class SokobanMixin:
         # see the item) with the trap under it -- or never seen there; unless a push of ours filled it (an item on
         # the filled square hides that from the map). A filled pit or hole shows the floor. A boulder shown on a
         # trap we did not fill is a giant mimic posing as one (a real one would have filled it): still open.
+        # A trap the map shows is open, whatever we noted (a fill message may have come from another push); a boulder
+        # on a square we saw as floor since is on a filled trap (filled by a push the message of which we did not
+        # read as ours -- a fight step's: 79285, 79980 gave up a step before the end).
         def is_open(t):
-            k = top[t[0] + oy, t[1] + ox]
-            return k in (G.TRAP, G.BOULDER) or (G.IS_COVERED[k] and terr[t[0] + oy, t[1] + ox] in (G.TRAP, G.UNKNOWN))
-        ts = frozenset(tuple(t) for t in st.lv["traps"] if tuple(t) not in st.filled and is_open(t))
+            k, tk = top[t[0] + oy, t[1] + ox], terr[t[0] + oy, t[1] + ox]
+            if k == G.TRAP:
+                return True
+            if t in st.filled:
+                return False
+            return (k == G.BOULDER or G.IS_COVERED[k]) and tk in (G.TRAP, G.UNKNOWN)
+        ts = frozenset(tuple(t) for t in st.lv["traps"] if is_open(tuple(t)))
+        plan_traps = {tuple(t) for t in st.lv["traps"]}
+        st.seen_traps = {p for p in st.floor if p not in plan_traps
+                         and (top[p[0] + oy, p[1] + ox] == G.TRAP or terr[p[0] + oy, p[1] + ox] == G.TRAP)}
         return bs, ts
 
     def soko_match(self, st, bs, ts):
@@ -325,7 +345,7 @@ class SokobanMixin:
             cur = q.popleft()
             for dr, dc in DIRS8:
                 n = (cur[0] + dr, cur[1] + dc)
-                if n in prev or not free(n) or n in ts:
+                if n in prev or not free(n) or n in ts or n in st.seen_traps:
                     continue
                 if dr and dc and (cur in st.doors or n in st.doors
                                   or (not free((cur[0] + dr, cur[1])) and not free((cur[0], cur[1] + dc)))):
@@ -500,13 +520,16 @@ class SokobanMixin:
             # the map isn't kept: wait it out (the other steps still fight)
             self.soko_stats["impaired_wait"] += 1
             return self.soko_wait()
-        if not st.solved and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS:
-            return self.soko_give_up(lv, st, "turns")
         bs, ts = self.soko_state(lv, st)
+        trapped = not st.solved and self.soko_trapped(st, bs, ts)
+        if not st.solved and self.turn() - (lv.entered_turn or self.turn()) > SOKO_LEVEL_TURNS and not trapped:
+            return self.soko_give_up(lv, st, "turns")
         i = self.soko_match(st, bs, ts)
         if i is None and self.soko_replan(st, bs, ts):
             i = 0
         if i is None:
+            if trapped:
+                return self.soko_trapped_replan(lv, st, bs, ts)
             return self.soko_give_up(lv, st, "deviation")
         st.i = i
         if i != st.last_i or st.since is None:
@@ -564,7 +587,9 @@ class SokobanMixin:
                 return True
             if self.soko_step_to(lv, st, stand, bs, ts, extra):
                 return True
-            return self.soko_give_up(lv, st, "no_way_to_push") if stuck > SOKO_STUCK // 2 else self.soko_wait()
+            if stuck > SOKO_STUCK // 2 and not trapped:
+                return self.soko_give_up(lv, st, "no_way_to_push")
+            return self.soko_wait()
         return self.soko_finish(lv, st, bs, ts, extra)
 
     def soko_trapped(self, st, bs, ts):
@@ -573,24 +598,40 @@ class SokobanMixin:
         arrive = tuple(st.lv["arrive"])
         return here != arrive and self.soko_walk(st, here, arrive, bs, ts) is None
 
-    def soko_replan(self, st, bs, ts, walls=()):
+    def soko_replan(self, st, bs, ts, walls=(), budget=SOKO_REPLAN_SECS, force=False):
         """The level no longer matches the plan (a monster's scroll of earth dropped boulders, a wand of striking
-        broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_SECS of compute), at most
-        SOKO_REPLANS times a level. True if a new plan was found -- we follow it from its start."""
-        if st.replans >= SOKO_REPLANS:
+        broke one): solve it afresh from what we see (soko_solver, budget seconds of compute), at most
+        SOKO_REPLANS times a level (force: whatever the count). True if a new plan was found -- we follow it from
+        its start."""
+        if st.replans >= SOKO_REPLANS and not force:
             return False
         st.replans += 1
         solver = SOLVERS.get(st.name)
         if solver is None:
             solver = SOLVERS[st.name] = soko_solver.Level(st.lv)
         here = st.from_map(self.pos())
-        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here), walls=walls) if here in st.floor else None
+        plan = solver.solve(budget=budget, start=(bs, ts, here), walls=walls) if here in st.floor else None
         if plan is None:
             self.soko_stats["replan_fail"] += 1
             return False
         self.soko_stats["replan"] += 1
         st.plan, st.states, st.i, st.last_i = plan, plan_states(bs, ts, plan), 0, -1
         return True
+
+    def soko_trapped_replan(self, lv, st, bs, ts):
+        """No plan fits and the way back down is shut (Sokoban's pushes go one way): giving up would leave us on the
+        level for good -- searching till we starve (79285, 79673, 79717, 79980). Re-plan with more compute every
+        SOKO_TRAPPED_RETRY turns, SOKO_TRAPPED_REPLANS times; wait in between. True: it acted."""
+        if self.turn() >= st.trapped_retry and st.trapped_replans < SOKO_TRAPPED_REPLANS:
+            st.trapped_replans += 1
+            st.trapped_retry = self.turn() + SOKO_TRAPPED_RETRY
+            if self.soko_replan(st, bs, ts, budget=SOKO_TRAPPED_SECS, force=True):
+                self.soko_stats["trapped_replan"] += 1
+                return self.soko_wait()
+        if st.trapped_replans >= SOKO_TRAPPED_REPLANS and self.turn() >= st.trapped_retry:
+            return self.soko_give_up(lv, st, "trapped")
+        self.soko_stats["trapped_wait"] += 1
+        return self.soko_wait()
 
     def soko_rest(self, lv):
         """Below full HP with no hostile in view: rest (20s, the game stops it when something shows up). True if
@@ -786,7 +827,7 @@ class SokobanMixin:
                 return cur, d
             for dr, dc in DIRS8:
                 n = (cur[0] + dr, cur[1] + dc)
-                if not free(n) or n in ts or cost.get(n, 1) is None:
+                if not free(n) or n in ts or n in st.seen_traps or cost.get(n, 1) is None:
                     continue
                 if dr and dc and (cur in st.doors or n in st.doors
                                   or (not free((cur[0] + dr, cur[1])) and not free((cur[0], cur[1] + dc)))):
@@ -855,9 +896,9 @@ class SokobanMixin:
         return out
 
     def step_soko_zoo(self, c):
-        """Top level, the plan done and the zoo's door open: fight the zoo at the goal square -- the zoo's only
-        way out is the door west of it, so its monsters come one at a time -- while those in view keep moving
-        (the ones still asleep stay put); inside the zoo, hurt with its monsters moving: back to that square."""
+        """Top level, the plan done and the zoo's door open. Inside the zoo, hurt in the last ZOO_HURT_TURNS turns
+        with a hostile within ZOO_NEAR: back to the goal square -- the zoo's only way out is the door west of it, so
+        the awake ones come one at a time. At the goal square: hold it while those in view keep moving."""
         lv = c.lv
         if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_done or self.soko_failed:
             return False
@@ -872,16 +913,31 @@ class SokobanMixin:
 
     def _soko_zoo(self, lv, st, c):
         if self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED:
-            return False                                   # not open yet: soko_prize kicks it
+            return False                                   # not open yet: soko_prize opens it
         t = self.turn()
+        y, x = self.pos()
+        hostiles = self.visible_hostiles(lv)
+        near = [p for p, _ in hostiles if max(abs(p[0] - y), abs(p[1] - x)) <= ZOO_NEAR]
+        if st.zoo_hp is not None and c.hp < st.zoo_hp and near:
+            st.zoo_hurt = t                                # something by us hurt us: that one is awake
+        st.zoo_hp = c.hp
         inside = st.zoo | {st.zoo_door}
-        seen = frozenset(q for q in (st.from_map(p) for p, _ in self.visible_hostiles(lv)) if q in inside)
+        seen = frozenset(q for q in (st.from_map(p) for p, _ in hostiles) if q in inside)
         if seen != st.zoo_seen:
             st.zoo_seen, st.zoo_moved = seen, t
-        if not seen or t - st.zoo_moved >= ZOO_QUIET:
-            return False
         here = st.from_map(self.pos())
         goal = tuple(st.lv["goal"])
+        if here in inside and near and t - st.zoo_hurt <= ZOO_HURT_TURNS:
+            # the quiet way did not hold: back to the corridor east of the door, the zoo's only way out, and fight
+            # the awake ones there one at a time (79599: a fight at the door carried the bot into the zoo,
+            # surrounded 19 turns after the door opened); the ones still asleep stay put, the zoo way takes them
+            # one at a time later
+            bs, ts = self.soko_state(lv, st)
+            self.soko_stats["zoo_back"] += 1
+            self.cur_act = "soko_zoo"
+            return self.soko_step_to(lv, st, goal, bs, ts)
+        if not seen or t - st.zoo_moved >= ZOO_QUIET:
+            return False
         if here == goal:
             if st.zoo_hold >= ZOO_HOLD_MAX:
                 return False
@@ -889,11 +945,6 @@ class SokobanMixin:
             self.soko_stats["zoo_hold"] += 1
             self.cur_act = "soko_zoo"
             return self.soko_wait()
-        if here in inside and c.hp < c.maxhp * ZOO_BACK_HP:
-            bs, ts = self.soko_state(lv, st)
-            self.soko_stats["zoo_back"] += 1
-            self.cur_act = "soko_zoo"
-            return self.soko_step_to(lv, st, goal, bs, ts)
         return False
 
     def soko_give_up(self, lv, st, why):
