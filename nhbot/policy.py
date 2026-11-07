@@ -461,8 +461,8 @@ class PolicyMixin:
                 return True
             if self.loot_step(lv):
                 return True
-            if self.wishwand_step() or self.lamp_step():
-                return True
+            if not self.soko_stealth(lv) and (self.wishwand_step() or self.lamp_step()):
+                return True                          # no wand, no lamp's djinni by a sleeping zoo
             if self.force_read_step(lv):
                 return True
             if self.read_scroll_step(lv):

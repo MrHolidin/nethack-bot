@@ -204,7 +204,7 @@ class JewelryMixin:
     # ------------------------------------------------------------ identify
     def jewelry_id_step(self, lv):
         """No threat in view: read an identify scroll on unknown jewelry. True if it used the turn."""
-        if not self.unknown_jewelry():
+        if not self.unknown_jewelry() or self.soko_stealth(lv):
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):

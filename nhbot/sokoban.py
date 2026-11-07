@@ -597,6 +597,17 @@ class SokobanMixin:
         self.press("2"); self.press("0"); self.press("s")
         return True
 
+    def soko_stealth(self, lv):
+        """Stealth on Sokoban's top level: the plan done, the prize not ours yet and the zoo's door not broken (shut,
+        or unlocked and opened: its monsters sleep) -- no wand is zapped, no scroll read (a ray bouncing through the
+        zoo, a scroll's noise or monsters wake it: 79059, a fire bolt at ~15 sleepers)."""
+        if not self.opts.sokoban or self.soko_done or not self.in_sokoban(lv):
+            return False
+        st = self.soko.get(lv.key)
+        if st is None or not st.solved or st.zoo_door is None:
+            return False
+        return self.kinds(lv)[st.to_map(st.zoo_door)] in (G.DOOR_CLOSED, G.DOOR_OPEN)
+
     def soko_wait(self):
         self.press("s")
         return True

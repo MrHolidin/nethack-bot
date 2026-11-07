@@ -77,6 +77,8 @@ class WandIdMixin:
 
     def wandid_step(self, lv):
         """No threat in view (the caller checks): test one unidentified wand. True if it used the turn."""
+        if self.soko_stealth(lv):
+            return False
         it, key = self.wand_to_test()
         if it is None or not self.elb_can_write(lv) or lv.shop[self.pos()] \
                 or (lv.key, self.pos()) in self.wandid_refused \
