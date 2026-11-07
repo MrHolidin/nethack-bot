@@ -9,6 +9,8 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
 from nhbot.danger import adj_level, dice_pmf
+from nhbot.messages import (KILL_RE, KILLED_RE, MELEE_ON_US_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE,
+                            UNSEEN_ATTACK_RE)
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
@@ -38,27 +40,6 @@ MR_BIT = {"sleep": 0x04, "fire": 0x01, "cold": 0x02, "lightning": 0x10}    # mon
 _PM_INDEX = {nh.permonst(i).mname: i for i in range(nh.NUMMONS)}
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
 PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
-
-
-# mhitu.c: an attack by a monster we can't see is reported as "It <verb>" and marks its square with an 'I'
-IT_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches you|stings|kicks|butts|claws|scratches|"
-                          r"thrusts|swings|grabs|hugs|lashes|squeezes|engulfs|tickles|stabs|pummels|whips)\b")
-
-
-# mhitu.c: a melee attack on us by a monster we see: "The <name> <verb>!" (hallucination: the name is random);
-# monster-vs-monster and missiles read differently ("The gnome hits the jackal.", "You are hit by a dart.")
-MELEE_ON_US_RE = re.compile(r"\bThe [^.!]+? (?:hits|bites|misses|just misses|stings|kicks|butts|claws|scratches|"
-                            r"thrusts|swings|grabs|lashes|tickles|stabs|pummels|whips|touches you|engulfs you|"
-                            r"squeezes you|gores|charms you)!")
-
-
-# Somebody attacked us from a distance (mthrowu.c monshoot / thitu, zap.c buzz, muse.c), seen or not.
-RTHREAT_RE = re.compile(r"(?:throws|shoots) |zaps (?:a|an|the) |You are (?:almost )?hit by |You are hit!|misses you\.|"
-                        r"whizzes by you|hits you!|crashes on your head|You hear a nearby zap")
-
-
-# ...but arrow/dart/rock traps print the same 'You are hit by' lines
-RTRAP_RE = re.compile(r"trap|shoots out at you|falls on your head|from the ceiling")
 
 
 def wand_resisted(kind, name):
@@ -604,9 +585,9 @@ class CombatMixin:
     def msg_combat(self, m):
         """Our hits and kills, being shot at, being attacked by something unseen."""
         self.focus_note(m)
-        if re.search(r"You (kill|destroy) ", m):
+        if KILL_RE.search(m):
             self.kill_count += 1
-        mk = re.search(r"You (?:kill|destroy) (?:the |an? )?(.+?)!", m)
+        mk = KILLED_RE.search(m)
         if mk:
             self.kill_by[mk.group(1)] += 1
         self.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
@@ -620,11 +601,11 @@ class CombatMixin:
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
                 self.kills.append((self.turn(), mk.group(1), self.last_attack_target, self.cur_key))
                 self.goal_event("corpse", "created")
-        if RTHREAT_RE.search(m) and not RTRAP_RE.search(m) and self.turn() - self.own_zap_turn > 1:
+        if SHOT_AT_RE.search(m) and not TRAP_SHOT_RE.search(m) and self.turn() - self.own_zap_turn > 1:
             self.last_shot_turn = self.turn()
-            mm = re.search(r"The ([a-z][a-z' -]*?) (?:zaps|shoots|throws|hurls|fires|spits|breathes)", m)
+            mm = SHOOTER_RE.search(m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
-        if IT_ATTACK_RE.search(m):
+        if UNSEEN_ATTACK_RE.search(m):
             self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
         if MELEE_ON_US_RE.search(m):
             self.melee_on_us = True           # hallu_strike: something attacked us in melee this turn

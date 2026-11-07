@@ -12,12 +12,10 @@ from nhbot import elb_rules as ELB
 from nhbot import glyphs as G
 from nhbot.consts import NO_ENGRAVE_CMAP
 from nhbot.elb_rules import M1_NOHANDS
+from nhbot.messages import ELB_WIPED_RE
 from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
 
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
-
-ELB_WIPED_RE = re.compile(r"\bYou (?:hit|miss|smite|kill|destroy)\b|The engraving beneath you fades")
-
 
 
 class ElberethMixin:

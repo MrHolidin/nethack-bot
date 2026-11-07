@@ -23,7 +23,7 @@ from collections import Counter
 import numpy as np
 import nle.nethack as nh
 
-from nhbot.game import ID_MENU, MENU_ITEM_RE, PAGE_RE
+from nhbot.game import MENU_ITEM_RE, PAGE_RE
 from nhbot.items import base_name
 from nhbot.pricemem import appearance
 
@@ -36,6 +36,7 @@ AMULET_RE = re.compile(r"\bamulets? (?:of |called )?(%s)\b" % "|".join(AMULET_OR
                                                                                             # by what it is
 RING_RE = re.compile(r"\brings? of (%s)\b" % "|".join(sorted(RING_ORDER, key=len, reverse=True)))
 IDENTIFY_RE = re.compile(r"\bscrolls? of identify\b")
+ID_MENU = "What would you like to identify"         # invent.c menu_identify ("first" / "next")
 SCROLL_SHOPS = ("general store", "second-hand bookstore", "rare books")
 PRICE_RE = re.compile(r"for sale, (\d+) zorkmids?")
 MIN_PRICE = 20                   # the base price: no identify scroll costs less
@@ -230,6 +231,13 @@ class JewelryMixin:
                   [it for it in mine if it.ocls == nh.POTION_CLASS],
                   [it for it in mine if it.ocls == nh.WAND_CLASS]]
         return {it.letter for it in next((g for g in groups if g), [])}
+
+    def identify_menu_shown(self, tty, menu):
+        """settle: is a page of an identify menu on screen (its header, or a later page of the one we answer)? An
+        identify menu closed some other way is forgotten."""
+        if not menu and ID_MENU not in tty:
+            self.id_menu_open = False
+        return ID_MENU in tty or bool(menu and self.id_menu_open)
 
     def answer_identify_menu(self, tty):
         """settle: an identify menu page is on screen (page 2 on has no header: every "x - ..." line is an

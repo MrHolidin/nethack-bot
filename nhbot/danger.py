@@ -29,6 +29,7 @@ import nle.nethack as nh
 from nhbot.carry import WEAPON_NAME_OF
 from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name, erosion
+from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
@@ -123,9 +124,9 @@ class DangerMixin:
         self.danger_p = defaultdict(lambda: [0, 0.0, 0])         # bin -> [n, sum predicted, deaths]
 
     def danger_msg(self, m):
-        if re.search(r"\bYou (?:hit|smite|strike|bite|kick|butt|sting|touch)\b", m):
+        if OUR_HIT_RE.search(m):
             self.hit_seen = True
-        if re.search(r"\bYou (?:kill|destroy)\b", m) and self.last_attack_target is not None:
+        if KILL_WORD_RE.search(m) and self.last_attack_target is not None:
             self.our_hits.pop((self.cur_key, self.last_attack_target), None)
         for mon, weapon in WIELD_RE.findall(m):
             w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon

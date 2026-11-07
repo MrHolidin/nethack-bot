@@ -104,9 +104,18 @@ class VaultMixin:
         return None
 
     def vault_rob_ready(self):
-        """In a vault, a way to dig, the floor here not refused. (game.py: the guard is told "Croesus" then.)"""
+        """In a vault, a way to dig, the floor here not refused (answer_guard: the guard is told "Croesus" then)."""
         return self.cur_key not in self.dig_refused and self.vault_box() is not None \
             and self.dig_means() is not None
+
+    def answer_guard(self):
+        """settle: the vault guard's "Hello stranger, who are you?" -- our real name (lawful: lying costs alignment);
+        vault_rob, about to dig out: "Croesus" -- the guard leaves (vault.c invault)."""
+        name = "Croesus" if self.vault_rob_ready() else "Agent"
+        self.vault_stats["croesus"] += name == "Croesus"
+        for c in name:
+            self.raw_step(ord(c))
+        self.raw_step(13)
 
     def vault_rob_step(self, lv, hostiles):
         """Out of the vault after a dig -- the weapon back (not while tunnelling toward one); in one with a way to

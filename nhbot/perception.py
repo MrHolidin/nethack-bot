@@ -1,7 +1,6 @@
 """Who is around: hostile / peaceful monsters next to us and in view, threat gates for
 housekeeping, monsters we never melee, straight-line targets, and what blindness / hallucination
 leave us able to tell."""
-import re
 from collections import Counter
 
 import numpy as np
@@ -10,6 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
+from nhbot.messages import MELEE_BY_NAME_RE
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import ALWAYS_AVOID, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES
 from nhbot.rays import our_protection
@@ -40,10 +40,6 @@ RACE_MASKS = {"human": (0, M2_GNOME | M2_ORC), "elf": (M2_ELF, M2_ORC), "elven":
               "dwarf": (M2_DWARF | M2_GNOME, M2_ORC), "dwarven": (M2_DWARF | M2_GNOME, M2_ORC),
               "gnome": (M2_DWARF | M2_GNOME, M2_HUMAN), "gnomish": (M2_DWARF | M2_GNOME, M2_HUMAN),
               "orc": (0, M2_HUMAN | M2_ELF | M2_DWARF), "orcish": (0, M2_HUMAN | M2_ELF | M2_DWARF)}
-# a monster's melee attack on us (not on another monster: those name their target, without '!')
-ATTACKER_RE = re.compile(r"(?:^|[.!?]\s+)(The [^.!?]+?|[A-Z][\w'-]*(?: [\w'-]+)*?) (?:hits|bites|misses|just misses|stings|"
-                         r"kicks|butts|claws|scratches|lashes|tickles|stabs|pummels|whips|gores)!|"
-                         r"(?:^|[.!?]\s+)(The [^.!?]+?|[A-Z][\w'-]*(?: [\w'-]+)*?) (?:touches|engulfs|squeezes|charms|grabs) you")
 
 
 class PerceptionMixin:
@@ -154,7 +150,7 @@ class PerceptionMixin:
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
                and G.KIND[g[y + dy, x + dx]] == G.MONSTER]
-        for mm in ATTACKER_RE.finditer(m):
+        for mm in MELEE_BY_NAME_RE.finditer(m):
             who = mm.group(1) or mm.group(2)
             if who in ("You", "It") or who.startswith("You "):
                 continue

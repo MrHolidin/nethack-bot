@@ -11,7 +11,6 @@ MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is 
 MENU_ITEM_RE = re.compile(r"^\s*([a-zA-Z]) - (.*)$")
 MENU_ITEM_GOLD_RE = re.compile(r"^\s*([a-zA-Z$]) - (.*)$")   # gold's line too: "$ - 173 gold pieces" (goldbag)
 PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")       # a menu page: "(1 of 2)"
-ID_MENU = "What would you like to identify"         # invent.c menu_identify ("first" / "next")
 
 
 class GameOver(Exception):
@@ -46,8 +45,7 @@ class GameMixin:
             msg = self.message()
             flat = tty.replace("\n", "")
             menu = MENU_RE.search(tty)
-            if not menu and ID_MENU not in tty:
-                self.id_menu_open = False                        # an identify menu closed some other way
+            id_menu = self.identify_menu_shown(tty, menu)        # jewelry.py
             if "Things that are here" in tty:
                 self.here_window = (self.turn(), self.pos(), " | ".join(
                     l.strip() for l in self.menu_lines(tty, "Things that are here")))
@@ -72,17 +70,11 @@ class GameMixin:
                     self.answer_genocide(msg + " " + self.top_line())     # scrolls.py
                     continue
                 if "who are you" in (msg + self.top_line()).lower():
-                    # our real name (lawful: lying costs alignment); vault_rob, about to dig out: "Croesus" -- the
-                    # guard leaves (vault.c invault)
-                    name = "Croesus" if self.vault_rob_ready() else "Agent"
-                    self.vault_stats["croesus"] += name == "Croesus"
-                    for c in name:
-                        self.raw_step(ord(c))
-                    self.raw_step(13)
+                    self.answer_guard()                     # vault.py
                     continue
                 self.raw_step(27)
                 continue
-            if ID_MENU in tty or (menu and self.id_menu_open):
+            if id_menu:
                 self.answer_identify_menu(tty)                   # jewelry.py
                 continue
             if menu:

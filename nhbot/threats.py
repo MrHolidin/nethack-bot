@@ -16,25 +16,18 @@ gives it unlimited use of them):
   missiles  "The X shoots / throws 2 orcish arrows!": the kind, the volley sizes seen, poisoned or not;
   breath    "The X breathes ...": its breath attack (monattacks).
 """
-import re
-
 import numpy as np
 
 from nhbot import glyphs as G
+from nhbot.messages import ATTACKER_NAME_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE
 from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
 TRACK_FORGET = 10            # turns a track is kept unseen
 WAND_KINDS = ("striking", "magic missile", "fire", "cold", "sleep", "lightning", "death")
-ZAP_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) zaps (?:an? |the )?([a-z' -]*?wand(?: of [a-z ]+)?)!")
 RAY_SEEN = (("sleep ray", "sleep"), ("bolt of fire", "fire"), ("bolt of cold", "cold"),
             ("bolt of lightning", "lightning"), ("magic missile", "magic missile"), ("death ray", "death"),
             ("The wand hits you", "striking"), ("The wand misses you", "striking"), ("Boing!", "striking"))
-SHOOT_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:shoots|throws) (\d+|an?|the) ([a-z' -]+?)!")
-BREATH_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) breathes ")
-ATTACK_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|bites|stings|kicks|butts|touches|claws|thrusts|swings|"
-                       r"shoots|throws|zaps|breathes|casts|spits|gazes|engulfs|squeezes|lashes|tentacles|"
-                       r"just misses|strikes)\b")
 
 
 def singular(what):
@@ -85,11 +78,11 @@ class ThreatMixin:
         if not self.mon_tracks:
             return
         t = self.turn()
-        for name in ATTACK_RE.findall(m):
+        for name in ATTACKER_NAME_RE.findall(m):
             tr = self.track_named(name)
             if tr is not None:
                 tr["attacked"] = t
-        for name, wand in ZAP_RE.findall(m):
+        for name, wand in MON_ZAPS_RE.findall(m):
             tr = self.track_named(name)
             if tr is not None:
                 kind = wand[len("wand of "):] if wand.startswith("wand of ") else None
@@ -101,7 +94,7 @@ class ThreatMixin:
             if kind is not None:
                 self.zapper[1]["wands"].add(kind)
                 self.zapper = None
-        for name, count, what in SHOOT_RE.findall(m):
+        for name, count, what in MON_SHOOTS_RE.findall(m):
             tr = self.track_named(name)
             if tr is not None:
                 n = int(count) if count.isdigit() else 1
@@ -110,7 +103,7 @@ class ThreatMixin:
                 old = tr["missile"]
                 tr["missile"] = {"kind": kind, "counts": (old["counts"] if old else []) + [n],
                                  "poisoned": poisoned or bool(old and old["poisoned"])}
-        for name in BREATH_RE.findall(m):
+        for name in MON_BREATHES_RE.findall(m):
             tr = self.track_named(name)
             if tr is not None:
                 tr["breath"] = True
