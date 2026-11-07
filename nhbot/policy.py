@@ -101,6 +101,8 @@ class PolicyMixin:
         self.poly_track()                        # thieves.py: what fell from us when we changed form
         if self.opts.lep_stash:
             self.lep_track()                     # thieves.py: which leprechauns moved since the tick before
+        if self.opts.sokoban:
+            self.soko_track(lv)                  # sokoban.py: what we carried on coming onto this square
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
             self.last_step = "level_arrival"
             return

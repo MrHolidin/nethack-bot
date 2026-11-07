@@ -107,7 +107,6 @@ class SokoLevel:
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
-        self.inv_outside = None       # soko_prize_items() on the last tick outside the prize closets
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
@@ -136,6 +135,9 @@ class SokobanMixin:
     def sokoban_init(self):
         self.soko = {}                  # level key -> SokoLevel
         self.soko_done = False          # the top level's prize taken (or the zoo given up)
+        self.soko_prize_named = False   # the prize was told and called by its name (soko_name_prize)
+        self.soko_track_pos = None      # soko_track: our square, and the amulets / bags we had on coming onto it
+        self.soko_inv_arrival = frozenset()
         self.soko_failed = False        # a level given up: Sokoban is over for this game
         self.soko_stats = Counter()
         self.soko_secs = 0.0            # compute time spent in this module (the tick that acted included)
@@ -630,11 +632,8 @@ class SokobanMixin:
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         here = st.from_map(self.pos())
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
-        # an amulet or a bag that came while we stand in a closet came from it -- whichever step picked it up
-        if here in closets and st.inv_outside is not None:
-            self.soko_name_prize(self.soko_prize_items() - st.inv_outside)
-        else:
-            st.inv_outside = self.soko_prize_items()
+        if here in closets:
+            self.soko_name_prize()
         shut = self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED
         if st.solved_turn is None:
             st.solved_turn = self.turn()
@@ -662,12 +661,8 @@ class SokobanMixin:
             new = self.soko_prize_items() - had
             if new:
                 self.soko_stats["prize"] += 1
-                self.soko_name_prize(new)
-                # an amulet from a closet is the prize, reflection (one from a pile in the zoo may be anything)
-                am = next((it for it in self.items() if it.letter in new and it.ocls == nh.AMULET_CLASS), None)
-                if am is not None and here in closets:
-                    self.jewelry_put_on(am)
-                    self.soko_stats["amulet_worn"] += 1
+                if here in closets:
+                    self.soko_name_prize()
                 self.soko_done = True
             return True
         if not todo:
@@ -688,21 +683,42 @@ class SokobanMixin:
         st.closet_done.add(tgt)
         return self.soko_wait()
 
-    def soko_name_prize(self, letters):
-        """The prize just taken from a closet is known by where it lay (sokoban.des: the bag of holding or the
-        amulet of reflection): its type called so at once, so everything reading item names knows it -- "reflection"
-        (equipment, rays, jewelry), "bag of holding" (goldbag's bag rank)."""
+    def soko_track(self, lv):
+        """Every tick in Sokoban: the amulets and bags we carried when we came onto this square (soko_name_prize
+        tells what this square gave us by them)."""
+        if not self.in_sokoban(lv):
+            return
+        pos = self.pos()
+        if pos != self.soko_track_pos:
+            self.soko_track_pos = pos
+            self.soko_inv_arrival = self.soko_prize_items()
+
+    def soko_name_prize(self):
+        """Standing in a prize closet: an amulet or a bag that came since we stepped in came from it -- whichever
+        step picked it up -- and is the prize (sokoban.des: the bag of holding or the amulet of reflection). Its
+        type called so at once, so everything reading item names knows it -- "reflection" (jewelry, equipment,
+        rays), "bag of holding" (goldbag's bag rank) -- and the amulet put on. Once a game."""
+        if self.soko_prize_named:
+            return
+        got = self.soko_prize_items() - self.soko_inv_arrival
         for it in self.items():
-            if it.letter not in letters:
+            if it.letter not in got:
                 continue
-            if it.ocls == nh.AMULET_CLASS and "reflection" not in it.text:
+            if it.ocls == nh.AMULET_CLASS:
                 name = "reflection"
-            elif "bag" in it.text and "holding" not in it.text:
+            elif "bag" in it.text:
                 name = "bag of holding"
             else:
                 continue
-            if self.call_type(it.letter, name):
+            self.soko_prize_named = True
+            if name not in it.text and self.call_type(it.letter, name):
                 self.soko_stats["prize_named"] += 1
+            if it.ocls == nh.AMULET_CLASS and not it.worn:
+                am = next((a for a in self.items() if a.letter == it.letter), None)
+                if am is not None and not am.cursed:
+                    self.jewelry_put_on(am)
+                    self.soko_stats["amulet_worn"] += 1
+            return
 
     def soko_zoo_walk(self, lv, st, start, goal, bs, ts):
         """First step (variant coords) of the way from start to goal with the fewest and weakest monsters to kill

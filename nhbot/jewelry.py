@@ -32,7 +32,8 @@ RING_ORDER = ("free action", "regeneration", "protection", "increase damage", "i
               "gain constitution", "slow digestion", "poison resistance", "fire resistance", "shock resistance",
               "see invisible", "warning")
 CHARGED = {"protection", "increase damage", "increase accuracy", "gain strength", "gain constitution"}
-AMULET_RE = re.compile(r"\bamulets? (?:of )?(%s)\b" % "|".join(AMULET_ORDER))
+AMULET_RE = re.compile(r"\bamulets? (?:of |called )?(%s)\b" % "|".join(AMULET_ORDER))   # called: a type we named
+                                                                                            # by what it is
 RING_RE = re.compile(r"\brings? of (%s)\b" % "|".join(sorted(RING_ORDER, key=len, reverse=True)))
 IDENTIFY_RE = re.compile(r"\bscrolls? of identify\b")
 SCROLL_SHOPS = ("general store", "second-hand bookstore", "rare books")
