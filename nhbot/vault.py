@@ -46,6 +46,7 @@ class VaultMixin:
         self.vault_done = set()        # vault_find: level keys whose vault we reached or gave up
         self.vault_plan = None         # vault_find: {key, inner, start, path (squares to dig, in order), wand}
         self.vault_out = None          # vault_exit: (level key, square) where the tunnel into the vault we are in begins
+        self.vault_shut = {}           # vault_clear: level key -> the squares (floor, wall) of a vault we are leaving
         self.vault_tries = Counter()   # vault_find: tries at digging each square of the plan
         self.vault_loc_at = {}         # vault_find: level key -> (lv.under bytes hash, located interior or None)
         self.vault_wait = {}           # vault_find: level key -> turn before which no tunnel is planned again
@@ -61,6 +62,12 @@ class VaultMixin:
         if inner is not None:
             self.vault_seen = (self.cur_key, inner)
         return inner
+
+    @staticmethod
+    def vault_walls(inner):
+        """The 4 floor squares of a vault and the 12 of its wall around them."""
+        (y0, x0) = min(inner)
+        return [(y0 + i, x0 + j) for i in range(-1, 3) for j in range(-1, 3)]
 
     def vault_closed(self):
         g = self.obs["glyphs"]
@@ -108,6 +115,8 @@ class VaultMixin:
         if not self.opts.vault_rob:
             return False
         box = self.vault_box()
+        if box is None and self.vault_leaving(lv):
+            return self.vault_walk_out(lv)
         if box is None:
             self.vault_since = None
             return self.vault_plan is None and self.swap_back("dig")
@@ -138,13 +147,28 @@ class VaultMixin:
             self.press(DELTA2KEY[(p[0] - here[0], p[1] - here[1])])
             return True
         if self.opts.vault_exit and self.vault_out is not None and self.vault_out[0] == lv.key:
-            mask = np.zeros(lv.under.shape, dtype=bool)
-            mask[self.vault_out[1]] = True
-            if self.walk_to(lv, mask, act="vault_exit")[0] == "moved":
-                self.vault_stats["walk_out"] += 1     # vault_exit: out by our own tunnel, not down a hole
+            if self.opts.vault_clear:
+                self.vault_shut[lv.key] = self.vault_walls(box)
+            if self.vault_walk_out(lv):
                 return True
-            self.vault_out = None                     # the way back is shut: down after all
         return self.dig_down(lv, means)
+
+    def vault_leaving(self, lv):
+        """vault_clear: on the wall of the vault we are leaving -- in its dug opening, still in the vault for the
+        game (in_rooms counts a door with the room: the guard's count goes on)."""
+        return self.opts.vault_clear and self.vault_out is not None and self.vault_out[0] == lv.key \
+            and self.pos() in self.vault_shut.get(lv.key, ())
+
+    def vault_walk_out(self, lv):
+        """vault_exit: a step back along our tunnel. True if it used the turn; False if the way is shut (down
+        after all)."""
+        mask = np.zeros(lv.under.shape, dtype=bool)
+        mask[self.vault_out[1]] = True
+        if self.walk_to(lv, mask, act="vault_exit")[0] == "moved":
+            self.vault_stats["walk_out"] += 1         # vault_exit: out by our own tunnel, not down a hole
+            return True
+        self.vault_out = None
+        return False
 
     def dig_down(self, lv, means):
         kind, it = means

@@ -186,6 +186,9 @@ class MapMixin:
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
             p[lv.shop] = False
+        shut = self.vault_shut.get(lv.key) if self.opts.vault_clear else None
+        if shut and self.pos() not in shut:
+            p[tuple(zip(*shut))] = False      # vault_clear: a vault we left -- no walk back in (the guard's count)
         if self.opts.lep_hall and not lv.lep_shut[self.pos()]:
             p[lv.lep_shut] = False
         if self.opts.peace_shut:

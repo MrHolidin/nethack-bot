@@ -56,6 +56,8 @@ DEFAULTS = {
                                #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
                                #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
+    "vault_clear": False,      # A/B: a vault we tunnelled into and are leaving: out past its wall (the dug opening is
+                               #      still the vault: in_rooms, the guard comes there), then no other walk back in
     "vault_exit": True,        # A/B -222 [-411, -47] (it looped over gold it would not lift): in a vault we tunnelled
                                #      into (vault_find): out by the tunnel with the gold, no hole down (vault.c: the
                                #      guard comes after 30 turns inside, told "Croesus" if he comes)
