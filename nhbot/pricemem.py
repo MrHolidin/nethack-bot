@@ -18,6 +18,7 @@ shopkeeper (o_id % 4, m_id % 4) are treated as independent 1-in-4 events per rea
 Identified items ("potion of healing") need nothing: the game already names them.
 """
 import re
+from functools import lru_cache
 
 import nle.nethack as nh
 
@@ -133,8 +134,10 @@ def likelihood(name, cls, r):
 
 
 # ---------------------------------------------------------------- text -> appearance
+@lru_cache(maxsize=1 << 16)
 def appearance(text):
-    """(class, appearance key) of an UNIDENTIFIED item named by its looks, else None."""
+    """(class, appearance key) of an UNIDENTIFIED item named by its looks, else None. A function of the text
+    alone: cached."""
     t = base_name(text)[2]
     t = re.sub(r"^(pair|set)s? of ", "", t).strip()
     if re.search(r"\b(potion|scroll|ring|wand|amulet|spellbook)s? of ", t):

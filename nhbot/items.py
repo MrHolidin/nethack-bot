@@ -13,6 +13,7 @@ There is no "(in use)" and no "(weapons in hands)" in 3.6.6.
 """
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 WIELD_RE = re.compile(r"\((?:tethered )?weapon in (\w+)")
 CURSED_RE = re.compile(r"\bcursed\b")               # not "uncursed"
@@ -96,9 +97,11 @@ def erosion(s):
                default=0)
 
 
+@lru_cache(maxsize=1 << 16)
 def base_name(s, called=False):
     """Inventory / floor text -> (quantity, enchantment or None, bare name): no state suffixes, article or
-    count, prefix words, enchantment; no 'called' / 'named' part unless called."""
+    count, prefix words, enchantment; no 'called' / 'named' part unless called. A function of the text
+    alone, and the same texts come back every tick: cached (a quarter of the run time went here)."""
     t = re.sub(r"\s*\(.*?\)", "", s).strip()
     if not called:
         t = re.sub(r"\s+(called|named)\s+.*$", "", t)
