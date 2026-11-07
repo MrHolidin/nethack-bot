@@ -57,6 +57,12 @@ TRAP_MSGS = (("bear", ("A bear trap closes on your foot", "You are caught in a b
               ("You disentangle yourself", "You tear through", "cuts through the web")))
 
 BARS_GLYPH = nh.GLYPH_CMAP_OFF + 17   # S_bars (iron bars)
+# sounds.c dosounds: a level's shopkeeper, temple, fountains, sinks heard from afar -- on Mines level 3-4 (where
+# Minetown lies: dungeon.def minetn @ (3, 2)) only Minetown has any of them (filler levels are caves, no rooms)
+TOWN_SOUNDS = ("cursing shoplifters", "chime of a cash register", "Neiman and Marcus arguing",
+               "strident plea for donations", "carcass being offered in sacrifice", "someone praising",
+               "someone beseeching", "bubbling water", "water falling on coins", "splashing of a naiad",
+               "a soda fountain", "a slow drip", "a gurgling noise", "dishes being washed")
 SHOP_MAX = 150                   # shk_marks_shop: a shop room is no bigger than this
 
 
@@ -75,6 +81,7 @@ class Level:
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.lep_shut = np.zeros((ROWS, COLS), dtype=bool)   # lep_hall: a room of leprechauns, closed from outside
         self.grotto = False        # Grotto Town (is_grotto)
+        self.town_heard = False    # minetown_sounds: a shop / temple / fountain / sink heard on this Mines level 3-4
         self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
@@ -302,6 +309,8 @@ class MapMixin:
         filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
+        if self.opts.minetown_sounds and lv.town_heard:
+            return True
         return bool(lv.shop.any() or np.isin(self.terrain_glyphs(lv), (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
 
     def stairs_kind_here(self, lv):
@@ -315,6 +324,9 @@ class MapMixin:
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""
+        if self.opts.minetown_sounds and lv is not None and lv.key[0] == 2 and lv.key[1] in (3, 4) \
+                and "You hear" in m and any(t in m for t in TOWN_SOUNDS):
+            lv.town_heard = True                              # minetown_sounds: Minetown, before we see it
         if "under arrest" in m:
             self.mines_kick_stats["arrest"] += 1
         if "stop damaging that door" in m and lv and self.last_move_target:
