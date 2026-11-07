@@ -309,6 +309,14 @@ class PerceptionMixin:
                 return True
         return False
 
+    def peaceful_next(self, lv, hostiles):
+        """A monster next to us that is not one of the hostiles (peaceful: the watch, a shopkeeper, a gnome)."""
+        g = self.obs["glyphs"]
+        y, x = self.pos()
+        hot = {p for p, _ in hostiles}
+        return any(G.KIND[g[y + dy, x + dx]] == G.MONSTER and (y + dy, x + dx) not in hot
+                   for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS)
+
     def town_folk_visible(self):
         """Minetown's watch, temple priest or shopkeepers in view (an unlit Minetown may hide its altar)."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:

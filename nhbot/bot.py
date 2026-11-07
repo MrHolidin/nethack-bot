@@ -188,6 +188,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.thieves_init()
         self.goldbag_init()
         self.vault_init()
+        self.stun_peace_waits = 0
         self.dig_through_init()
         self.lock_init()
         self.weapons_init()
@@ -343,7 +344,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "shops": self.shops_seen, "shops_from_keeper": self.shops_from_keeper,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
-            "vault": [self.vault_drops, self.vault_moves, self.vault_approach, self.vault_bag_outs], "vault_rob": dict(self.vault_stats), "dig_through": dict(self.dig_stats), "lock_tools": dict(self.lock_stats),
+            "vault": [self.vault_drops, self.vault_moves, self.vault_approach, self.vault_bag_outs], "vault_rob": dict(self.vault_stats), "dig_through": dict(self.dig_stats), "lock_tools": dict(self.lock_stats), "stun_peace_waits": self.stun_peace_waits,
             "items_first": self.items_first_holds,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,

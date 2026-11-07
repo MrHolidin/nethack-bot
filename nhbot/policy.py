@@ -249,6 +249,10 @@ class PolicyMixin:
                 self.stun_waits += 1
                 self.press("s")
                 return True
+            if self.opts.stun_peace and self.is_minetown(c.lv) and self.peaceful_next(c.lv, c.hostiles):
+                self.stun_peace_waits += 1        # stun_peace: a blow could go to the watch (uhitm.c: stunned,
+                self.press("s")                   # confused -- a random direction): no melee in Minetown
+                return True
         return False
 
     def step_vault_guard(self, c):
