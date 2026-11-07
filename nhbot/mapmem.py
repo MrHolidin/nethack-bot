@@ -415,3 +415,7 @@ class MapMixin:
             yy, xx = self.pos()
             if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
                 lv.set_terrain((yy, xx), FLOOR_GLYPH)
+            elif self.opts.stair_refuse and G.KIND[int(lv.terrain[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
+                # stair_refuse: an item lies there and the staircase is in the terrain layer under it (kinds reads
+                # that through the item) -- 79654 pressed '>' 14047 times in 120 turns, 25 steps a turn
+                lv.terrain[yy, xx] = FLOOR_GLYPH

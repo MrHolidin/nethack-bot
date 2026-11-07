@@ -41,6 +41,8 @@ DEFAULTS = {
                                #      the level's up or down staircase is unknown
     "force_read": None,        # experiments: a scroll type ("destroy armor", control "blank paper") read once, the first
                                #      time it is safe (nhbot.scrolls.force_read_step)
+    "stair_refuse": False,     # A/B: "You can't go down here" clears a staircase remembered in the terrain layer under an
+                               #      item too (not only a shown one): no '>' pressed again and again for no time
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
                                #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
