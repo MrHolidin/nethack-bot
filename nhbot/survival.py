@@ -271,6 +271,10 @@ class SurvivalMixin:
     def vault_step(self, lv, hostiles):
         """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
         if self.vault_drop:
+            bag = self.gold_bag() if self.opts.vault_bag_out else None
+            if bag is not None and self.bag_gold > 0:
+                self.vault_bag_outs += 1          # he wants the gold in our bag too (vault.c hidden_gold): out first
+                return self.bag_take_out(bag)
             self.vault_drop = False
             self.vault_drops += 1
             if self.ask("d", "drop"):
@@ -352,7 +356,8 @@ class SurvivalMixin:
         if recent and any(p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
                                            "Then die, mortal", "Thou durst")):
             self.god_angry = True
-        if "drop that gold" in m or "drop that money" in m:
+        if "drop that gold" in m or "drop that money" in m \
+                or self.opts.vault_bag_out and "drop that hidden money" in m:
             self.vault_drop = True
         if "follow me" in m:
             self.vault_follow_until = self.turn() + 300

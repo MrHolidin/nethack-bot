@@ -50,6 +50,8 @@ DEFAULTS = {
                                #      be wielded again
     "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
+    "vault_bag_out": False,    # A/B: the vault guard asks for every coin, the bag's too (vault.c hidden_gold): taken out
+                               #      of the bag before the gold is dropped
     "backup_weapon": False,    # A/B: lawful without Excalibur -- the weapon that hits hardest now is wielded (and kept)
                                #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
