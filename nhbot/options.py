@@ -33,9 +33,10 @@ DEFAULTS = {
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
-    "lock_tools": False,       # A/B: the best unlocking tool we carry (skeleton key > lock pick > credit card) kept,
-                               #      better ones picked up; locked doors and boxes unlocked with it, silently, before
-                               #      any kick / #force -- not in Minetown, Orcish Town yes (nhbot.locktools)
+    "lock_tools": True,        # A/B +350 [-966, +1591], median +274 (box kicks halved): the best unlocking tool we
+                               #      carry (skeleton key > lock pick > credit card) kept, better ones picked up; locked
+                               #      doors and boxes unlocked with it, silently, before any kick / #force -- not in
+                               #      Minetown, Orcish Town yes (nhbot.locktools)
     "shop_regrow": False,      # A/B: a shop greeted while dark grows as its floor becomes known (the flood from its
                                #      door again each tick until nothing unknown is next to it) -- mapmem.shop_regrow
     "stun_peace": False,       # A/B: stunned / confused in Minetown with a peaceful next to us: no melee (a blow goes
