@@ -40,11 +40,11 @@ STEPS = (
     "elbereth",
     "thieves",
     "regen",             # ring of regeneration on below full HP, off at full (nothing next to us)
-    "soko_zoo_back",     # Sokoban's zoo: hurt inside it by more than one -- back to the corridor before any fight
+    "soko_zoo",          # Sokoban's zoo open: two awake near -- back to the corridor; else on to the prize, the one
+                         # in the way attacked (nhbot.sokoban) -- before the fight steps
     "weapon",
     "wands",
     "melee",
-    "soko_zoo",          # Sokoban's top level: its zoo fought at the doorway (nhbot.sokoban)
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line

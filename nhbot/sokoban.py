@@ -48,10 +48,8 @@ SOKO_LEAVE_EXPLORE = 500  # ticks of the generic explore to leave a level given 
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
-ZOO_QUIET = 8             # turns with the zoo's monsters in view all where they were: the wave is over (the rest sleep)
-ZOO_NEAR = 2              # hurt in the zoo with more than one hostile this close ...
-ZOO_HURT_TURNS = 3        # ... in the last this many turns: back to the corridor (step_soko_zoo_back)
-ZOO_HOLD_MAX = 300        # turns at most spent holding the zoo's doorway
+ZOO_NEAR = 1              # two awake hostiles this close: back to the corridor east of the zoo's door (step_soko_zoo)
+ZOO_WAIT = 20             # ... where we wait this long for them; none came: they cannot (other monsters in their way)
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
@@ -105,12 +103,11 @@ class SokoLevel:
         self.retreat_from = None
         self.last_i = -1
         self.closet_done = set()      # top level: the prize closets and the zoo piles looked into
-        self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
-        self.zoo_moved = -1           # ... and the turn that set last changed
-        self.zoo_hold = 0             # turns spent holding the doorway
+        self.zoo_last = frozenset()   # top level: squares of the hostiles in view on the last zoo tick (map) ...
+        self.zoo_active = set()       # ... and of those awake: seen moving, or next to us when we were hurt
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
-        self.zoo_hurt = -99           # turn something by us in the zoo last hurt us
         self.zoo_hp = None            # our HP on the last zoo tick
+        self.zoo_back_turn = None     # turn we went back to the corridor last (a wait there follows: ZOO_WAIT)
         self.zoo_peace_waits = 0      # ticks waited with every way closed by peaceful monsters
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
@@ -650,7 +647,7 @@ class SokobanMixin:
         if not self.opts.sokoban or self.soko_done or not self.in_sokoban(lv):
             return False
         st = self.soko.get(lv.key)
-        if st is None or not st.solved or st.zoo_door is None:
+        if st is None or not st.solved or st.lv["up"] is not None or st.zoo_door is None:
             return False
         return self.kinds(lv)[st.to_map(st.zoo_door)] in (G.DOOR_CLOSED, G.DOOR_OPEN)
 
@@ -731,15 +728,9 @@ class SokobanMixin:
         # an amulet or a tool seen first, then the closets, then the nearest
         like = self.soko_prize_like(lv, st)
         if not shut:
-            # the zoo open: of the places left, the one with the easiest way (soko_zoo_walk) -- a peaceful monster
-            # sleeping before a closet's door closes that closet, not the hunt (79059: a pony by the first closet,
-            # the bot backed off from it for 6000 turns)
-            mimics = extra - st.real_extra
-            ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts, mimics)) for p in todo]
-            ways = [(p, w) for p, w in ways if w[0] is not None]
-            if ways:
-                tgt, (nxt, _) = min(ways, key=lambda pw: (pw[0] not in like, pw[0] not in closets, pw[1][1]))
-                return self.soko_zoo_step(lv, st, nxt, mimics)
+            nxt = self.soko_zoo_next(lv, st, here, todo, closets, bs, ts, extra)
+            if nxt is not None:
+                return self.soko_zoo_step(lv, st, nxt, extra - st.real_extra)
             st.zoo_peace_waits += 1
             if st.zoo_peace_waits <= ZOO_PEACE_WAIT_MAX:
                 self.soko_stats["zoo_no_way_wait"] += 1
@@ -791,6 +782,26 @@ class SokobanMixin:
                     self.jewelry_put_on(am)
                     self.soko_stats["amulet_worn"] += 1
             return
+
+    def soko_zoo_todo(self, lv, st):
+        """(the places left to look into for the prize: the closets, the piles in the zoo and on its door -- a monster
+        of the zoo may have carried the prize off and dropped it where it died -- ; the closets), variant coords."""
+        closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
+        todo = [p for p in closets + sorted(self.soko_piles(lv, st)) if p not in st.closet_done]
+        return todo, closets
+
+    def soko_zoo_next(self, lv, st, here, todo, closets, bs, ts, extra):
+        """The zoo open: the next step (variant coords) toward the place left with the easiest way (soko_zoo_walk),
+        an amulet or a tool seen first, then the closets -- a peaceful monster sleeping before a closet's door
+        closes that closet, not the hunt (79059: a pony by the first closet, the bot backed off from it for 6000
+        turns). None: no way to any."""
+        like = self.soko_prize_like(lv, st)
+        mimics = extra - st.real_extra
+        ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts, mimics)) for p in todo]
+        ways = [(p, w) for p, w in ways if w[0] is not None]
+        if not ways:
+            return None
+        return min(ways, key=lambda pw: (pw[0] not in like, pw[0] not in closets, pw[1][1]))[1][0]
 
     def soko_zoo_walk(self, lv, st, start, goal, bs, ts, mimics=frozenset()):
         """(first step (variant coords), cost) of the way from start to goal with the fewest and weakest monsters
@@ -901,54 +912,83 @@ class SokobanMixin:
         if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_done or self.soko_failed:
             return None
         st = self.soko.get(lv.key)
-        if st is None or not st.solved or st.zoo_door is None \
+        if st is None or not st.solved or st.lv["up"] is not None or st.zoo_door is None \
                 or self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED:
-            return None
+            return None                                    # (levels 2 and 3 have a locked door too: no zoo)
         return st
 
-    def step_soko_zoo_back(self, c):
-        """Before the fight steps (they would hold us where we stand): inside the zoo, hurt in the last
-        ZOO_HURT_TURNS turns with more than one hostile within ZOO_NEAR -- the quiet way did not hold, or the door
-        was kicked: back to the goal square in the corridor east of the door, the zoo's only way out, where they come
-        one at a time (79599: a fight at the door carried the bot into the zoo, surrounded 19 turns after the door
-        opened). One awake at a time is fought where we stand; the ones still asleep stay put for the zoo way."""
-        lv = c.lv
-        st = self.soko_zoo_level(lv)
-        if st is None:
-            return False
-        t = self.turn()
+    def soko_zoo_track(self, lv, st, c):
+        """Every zoo tick: which hostiles in view are awake -- one that stands where none stood, with a square left
+        empty within 2 (it moved; a monster coming into view or a kill does not count), or one next to us when our HP
+        fell (it hit us). Those stay awake while they stay put. The awake ones within ZOO_NEAR of us (map coords):
+        next to us."""
+        now = frozenset(p for p, _ in self.visible_hostiles(lv))
+        gone = st.zoo_last - now
+        moved = {p for p in now - st.zoo_last if any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in gone)}
         y, x = self.pos()
-        near = [p for p, _ in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) <= ZOO_NEAR]
-        if st.zoo_hp is not None and c.hp < st.zoo_hp and near:
-            st.zoo_hurt = t                                # something by us hurt us: awake
-        st.zoo_hp = c.hp
-        here = st.from_map(self.pos())
-        if here not in st.zoo | {st.zoo_door} or len(near) < 2 or t - st.zoo_hurt > ZOO_HURT_TURNS:
-            return False
-        bs, ts = self.soko_state(lv, st)
-        self.soko_stats["zoo_back"] += 1
-        self.cur_act = "soko_zoo"
-        return self.soko_step_to(lv, st, tuple(st.lv["goal"]), bs, ts)
+        hit = {p for p in now if max(abs(p[0] - y), abs(p[1] - x)) == 1} \
+            if st.zoo_hp is not None and c.hp < st.zoo_hp else set()
+        st.zoo_active = (st.zoo_active & now) | moved | hit
+        st.zoo_last, st.zoo_hp = now, c.hp
+        return [p for p in st.zoo_active if max(abs(p[0] - y), abs(p[1] - x)) <= ZOO_NEAR]
 
     def step_soko_zoo(self, c):
-        """At the goal square, the zoo's door open: hold it while the zoo's monsters in view keep moving -- they come
-        through the door one at a time."""
+        """The zoo's door open, the prize not ours: before the fight steps, which would hold us on whatever stands
+        next to us. Two awake hostiles next to us (soko_zoo_track): back to the goal square in the corridor east of
+        the door, the zoo's only way out, where they come one at a time -- there, the one next to us is fought (the
+        fight steps), else we wait ZOO_WAIT turns for them; none came: they cannot, and we go on (79599: a fight at
+        the door carried the bot into the zoo, surrounded 19 turns after the door opened). Otherwise on toward the prize: the monster on the next square
+        of the way is attacked, the rest sleep on (79009 fought what stood beside it and went nowhere). Below
+        ZOO_ENTER_HP of max HP with none awake near: rest at the goal square first (soko_prize rests there)."""
         lv = c.lv
         st = self.soko_zoo_level(lv)
         if st is None:
             return False
-        t = self.turn()
+        t0 = time.perf_counter()
+        try:
+            return self._soko_zoo(lv, st, c)
+        finally:
+            self.soko_secs += time.perf_counter() - t0
+
+    def _soko_zoo(self, lv, st, c):
+        active = self.soko_zoo_track(lv, st, c)
+        here = st.from_map(self.pos())
+        goal = tuple(st.lv["goal"])
         inside = st.zoo | {st.zoo_door}
-        seen = frozenset(q for q in (st.from_map(p) for p, _ in self.visible_hostiles(lv)) if q in inside)
-        if seen != st.zoo_seen:
-            st.zoo_seen, st.zoo_moved = seen, t
-        if not seen or t - st.zoo_moved >= ZOO_QUIET or st.from_map(self.pos()) != tuple(st.lv["goal"]) \
-                or st.zoo_hold >= ZOO_HOLD_MAX:
-            return False
-        st.zoo_hold += 1
-        self.soko_stats["zoo_hold"] += 1
-        self.cur_act = "soko_zoo"
-        return self.soko_wait()
+        bs, ts = self.soko_state(lv, st)
+        t = self.turn()
+        if len(active) >= 2 and here != goal:
+            st.zoo_back_turn = t
+            self.soko_stats["zoo_back"] += 1
+            self.cur_act = "soko_zoo"
+            return self.soko_step_to(lv, st, goal, bs, ts)
+        if here == goal and st.zoo_back_turn is not None:
+            y, x = self.pos()
+            if any(max(abs(p[0] - y), abs(p[1] - x)) == 1 for p, _ in self.visible_hostiles(lv)):
+                st.zoo_back_turn = t
+                return False                               # the one next to us: the fight steps, here
+            if t - st.zoo_back_turn <= ZOO_WAIT:
+                self.soko_stats["zoo_hold"] += 1
+                self.cur_act = "soko_zoo"
+                return self.soko_wait()                    # waiting for the awake ones to come through the door
+            st.zoo_back_turn = None
+            st.zoo_active.clear()                          # none came: they cannot -- fought where they stand
+        todo, closets = self.soko_zoo_todo(lv, st)
+        if not todo or here in todo:
+            return False                                   # soko_prize: pick up here / done
+        if active:
+            return False                                   # one awake next to us: the fight steps take it on
+        if c.hp < c.maxhp * ZOO_ENTER_HP and not active:
+            if here in inside:
+                self.soko_stats["zoo_back_rest"] += 1
+                self.cur_act = "soko_zoo"
+                return self.soko_step_to(lv, st, goal, bs, ts)
+            return False                                   # soko_prize rests outside the zoo
+        extra = bs - st.states[st.i][0]
+        nxt = self.soko_zoo_next(lv, st, here, todo, closets, bs, ts, extra)
+        if nxt is None:
+            return False                                   # soko_prize waits, then gives the rest up
+        return self.soko_zoo_step(lv, st, nxt, extra - st.real_extra)
 
     def soko_give_up(self, lv, st, why):
         if st is not None and not st.failed:
