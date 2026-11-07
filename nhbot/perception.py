@@ -56,6 +56,7 @@ class PerceptionMixin:
         self.peace_turned = 0          # looks that found a kind created peaceful hostile
         self.empty_looks = 0           # looks whose description came back empty
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
+        self._adjacent, self._adjacent_at = [], None     # adjacent_hostiles: the answer and (tick, steps, level) of it
 
     # ------------------------------------------------------------------ peacefulness
     def peace_class(self, idx):
@@ -213,6 +214,17 @@ class PerceptionMixin:
                 self.avoid_cells.append(pos)
 
     def adjacent_hostiles(self, lv):
+        """The hostiles next to us we may hit, [(pos, name)]; on the way avoid_cells (the never-melee monsters within 7
+        squares, and the remembered stationary ones) and Level.stationary are brought up to date. Worked out once per
+        observation -- again only once a key was sent (a look may send some): the steps of a tick that ask again
+        (items_gate) read the same answer."""
+        at = (self.tick_no, self.steps, lv.key)
+        if self._adjacent_at != at:
+            out = self.find_adjacent_hostiles(lv)
+            self._adjacent, self._adjacent_at = out, (self.tick_no, self.steps, lv.key)
+        return list(self._adjacent)
+
+    def find_adjacent_hostiles(self, lv):
         y, x = self.pos()
         g = self.obs["glyphs"]
         out = []

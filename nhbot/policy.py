@@ -5,7 +5,8 @@ True) ends the tick. A step that only updates bookkeeping returns False. The ord
 first, then fighting, then food and items, then exploring.
 """
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from functools import cached_property
 
 import numpy as np
 import nle.nethack as nh
@@ -65,6 +66,7 @@ STEPS = (
 @dataclass
 class Tick:
     """What every step of one tick sees."""
+    bot: object = field(repr=False)
     lv: Level
     y: int
     x: int
@@ -73,7 +75,11 @@ class Tick:
     maxhp: int
     hunger: int
     hostiles: list = None        # set by the perceive step
-    vis: list = None             # set by the housekeeping step (visible_hostiles)
+
+    @cached_property
+    def vis(self):
+        """The hostiles in view (visible_hostiles), read once a tick: by the first step that asks (housekeeping)."""
+        return self.bot.visible_hostiles(self.lv)
 
 
 class PolicyMixin:
@@ -102,7 +108,7 @@ class PolicyMixin:
             self.last_step = "level_arrival"
             return
         y, x = self.pos()
-        c = Tick(lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP), maxhp=self.bl(nh.NLE_BL_HPMAX),
+        c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP), maxhp=self.bl(nh.NLE_BL_HPMAX),
                  hunger=self.bl(nh.NLE_BL_HUNGER))
         for name, step in self.steps_by_name[1:]:
             if step(c):
@@ -423,7 +429,6 @@ class PolicyMixin:
         """No hostile in view: pay, shop visit, Excalibur, recover stolen loot, read good scrolls, wear armor,
         inspect the pile here. Hostiles in view but not in combat (pickup_calm): loot and the pile only."""
         lv, y, x = c.lv, c.y, c.x
-        c.vis = self.visible_hostiles(lv)
         if not c.vis:
             if self.need_pay:
                 self.need_pay = False
