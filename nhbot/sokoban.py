@@ -61,6 +61,7 @@ ZOO_BACKS = 5             # ... this many times a level at most; then they are f
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
+ZOO_UNSEEN_LEVEL = 7      # ... an unseen one ('I'): its level taken as an invisible stalker's (a black light: 5)
 ZOO_PEACE_TURNS = 50      # a square a look found a peaceful monster on stays closed to the zoo way this long
 ZOO_PEACE_WAIT_MAX = 300  # ticks waited with no way to what is left (peaceful monsters on it), before giving it up
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
@@ -114,6 +115,8 @@ class SokoLevel:
         self.zoo_last = frozenset()   # top level: squares of the hostiles in view on the last zoo tick (map) ...
         self.zoo_active = set()       # ... and of those awake: seen moving, or next to us when we were hurt
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
+        self.zoo_unseen = set()       # zoo way: squares where the map showed an unseen monster ('I') -- kept after the
+                                      # mark is gone (we stepped away); forgotten when we stand there or hit only air
         self.zoo_hp = None            # our HP on the last zoo tick
         self.zoo_back_turn = None     # turn we went back to the corridor last (a wait there follows: ZOO_WAIT)
         self.zoo_backs = 0            # times we went back to the corridor (ZOO_BACKS at most)
@@ -838,6 +841,9 @@ class SokobanMixin:
                     cost[p] = ZOO_KILL_COST + nh.permonst(nh.glyph_to_mon(int(g[mp]))).mlevel
         for p in mimics:
             cost[p] = ZOO_KILL_COST + 8                    # giant mimic: level 8
+        for p in st.zoo_unseen - {start}:
+            if cost.get(p, 1) == 1:                        # (one in view there now counts as itself)
+                cost[p] = ZOO_KILL_COST + ZOO_UNSEEN_LEVEL
         bs = bs - mimics
         free = lambda p: p in st.floor and p not in bs
         dist, prev = {start: 0}, {start: None}
@@ -894,6 +900,18 @@ class SokobanMixin:
                 st.real_extra.add(nxt)
             return True
         k = G.KIND[int(self.obs["glyphs"][mp])]
+        if nxt in st.zoo_unseen and k not in (G.MONSTER, G.PET):
+            # an unseen monster there (79016: bumped into one -- "Wait! There's something there you can't see!" --
+            # then walked into it again: a black light, it blew up, hallucination, the zoo around awake): attacked
+            # where we last knew it; only air there: it went, the square is free
+            seq = self.msg_seq
+            self.soko_stats["zoo_unseen_attack"] += 1
+            self.cur_act = "fight"
+            self.press("F")
+            self.press(DELTA2KEY[(mp[0] - y, mp[1] - x)])
+            if "thin air" in self.text_since(seq):
+                st.zoo_unseen.discard(nxt)
+            return True
         self.cur_act = "soko_zoo"
         if k == G.MONSTER:
             if self.peaceful_now(lv, mp):
@@ -954,6 +972,9 @@ class SokobanMixin:
             if st.zoo_hp is not None and c.hp < st.zoo_hp else set()
         st.zoo_active = (st.zoo_active & now) | moved | hit
         st.zoo_last, st.zoo_hp = now, c.hp
+        g = self.obs["glyphs"]
+        st.zoo_unseen |= {p for p in st.floor if G.KIND[int(g[st.to_map(p)])] == G.INVIS}
+        st.zoo_unseen.discard(st.from_map((y, x)))
         return [p for p in st.zoo_active if max(abs(p[0] - y), abs(p[1] - x)) <= ZOO_NEAR]
 
     def step_soko_zoo(self, c):
