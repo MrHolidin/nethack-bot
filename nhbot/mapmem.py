@@ -56,6 +56,7 @@ TRAP_MSGS = (("bear", ("A bear trap closes on your foot", "You are caught in a b
              ("web", ("You stumble into a spider web", "You are stuck to the web"),
               ("You disentangle yourself", "You tear through", "cuts through the web")))
 
+BARS_GLYPH = nh.GLYPH_CMAP_OFF + 17   # S_bars (iron bars)
 SHOP_MAX = 150                   # shk_marks_shop: a shop room is no bigger than this
 
 
@@ -290,6 +291,11 @@ class MapMixin:
             lv.grotto = int(lv.under[1, 3]) == UPSTAIR_GLYPH or any(
                 int(self.terrain_glyphs(lv)[p]) == FOUNTAIN_GLYPH for p in ((9, 52), (15, 12), (18, 68)))
         return lv.grotto
+
+    def is_orctown(self, lv):
+        """Orcish Town (mines.des minetn-1, Frontier Town overrun by orcs): the only Mines level with iron bars (its
+        walls' 'F', shown '#'). Its watch, priest and shopkeepers lie dead -- nobody minds a dug wall there."""
+        return lv is not None and lv.key[0] == 2 and bool((self.terrain_glyphs(lv) == BARS_GLYPH).any())
 
     def is_minetown(self, lv):
         """A Mines level with an altar, a fountain or a shop: Minetown (every variant has a temple altar;

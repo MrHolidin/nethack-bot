@@ -3,7 +3,8 @@ than 600 carried), a boulder that won't move (a monster or another boulder behin
 instead of shedding our things or giving the way up: one of the squeeze's two corners dug (dig.c: a wall or rock
 square becomes a passage; a wand of digging zapped that way), a boulder broken by the pick-axe / mattock applied
 at it (dig.c dig: "you hit the boulder with all your might" -- fracture_rock). Not in Sokoban (boulders are the
-puzzle), not on a Minetown level (the watch minds dug walls: dig.c watch_dig), not next to a shop (shopdig)."""
+puzzle), not on a Minetown level (the watch minds dug walls: dig.c watch_dig) but Orcish Town (all of them dead),
+not next to a shop (shopdig)."""
 import numpy as np
 
 from nhbot import glyphs as G
@@ -24,8 +25,10 @@ class DigThroughMixin:
     def dig_through_note(self, lv, here, target, kind):
         """A squeeze from here to target refused for our weight, or the boulder on target that won't move:
         a dig job if we can dig it open. True if one was set (the caller then neither sheds nor blocks)."""
-        if not self.opts.dig_through or lv is None or self.in_sokoban(lv) or self.is_minetown(lv) \
-                or self.minetown_rooms(lv):
+        if not self.opts.dig_through or lv is None or self.in_sokoban(lv):
+            return False
+        orcs = self.is_orctown(lv)                     # Orcish Town: its watch is dead -- dug there too
+        if not orcs and (self.is_minetown(lv) or self.minetown_rooms(lv)):
             return False
         means = self.dig_means()
         if means is None or (kind == "boulder" and means[0] == "wand"):
@@ -35,11 +38,11 @@ class DigThroughMixin:
         else:
             corners = [(here[0], target[1]), (target[0], here[1])]
             k = self.kinds(lv)
-            corners = [c for c in corners if k[c] in (G.WALL, G.UNKNOWN) and self.dig_ok(lv, c)]
+            corners = [c for c in corners if k[c] in (G.WALL, G.UNKNOWN) and (orcs or self.dig_ok(lv, c))]
             if not corners:
                 return False
             sq = corners[0]
-        if (lv.key, sq) in self.dig_given_up or not self.dig_ok(lv, sq):
+        if (lv.key, sq) in self.dig_given_up or not (orcs or self.dig_ok(lv, sq)):
             return False
         self.dig_job = (lv.key, here, sq, kind, 0)
         self.dig_note_stat("planned_" + kind)

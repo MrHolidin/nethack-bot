@@ -36,7 +36,8 @@ DEFAULTS = {
                                #      (both ways), not its square -- reached straight from another side it is open
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
-                               #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban / Minetown / by shops
+                               #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
+                               #      Orcish Town: its watch is dead), by shops
     "trap_noblock": False,     # A/B: a step that failed but took a turn (held by a trap, ...) counts against no square
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
