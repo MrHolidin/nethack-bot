@@ -135,6 +135,8 @@ class SokoLevel:
         self.zoo_hp = None            # our HP on the last zoo tick
         self.zoo_back_turn = None     # turn we went back to the corridor last (a wait there follows: ZOO_WAIT)
         self.zoo_backs = 0            # times we went back to the corridor (ZOO_BACKS at most)
+        self.zoo_exit_held = False    # the hunt over: back at the goal square, the hold there for what follows begun
+        self.zoo_exit_done = False    # ... and over: soko_leave from there
         self.zoo_peace_waits = 0      # ticks waited with every way closed by peaceful monsters
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
@@ -1016,15 +1018,18 @@ class SokobanMixin:
         return True
 
     def soko_zoo_level(self, lv):
-        """Our Sokoban top level with the plan done, the prize hunt on and the zoo's door open: its SokoLevel, else
-        None."""
-        if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_done or self.soko_failed \
-                or self.soko_prize_named:
-            return None                                    # (the prize ours: soko_prize leaves)
+        """Our Sokoban top level with the plan done and the zoo's door open, the prize hunt on -- or over (the
+        prize ours, or every place looked into) and we not yet back out at the goal square with the hold there done:
+        the zoo's rules hold on the way out too (79003, 79009, 79011, 79123, 79244 died 14-42 turns after the prize,
+        walking out through the woken zoo by soko_leave). Its SokoLevel, else None."""
+        if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_failed:
+            return None
         st = self.soko.get(lv.key)
         if st is None or not st.solved or st.lv["up"] is not None or st.zoo_door is None \
                 or self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED:
             return None                                    # (levels 2 and 3 have a locked door too: no zoo)
+        if (self.soko_done or self.soko_prize_named) and st.zoo_exit_done:
+            return None                                    # out: soko_leave
         return st
 
     def soko_zoo_track(self, lv, st, c):
@@ -1111,6 +1116,18 @@ class SokobanMixin:
             st.zoo_active.clear()                          # none came: they cannot -- fought where they stand
         if active and self.soko_zoo_fight(active):
             return True                                    # one awake next to us: fought first, not the sleeper on the way
+        if self.soko_done or self.soko_prize_named:
+            # the hunt over: out to the goal square by the zoo way, then the hold there (what follows comes through
+            # the door one at a time), then soko_leave
+            if here == goal:
+                if not st.zoo_exit_held:
+                    st.zoo_exit_held = True
+                    st.zoo_back_turn = t
+                    return self.soko_wait()
+                st.zoo_exit_done = True
+                return False
+            self.soko_stats["zoo_exit"] += 1
+            return self.soko_zoo_to(lv, st, here, goal, bs, ts)
         # from here on soko_prize, not the fight steps, has the turn: those attack whatever sleeps next to us
         # (79016: at a pile in the zoo a panther, then a zruty beside it, at the door a rope golem -- woken, they
         # mauled it, four retreats)
