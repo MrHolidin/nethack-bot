@@ -140,7 +140,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.hist = deque()
         self.no_eat_until = 0
         self.shops_seen = 0
-        self.shops_from_keeper = 0   # mapmem.shop_from_keeper: shops marked from a shopkeeper in view
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0
         self.desperations = 0
         self.vault_drop = False
@@ -295,15 +294,15 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "quaffs": self.quaffs, "unihorn": dict(self.horn_stats),
             "maps_read": self.maps_read,
             "pet_waited": self.pet_waited_total,
-            "zaps": self.zaps, "zap_stats": dict(self.zap_stats), "wishes": self.wishes, "wishing": dict(self.wish_stats), "ray_risk": {"counts": dict(self.ray_risk_stats), "log": self.ray_risk_log}, "wand_pwin_log": self.wand_pwin_log, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "flee": dict(self.flee_stats), "descent_rest": sum(self.descent_rest.values()), "revisit": dict(self.revisit_stats), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "protection": dict(self.prot_stats, ac=self.prot_bought), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),
-            "thefts": self.thefts, "gold_flow": dict(self.gold_flow), "thief_stats": dict(self.thief_stats), "poly": dict(self.poly_stats), "gold_by_xl": self._gold_xl,
+            "zaps": self.zaps, "zap_stats": dict(self.zap_stats), "wishes": self.wishes, "wishing": dict(self.wish_stats), "ray_risk": {"counts": dict(self.ray_risk_stats), "log": self.ray_risk_log}, "wand_pwin_log": self.wand_pwin_log, "wandid": dict(self.wandid_stats), "danger": self.danger_summary(), "descent_rest": sum(self.descent_rest.values()), "tins": dict(self.tin_stats), "altar": dict(self.altar_stats), "protection": dict(self.prot_stats, ac=self.prot_bought), "quaff_test": dict(self.quaff_stats), "jewelry": dict(self.jewelry_stats), "browse": dict(self.browse_stats), "gift": self.gift_stats, "tins_eaten": dict(self.tin_eaten_by),
+            "thefts": self.thefts, "gold_flow": dict(self.gold_flow), "poly": dict(self.poly_stats), "gold_by_xl": self._gold_xl,
             "gold_bag": dict(self.bag_stats, in_bag=self.bag_gold),
             "elb_engraves": self.elb_engraves,
             "elb_misspelled": self.elb_misspelled,
             "elb_fail": self.elb_fail,
             "focus_calls": self.focus_calls, "focus_picks": self.focus_picks,
             "boxes": dict(self.box_stats, welded=self.swap_welded),
-            "enchant": dict(self.enchant_stats, log=self.enchant_log), "scrolls": dict(self.scroll_stats), "force_read": self.force_read_log, "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
+            "enchant": dict(self.enchant_stats, log=self.enchant_log), "scrolls": dict(self.scroll_stats), "snaps": self.snaps, "price_memory": dict(self.price_stats, appearances=self.price_report()),
 
             "blind_waits": self.blind_waits, "hallu_waits": self.hallu_waits, "poison_res": self.poison_res, "shop_kicks_avoided": self.shop_kicks_avoided,
 
@@ -320,13 +319,13 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "deadly_prayers": self.deadly_prayers,
             "pray_failed": self.pray_failed,
             "stun_waits": self.stun_waits,
-            "nymph_kills": self.nymph_kills, "nymph_zaps": dict(self.nymph_zap_stats),
+            "nymph_kills": self.nymph_kills,
             "loot_pickups": self.loot_pickups,
             "rewields": self.rewields,
             "excalibur": self.excal_turn,
             "dips": self.dips,
             "excal_trips": self.excal_trips,
-            "dip_events": self.dip_events, "fountain_elb": dict(self.fhide_stats), "backup_weapon": dict(self.backup_stats),
+            "dip_events": self.dip_events,
             "fountain_levels": len(self.fountain_levels),
             "align": int(self.last_bl[nh.NLE_BL_ALIGN]),
             "ammo_pickups": self.ammo_pickups,
@@ -345,14 +344,14 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "ac": self.bl(nh.NLE_BL_AC),
             "worn": [e[2] for e in self.equip_events if e[1] == "wear"],
             "equip_fail": sum(1 for e in self.equip_events if e[1] == "fail"),
-            "shops": self.shops_seen, "shops_from_keeper": self.shops_from_keeper,
+            "shops": self.shops_seen,
             "desperate": self.desperations,
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "vault": [self.vault_drops, self.vault_moves, self.vault_approach, self.vault_bag_outs], "vault_rob": dict(self.vault_stats), "dig_through": dict(self.dig_stats), "lock_tools": dict(self.lock_stats), "stun_peace_waits": self.stun_peace_waits,
             "items_first": self.items_first_holds,
             "search_log": self.search_log, "search_v2": dict(self.search_v2_stats),
             "mines_return_descents": self.mines_return_descents,
-            "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,
+            "peaceful_waits": self.peaceful_waits,
             "msg_audit": dict(self.msg_audit),
             "farlooks": self.farlooks,
             "peaceful_hits": dict(self.peaceful_hits),

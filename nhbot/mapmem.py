@@ -65,7 +65,6 @@ TOWN_SOUNDS = ("cursing shoplifters", "chime of a cash register", "Neiman and Ma
                "strident plea for donations", "carcass being offered in sacrifice", "someone praising",
                "someone beseeching", "bubbling water", "water falling on coins", "splashing of a naiad",
                "a soda fountain", "a slow drip", "a gurgling noise", "dishes being washed")
-SHOP_MAX = 150                   # shk_marks_shop: a shop room is no bigger than this
 
 
 class Level:
@@ -82,7 +81,6 @@ class Level:
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.shop_anchors = []     # [door, square we came from (outside), closed] of each greeting (shop_regrow)
-        self.lep_shut = np.zeros((ROWS, COLS), dtype=bool)   # lep_hall: a room of leprechauns, closed from outside
         self.grotto = False        # Grotto Town (is_grotto)
         self.town_heard = False    # Minetown told before seen: heard (minetown_sounds), warned by the watch
                                    # (minetown_watch), its watch / priest / shopkeeper in view (minetown_folk)
@@ -100,16 +98,10 @@ class Level:
         self.last_reset = 0   # downstairs leading into the Gnomish Mines
         self.entered_turn = None
         self.entered_xl = None     # experience level at the first arrival (stats)
-        self.unexplored = False    # the last explore step here walked toward a frontier we can reach
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
         self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
         self.altar_align = {}      # sacrifice: altar square -> its alignment, read on stepping there
         self.stationary = {}       # square -> a never-melee monster that never moves, seen there
-        self.peace_shut = {}       # peace_shut: square -> turn until which it is closed (a peaceful stood there)
-        self.peace_waits = {}      # peace_shut: square -> waits for a peaceful monster standing on it
-        self.squeeze_shut = set()  # squeeze_plan: (from, to) diagonal squeezes refused for our weight, both ways
-        self.squeeze_dead = set()  # squeeze_edge: (from, to) diagonal squeezes that stay refused, both ways (for good)
-        self.squeeze_fail = {}     # squeeze_edge: (from, to) -> refusals
         self.not_stairs = set()    # squares where the game said there is no staircase
         self.kill_piles = set()    # squares where we killed a monster that may carry things (monsters.CARRIERS)
         self.elbereth = set()     # positions where we engraved
@@ -160,8 +152,6 @@ class MapMixin:
             # visit) locked us in, since shop squares are impassable from outside. Next to the shop and
             # neither door nor corridor means inside it.
             lv.shop[y, x] = True
-        if self.opts.shk_marks_shop:
-            self.shop_from_keeper(lv)
         self.max_depth = max(self.max_depth, self.bl(nh.NLE_BL_DEPTH))
         pc = int(lv.seen.sum()) + int((lv.visited > 0).sum())
         if pc > lv.progress_count:
@@ -203,13 +193,6 @@ class MapMixin:
         shut = self.vault_shut.get(lv.key)
         if shut and self.pos() not in shut:
             p[tuple(zip(*shut))] = False      # a vault we left -- no walk back in (the guard's count)
-        if self.opts.lep_hall and not lv.lep_shut[self.pos()]:
-            p[lv.lep_shut] = False
-        if self.opts.peace_shut:
-            t = self.turn()
-            for sq, until in lv.peace_shut.items():
-                if until > t:
-                    p[sq] = False
         if self.opts.sokoban and self.in_sokoban(lv) and not (self.soko_failed or self.soko_done):
             # Sokoban: no other walk may push a boulder out of the plan or step into a pit / hole
             p[(k_mem == G.BOULDER) | (k_live == G.BOULDER) | (k_mem == G.TRAP)] = False
@@ -224,34 +207,6 @@ class MapMixin:
         k = G.KIND[g]
         ok = np.isin(k, [G.FLOOR, G.OBJECT, G.GOLD, G.CORPSE, G.TRAP, G.BOULDER]) & ~np.isin(g, list(CORRIDOR_GLYPHS))
         return ok & ~lv.door_seen                   # a door under an item is not shop floor
-
-    def shop_from_keeper(self, lv):
-        """shk_marks_shop: we stand in an unmarked room with a shopkeeper in view -- a shop we got into without
-        the greeting at its door (a mimic in the doorway, a fall, a teleport): mark the room, as mark_shop does
-        from the door. Only from inside (marked squares are closed to us from outside, and from the door the
-        greeting does it), only a closed room of at most SHOP_MAX squares with the shopkeeper in it."""
-        me = self.pos()
-        if lv.shop[me] or lv.door_seen[me]:
-            return
-        g = self.obs["glyphs"]
-        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-        keepers = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "shopkeeper"]
-        if not keepers:
-            return
-        ok = self.shop_floor(lv)
-        ok[me] = True
-        for p in keepers:
-            ok[p] = True
-        room = self._flood(ok, [me], cap=SHOP_MAX + 1)
-        if len(room) > SHOP_MAX or not any(p in room for p in keepers):
-            return
-        k = self.kinds(lv)
-        for cy, cx in room:                         # closed: nothing unexplored right next to it
-            if (k[max(0, cy - 1):cy + 2, max(0, cx - 1):cx + 2] == G.UNKNOWN).any():
-                return
-        for c in room:
-            lv.shop[c] = True
-        self.shops_from_keeper += 1
 
     def mark_shop(self, lv, door):
         came = self._cur_pos          # map memory is not updated yet for the door square
@@ -383,12 +338,8 @@ class MapMixin:
             self.squeeze_stats["refused"] += 1
             if self.dig_through_note(lv, self.pos(), self.last_move_target, "squeeze"):
                 pass                                          # dig_through: a corner dug instead of shedding
-            elif self.opts.squeeze_plan and self.squeeze_target != (lv.key, self.pos(), self.last_move_target):
-                a, b = self.pos(), self.last_move_target      # explore round it first (explore.squeeze_open_step)
-                lv.squeeze_shut |= {(a, b), (b, a)}
-                self.squeeze_stats["shut"] += 1
             else:
-                self.squeeze_pending = (lv.key, self.last_move_target, self.pos())
+                self.squeeze_pending = (lv.key, self.last_move_target)
         elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",
                 "Perhaps that's why you cannot move past it",

@@ -54,7 +54,6 @@ class PerceptionMixin:
         self.peaceful_hits = Counter() # species: attacks on us by a monster we took for peaceful
         self.peace_turned = 0          # looks that found a kind created peaceful hostile
         self.empty_looks = 0           # looks whose description came back empty
-        self.peace_shut_count = 0          # peace_shut: squares closed after waiting for a peaceful monster on them
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
 
     # ------------------------------------------------------------------ peacefulness

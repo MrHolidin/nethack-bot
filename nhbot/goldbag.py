@@ -2,22 +2,14 @@
 loose (steal.c stealgold: findgold(invent)), not what is in a container -- and taken back out in a shop, where it
 pays. One bag that is not a bag of tricks is needed (carry.py: never sold, never dropped)."""
 
-import re
 from collections import Counter
 
-import numpy as np
 import nle.nethack as nh
 
 from nhbot.game import MENU_ITEM_GOLD_RE
 
 BAG_WORDS = ("bag", "sack")
 BAG_RANK = ("holding", "oilskin", "sack")      # the bag used: the first of these we carry, else a plain "bag"
-BAG_PRICE_RE = re.compile(r"for sale, (\d+) zorkmids?")
-# the four bags look alike ("bag", objects.c): sack, oilskin sack, bag of holding, bag of tricks
-BAG_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
-for _g in range(nh.MAX_GLYPH):
-    if nh.glyph_is_object(_g) and nh.OBJ_DESCR(nh.objclass(nh.glyph_to_obj(_g))) == "bag":
-        BAG_GLYPH[_g] = True
 
 
 class GoldBagMixin:
@@ -59,43 +51,6 @@ class GoldBagMixin:
             return False
         self.bag_stats["unload_before_drop"] += 1
         return self.bag_take_out(bag)
-
-    def bag_buy_step(self, lv):
-        """bag_buy, on a shop visit (shop.shop_step), no bag of ours to use and nothing unpaid: a bag for sale we
-        can pay for -- the cheapest (a 2-zorkmid one is a sack, never a bag of tricks) -- picked up (paid for
-        by shop_buy_step); bags whose tags we have not read: walked onto. True if it acted."""
-        if not self.opts.bag_buy or self.gold_bag() is not None or any("unpaid" in it.text for it in self.items()):
-            return False
-        gold = int(self.bl(nh.NLE_BL_GOLD))
-        here = self.pos()
-
-        is_bag = lambda t: any(w in t for w in BAG_WORDS) and "tricks" not in t
-
-        def price(t):                                     # a line of the pick-up menu
-            m = BAG_PRICE_RE.search(t)
-            return int(m.group(1)) if m and is_bag(t) else None
-
-        offers = {}                                       # square -> cheapest affordable bag there
-        for (k, p), tags in self.for_sale.items():
-            ok = [pr for t, pr in tags.items() if is_bag(t) and pr <= gold]
-            if k == lv.key and lv.shop[p] and ok:
-                offers[p] = min(ok)
-        if offers:
-            best = min(offers, key=lambda p: (offers[p], max(abs(p[0] - here[0]), abs(p[1] - here[1]))))
-            if here == best:
-                self.cur_act = "buy_bag"
-                taken = []
-                self.pickup(lambda t: not taken and price(t) == offers[best] and not taken.append(t), "buy_bag")
-                self.for_sale.pop((lv.key, here), None)
-                self.shop_browsed.add((lv.key, here))     # not walked onto again to read its tag
-                got = any("unpaid" in it.text and any(w in it.text for w in BAG_WORDS) for it in self.items())
-                self.bag_stats["picked_up_for_sale" if got else "not_lifted"] += 1   # too heavy: Burdened
-                return True
-            mask = np.zeros(lv.under.shape, dtype=bool)
-            mask[best] = True
-            if self.walk_to(lv, mask, act="buy_bag")[0] == "moved":
-                return True
-        return self.browse_step(lv, BAG_GLYPH, "buy_bag_browse")
 
     def bag_open(self, bag):
         """Apply the bag: True if its "Do what with ..." menu is up. A bag that gives none (a bag of tricks

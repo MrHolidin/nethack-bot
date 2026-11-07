@@ -12,8 +12,6 @@ from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 # Grotto Town (mines.des minetn-5, map (x, y) on screen (y, x + 2)): its down staircase lies behind the locked
 # door at map (50, 6) in every one of its terrain variants; the way to that door has closed doors only
 GROTTO_STAIR_DOOR = (6, 52)
-PEACE_SHUT_WAITS = 5     # peace_shut: waits for a peaceful monster on a square of our path ...
-PEACE_SHUT_TURNS = 200   # ... close the square for this many turns
 
 
 def line_clear(k_mem, glyphs, y, x, dy, dx, d):
@@ -63,11 +61,9 @@ class PathPrev:
 
 
 class NavMixin:
-    def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True,
-                 shut=True):
+    def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True):
         """Shortest paths from start: (dist array or None without want_dist, prev, the first target square
-        reached or None). Stops at the first square of targets_mask popped, or past max_cost. squeeze_plan: the
-        diagonal squeezes refused for our weight (Level.squeeze_shut) are not taken, unless shut is False."""
+        reached or None). Stops at the first square of targets_mask popped, or past max_cost."""
         cost = _STEP_COST[k_mem]
         cost[(k_live == G.BOULDER) & (k_mem != G.TRAP)] = 15
         for p in lv.locked:
@@ -81,8 +77,6 @@ class NavMixin:
         # an item on a door hides it from k_mem: the doors remembered and the refused diagonals count too
         _pad_door[1:-1, 1:-1] = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
         door = _pad_door.ravel().tolist()
-        edges = (lv.squeeze_shut if shut else set()) | lv.squeeze_dead
-        blocked = {((a[0] + 1) * _W + a[1] + 1, (b[0] + 1) * _W + b[1] + 1) for a, b in edges} if edges else None
         tm = None
         if targets_mask is not None:
             _pad_target[1:-1, 1:-1] = targets_mask
@@ -107,7 +101,7 @@ class NavMixin:
             for off, diag in _STEPS:
                 j = i + off
                 c = cost[j]
-                if c < 0 or (diag and (di or door[j] or (blocked and (i, j) in blocked))):
+                if c < 0 or (diag and (di or door[j])):
                     continue
                 nd = d + c
                 if nd < dist[j]:
@@ -199,20 +193,11 @@ class NavMixin:
             return
         if G.KIND[self.obs["glyphs"][target]] == G.MONSTER and self.peaceful_now(lv, target):
             # a peaceful monster in the way: wait for it to move (a shopkeeper in a doorway may never move;
-            # making the square impassable for good after a few waits was tried and not taken; peace_shut closes
-            # it for a while -- peaceful_waits counts)
+            # making the square impassable for good after a few waits was tried and not taken -- peaceful_waits
+            # counts)
             lv.fail[ty, tx] += 1
             self.peaceful_waits += 1
             self.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
-            if self.opts.peace_shut:
-                lv.peace_waits[target] = lv.peace_waits.get(target, 0) + 1
-                if lv.peace_waits[target] >= PEACE_SHUT_WAITS:
-                    # the peaceful one may never move (a shopkeeper keeping out an invisible customer, a gnome
-                    # king in a dead end: 80011, 80004 starved there): the square closed for a while, the rest of
-                    # the level explored meanwhile
-                    lv.peace_shut[target] = self.turn() + PEACE_SHUT_TURNS
-                    lv.peace_waits[target] = 0
-                    self.peace_shut_count += 1
             self.press("s")
             return
         seq0 = self.msg_seq
@@ -225,15 +210,6 @@ class NavMixin:
         if self.opts.door_resists and "The door resists!" in self.text_since(seq0):
             self.door_stats["resisted"] += 1    # lock.c doopen: a stuck door, opened with P ~ (Str+Dex+Con)/3 in 20 a try
             return                                # -- try again; not the square's fault (80014: left after two)
-        if self.opts.squeeze_plan and "carrying too much to get through" in self.text_since(seq0):
-            return                    # refused for our weight, not the square's fault (explore.squeeze_open_step)
-        if self.opts.squeeze_edge and "carrying too much to get through" in self.text_since(seq0):
-            edge = ((y, x), target)
-            lv.squeeze_fail[edge] = lv.squeeze_fail.get(edge, 0) + 1
-            if lv.squeeze_fail[edge] >= 6:                # squeeze_edge: the diagonal step shut, not the square
-                lv.squeeze_dead |= {edge, (target, (y, x))}
-                self.squeeze_stats["edge_shut"] += 1
-            return
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
             if self.trapped is not None and self.trapped[1:] == (lv.key, (y, x)) and after[2] > before[2]:
                 # in the trap we were caught in, the step took its turn: held, for however long -- the square is not

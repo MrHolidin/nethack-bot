@@ -32,8 +32,6 @@ FOOD_NUTRITION = {"food ration": 800, "cram ration": 600, "lembas wafer": 800, "
                   "clove of garlic": 40, "meatball": 5, "meat stick": 5, "huge chunk of meat": 2000,
                   "meat ring": 5, "lichen corpse": 200, "lizard corpse": 40, "tripe ration": 200, "egg": 80}
 
-EAT_BEES = ("killer bee", "scorpion")    # eat_bees: poisonous, but the surest poison resistance
-
 
 class SurvivalMixin:
     def survival_init(self):
@@ -142,9 +140,6 @@ class SurvivalMixin:
             return True
         if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res:
             return True                       # poison resistant: a poisonous corpse is ordinary food
-        if self.opts.eat_bees and name in EAT_BEES:
-            return hp > 20                    # eat_bees: poison resistance 1 in 4 + level/15 (eat.c should_givit);
-            #                                   the poison (4 in 5: -1..4 Str, 1..15 HP) is mended by restore_fix
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > 20
         return True
@@ -152,9 +147,9 @@ class SurvivalMixin:
     def eat_corpse_here(self):
         self.press("e", expect_prompt=True)
         m = self.message().lower()
-        # "There is a jackal corpse here; eat it?" / "There are 2 jackal corpses here; eat one?" (eat.c floorfood);
-        # without eat_plural the second one is answered no (settle)
-        if self.obs["misc"][0] and ("corpse here" in m or self.opts.eat_plural and "corpses here" in m):
+        # "There is a jackal corpse here; eat it?" / "There are 2 jackal corpses here; eat one?" (eat.c floorfood):
+        # the second one is answered no (settle)
+        if self.obs["misc"][0] and "corpse here" in m:
             name = re.search(r"there (?:is|are) (?:an? |\d+ )?(.+?) corpses? here", m)
             kind = name.group(1) if name else None
             if kind and kind.startswith("partly eaten "):

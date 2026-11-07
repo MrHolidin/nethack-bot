@@ -26,6 +26,7 @@ def buc_key(text):
 
 PROTECTION_MAX = 9           # priest.c priest_talk: below this much protection a donation of 400*XL always adds
 PROTECTION_TRIES = 6         # donations at most on one level (one that didn't pay: something we don't see is off)
+PROTECTION_BUYS = 1          # protection bought at most this many times (A/B buy_protection +40 [-155, +258])
 
 
 class AltarMixin:
@@ -42,17 +43,15 @@ class AltarMixin:
     def protection_step(self, lv):
         """Buy protection from a temple priest (priest.c priest_talk): a donation of 400 * XL (below 600 * XL)
         gives 2-4 points of AC the first time, one more each time after, every time while the protection is below
-        PROTECTION_MAX -- buy_protection times at most; gold in our bag is taken out for it. Only on a level where we entered his temple (out of it he takes a chat for an insult and
+        PROTECTION_MAX -- PROTECTION_BUYS times at most; gold in our bag is taken out for it. Only on a level where we entered his temple (out of it he takes a chat for an insult and
         turns hostile), with the gold for it, nothing threatening us (the caller checks): to a square next to him,
         #chat, offer. True if it used the turn."""
-        if not self.opts.buy_protection:
-            return False
         new = self.msgs_since(self._temple_seq) if self._temple_seq else []
         self._temple_seq = self.msg_seq
         if any("enter a sacred place" in m for m in new):
             self.temple_levels.add(lv.key)
         if lv.key not in self.temple_levels or self.prot_bought >= PROTECTION_MAX \
-                or self.prot_stats["bought"] >= int(self.opts.buy_protection) \
+                or self.prot_stats["bought"] >= PROTECTION_BUYS \
                 or self.prot_tries[lv.key] >= PROTECTION_TRIES \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_HALLU | nh.BL_MASK_CONF
                                                              | nh.BL_MASK_STUN):

@@ -8,39 +8,15 @@ DEFAULTS = {
     # ---- off by default (accepted features are plain behaviour, not options)
     "sacrifice": False,        # A/B: a neutral hero offers fresh corpses of its kills at a neutral altar, carried there
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
-    "peace_shut": False,       # A/B: PEACE_SHUT_WAITS waits for a peaceful monster on a square of our path close it
-                               #      for PEACE_SHUT_TURNS turns (nav.move, mapmem.passable_grid)
-    "lep_hall": False,         # A/B: 3+ leprechauns in view and no other hostile: their room closed to us from outside
-                               #      like a shop (nhbot.thieves.lep_hall_mark, mapmem.passable_grid)
-    "no_dagger_need": False,   # A/B: daggers are not needed (carry.needed): valued at their price like any loot, sold
-    "bag_buy": False,          # A/B: gold_bag and no bag of ours: the cheapest bag for sale we can pay for is bought (nhbot.goldbag)
-    "lep_nogold": False,       # A/B: no gold picked up (nor gone for) on the floor of a leprechaun hall until it is cleared (nhbot.thieves)
-    "lep_stash": False,        # A/B: a leprechaun hall in view: our gold dropped out of its sight first (taken back once no
-                               #      leprechaun is in view); next to us, the leprechaun we hit last is hit on (nhbot.thieves)
-    "lep_drop": False,         # A/B: a leprechaun in view: drop our gold where we stand, fight; take it back once none
-                               #      is in view (nhbot.thieves.lep_step)
-    "menu_gold": False,        # A/B: item menus (pick up, ...) take gold's "$ - ..." line too: gold lying with other things is picked up
-    "buy_protection": 1,       # A/B +40 [-155, +258]: buy AC from a temple priest, 400 * XL gold a time while below 9,
-                               #      this many times (an int; True: once) (nhbot.altar)
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "soko_xl": 0,              # with sokoban: up into it only from this experience level on (0: any)
-    "soko_zoo": True,          # with sokoban: open the top level's zoo for the prize (False: the four puzzles only --
-                               #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
-    "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step
-                               #      (both ways), not its square -- reached straight from another side it is open
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
                                #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
                                #      Orcish Town: its watch is dead), by shops
-    "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
-                               #      nothing else is left to walk to past it, stand at it and shed a unit per
-                               #      refusal till through (explore.squeeze_open_step); "stairs": that only while
-                               #      the level's up or down staircase is unknown
-    "force_read": None,        # experiments: a scroll type ("destroy armor", control "blank paper") read once, the first
-                               #      time it is safe (nhbot.scrolls.force_read_step)
     "stair_refuse": False,     # A/B: "You can't go down here" clears a staircase remembered in the terrain layer under an
                                #      item too (not only a shown one): no '>' pressed again and again for no time
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
@@ -50,43 +26,6 @@ DEFAULTS = {
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
-    "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read
-                               #      its price tag (nhbot.pricemem)
-    "eat_bees": False,         # A/B: killer bee / scorpion corpses eaten without poison resistance (HP > 20): the surest way to get it
-    "restore_fix": False,      # A/B: a known potion of restore ability is kept and drunk when an attribute fell below its best
-    "backup_weapon": False,    # A/B: lawful without Excalibur -- the weapon that hits hardest now is wielded (and kept)
-                               #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
-    "fountain_rehide": False,  # A/B (with fountain_elb): leaving the level after a hide, caught by what beats us --
-                               #      Elbereth written there, a hide again, then on our way (not a fight)
-    "fountain_retreat": False, # A/B (with fountain_elb): the Elbereth square taken by what the dip brought out -- the
-                               #      new one on the first step of our way off the level, not the one fewest are next to
-    "fountain_stay": False,    # A/B (with fountain_elb, fountain_rehide): after a hide the level is not left -- its other
-                               #      fountains are still dipped (nothing in view), caught on the way: a hide again
-    "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
-                               #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
-    "cloak_cover": "uncursed", # A/B +862 [-5, +1787] (True: +662 [-678, +1971]): a cloak over an empty cloak slot
-                               #      counts CLOAK_COVER AC more (it takes destroy armor and erosion for the suit); mummy
-                               #      wrapping, orcish / dwarvish cloak are worn -- True: any of them, "uncursed": only
-                               #      one known uncursed / blessed
-    "quaff_test": "explored",  # (with keep_100, hallu_wait, quaff_no_peace: A/B q2_v1 on seeds 81000 -1083 [-2216, +113]) drink an unknown potion of the 100 zm group on Elbereth when calm (nhbot.potiontest);
-                               #      "explored": only on a level explored (mapmem.Level.explored)
-    "eat_plural": False,       # A/B: "There are 2 jackal corpses here; eat one?" is answered as for one corpse (else no)
-    "read_explored": False,    # A/B: untested scrolls are read only on a level explored (mapmem.Level.explored)
-    "revisit_up": False,       # A/B: before going down, climb back to the level above if we fell past it or left
-                               #      it with a reachable frontier (hole, trap door, teleport)
-    "elb_full_rest": False,    # A/B: leave Elbereth with nobody in view only at elb_exit HP too (else 60%)
-    "flee": False,             # A/B: P(death this turn) > 50%: get away (Elbereth first if not faster), then rest on
-                               #      Elbereth; "stairs": away to the up staircase, climb, rest next to it above
-    "nymph_wands": False,      # A/B: attack wands at thieves in line (sleep first); a ray only when P(it comes back
-                               #      and hits us) < 10% (nhbot.rays)
-    "elb_pwin": False,         # A/B: write Elbereth when P(we win the fight with the adjacent ones) < 50% (danger.py
-                               #      win_prob) instead of HP < elb_hp
-    "elb_shot_seen": False,    # A/B: a weapon user blocks Elbereth only within ELB_SHOT_TURNS of a missile or zap
-                               #      message (combat.RTHREAT_RE), else it doesn't
-    "shk_marks_shop": False,   # A/B: standing in an unmarked room with a shopkeeper in view marks it as a shop
-                               #      (mapmem.shop_from_keeper)
-    "box_dagger_any": False,   # A/B: force a lock with any dagger we carry (known uncursed first),
-                               #      not only the alternate weapon (nhbot.boxes.box_opener)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP

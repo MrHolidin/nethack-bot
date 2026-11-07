@@ -688,10 +688,6 @@ class SokobanMixin:
                 self.press("<")
                 return True
             return self.soko_step_to(lv, st, goal, bs, ts, extra) or self.soko_wait()
-        if not self.opts.soko_zoo:
-            self.soko_done = True
-            self.soko_stats["zoo_skipped"] += 1
-            return self.soko_leave(lv, st)
         return self.soko_prize(lv, st, bs, ts, extra)
 
     def soko_prize(self, lv, st, bs, ts, extra):

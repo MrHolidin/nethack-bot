@@ -19,7 +19,7 @@ mean damage and P(death) against what the next turn did.
 """
 import re
 from bisect import bisect_right
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 import numpy as np
 import nle.nethack as nh
@@ -27,11 +27,9 @@ import nle.nethack as nh
 from nhbot.carry import WEAPON_NAME_OF
 from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name, erosion
-from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
-from nhbot.weapons import SKILL_DMG, SKILL_HIT
 from nhbot.rays import RAY_RESIST, our_protection, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
@@ -53,11 +51,8 @@ MON_INDICES = {}                         # name -> every kind of that name (a we
 for _i in range(nh.NUMMONS):
     MON_INDICES.setdefault(nh.permonst(_i).mname, []).append(_i)
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
-FLEE_P = 0.5                     # flee: P(death this turn) above this
 WIN_SIMS = 200                   # win_prob: sampled fights
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
-FLEE_TURNS = 100                 # flee: give up getting away after this long
-FLEE_DIST = 3                    # flee: toward a square at least this far (Chebyshev) from every hostile in view
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
 P_EDGES = (0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.01)
 
@@ -122,9 +117,6 @@ class DangerMixin:
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
         self.hit_seen = False                    # this tick: a melee hit of ours
         self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
-        self.flee_stats = Counter()
-        self.flee_mode = None                    # flee: (level key, give-up turn) while getting away
-        self.flee_arrive = None                  # flee 'stairs': (level key we left, turn) just after climbing
         self.danger_mean = defaultdict(lambda: [0, 0.0, 0.0])    # bin -> [n, sum predicted, sum actual]
         self.danger_p = defaultdict(lambda: [0, 0.0, 0])         # bin -> [n, sum predicted, deaths]
 
@@ -195,11 +187,10 @@ class DangerMixin:
         return pmf, 1 - (1 - inst) ** (k + frac / 12)
 
     # ------------------------------------------------------------ our attack: it may die before it acts
-    def our_weapon(self, it=False):
+    def our_weapon(self):
         """(weapon type or None, enchantment, (to-hit die, damage die) of an artifact's attack bonus) of the weapon
-        in hand -- or of item it (None: bare hands)."""
-        if it is False:
-            it = next((i for i in self.items() if i.wielded), None)
+        in hand."""
+        it = next((i for i in self.items() if i.wielded), None)
         if it is None:
             return None, 0, (0, 0)
         _, ench, name = base_name(it.text)
@@ -208,16 +199,13 @@ class DangerMixin:
         name = WEAPON_NAME_OF.get(name, name)
         return (name if name in WEAPON_DICE else None), (ench or 0), (0, 0)
 
-    def our_hit_prob(self, name, weapon=False):
-        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20).
-        weapon: an item (None: bare hands) instead of the one in hand, our skill with it counted (weapon_hit_bonus)."""
+    def our_hit_prob(self, name):
+        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20)."""
         pm = PM_BY_NAME[name]
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
         abon = to_hit_abon(st, dx, xl)
-        w, ench, (hit_die, _) = self.our_weapon(weapon)
+        w, ench, (hit_die, _) = self.our_weapon()
         tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
-        if weapon is not False and w:
-            tmp += SKILL_HIT[self.weapon_skill(w)]
         cap = self.bl(nh.NLE_BL_CAP)
         if cap:
             tmp -= cap * 2 - 1                    # encumbrance: near_capacity()
@@ -225,16 +213,13 @@ class DangerMixin:
             return min(max(tmp - 1, 0), 20) / 20
         return sum(min(max(tmp + k - 1, 0), 20) for k in range(1, hit_die + 1)) / (20 * hit_die)   # + rnd(die)
 
-    def our_damage_pmf(self, name, weapon=False):
+    def our_damage_pmf(self, name):
         """weapon.c dmgval -- the small / large die + enchantment (not below 0), then less the erosion (rusty,
-        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die.
-        weapon: as our_hit_prob (the skill's damage bonus counted: weapon_dam_bonus)."""
+        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die."""
         pm = PM_BY_NAME[name]
         dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
-        w, ench, (_, dmg_die) = self.our_weapon(weapon)
-        if weapon is not False and w:
-            dbon += SKILL_DMG[self.weapon_skill(w)]
-        wielded = next((i for i in self.items() if i.wielded), None) if weapon is False else weapon
+        w, ench, (_, dmg_die) = self.our_weapon()
+        wielded = next((i for i in self.items() if i.wielded), None)
         eros = erosion(wielded.text) if w and wielded is not None else 0
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
@@ -264,12 +249,6 @@ class DangerMixin:
             return 1.0                                      # it should be dead by now: a tougher one
         dies = sum(hp[h] * (cdf(dk, h) - cdf(dk1, h)) for h in range(len(hp)) if hp[h])
         return self.our_hit_prob(name) * dies / alive
-
-    def danger_estimate(self, adjacent, target=None):
-        """(mean damage, P(death)) over the next game turn from the adjacent hostiles [(pos, name)]; target: the
-        square we attack first (if it dies, it doesn't act)."""
-        hp = self.bl(nh.NLE_BL_HP)
-        return self.danger_combine([self.danger_parts(pos, name) for pos, name in adjacent], target, hp)
 
     def danger_parts(self, pos, name):
         pmf, inst = self.monster_round(name)
@@ -331,7 +310,7 @@ class DangerMixin:
                       for k, v in sorted(self.danger_p.items())}}
 
     # ------------------------------------------------------------ the fight to the end
-    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None, weapon=False):
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None):
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
@@ -343,7 +322,6 @@ class DangerMixin:
         monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
         Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
         with and one without the opening see the same monster HP and the same later rolls.
-        weapon (backup_weapon): the fight fought with this item instead of the one in hand (our_hit_prob).
         approach (wand_ev): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
         mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
         only hit monsters next to us (none there: we wait).
@@ -364,7 +342,7 @@ class DangerMixin:
                 continue
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
-            mons.append((max(lev, 0), self.our_hit_prob(name, weapon), self.our_damage_pmf(name, weapon), rnd_pmf, inst,
+            mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
                          self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name,
                          self.monster_taint(name), self.monster_turn_pmf(name, 4),
                          bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),
@@ -737,146 +715,8 @@ class DangerMixin:
             return ray(*plan["breath"])
         return 0, 0, False
 
-    # ------------------------------------------------------------ flee (flag flee)
+    # ------------------------------------------------------------ our speed
     def our_speed(self):
         """12; a Valkyrie is intrinsically Fast from XL 7 (2 moves in 3 get +6: 16 on average); Burdened 3/4."""
         sp = 16 if self.bl(nh.NLE_BL_XP) >= 7 else 12
         return sp * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else sp
-
-    def flee_step(self, lv, hostiles):
-        """flee: P(death this turn) > FLEE_P starts it.
-          1. faster than every hostile in view: step away along squares next to none of them; else, if
-             Elbereth would hold them all (elb_blocked) and we can write here: write it and stand on it
-             (waiting, never attacking: that erases it).
-          2. every turn after: once a square FLEE_DIST from all of them is reached (or none is in view), write
-             Elbereth there and rest on it (elb_state, its own exit rules); else step on toward one along
-             squares next to none of them, or keep waiting on the Elbereth; with neither, give up.
-        True if it used the turn."""
-        if not self.opts.flee:
-            return False
-        if self.flee_arrive is not None and self.flee_arrive_step(lv, hostiles):
-            return True
-        fm = self.flee_mode
-        if fm is not None and (fm[0] != lv.key or self.turn() > fm[1]):
-            self.flee_stats["timeout" if fm[0] == lv.key else "left_level"] += 1
-            self.flee_mode = fm = None
-        if fm is None:
-            if not hostiles or self.elb_state is not None:
-                return False
-            target = min(hostiles, key=lambda t: self.mon_level(t[0]))[0]       # what melee would hit first
-            if self.danger_estimate(hostiles, target)[1] <= FLEE_P:
-                return False
-            self.flee_stats["start"] += 1
-            if self.faster_than_all(lv) and (self.flee_up(lv) or self.flee_walk(lv)):
-                self.flee_stats["ran"] += 1
-                self.flee_mode = (lv.key, self.turn() + FLEE_TURNS)
-                return True
-            if self.elb_can_write(lv) and not self.elb_blocked(lv) and self.engrave_elbereth():
-                self.flee_stats["hold"] += 1
-                self.flee_mode = (lv.key, self.turn() + FLEE_TURNS)
-                self.cur_act = "flee"
-                return True
-            self.flee_stats["no_escape"] += 1
-            return False
-        if self.flee_up(lv):
-            return True
-        if self.flee_safe(lv):
-            self.flee_mode = None
-            self.flee_stats["safe"] += 1
-            if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_exit and self.elb_can_write(lv):
-                self.flee_stats["rest"] += 1
-                return self.elb_write(lv)              # rest there: elb_step takes over
-            return False
-        if self.flee_walk(lv):
-            self.flee_stats["step"] += 1
-            return True
-        if hostiles and (self.pos() in lv.elbereth or self.elb_confirm(lv)):
-            self.flee_stats["wait"] += 1
-            self.cur_act = "flee"
-            self.press("s")
-            return True
-        self.flee_stats["gave_up"] += 1
-        self.flee_mode = None
-        return False
-
-    def flee_up(self, lv):
-        """flee 'stairs': toward the up staircase along squares next to no hostile in view; on it, climb (and
-        then rest next to it on the level above: flee_arrive_step). True if it used the turn."""
-        if self.opts.flee != "stairs" or self.bl(nh.NLE_BL_DEPTH) <= 1:      # Dlvl 1 up: out of the dungeon
-            return False
-        k_mem, k_live, ok = self.flee_grids(lv)
-        up = k_mem == G.UPSTAIR
-        if not up.any():
-            return False
-        if up[self.pos()]:
-            self.flee_stats["climb"] += 1
-            self.flee_mode = None
-            self.flee_arrive = (lv.key, self.turn())
-            self.cur_act = "flee"
-            self.took_stairs = True
-            self.press("<")
-            return True
-        if self.walk_to(lv, up, max_cost=80, act="flee", grids=(k_mem, k_live, ok | up))[0] == "moved":
-            self.flee_stats["to_stairs"] += 1
-            return True
-        return False
-
-    def flee_arrive_step(self, lv, hostiles):
-        """Just climbed away: step off the staircase (Elbereth can't be written on stairs), then write it and
-        rest on it (elb_state)."""
-        came, t0 = self.flee_arrive
-        if lv.key == came or self.turn() > t0 + 10:
-            self.flee_arrive = None if self.turn() > t0 + 10 else self.flee_arrive
-            return False
-        if self.stairs_kind_here(lv) is not None:
-            k_mem, k_live, ok = self.flee_grids(lv)
-            y, x = self.pos()
-            nb = np.zeros_like(ok)
-            nb[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
-            nb &= ok & (k_mem == G.FLOOR)
-            nb[y, x] = False
-            if nb.any() and self.walk_to(lv, nb, max_cost=10, act="flee", grids=(k_mem, k_live, ok))[0] == "moved":
-                return True
-            self.flee_arrive = None
-            return False
-        self.flee_arrive = None
-        if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_exit and self.elb_can_write(lv) \
-                and not self.elb_blocked(lv):
-            self.flee_stats["rest_above"] += 1
-            return self.elb_write(lv)
-        return False
-
-    def flee_grids(self, lv):
-        """(k_mem, k_live, passable squares next to no hostile in view; ours included)."""
-        k_mem, k_live, passable = self.grids(lv)
-        near = np.zeros_like(passable)
-        for (y, x), _ in self.visible_hostiles(lv):
-            near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
-        ok = passable & ~near
-        ok[self.pos()] = True
-        return k_mem, k_live, ok
-
-    def flee_safe(self, lv):
-        """No hostile in view within FLEE_DIST - 1 squares."""
-        y, x = self.pos()
-        return all(max(abs(p[0] - y), abs(p[1] - x)) >= FLEE_DIST for p, _ in self.visible_hostiles(lv))
-
-    def faster_than_all(self, lv):
-        sp = self.our_speed()
-        return all(PM_BY_NAME[n].mmove < sp for _, n in self.visible_hostiles(lv) if n in PM_BY_NAME)
-
-    def flee_walk(self, lv):
-        """One step along squares next to no hostile in view, toward a square FLEE_DIST from all of them."""
-        seen = self.visible_hostiles(lv)
-        if not seen:
-            return False
-        k_mem, k_live, passable = self.grids(lv)
-        near = np.zeros_like(passable)
-        far = np.ones_like(passable)
-        for (y, x), _ in seen:
-            near[max(0, y - 1):y + 2, max(0, x - 1):x + 2] = True
-            far[max(0, y - FLEE_DIST + 1):y + FLEE_DIST, max(0, x - FLEE_DIST + 1):x + FLEE_DIST] = False
-        ok = passable & ~near
-        ok[self.pos()] = True
-        status, _ = self.walk_to(lv, far & ok, max_cost=40, act="flee", grids=(k_mem, k_live, ok))
-        return status == "moved"

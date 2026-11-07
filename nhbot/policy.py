@@ -34,8 +34,6 @@ STEPS = (
     "blind",
     "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
-    "fountain_hide",     # fountain_elb: the Elbereth by the fountain -- written before a dip, hidden on after one
-    "flee",              # flee: likely to die this turn and faster than them: step away (nhbot.danger)
     "loot_here",         # loot_now: standing where our things fell -- picked up at once, fight or not
     "elbereth",
     "thieves",
@@ -97,11 +95,7 @@ class PolicyMixin:
         self.tick_seq = self.msg_seq
         self.threat_track()                      # threats.py: who is coming for us
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
-        if self.opts.restore_fix:
-            self.attr_track()                    # potiontest.py: the best each attribute has been
         self.poly_track()                        # thieves.py: what fell from us when we changed form
-        if self.opts.lep_stash:
-            self.lep_track()                     # thieves.py: which leprechauns moved since the tick before
         if self.opts.sokoban:
             self.soko_track(lv)                  # sokoban.py: what we carried on coming onto this square
         if self.step_level_arrival(lv):          # runs before the tick state is read: it may change level
@@ -220,17 +214,14 @@ class PolicyMixin:
 
     def step_weight(self, c):
         if self.squeeze_pending is not None:
-            key, target, frm = self.squeeze_pending
+            key, target = self.squeeze_pending
             self.squeeze_pending = None
             if key == c.lv.key:
                 if self.carry_drop_step(force=True, max_tier=3):
                     self.squeeze_stats["dropped"] += 1
                     return True
                 self.squeeze_stats["nothing_to_drop"] += 1
-                if self.opts.squeeze_edge:
-                    c.lv.squeeze_dead |= {(frm, target), (target, frm)}   # that diagonal step only, not the square
-                else:
-                    c.lv.blocked[target] = True   # nothing left to shed: the squeeze stays shut
+                c.lv.blocked[target] = True       # nothing left to shed: the squeeze stays shut
         return self.carry_drop_step()
 
     # ------------------------------------------------------------------ monsters around
@@ -246,7 +237,7 @@ class PolicyMixin:
         return self.unihorn_step(HORN_SICK)
 
     def step_unihorn(self, c):
-        return not c.hostiles and (self.unihorn_step(HORN_FIXES) or self.restore_step(c.hostiles))
+        return not c.hostiles and self.unihorn_step(HORN_FIXES)
 
     def step_stunned(self, c):
         """Moves and attacks go in random directions while stunned / confused: wait it out."""
@@ -311,23 +302,14 @@ class PolicyMixin:
             self.hist.popleft()
         return False
 
-    def step_flee(self, c):
-        return self.flee_step(c.lv, c.hostiles)
-
     def step_elbereth(self, c):
         return self.elb_step(c.lv, c.hostiles)
 
     def step_thieves(self, c):
-        self.lep_hall_mark(c.lv)
-        if self.opts.lep_nogold and not self.opts.lep_stash:
-            self.lep_hall_note(c.lv)                 # lep_stash notes it in lep_stash_step
-        return self.gold_bag_step(c.lv, c.hostiles) or self.lep_stash_step(c.lv, c.hostiles) or self.lep_step(c.lv) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
+        return self.gold_bag_step(c.lv, c.hostiles) or (not self.hallu_blind_ranged() and self.nymph_step(c.lv, c.hostiles))
 
     def step_regen(self, c):
         return not c.hostiles and self.regen_step()
-
-    def step_fountain_hide(self, c):
-        return self.fountain_hide_step(c.lv, c.hostiles)
 
     def step_loot_here(self, c):
         """On the loot square (our armor fell there when we changed form, a thief died there): one turn picks it all
@@ -350,8 +332,6 @@ class PolicyMixin:
         if c.hostiles and self.swapped_for is None and self.tin_slipped is None \
                 and not any(it.wielded for it in self.items()):
             return self.weapon_check()           # bare hands in a fight -- the best weapon we carry
-        if self.opts.backup_weapon and c.hostiles and self.swapped_for is None and self.tin_slipped is None:
-            return self.backup_fight_step(c.hostiles)
         return not c.hostiles and self.tin_slipped is None and self.swapped_for is None and self.weapon_check()
 
     def step_wands(self, c):
@@ -361,15 +341,11 @@ class PolicyMixin:
         """Attack the weakest-looking (lowest level) adjacent hostile; focus: Smith's rule among several."""
         if not c.hostiles:
             return False
-        cands = self.lep_melee_cands(c.hostiles)
-        if not cands:
-            return False
-        awake = [t for t in cands if not self.asleep(c.lv, t[0])]
-        cands = awake or cands                   # one put to sleep comes after every awake one
+        awake = [t for t in c.hostiles if not self.asleep(c.lv, t[0])]
+        cands = awake or c.hostiles              # one put to sleep comes after every awake one
         target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
         if len(cands) > 1:
             target = self.focus_target(cands, target)
-        target = self.lep_focus_target(c.lv, cands) or target     # lep_stash: the leprechaun we were on
         self.attack(target)
         return True
 
@@ -466,8 +442,6 @@ class PolicyMixin:
                 return True                          # no wand in Sokoban before its level is solved
             if not self.soko_stealth(lv) and self.lamp_step():
                 return True                          # no lamp's djinni by a sleeping zoo
-            if self.force_read_step(lv):
-                return True
             if self.read_scroll_step(lv):
                 return True
             if self.jewelry_id_step(lv):
@@ -515,9 +489,7 @@ class PolicyMixin:
     def step_gold_here(self, c):
         lv, y, x = c.lv, c.y, c.x
         if G.KIND[lv.under[y, x]] == G.GOLD and (y, x) not in self.goal_closed_set("gold", lv.key) \
-                and not self.merch_risk(lv, (y, x)) and not self.lep_hold_gold() \
-                and (y, x) not in self.lep_gold_shut(lv) \
-                and self.items_gate(lv):
+                and not self.merch_risk(lv, (y, x)) and self.items_gate(lv):
             self.goal_done("gold", lv, (y, x))
             self.pickup_matching(("gold piece",))
             lv.under[y, x] = FLOOR_GLYPH

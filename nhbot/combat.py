@@ -113,7 +113,6 @@ def wand_effect(kind, name, depth, xl):
 class CombatMixin:
     def combat_init(self):
         self.kill_by = Counter()       # our kills, by kind
-        self.kill_log = []             # every kill of ours: (turn, name, square, level key) -- self.kills: corpses
         self.zaps = 0
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
@@ -662,7 +661,6 @@ class CombatMixin:
         mk = re.search(r"You (kill|destroy) (?:the |an? )?(.+?)!", m)
         self.killed = mk.group(2) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
-            self.kill_log.append((self.turn(), mk.group(2), self.last_attack_target, self.cur_key))
             lvk = self.levels.get(self.cur_key)
             if lvk is not None:
                 lvk.stationary.pop(self.last_attack_target, None)   # killed it (a missile at a mold)

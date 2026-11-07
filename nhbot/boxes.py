@@ -114,7 +114,7 @@ class BoxMixin:
             return True                          # lock_tools: unlocked with the tool, nothing broken
         if self.swapped_for == "box" and self.box_forces[key] < FORCE_TRIES:
             return self.box_force(key)
-        opener = self.box_opener() if self.swapped_for is None and self.box_forces[key] < FORCE_TRIES else None
+        opener = self.dagger_alternate() if self.swapped_for is None and self.box_forces[key] < FORCE_TRIES else None
         if opener is not None:
             self.swap_in("box", opener)
             return True
@@ -123,13 +123,6 @@ class BoxMixin:
         self.box_kick = (lv.key, pos)
         self.box_stats["kick_start"] += 1
         return self.box_kick_step(lv)
-
-    def box_opener(self):
-        """The dagger to force a lock with: the alternate one, or (box_dagger_any) any we carry, known uncursed
-        first (weapons.opener_daggers)."""
-        if self.opts.box_dagger_any:
-            return next(iter(self.opener_daggers()), None)
-        return self.dagger_alternate()
 
     def box_loot(self):
         """#loot the box under us. "opened" (took what we want), "empty", "locked", "none" (no box here), or

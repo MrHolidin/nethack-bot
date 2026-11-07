@@ -14,8 +14,6 @@ from nhbot.consts import NO_ENGRAVE_CMAP
 from nhbot.elb_rules import M1_NOHANDS
 from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_NAME, SWARMERS, VALK_RANKS
 
-ELB_PWIN = 0.5                     # elb_pwin
-ELB_SHOT_TURNS = 10                # elb_shot_seen: a weapon user blocks only this soon after a missile
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
 
@@ -121,9 +119,7 @@ class ElberethMixin:
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
         glyphs, me = self.obs["glyphs"], self.pos()
         pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
-        # elb_shot_seen: a weapon user counts only if something was thrown / shot / zapped lately (combat.py)
-        quiet = self.opts.elb_shot_seen and self.turn() - self.last_shot_turn > ELB_SHOT_TURNS
-        bl = ELB.blockers(glyphs, me, pp, lv.key[0], weapons_ok=quiet)
+        bl = ELB.blockers(glyphs, me, pp, lv.key[0])
         if bl and not ELB.blockers(glyphs, me, pp, lv.key[0], optimistic=True):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         if bl:
@@ -154,9 +150,8 @@ class ElberethMixin:
 
     def elb_wanted(self, lv, hostiles):
         """Write Elbereth now: a hostile next to us or within 3 squares, and either two swarmers among them or
-        we are hurt -- below elb_hp of max HP (elb_pwin: P(we win the fight with the adjacent ones) below
-        ELB_PWIN) -- and we can write here and nothing in view ignores it (elb_blocked). A prayer in reserve
-        doesn't hold it back (A/B elb_with_prayer: the prayer stays for when Elbereth can't help)."""
+        we are hurt -- below elb_hp of max HP -- and we can write here and nothing in view ignores it (elb_blocked).
+        A prayer in reserve doesn't hold it back (A/B elb_with_prayer: the prayer stays for when Elbereth can't help)."""
         if not self.elb_can_write(lv):
             return False
         y, x = self.pos()
@@ -164,13 +159,9 @@ class ElberethMixin:
         threats = hostiles + [t for t in near if t not in hostiles]
         if not threats:
             return False
-        if sum(1 for _, n in threats if n in SWARMERS) < 2:
-            if self.opts.elb_pwin:
-                hurt = bool(hostiles) and self.win_prob(hostiles) < ELB_PWIN
-            else:
-                hurt = self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_hp
-            if not hurt:
-                return False
+        if sum(1 for _, n in threats if n in SWARMERS) < 2 \
+                and self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_hp:
+            return False
         return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
@@ -202,7 +193,7 @@ class ElberethMixin:
                     self.elb_state = None
                     return False                       # fight / let tactics handle it
                 visible = self.visible_hostiles(lv)
-                early = not visible and hp >= maxhp * (self.opts.elb_exit if self.opts.elb_full_rest else 0.6)
+                early = not visible and hp >= maxhp * 0.6
                 if hp >= maxhp * self.opts.elb_exit or early:
                     self.elb_exits["healed"] += 1
                     self.elb_state = None

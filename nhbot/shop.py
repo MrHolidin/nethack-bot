@@ -1,9 +1,6 @@
 """Shop visits: the shared state for a visit (selling in carry.py) and paying."""
 import re
 
-import numpy as np
-import nle.nethack as nh
-
 from nhbot.carry import LEAVE_RE
 
 
@@ -16,11 +13,6 @@ SHOP_WELCOME_RE = re.compile(r"Welcome(?: again)? to [A-Z][\w' -]*?(?:'s|s') ([^
 # hack.c check_special_room: entering a zoo says "Welcome to David's treasure zoo!" -- the same shape as a shop
 # greeting, but no shop (zoo_not_shop)
 ZOO_WELCOME = "Welcome to David's treasure zoo!"
-# merchandise: an object glyph other than a boulder / statue (ROCK_CLASS)
-ITEM_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
-for _g in range(nh.MAX_GLYPH):
-    if nh.glyph_is_object(_g) and ord(nh.objclass(nh.glyph_to_obj(_g)).oc_class) != nh.ROCK_CLASS:
-        ITEM_GLYPH[_g] = True
 ARRIVED_RE = re.compile(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize")   # this tick
 
 
@@ -74,11 +66,7 @@ class ShopMixin:
             return False
         if self.carry_sell_step(lv):
             return True
-        if self.shopping is not None and self.bag_buy_step(lv):
-            return True
         if self.shopping is not None and self.shop_buy_step(lv):
-            return True
-        if self.shopping is not None and self.opts.shop_browse and self.browse_step(lv, ITEM_GLYPH, "browse"):
             return True
         if self.shopping is not None:
             self.shops_done.add(self.shopping["key"])

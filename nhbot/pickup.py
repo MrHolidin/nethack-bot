@@ -131,8 +131,8 @@ class PickupMixin:
         elif ocls == nh.WEAPON_CLASS and not cursed and typ not in AMMO_TYPES:
             if typ in MISSILE_TYPES:
                 reason = "missile"
-            elif typ in WIELD_TYPES or self.backup_wants(text):
-                reason = "weapon"                        # backup_weapon: harder-hitting than the backup we carry
+            elif typ in WIELD_TYPES:
+                reason = "weapon"
             else:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
@@ -153,16 +153,13 @@ class PickupMixin:
         return reason
 
     # ------------------------------------------------------------------ explore goals: piles worth a walk
-    def weapon_glyphs(self):
-        return WANTED_WEAPON_GLYPH | self.backup_glyphs() if self.backup_on() else WANTED_WEAPON_GLYPH
-
     def carry_glyph(self, g):
         """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
         makes the step that inspects it (and so removes the goal) run."""
-        return bool(CARRY_GLYPH[g] or MORE_GLYPH[g] or self.weapon_glyphs()[g] or ALL_GLYPH[g])
+        return bool(CARRY_GLYPH[g] or MORE_GLYPH[g] or WANTED_WEAPON_GLYPH[g] or ALL_GLYPH[g])
 
     def carry_targets(self, lv):
-        glyphs = CARRY_GLYPH | MORE_GLYPH | self.weapon_glyphs() | ALL_GLYPH
+        glyphs = CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH
         mask = glyphs[lv.under] & ~lv.shop
         for p in self.goal_closed_set("pile", lv.key):
             mask[p] = False

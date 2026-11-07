@@ -248,8 +248,6 @@ class CarryMixin:
             return True
         if c == nh.TOOL_CLASS and any(k in s for k in KEEP_TOOLS) and not self.horn_is_bad(it):
             return True                      # a horn that harmed us is cursed: sold
-        if c == nh.POTION_CLASS and self.opts.restore_fix and self.restore_potion(it):
-            return True                      # restore_fix: mends what poison took (potiontest.restore_step)
         if c == nh.POTION_CLASS and self.potion_100(s):
             return True                      # maybe healing / extra healing -- kept for quaff_test
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None
@@ -258,10 +256,6 @@ class CarryMixin:
         if c == nh.SCROLL_CLASS and any(n in s.replace("scrolls", "scroll") for n in FIND_SCROLLS) \
                 or c == nh.WAND_CLASS and "wand of digging" in s:
             return True                      # to find a vault and dig to it (nhbot.vault)
-        if self.opts.backup_weapon and c == nh.WEAPON_CLASS:
-            bk = self.backup_best()
-            if bk is not None and bk[1].letter == it.letter:
-                return True                  # backup_weapon: what we fight with while the sword is dipped / rusty
         if c == nh.TOOL_CLASS:
             lt = self.lock_tool()
             if lt is not None and lt.letter == it.letter:
@@ -274,8 +268,7 @@ class CarryMixin:
             return True                      # jewelry: identify scrolls, amulets and rings to identify
         if c == nh.WEAPON_CLASS:
             d = describe(c, s)["key"][1]
-            keep = [k for k in KEEP_WEAPONS if not (self.opts.no_dagger_need and k == "dagger")]
-            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in keep):
+            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
                 return True                  # wield candidates (valk.weapon_rank) and missiles we throw
         return False
 
@@ -299,8 +292,7 @@ class CarryMixin:
         return False
 
     def carry_shop_greeted(self, lv, stype):
-        if lv.key in self.shops_done or not (self.sellables(lv, stype) or self.buy_wanted(stype)
-                                             or self.opts.shop_browse):
+        if lv.key in self.shops_done or not (self.sellables(lv, stype) or self.buy_wanted(stype)):
             return
         self.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
 

@@ -12,7 +12,7 @@ alone +1504 [+240, +2831]): with no hostile in view, at full HP above TEST_MIN_H
 neither enchant armor nor identify is known by name (discoveries), a scroll whose price group is unknown or is 20 zm
 (identify) or 60 zm (enchant weapon) is read; every worn piece +3 or better comes off first
 (equipment.strip_for_test) -- destroy armor would otherwise take the Valkyrie's +3 shield. One forced read in that
-state against a blank one (force_read, 861 games): enchant armor +0.58 depth, destroy armor -0.81, fire -0.38,
+state against a blank one (an experiment, 861 games): enchant armor +0.58 depth, destroy armor -0.81, fire -0.38,
 earth -0.24, amnesia -0.08.
 
 What a scroll asks (read.c seffects), answered in game.settle and read_scroll:
@@ -55,7 +55,6 @@ class ScrollMixin:
         self.scroll_known = None         # scroll types known by name (discoveries); None: ask again
         self.genocide_typed = set()      # names given to a genocide question (never twice)
         self.read_seq = 0                # msg_seq when the last read began
-        self.force_read_log = None       # force_read: the read (state and what the game said), once done
         self.enchant_stats = Counter()   # msg_enchant: what enchant armor / weapon did, from the game's words
         self.enchant_log = []            # (turn, effect, item) of the first ENCHANT_LOG of them
 
@@ -137,35 +136,13 @@ class ScrollMixin:
         return self.test_safe() and not self.known_scroll_types() & TESTING_ENDS
 
     def read_state(self):
-        """The state a read happens in (logged for untested and force_read reads)."""
+        """The state a read happens in (logged for untested reads)."""
         return {"t": self.turn(), "dlvl": self.bl(nh.NLE_BL_DEPTH), "xl": self.bl(nh.NLE_BL_XP),
                 "hp": self.bl(nh.NLE_BL_HP), "maxhp": self.bl(nh.NLE_BL_HPMAX), "ac": self.bl(nh.NLE_BL_AC)}
 
-    def force_read_step(self, lv):
-        """force_read (experiments): the first time test_safe holds with no hostile in view (housekeeping),
-        an uncursed scroll of that type is put into the inventory (gift.gift_items) and read. Compare with
-        force_read="blank paper" (it reads as nothing; the same RNG use) on the same seeds: the effect of
-        reading that scroll in that state."""
-        if not self.opts.force_read or self.force_read_log is not None:
-            return False
-        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
-        if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU) or not self.test_safe():
-            return False
-        name = self.opts.force_read
-        state = self.read_state()
-        self.gift_items(["uncursed scroll of " + name], log=False)
-        it = next((i for i in self.items() if i.ocls == nh.SCROLL_CLASS and name in i.text), None)
-        self.force_read_log = dict(state, said="")
-        if it is None or not self.read_scroll(lv, it.letter):
-            self.force_read_log["said"] = "not read"
-            return True
-        self.force_read_log["said"] = self.text_since(self.read_seq)[-120:]
-        return True
-
     # ------------------------------------------------------------ read
     def read_scroll_step(self, lv):
-        """Housekeeping (no hostile in view): read a good scroll, else an untested one (read_explored: only on a
-        level explored, Level.explored)."""
+        """Housekeeping (no hostile in view): read a good scroll, else an untested one."""
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & (nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False              # confused remove curse / enchant armor do other things
@@ -176,7 +153,7 @@ class ScrollMixin:
         todo = [(l, s, "good") for l, s in good]
         if not good:
             unknown = [(l, s) for l, s in inv if self.unknown_readable(s)]
-            if unknown and self.test_reading_on() and (lv.explored or not self.opts.read_explored):
+            if unknown and self.test_reading_on():
                 todo = [(l, s, "unknown") for l, s in unknown]
         for letter, s, why in todo:
             if why == "unknown":

@@ -121,9 +121,11 @@ ARMOR_WISHES = ("blessed +2 gray dragon scale mail", "blessed +2 gauntlets of po
 MC_OF = {"cloak of protection": 3, "plate mail": 2, "crystal plate mail": 2, "dwarvish mithril-coat": 2,
          "elven mithril-coat": 2, "oilskin cloak": 2, "slippery cloak": 2, "robe": 2, "leather jacket": 0,
          "cornuthaum": 1}
-# cloak_cover: what any cloak is worth beyond its AC -- it takes destroy armor (do_wear.c some_armor: the cloak
-# before the suit) and the torso's erosion (uhitm.c erode_armor) for the suit. Counted only against an empty slot
-# (every cloak has it); above UNKNOWN_ENCH + the 0.5 of improves, so an AC 0 cloak of unknown enchantment is worn.
+# what any cloak is worth beyond its AC -- it takes destroy armor (do_wear.c some_armor: the cloak before the suit)
+# and the torso's erosion (uhitm.c erode_armor) for the suit. Counted only against an empty slot (every cloak has
+# it); above UNKNOWN_ENCH + the 0.5 of improves, so an AC 0 cloak of unknown enchantment is worn. With it a mummy
+# wrapping / orcish / dwarvish cloak known uncursed or blessed is worn too (cover_cloak_ok). A/B cloak_cover
+# "uncursed" +862 [-5, +1787] (any of those cloaks, curse status unknown too: +662 [-678, +1971]).
 CLOAK_COVER = 0.7
 MC_VALUE = 1.75          # mc_value: AC a point of MC is worth
 # what a worn piece gives that its AC doesn't show: magic resistance, reflection -- PROP_VALUE AC each (mc_value)
@@ -214,7 +216,7 @@ class EquipMixin:
         gain of sum(AC) + MC_VALUE * MC + PROP_VALUE * properties, so swaps can't go round in a circle."""
         cur = worn.get(a["slot"])
         gain = value(a) - (value(cur) if cur is not None else 0)
-        if self.opts.cloak_cover and a["slot"] == CLOAK and cur is None:
+        if a["slot"] == CLOAK and cur is None:
             gain += CLOAK_COVER
         # magic cancellation and magic resistance / reflection count (A/B mc_v1 +289 [-191, +792])
         others = [armor_mc(w) for s, w in worn.items() if s != a["slot"]]
@@ -230,11 +232,9 @@ class EquipMixin:
         return gain
 
     def cover_cloak_ok(self, a):
-        """cloak_cover: a mummy wrapping / orcish / dwarvish cloak may be worn ("uncursed": only one known
-        uncursed or blessed -- objnam.c always names "uncursed" on armor whose curse status we know)."""
-        if not self.opts.cloak_cover or a["slot"] != CLOAK:
-            return False
-        return self.opts.cloak_cover != "uncursed" or bool(UNCURSED_RE.search(a.get("text", "")))
+        """A mummy wrapping / orcish / dwarvish cloak may be worn when known uncursed or blessed -- objnam.c
+        always names "uncursed" on armor whose curse status we know (CLOAK_COVER)."""
+        return a["slot"] == CLOAK and bool(UNCURSED_RE.search(a.get("text", "")))
 
     def improves(self, a, worn):
         safe = a.get("safe") or self.cover_cloak_ok(a)

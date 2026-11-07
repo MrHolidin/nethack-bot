@@ -1,12 +1,11 @@
 """Excalibur (wiki "Excalibur"): lawful, XL >= 5, dip an unnamed long sword into a fountain;
 1/6 per dip, the fountain disappears on success."""
 import re
-from collections import Counter
 
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import DELTA2KEY, FLOOR_GLYPH, FOUNTAIN_GLYPH, NO_ENGRAVE_CMAP
+from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
 from nhbot.materials import rusts
 
@@ -14,10 +13,6 @@ JUNK_CLASSES = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.WEAPON_CLASS, nh.TOOL_CLASS, nh.
 CONTAINERS = ("bag", "sack", "box", "chest", "lamp", "candle")
 FOUNTAIN_DIP_DEPTH = 20     # dips for a wish on dungeon levels above this only
 DEMON_WIN = 0.7      # dip for a wish only while P(we beat a water demon) is above this
-FOUNTAIN_PWIN = 0.75  # fountain_elb: what a dip brought out we fight below this P(win) only from our Elbereth
-FOUNTAIN_CALM = 3     # fountain_elb: turns with nothing within 2 squares before we leave the Elbereth
-FOUNTAIN_HIDE_MAX = 300   # fountain_elb: turns at most on it
-FOUNTAIN_REHIDE_MAX = 20  # fountain_rehide: hides at most on one level while we leave it
 
 
 class ExcaliburMixin:
@@ -30,12 +25,6 @@ class ExcaliburMixin:
         self.excal_trips = 0
         self.excal_skip = set()
         self.demon_win = (None, 0.0)     # (state key, P(we beat a water demon))
-        self.fountain_shut = set()       # fountain_elb: (level key, square) of fountains left after a hide
-        self.fhide = None                # fountain_elb: {key, fountain, sq, phase, hiding, calm, since, dip_turn}
-        self.fhide_stats = Counter()
-        self.fountain_leave = None       # fountain_elb: level key to leave by the stairs down after a hide
-        self.fountain_rehides = Counter()  # fountain_rehide: level key -> hides on the way off it
-        self.fountain_roam = None        # fountain_stay: level key where what a dip brought out still roams
 
     def long_sword(self):
         for it in self.items():
@@ -68,15 +57,10 @@ class ExcaliburMixin:
             fmask &= ~lv.shop
         if lv.key[0] == 2:
             fmask[:] = False          # Minetown: a fountain drying up angers the watch
-        for k, p in self.fountain_shut:
-            if k == lv.key:
-                fmask[p] = False
         if not fmask.any():
             return self.excal_go_up(lv)
         y, x = self.pos()
         if fmask[y, x]:
-            if self.fountain_elb_prepare(lv):
-                return True
             return self.dip(lv)
         if self.walk_to(lv, fmask, max_cost=self.opts.excal_cost, act="excal", also=fmask)[0] == "moved":
             return True
@@ -148,8 +132,6 @@ class ExcaliburMixin:
         """#dip an inventory item into the fountain we stand on. The messages since, or None if no dip
         happened (no fountain here any more: forgotten)."""
         seq0 = self.msg_seq
-        if self.fhide is not None:
-            self.fhide["dip_turn"] = self.turn()
         self.raw_step(228)                       # M-d: #dip
         if "dip" not in self.message().lower():
             self.settle(); return None
@@ -186,9 +168,6 @@ class ExcaliburMixin:
         fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
         if lv.key[0] == 2 or lv.key in self.excal_skip:
             return fmask & False
-        for k, p in self.fountain_shut:
-            if k == lv.key:
-                fmask[p] = False
         return fmask & ~lv.shop if lv.shop.any() else fmask
 
     def dip_at_fountain(self, lv, fmask, letter, act):
@@ -196,8 +175,6 @@ class ExcaliburMixin:
         self.cur_act = act
         y, x = self.pos()
         if fmask[y, x]:
-            if self.fountain_elb_prepare(lv):
-                return True
             recent = self.dip_into_fountain(lv, letter)
             if recent is None:
                 return False
@@ -289,230 +266,3 @@ class ExcaliburMixin:
                  and not any(w in it.text for w in CONTAINERS) and not re.search(r"\blong sword\b", it.text)]
         return min(cands, key=lambda it: (rusts(it.text), JUNK_CLASSES.index(it.ocls)), default=None)
 
-    # ------------------------------------------------------------------ fountain_elb
-    def fountain_elb_prepare(self, lv):
-        """fountain_elb, on the fountain about to dip: Elbereth first on a floor square next to it (written and
-        read back), then back onto the fountain. True if it used the turn; False: dip now."""
-        if not self.opts.fountain_elb:
-            return False
-        here = self.pos()
-        st = self.fhide
-        if st is None or st["key"] != lv.key or st["fountain"] != here:
-            sq = self.fountain_elb_square(lv, here)
-            st = self.fhide = {"key": lv.key, "fountain": here, "sq": sq, "phase": "go" if sq else "none",
-                               "hiding": False, "calm": 0, "since": 0, "dip_turn": -99}
-            self.fhide_stats["planned" if sq else "no_square"] += 1
-        if st["phase"] in ("ready", "none"):
-            return False
-        sq = st["sq"]
-        if st["phase"] == "go":                          # standing on the fountain: a step onto the square
-            if self.square_taken(sq):                    # someone on it (the Oracle's centaurs: "Really attack?")
-                st["sq"] = sq = self.fountain_elb_square(lv, here)
-                if sq is None:
-                    st["phase"] = "none"
-                    self.fhide_stats["no_square"] += 1
-                    return False
-            st["phase"] = "write"
-            self.cur_act = "fountain_elb"
-            self.press(DELTA2KEY[(sq[0] - here[0], sq[1] - here[1])])
-            return True
-        return False
-
-    def square_taken(self, q):
-        return G.KIND[self.obs["glyphs"][q]] in (G.MONSTER, G.PET, G.INVIS)
-
-    def fountain_elb_square(self, lv, fountain):
-        """A square next to the fountain to write Elbereth on: floor (no doorway: diagonal steps; no trap, stairs,
-        altar, another fountain), one we stand on as written already first."""
-        k = self.kinds(lv)
-        ter = self.terrain_glyphs(lv)
-        best = None
-        for dy, dx in DELTA2KEY:
-            q = (fountain[0] + dy, fountain[1] + dx)
-            if not (0 <= q[0] < k.shape[0] and 0 <= q[1] < k.shape[1]) or k[q] != G.FLOOR \
-                    or int(ter[q]) == FOUNTAIN_GLYPH or (nh.glyph_is_cmap(int(ter[q]))
-                                                         and nh.glyph_to_cmap(int(ter[q])) in NO_ENGRAVE_CMAP):
-                continue
-            if self.square_taken(q):
-                continue                                 # a monster on it: never a step into it
-            if q in lv.elbereth:
-                return q
-            best = best or q
-        return best
-
-    def fountain_hide_step(self, lv, hostiles):
-        """fountain_elb, every tick: writing the Elbereth by the fountain and stepping back; after a dip, what came
-        out beats us with P(win) below FOUNTAIN_PWIN -- onto the Elbereth, waiting there until nothing is within 2
-        squares for FOUNTAIN_CALM turns, then this fountain is left (another one, or on and down). True if it used
-        the turn."""
-        st = self.fhide
-        if self.opts.fountain_elb and self.fountain_leave is not None and st is None:
-            return self.fountain_leave_step(lv, hostiles)
-        idle = st is None or (st["phase"] == "ready" and not st["hiding"] and self.pos() not in (st["fountain"], st["sq"]))
-        if self.opts.fountain_elb and self.opts.fountain_stay and idle and self.fountain_roam == lv.key and hostiles:
-            return self.fountain_rehide_step(lv, hostiles)   # fountain_stay: caught away from a fountain we dip at
-        if not self.opts.fountain_elb or st is None or st["key"] != lv.key or not st["sq"]:
-            return False
-        here, sq, ftn = self.pos(), st["sq"], st["fountain"]
-        dist = lambda p, q: max(abs(p[0] - q[0]), abs(p[1] - q[1]))
-        if st["phase"] == "write":
-            if here != sq:
-                st["phase"] = "go"
-                return False
-            if hostiles:
-                return False                             # a fight came first: the step comes back to it
-            self.cur_act = "fountain_elb"
-            if sq in lv.elbereth and self.elb_confirm(lv):
-                st["phase"] = "back"
-            elif not self.elb_can_write(lv) or not self.engrave_elbereth():
-                st["phase"], st["sq"] = "none", None     # it can't be written here: dip without
-                self.fhide_stats["write_failed"] += 1
-                return True
-            elif self.elb_confirm(lv):
-                st["phase"] = "back"
-                self.fhide_stats["written"] += 1
-            return True
-        if st["phase"] == "back":
-            if here == ftn:
-                st["phase"] = "ready"
-                return False
-            if dist(here, ftn) == 1 and self.square_taken(ftn):
-                return False                             # someone on the fountain: as ever until it moves
-            if dist(here, ftn) == 1:
-                self.cur_act = "fountain_elb"
-                self.press(DELTA2KEY[(ftn[0] - here[0], ftn[1] - here[1])])
-                return True
-            st["phase"] = "go"
-            return False
-        if st["phase"] != "ready":
-            return False
-        y, x = here
-        vis = [(p, n) for p, n in self.visible_hostiles(lv) if dist(p, here) <= 6]
-        if not st["hiding"]:
-            if not vis or here not in (ftn, sq) or self.turn() - st["dip_turn"] > 3:
-                return False
-            if any(not self.respects(p, n) for p, n in vis):
-                return False
-            approach = {p: max(0, dist(p, here) - 1) for p, _ in vis}
-            if self.win_prob(vis, approach=approach) >= FOUNTAIN_PWIN:
-                return False
-            st["hiding"], st["since"], st["calm"] = True, self.turn(), 0
-            self.fhide_stats["hid"] += 1
-        taken = self.square_taken
-        if here != sq:
-            if dist(here, sq) == 1 and taken(sq):        # something came out onto it (makemon: next to us)
-                k = self.kinds(lv)
-                ter = self.terrain_glyphs(lv)
-                free = [(here[0] + dy, here[1] + dx) for dy, dx in DELTA2KEY]
-                free = [q for q in free if 0 <= q[0] < k.shape[0] and 0 <= q[1] < k.shape[1] and k[q] == G.FLOOR
-                        and not taken(q) and int(ter[q]) != FOUNTAIN_GLYPH]
-                if not free:
-                    self.fhide = None                    # boxed in: fight as ever
-                    return False
-                sq = self.fountain_retreat_square(lv, free) if self.opts.fountain_retreat else None
-                sq = st["sq"] = sq or min(free, key=lambda q: sum(1 for p, _ in vis if dist(p, q) <= 1))
-                st["fresh"] = True                       # a new one: written once we stand there
-                self.fhide_stats["moved_square"] += 1
-            if dist(here, sq) == 1:
-                self.cur_act = "fountain_hide"
-                self.press(DELTA2KEY[(sq[0] - here[0], sq[1] - here[1])])
-                return True
-            self.fhide = None                            # pushed away from it: fight / flee as ever
-            return False
-        if any(not self.respects(p, n) for p, n in vis):
-            self.fhide_stats["hide_broken"] += 1
-            self.fhide = None                            # it won't hold them: the Elbereth step / fight
-            return False
-        if (st.get("fresh") or hostiles) and not self.elb_confirm(lv):
-            st["fresh"] = False
-            st["rewrites"] = st.get("rewrites", 0) + 1
-            if st["rewrites"] > 3 or not self.elb_can_write(lv):
-                self.fhide_stats["hide_broken"] += 1
-                self.fhide = None
-                return False
-            self.fhide_stats["rewritten"] += 1
-            self.cur_act = "fountain_hide"
-            self.engrave_elbereth()                      # written (again) under us -- smudged by what stood on it
-            return True
-        st["fresh"] = False
-        st["calm"] = 0 if any(dist(p, here) <= 2 for p, _ in vis) else st["calm"] + 1
-        if st["calm"] < FOUNTAIN_CALM and self.turn() - st["since"] < FOUNTAIN_HIDE_MAX:
-            self.cur_act = "fountain_hide"
-            self.press("s")
-            return True
-        if ftn is not None:
-            self.fountain_shut.add((lv.key, ftn))        # this fountain is left
-        self.fhide_stats["left"] += 1
-        self.fhide = None
-        if self.opts.fountain_stay:
-            self.fountain_roam = lv.key                  # fountain_stay: the other fountains here still dipped (when
-            return False                                 # nothing is in view: housekeeping), a hide again if caught
-        self.excal_skip.add(lv.key)                      # what came out still roams here: no more dips on this
-        self.fountain_leave = lv.key                     # level, and off it by the stairs down
-        return False
-
-    def fountain_leave_goal(self, lv):
-        """Where fountain_leave_step will head off this level: the up stairs while a fountain above is still
-        wanted for Excalibur, else the down stairs we know. None: neither known."""
-        k_mem = self.grids(lv)[0]
-        up = k_mem == G.UPSTAIR
-        if self.excal_eligible() and self.excal_up_wanted(lv) and up.any():
-            return up
-        down = self.kinds(lv) == G.DOWNSTAIR
-        return down if down.any() else None
-
-    def fountain_retreat_square(self, lv, free):
-        """fountain_retreat: of the free squares next to us, the first step of our way off the level
-        (fountain_leave_goal) -- the Elbereth goes there. None: that step is not free (or no way known)."""
-        goal = self.fountain_leave_goal(lv)
-        if goal is None:
-            return None
-        here = self.pos()
-        k_mem, k_live, passable = self.grids(lv)
-        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, goal, want_dist=False)
-        step = self.first_step(prev, here, reached) if reached is not None else None
-        if step in free:
-            self.fhide_stats["retreat_square"] += 1
-            return step
-        return None
-
-    def fountain_rehide_step(self, lv, hostiles):
-        """fountain_rehide, on the way off the level after a hide: caught (something next to us) by what beats us
-        with P(win) below FOUNTAIN_PWIN -- Elbereth written where we stand and a hide there as by the fountain
-        (fountain_hide_step: until nothing is within 2 squares for FOUNTAIN_CALM turns), then on our way again.
-        Not where it can't be written (stairs, ...), not against what ignores it. True if it used the turn."""
-        if not self.opts.fountain_rehide or self.fountain_rehides[lv.key] >= FOUNTAIN_REHIDE_MAX \
-                or not self.elb_can_write(lv):
-            return False
-        here = self.pos()
-        dist = lambda p: max(abs(p[0] - here[0]), abs(p[1] - here[1]))
-        vis = [(p, n) for p, n in self.visible_hostiles(lv) if dist(p) <= 6]
-        if not vis or any(not self.respects(p, n) for p, n in vis):
-            return False
-        if self.win_prob(vis, approach={p: max(0, dist(p) - 1) for p, _ in vis}) >= FOUNTAIN_PWIN:
-            return False
-        self.fountain_rehides[lv.key] += 1
-        self.fhide_stats["rehid"] += 1
-        self.fhide = {"key": lv.key, "fountain": None, "sq": here, "phase": "ready", "hiding": True, "calm": 0,
-                      "since": self.turn(), "dip_turn": -99, "fresh": True}
-        return self.fountain_hide_step(lv, hostiles)
-
-    def fountain_leave_step(self, lv, hostiles):
-        """fountain_elb, after a hide (what came out still roams this level): off it where we were headed anyway --
-        up to a fountain remembered above while we still dip for Excalibur (excal_go_up), else down the stairs
-        we know; neither: as ever. Nothing next to us (a fight comes first). True if it used the turn."""
-        if self.fountain_leave != lv.key:
-            self.fountain_leave = None
-            return False
-        if hostiles and self.fountain_rehide_step(lv, hostiles):
-            return True
-        if hostiles:
-            return False
-        if self.excal_eligible() and self.excal_go_up(lv):
-            self.fhide_stats["leave_up"] += 1
-            return True
-        down = self.kinds(lv) == G.DOWNSTAIR
-        if down.any() and self.go_down(lv, self.grids(lv), down):
-            self.fhide_stats["leave_down"] += 1
-            return True
-        return False
