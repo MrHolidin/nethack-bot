@@ -81,7 +81,7 @@ class Level:
         self.locked = set()
         self.avoid_down = set()
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
-        self.shop_anchors = []     # shop_regrow: [door, square we came from (outside), closed] of each greeting
+        self.shop_anchors = []     # [door, square we came from (outside), closed] of each greeting (shop_regrow)
         self.lep_shut = np.zeros((ROWS, COLS), dtype=bool)   # lep_hall: a room of leprechauns, closed from outside
         self.grotto = False        # Grotto Town (is_grotto)
         self.town_heard = False    # Minetown told before seen: heard (minetown_sounds), warned by the watch
@@ -259,8 +259,7 @@ class MapMixin:
             came = self.prev_pos
         for c in self.shop_flood(lv, door, came):
             lv.shop[c] = True
-        if self.opts.shop_regrow:
-            lv.shop_anchors.append([door, came, False])
+        lv.shop_anchors.append([door, came, False])
 
     def shop_flood(self, lv, door, came):
         """The shop's squares behind its door as far as the map knows them: room floor from the door, not the side
@@ -290,10 +289,12 @@ class MapMixin:
         return seen
 
     def shop_regrow(self, lv):
-        """shop_regrow, every tick: a shop greeted while dark (its floor not yet in our map: the flood from the door
+        """Every tick: a shop greeted while dark (its floor not yet in our map: the flood from the door
         found little or nothing) grows as its squares become known -- the flood from its door again, squares
         added, none taken away -- until nothing unknown is next to it (79607: Izchak's dark shop never marked, a
-        corpse on its floor eaten and not paid for)."""
+        corpse on its floor eaten and not paid for). Lit shops too: the squares the shopkeeper or a pet stood on
+        at the greeting join later. A/B shop_regrow +1658 [+174, +3111], max_depth +0.4 (628 of 1000 games went
+        another way: the mechanism of the gain not found)."""
         k = None
         for a in lv.shop_anchors:
             if a[2]:
@@ -354,8 +355,9 @@ class MapMixin:
         if lv is not None and lv.key[0] == 2 and lv.key[1] in (3, 4) \
                 and "You hear" in m and any(t in m for t in TOWN_SOUNDS):
             lv.town_heard = True                              # Minetown, before we see it (accepted without A/B)
-        if self.opts.minetown_watch and lv is not None and lv.key[0] == 2 and any(w in m for w in WATCH_WARNINGS):
-            lv.town_heard = True                              # minetown_watch: the watch warned us -- Minetown
+        if lv is not None and lv.key[0] == 2 and any(w in m for w in WATCH_WARNINGS):
+            lv.town_heard = True                              # the watch warned us -- Minetown (A/B minetown_watch:
+                                                              # never fired without dig_through, accepted)
         if "under arrest" in m:
             self.mines_kick_stats["arrest"] += 1
         if "stop damaging that door" in m and lv and self.last_move_target:

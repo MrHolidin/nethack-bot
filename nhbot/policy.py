@@ -114,7 +114,7 @@ class PolicyMixin:
 
     # ------------------------------------------------------------------ emergencies
     def step_level_arrival(self, lv):
-        if self.opts.shop_regrow and lv.shop_anchors:
+        if lv.shop_anchors:
             self.shop_regrow(lv)
         if self.pending_mines_mark:
             self.pending_mines_mark = False
@@ -140,8 +140,9 @@ class PolicyMixin:
             return True
         if lv.key[0] == 2:
             folk = self.town_folk_visible()
-            if self.opts.minetown_folk and folk and lv.key[1] in (3, 4):
-                lv.town_heard = True                  # minetown_folk: its watch / priest / shopkeeper in view
+            if folk and lv.key[1] in (3, 4):
+                lv.town_heard = True                  # its watch / priest / shopkeeper in view (minetown_folk,
+                                                      # accepted before its A/B was in)
             if self.is_minetown(lv) or folk:
                 self.minetown_seen = True
             if not self.minetown_seen and lv.key[1] >= 5:
@@ -251,9 +252,11 @@ class PolicyMixin:
                 self.stun_waits += 1
                 self.press("s")
                 return True
-            if self.opts.stun_peace and self.is_minetown(c.lv) and self.peaceful_next(c.lv, c.hostiles):
-                self.stun_peace_waits += 1        # stun_peace: a blow could go to the watch (uhitm.c: stunned,
-                self.press("s")                   # confused -- a random direction): no melee in Minetown
+            if self.is_minetown(c.lv) and self.peaceful_next(c.lv, c.hostiles):
+                self.stun_peace_waits += 1        # a blow could go to the watch (uhitm.c: stunned, confused -- a
+                self.press("s")                   # random direction): no melee in Minetown. A/B stun_peace +164
+                return True                       # [-345, +656]; in the 10 games it fired +141 a game, 4 deaths to
+                                                  # the watch gone
                 return True
         return False
 

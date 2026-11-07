@@ -29,14 +29,6 @@ DEFAULTS = {
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
-    "shop_regrow": False,      # A/B: a shop greeted while dark grows as its floor becomes known (the flood from its
-                               #      door again each tick until nothing unknown is next to it) -- mapmem.shop_regrow
-    "stun_peace": False,       # A/B: stunned / confused in Minetown with a peaceful next to us: no melee (a blow goes
-                               #      a random way -- 79755 hit the watchman), we wait
-    "minetown_folk": False,    # A/B: on Mines level 3-4 a watchman / watch captain / priest / shopkeeper in view makes
-                               #      it Minetown at once (perception.town_folk_visible)
-    "minetown_watch": False,   # A/B: a watch warning on a Mines level ("Hey, stop damaging that wall!", "... picking
-                               #      that lock!", "... using that fountain!") makes it Minetown at once
     "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step
                                #      (both ways), not its square -- reached straight from another side it is open
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
