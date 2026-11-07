@@ -18,6 +18,7 @@ P(death) = P(total damage >= HP) combined with the instant deaths. Calibration (
 mean damage and P(death) against what the next turn did.
 """
 import re
+from bisect import bisect_right
 from collections import Counter, defaultdict
 
 import numpy as np
@@ -92,6 +93,25 @@ def adj_level(base, depth, xl):
     cap = min(3 * base // 2, 49)
     return min(tmp, cap) if tmp > 0 else 0
 
+
+
+def pmf_cdf(p):
+    """The table Generator.choice(len(p), p=p) searches: the cumulative sum over its last value (numpy
+    _generator.pyx choice)."""
+    c = np.asarray(p, dtype=np.float64).cumsum()
+    c /= c[-1]
+    return c.tolist()
+
+
+def cdf_draw(rng, cdf):
+    """int(rng.choice(len(p), p=p)) for cdf = pmf_cdf(p): the same one uniform draw, the same index -- without
+    choice's checks and cumulative sum on every call (a twentieth of the time)."""
+    return bisect_right(cdf, rng.random())
+
+
+def cdf_draws(rng, cdf, n):
+    """int(rng.choice(len(p), size=n, p=p).sum()) for cdf = pmf_cdf(p): the same n uniform draws."""
+    return sum(bisect_right(cdf, u) for u in rng.random(n))
 
 class DangerMixin:
     def danger_init(self):
@@ -352,6 +372,8 @@ class DangerMixin:
         if not mons:
             return 1.0
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
+        # the pmfs drawn from, as choice's tables, by object (they all live in mons for the whole call)
+        cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m[2], m[3], m[7][0], m[11][0])}
         state = self.our_state() if approach is not None else None
         plans = [self.ranged_plan(ranged.get(m[6]), m[9]) if ranged else None for m in mons]
         zrng = self.opening_rng
@@ -365,14 +387,14 @@ class DangerMixin:
                 for _try in range(20):
                     h = full = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
-                        h -= int(rng.choice(len(dmg), size=hits, p=dmg).sum())
+                        h -= cdf_draws(rng, cdfs[id(dmg)], hits)
                     if h > 0:
                         break
                 hps.append(max(h, 1))
                 hcap.append(max(full, h, 1))             # regeneration stops at its full HP
             hp, alive, asleep = hp0, list(range(len(mons))), 0
             if approach is not None:
-                end, tainted = self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans,
+                end, tainted = self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs, plans,
                                                hcap, state)
                 if end > 0:
                     wins += TAINTED_WIN if tainted else 1
@@ -384,7 +406,7 @@ class DangerMixin:
                         break
                     j = alive[0]
                     hit = rng.random() < mons[j][1]
-                    d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
+                    d = cdf_draw(rng, cdfs[id(mons[j][2])]) if hit else 0
                     if opening is not None and _turn == 0 and _a == 0:
                         def alive_at(pos):
                             return pos in index and index[pos] in alive
@@ -415,14 +437,14 @@ class DangerMixin:
                     if rng.random() < mons[j][4]:
                         hp = 0
                         break
-                    hp -= int(rng.choice(len(mons[j][3]), p=mons[j][3]))
+                    hp -= cdf_draw(rng, cdfs[id(mons[j][3])])
                 if hp <= 0:
                     break
             if hp > 0:
                 wins += 1
         return wins / sims
 
-    def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, plans=None, hcap=None,
+    def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs, plans=None, hcap=None,
                    state=None):
         """One sampled fight of win_prob with approach (see there): (our HP at its end -- <= 0: lost, tainted: it
         blinded us, gave us lycanthropy, charmed and robbed us or took our gold -- TAINT_AD, a yellow light's or
@@ -449,7 +471,7 @@ class DangerMixin:
                 ready = [j for j in alive if left[j] == 0 and not mons[j][14]]      # never_melee: a floating eye
                 j = ready[0] if ready else None
                 hit = j is not None and rng.random() < mons[j][1] * aim
-                d = int(rng.choice(len(mons[j][2]), p=mons[j][2])) if hit else 0
+                d = cdf_draw(rng, cdfs[id(mons[j][2])]) if hit else 0
                 if opening is not None and _turn == 0 and _a == 0:
                     def alive_at(pos):
                         return pos in index and index[pos] in alive
@@ -511,7 +533,7 @@ class DangerMixin:
                         break
                     if rng.random() < inst:
                         return 0, tainted
-                    hp -= int(rng.choice(len(one), p=one))
+                    hp -= cdf_draw(rng, cdfs[id(one)])
                     if p_taint and rng.random() < p_taint:
                         tainted = True
                     p_plys = mons[j][13][0]
