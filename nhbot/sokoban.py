@@ -53,6 +53,7 @@ ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share o
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
 ZOO_PEACE_TURNS = 50      # a square a look found a peaceful monster on stays closed to the zoo way this long
+ZOO_PEACE_WAIT_MAX = 300  # ticks waited, every way to what is left closed by peaceful monsters, before giving it up
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -105,6 +106,7 @@ class SokoLevel:
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
+        self.zoo_peace_waits = 0      # ticks waited with every way closed by peaceful monsters
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
@@ -684,10 +686,24 @@ class SokobanMixin:
             return self.soko_leave(lv, st)
         # an amulet or a tool seen first, then the closets, then the nearest
         like = self.soko_prize_like(lv, st)
+        if not shut:
+            # the zoo open: of the places left, the one with the easiest way (soko_zoo_walk) -- a peaceful monster
+            # sleeping before a closet's door closes that closet, not the hunt (79059: a pony by the first closet,
+            # the bot backed off from it for 6000 turns)
+            ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts)) for p in todo]
+            ways = [(p, w) for p, w in ways if w[0] is not None]
+            if ways:
+                tgt, (nxt, _) = min(ways, key=lambda pw: (pw[0] not in like, pw[0] not in closets, pw[1][1]))
+                return self.soko_zoo_step(lv, st, nxt)
+            st.zoo_peace_waits += 1
+            if st.zoo_peace_waits <= ZOO_PEACE_WAIT_MAX:
+                self.soko_stats["zoo_peace_wait"] += 1
+                return self.soko_wait()                  # every way closed by peaceful monsters: they may move
+            self.soko_stats["zoo_peace_gave_up"] += 1
+            st.closet_done.update(todo)
+            return True
         todo.sort(key=lambda p: (p not in like, p not in closets, abs(p[0] - here[0]) + abs(p[1] - here[1])))
         tgt = todo[0]
-        if not shut and self.soko_zoo_step(lv, st, tgt, bs, ts):
-            return True
         if self.soko_step_to(lv, st, tgt, bs, ts, extra):
             return True
         self.soko_stats["zoo_no_way"] += 1
@@ -732,9 +748,9 @@ class SokobanMixin:
             return
 
     def soko_zoo_walk(self, lv, st, start, goal, bs, ts):
-        """First step (variant coords) of the way from start to goal with the fewest and weakest monsters to kill
-        on it -- a hostile's square costs ZOO_KILL_COST plus its level, a pet's two steps (we swap), a peaceful's is
-        closed -- by Sokoban's rules (soko_walk). None: no way."""
+        """(first step (variant coords), cost) of the way from start to goal with the fewest and weakest monsters
+        to kill on it -- a hostile's square costs ZOO_KILL_COST plus its level, a pet's two steps (we swap), a
+        peaceful's is closed -- by Sokoban's rules (soko_walk). (None, None): no way."""
         g = self.obs["glyphs"]
         t = self.turn()
         cost = {}
@@ -757,9 +773,9 @@ class SokobanMixin:
             if d > dist[cur]:
                 continue
             if cur == goal:
-                while prev[cur] != start:
+                while cur != start and prev[cur] != start:
                     cur = prev[cur]
-                return cur
+                return cur, d
             for dr, dc in DIRS8:
                 n = (cur[0] + dr, cur[1] + dc)
                 if not free(n) or n in ts or cost.get(n, 1) is None:
@@ -771,17 +787,15 @@ class SokobanMixin:
                 if nd < dist.get(n, 1 << 30):
                     dist[n], prev[n] = nd, cur
                     heapq.heappush(q, (nd, n))
-        return None
+        return None, None
 
-    def soko_zoo_step(self, lv, st, target, bs, ts):
-        """The zoo's door open (unlocked quietly its monsters still sleep; kicked, the wave is over): along the way
-        with the fewest and weakest monsters to the prize (soko_zoo_walk), killing them one at a time -- the one on
-        the next square is attacked ('F'), the others sleep on. A peaceful one there (a look decides): that square
-        closed for a while, the way chosen afresh. True if it acted."""
-        here = st.from_map(self.pos())
-        nxt = self.soko_zoo_walk(lv, st, here, target, bs, ts)
-        if nxt is None or nxt == here:
-            return False
+    def soko_zoo_step(self, lv, st, nxt):
+        """The zoo's door open (unlocked quietly its monsters still sleep; kicked, the wave is over): one step nxt
+        (variant coords) along the way with the fewest and weakest monsters to the prize (soko_zoo_walk), killing
+        them one at a time -- the one on the next square is attacked ('F'), the others sleep on. A peaceful one
+        there (a look decides): that square closed for a while, the way chosen afresh. True: it acted."""
+        if nxt == st.from_map(self.pos()):
+            return self.soko_wait()
         mp = st.to_map(nxt)
         k = G.KIND[int(self.obs["glyphs"][mp])]
         self.cur_act = "soko_zoo"
