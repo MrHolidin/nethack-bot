@@ -544,7 +544,7 @@ class ThievesMixin:
 
     def nymph_zap(self, lv):
         """nymph_wands: zap a thief in a clear line within 7. True if we zapped."""
-        if not self.opts.nymph_wands or self.soko_stealth(lv):
+        if not self.opts.nymph_wands or self.soko_wands_shut(lv):
             return False
         wands = self.attack_wands()
         if not wands:

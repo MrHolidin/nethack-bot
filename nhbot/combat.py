@@ -427,8 +427,9 @@ class CombatMixin:
     def wand_step(self, lv, hostiles):
         """An attack wand when wand_ev_pairs finds a zap that beats fighting on. Never from Elbereth (attacking
         erases it: engrave.c u_wipe_engr), never sleep at one our sleep ray put down (asleep), never at a monster
-        that resists the wand (wand_resisted). Targets asleep come last. None in Sokoban's stealth (soko_stealth)."""
-        if self.soko_stealth(lv):
+        that resists the wand (wand_resisted). Targets asleep come last. None in Sokoban before a level is solved and in
+        its stealth (soko_wands_shut)."""
+        if self.soko_wands_shut(lv):
             return False
         wands = self.attack_wands()
         if not wands:

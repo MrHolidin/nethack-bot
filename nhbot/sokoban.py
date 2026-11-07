@@ -50,6 +50,7 @@ BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster 
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
 ZOO_NEAR = 1              # two awake hostiles this close: back to the corridor east of the zoo's door (step_soko_zoo)
 ZOO_WAIT = 20             # ... where we wait this long for them; none came: they cannot (other monsters in their way)
+ZOO_BACKS = 5             # ... this many times a level at most; then they are fought where they stand
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
 ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
@@ -108,6 +109,7 @@ class SokoLevel:
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
         self.zoo_hp = None            # our HP on the last zoo tick
         self.zoo_back_turn = None     # turn we went back to the corridor last (a wait there follows: ZOO_WAIT)
+        self.zoo_backs = 0            # times we went back to the corridor (ZOO_BACKS at most)
         self.zoo_peace_waits = 0      # ticks waited with every way closed by peaceful monsters
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
@@ -454,21 +456,6 @@ class SokobanMixin:
         st.behind_waits = SOKO_BEHIND_WAITS - 3
         return True
 
-    def soko_zap_over(self, st, d):
-        """Nothing left to throw: a ray along the push at the monster beyond the boulder (a ray passes over
-        boulders; striking's force bolt would break the boulder, sleep coming back would put us down) -- cold
-        first (a Valkyrie resists it). True if zapped."""
-        if self.hallu_blind_ranged():
-            return False
-        order = {"cold": 0, "magic missile": 1, "fire": 2, "lightning": 3}
-        wands = sorted((order[k], l) for l, k in self.attack_wands() if k in order)
-        if not wands:
-            return False
-        self.soko_stats["behind_zap"] += 1
-        self.zap(wands[0][1], DELTA2KEY[d])
-        st.behind_waits = SOKO_BEHIND_WAITS - 3
-        return True
-
     def soko_retreat(self, lv, st, blocker, bs, ts):
         """A monster in the way (a peaceful one on our path, one beyond the boulder that won't go): for
         SOKO_RETREAT turns stand at least 4 squares from it (the nearest such square we reach), then try again."""
@@ -558,7 +545,7 @@ class SokobanMixin:
                 # trap): attack it from beside, else throw over the boulder at it (missiles fly over boulders)
                 if self.soko_attack_at(lv, st, beyond, bs, ts):
                     return True
-                if here == stand and (self.soko_throw_over(st, d) or self.soko_zap_over(st, d)):
+                if here == stand and self.soko_throw_over(st, d):
                     return True
                 # nothing to throw: walk away for a while -- it stays there to get at us; gone from its sight it
                 # may move off, and the push goes
@@ -651,6 +638,14 @@ class SokobanMixin:
             return False
         return self.kinds(lv)[st.to_map(st.zoo_door)] in (G.DOOR_CLOSED, G.DOOR_OPEN)
 
+    def soko_wands_shut(self, lv):
+        """No wand zapped in Sokoban while the level is unsolved -- a force bolt breaks a boulder, a ray or a digging
+        beam does the puzzle no good -- nor in its stealth on the top level (soko_stealth)."""
+        if not self.opts.sokoban or not self.in_sokoban(lv):
+            return False
+        st = self.soko.get(lv.key)
+        return st is None or not st.solved or self.soko_stealth(lv)
+
     def soko_wait(self):
         self.press("s")
         return True
@@ -688,6 +683,10 @@ class SokobanMixin:
         closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         if here in closets:
             self.soko_name_prize()
+        if self.soko_prize_named:
+            self.soko_done = True                          # the prize is ours: the zoo's other piles are not worth it
+            self.soko_stats["prize_elsewhere"] += 1
+            return self.soko_leave(lv, st)
         shut = self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED
         if st.solved_turn is None:
             st.solved_turn = self.turn()
@@ -849,6 +848,15 @@ class SokobanMixin:
                     heapq.heappush(q, (nd, n))
         return None, None
 
+    def soko_zoo_to(self, lv, st, here, target, bs, ts):
+        """A step toward target through the zoo by soko_zoo_walk -- what sleeps on the way is attacked (79042: a
+        plain walk back to the corridor met a sleeper on its next square and stood there 400 turns). True: it
+        acted."""
+        nxt = self.soko_zoo_walk(lv, st, here, target, bs, ts)[0]
+        if nxt is None:
+            return False
+        return self.soko_zoo_step(lv, st, nxt)
+
     def soko_zoo_step(self, lv, st, nxt, mimics=frozenset()):
         """The zoo's door open (unlocked quietly its monsters still sleep; kicked, the wave is over): one step nxt
         (variant coords) along the way with the fewest and weakest monsters to the prize (soko_zoo_walk), killing
@@ -909,8 +917,9 @@ class SokobanMixin:
     def soko_zoo_level(self, lv):
         """Our Sokoban top level with the plan done, the prize hunt on and the zoo's door open: its SokoLevel, else
         None."""
-        if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_done or self.soko_failed:
-            return None
+        if not self.opts.sokoban or not self.in_sokoban(lv) or self.soko_done or self.soko_failed \
+                or self.soko_prize_named:
+            return None                                    # (the prize ours: soko_prize leaves)
         st = self.soko.get(lv.key)
         if st is None or not st.solved or st.lv["up"] is not None or st.zoo_door is None \
                 or self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED:
@@ -957,11 +966,14 @@ class SokobanMixin:
         inside = st.zoo | {st.zoo_door}
         bs, ts = self.soko_state(lv, st)
         t = self.turn()
-        if len(active) >= 2 and here != goal:
+        if len(active) >= 2 and here != goal and (st.zoo_back_turn is not None or st.zoo_backs < ZOO_BACKS):
+            # two that stay by the door and never come out (79042: a yeti and a black unicorn, the bot went back and
+            # forth 1451 times till it died): ZOO_BACKS times, then they are fought
+            if st.zoo_back_turn is None:
+                st.zoo_backs += 1
             st.zoo_back_turn = t
             self.soko_stats["zoo_back"] += 1
-            self.cur_act = "soko_zoo"
-            return self.soko_step_to(lv, st, goal, bs, ts)
+            return self.soko_zoo_to(lv, st, here, goal, bs, ts)
         if here == goal and st.zoo_back_turn is not None:
             y, x = self.pos()
             if any(max(abs(p[0] - y), abs(p[1] - x)) == 1 for p, _ in self.visible_hostiles(lv)):
@@ -981,8 +993,7 @@ class SokobanMixin:
         if c.hp < c.maxhp * ZOO_ENTER_HP and not active:
             if here in inside:
                 self.soko_stats["zoo_back_rest"] += 1
-                self.cur_act = "soko_zoo"
-                return self.soko_step_to(lv, st, goal, bs, ts)
+                return self.soko_zoo_to(lv, st, here, goal, bs, ts)
             return False                                   # soko_prize rests outside the zoo
         extra = bs - st.states[st.i][0]
         nxt = self.soko_zoo_next(lv, st, here, todo, closets, bs, ts, extra)
