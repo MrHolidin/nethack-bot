@@ -339,10 +339,11 @@ class PolicyMixin:
 
     def step_melee(self, c):
         """Attack the weakest-looking (lowest level) adjacent hostile; focus: Smith's rule among several."""
-        if not c.hostiles:
+        hostiles = [t for t in c.hostiles if not self.soko_no_melee(c.lv, t[0])]   # Sokoban's zoo: no exploder
+        if not hostiles:
             return False
-        awake = [t for t in c.hostiles if not self.asleep(c.lv, t[0])]
-        cands = awake or c.hostiles              # one put to sleep comes after every awake one
+        awake = [t for t in hostiles if not self.asleep(c.lv, t[0])]
+        cands = awake or hostiles                # one put to sleep comes after every awake one
         target = min(cands, key=lambda t: self.mon_level(t[0]))[0]
         if len(cands) > 1:
             target = self.focus_target(cands, target)

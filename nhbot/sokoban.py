@@ -24,6 +24,7 @@ walk (mapmem.passable_grid), unknown scrolls are not read (scroll of earth makes
 is this module's.
 """
 import heapq
+import re
 import time
 from collections import Counter, deque
 
@@ -33,6 +34,9 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot import soko_solver
 from nhbot.consts import COLS, DELTA2KEY, FOUNTAIN_GLYPH, NOT_HUNGRY, ROWS, ray_squares
+from nhbot.items import base_name
+from nhbot.monattacks import ATTACKS
+from nhbot.pricemem import appearance
 from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
@@ -64,6 +68,16 @@ ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps
 ZOO_UNSEEN_LEVEL = 7      # ... an unseen one ('I'): its level taken as an invisible stalker's (a black light: 5)
 ZOO_PEACE_TURNS = 50      # a square a look found a peaceful monster on stays closed to the zoo way this long
 ZOO_PEACE_WAIT_MAX = 300  # ticks waited with no way to what is left (peaceful monsters on it), before giving it up
+# monsters that explode, by permonst index: a sphere's or a light's attack is to explode at us (mhitu.c explmu ends in
+# wake_nearto(x, y, 7*7): every sleeper within ~6 squares wakes), a gas spore explodes when it dies (explode.c
+# wake_nearto) -- sokst_v3, 20 games without the prize: 13-29 woken at once in 9 of them. In the zoo never fought hand
+# to hand; the zoo way never through their squares, and next to them only when there is no other way
+ZOO_EXPLODERS = frozenset(i for i, atts in enumerate(ATTACKS) if any(a[0] in ("EXPL", "BOOM") for a in atts))
+# a monster that was hidden shows itself next to us: under the gold every zoo square has (mkroom.c fill_zoo), on the
+# ceiling, as a mimic posing as gold -- awake (uhitm.c wakeup) the moment it shows
+ZOO_REVEAL_RE = re.compile(r"hiding under|drops from the ceiling|was an? [a-z ]*mimic")
+ZOO_ATTACK_RE = re.compile(r"The ([a-z][a-z' -]*?) (?:hits|bites|misses|just misses|stings|butts|kicks|claws|touches|"
+                           r"thrusts|swings|strikes|grabs|engulfs|spits|breathes|gazes)")
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -113,6 +127,7 @@ class SokoLevel:
         self.last_i = -1
         self.closet_done = set()      # top level: the prize closets and the zoo piles looked into
         self.zoo_last = frozenset()   # top level: squares of the hostiles in view on the last zoo tick (map) ...
+        self.zoo_seq = None           # ... and the message count then (soko_zoo_track reads what came since)
         self.zoo_active = set()       # ... and of those awake: seen moving, or next to us when we were hurt
         self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
         self.zoo_unseen = set()       # zoo way: squares where the map showed an unseen monster ('I') -- kept after the
@@ -727,7 +742,10 @@ class SokobanMixin:
         todo = [p for p in closets + sorted(self.soko_piles(lv, st)) if p not in st.closet_done]
         if here in todo:
             had = self.soko_prize_items()
+            seq = self.msg_seq
             self.pickup_matching(["amulet", "bag"], own=True)
+            if "cannot accommodate" in self.text_since(seq) and self.soko_make_room():
+                return True                                # the pick-up again on the next tick
             st.closet_done.add(here)
             new = self.soko_prize_items() - had
             if new:
@@ -762,6 +780,23 @@ class SokobanMixin:
         self.soko_stats["zoo_no_way"] += 1
         st.closet_done.add(tgt)
         return self.soko_wait()
+
+    def soko_make_room(self):
+        """The knapsack's 52 letters all taken and the prize here (79009, 79175: the amulet / the bag in the closet,
+        "Your knapsack cannot accommodate any more items"): the item worth least (value.est_value: what we wear,
+        wield or need comes last; never an amulet or a bag) dropped here, never picked up again (pickup.never_take).
+        True: it dropped one."""
+        inv = [it for it in self.items() if it.ocls not in (nh.COIN_CLASS, nh.AMULET_CLASS) and "bag" not in it.text
+               and not it.on_body and it.key not in self.cant_drop and not self.sac_carrying(it)]
+        if not inv:
+            return False
+        looks = self.carried_by_look()
+        same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
+        it = min(inv, key=lambda it: self.est_value(it, same(it)))
+        self.never_take.add(base_name(it.text)[2])
+        self.soko_stats["room_dropped"] += 1
+        self.drop_units(it.letter)
+        return True
 
     def soko_track(self, lv):
         """Every tick in Sokoban: the amulets and bags we carried when we came onto this square (soko_name_prize
@@ -814,31 +849,43 @@ class SokobanMixin:
         turns). None: no way to any."""
         like = self.soko_prize_like(lv, st)
         mimics = extra - st.real_extra
-        ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts, mimics)) for p in todo]
-        ways = [(p, w) for p, w in ways if w[0] is not None]
-        if not ways:
-            return None
-        return min(ways, key=lambda pw: (pw[0] not in like, pw[0] not in closets, pw[1][1]))[1][0]
+        for near_ok in (False, True):                      # not next to a monster that explodes, if any way can
+            ways = [(p, self.soko_zoo_walk(lv, st, here, p, bs, ts, mimics, near_ok)) for p in todo]
+            ways = [(p, w) for p, w in ways if w[0] is not None]
+            if ways:
+                return min(ways, key=lambda pw: (pw[0] not in like, pw[0] not in closets, pw[1][1]))[1][0]
+        return None
 
-    def soko_zoo_walk(self, lv, st, start, goal, bs, ts, mimics=frozenset()):
+    def soko_zoo_walk(self, lv, st, start, goal, bs, ts, mimics=frozenset(), near_ok=True):
         """(first step (variant coords), cost) of the way from start to goal with the fewest and weakest monsters
         to kill on it -- a hostile's square costs ZOO_KILL_COST plus its level, a pet's two steps (we swap), a
-        peaceful's is closed, a boulder the plan doesn't know (mimics: the top level's giant mimics pose as
-        boulders) costs a kill -- by Sokoban's rules (soko_walk). (None, None): no way."""
+        peaceful's is closed, a monster's that explodes is closed (ZOO_EXPLODERS) and, unless near_ok, the squares
+        next to it too, a boulder the plan doesn't know (mimics: the top level's giant mimics pose as boulders)
+        costs a kill -- by Sokoban's rules (soko_walk). (None, None): no way."""
         g = self.obs["glyphs"]
         t = self.turn()
         cost = {}
+        boom = set()
         for p in st.floor:
             k = G.KIND[int(g[st.to_map(p)])]
             if k == G.PET:
                 cost[p] = 2
             elif k == G.MONSTER and p != start:
                 mp = st.to_map(p)
-                if t - st.zoo_peace.get(p, -ZOO_PEACE_TURNS) < ZOO_PEACE_TURNS \
+                if self.soko_exploder_at(mp):
+                    boom.add(p)
+                    cost[p] = None
+                elif t - st.zoo_peace.get(p, -ZOO_PEACE_TURNS) < ZOO_PEACE_TURNS \
                         or self.peaceful_now(lv, mp, look=False):
                     cost[p] = None
                 else:
                     cost[p] = ZOO_KILL_COST + nh.permonst(nh.glyph_to_mon(int(g[mp]))).mlevel
+        if not near_ok:
+            for b in boom:
+                for dr, dc in DIRS8:
+                    n = (b[0] + dr, b[1] + dc)
+                    if n != start:
+                        cost[n] = None
         for p in mimics:
             cost[p] = ZOO_KILL_COST + 8                    # giant mimic: level 8
         for p in st.zoo_unseen - {start}:
@@ -873,10 +920,11 @@ class SokobanMixin:
         """A step toward target through the zoo by soko_zoo_walk -- what sleeps on the way is attacked (79042: a
         plain walk back to the corridor met a sleeper on its next square and stood there 400 turns). True: it
         acted."""
-        nxt = self.soko_zoo_walk(lv, st, here, target, bs, ts)[0]
-        if nxt is None:
-            return False
-        return self.soko_zoo_step(lv, st, nxt)
+        for near_ok in (False, True):                      # not next to a monster that explodes, if any way can
+            nxt = self.soko_zoo_walk(lv, st, here, target, bs, ts, near_ok=near_ok)[0]
+            if nxt is not None:
+                return self.soko_zoo_step(lv, st, nxt)
+        return False
 
     def soko_zoo_step(self, lv, st, nxt, mimics=frozenset()):
         """The zoo's door open (unlocked quietly its monsters still sleep; kicked, the wave is over): one step nxt
@@ -947,6 +995,26 @@ class SokobanMixin:
                 out.add(p)
         return out
 
+    def soko_exploder_at(self, mp):
+        """The monster shown at mp (map coords) explodes (ZOO_EXPLODERS)."""
+        g = int(self.obs["glyphs"][mp])
+        return G.KIND[g] == G.MONSTER and nh.glyph_to_mon(g) in ZOO_EXPLODERS
+
+    def soko_no_melee(self, lv, pos):
+        """In the zoo (soko_zoo_level): a monster that explodes is never fought hand to hand -- the fight steps ask."""
+        return self.soko_exploder_at(pos) and self.soko_zoo_level(lv) is not None
+
+    def soko_zoo_fight(self, cands):
+        """Attack the weakest (lowest level) of cands (map squares next to us), monsters that explode aside. False:
+        none to attack."""
+        g = self.obs["glyphs"]
+        cands = [p for p in cands if G.KIND[int(g[p])] == G.MONSTER and not self.soko_exploder_at(p)]
+        if not cands:
+            return False
+        self.soko_stats["zoo_fight"] += 1
+        self.attack(min(cands, key=lambda p: nh.permonst(nh.glyph_to_mon(int(g[p]))).mlevel))
+        return True
+
     def soko_zoo_level(self, lv):
         """Our Sokoban top level with the plan done, the prize hunt on and the zoo's door open: its SokoLevel, else
         None."""
@@ -968,11 +1036,17 @@ class SokobanMixin:
         gone = st.zoo_last - now
         moved = {p for p in now - st.zoo_last if any(max(abs(p[0] - q[0]), abs(p[1] - q[1])) <= 2 for q in gone)}
         y, x = self.pos()
-        hit = {p for p in now if max(abs(p[0] - y), abs(p[1] - x)) == 1} \
-            if st.zoo_hp is not None and c.hp < st.zoo_hp else set()
-        st.zoo_active = (st.zoo_active & now) | moved | hit
-        st.zoo_last, st.zoo_hp = now, c.hp
         g = self.obs["glyphs"]
+        adj = {p for p in now if max(abs(p[0] - y), abs(p[1] - x)) == 1}
+        hit = adj if st.zoo_hp is not None and c.hp < st.zoo_hp else set()
+        said = self.text_since(st.zoo_seq) if st.zoo_seq is not None else ""
+        # one that showed itself next to us (hidden under gold, on the ceiling, a mimic: 79003, 79039, 79184 fought
+        # the sleeper on the way while it bit) and one a message names attacking (a miss leaves our HP as it was)
+        revealed = (adj - st.zoo_last) if ZOO_REVEAL_RE.search(said) else set()
+        names = set(ZOO_ATTACK_RE.findall(said))
+        attackers = {p for p in adj if G.monster_name(int(g[p])) in names} if names else set()
+        st.zoo_active = (st.zoo_active & now) | moved | hit | revealed | attackers
+        st.zoo_last, st.zoo_hp, st.zoo_seq = now, c.hp, self.msg_seq
         st.zoo_unseen |= {p for p in st.floor if G.KIND[int(g[st.to_map(p)])] == G.INVIS}
         st.zoo_unseen.discard(st.from_map((y, x)))
         return [p for p in st.zoo_active if max(abs(p[0] - y), abs(p[1] - x)) <= ZOO_NEAR]
@@ -1015,19 +1089,28 @@ class SokobanMixin:
                 return True
             st.zoo_back_turn = None                        # no way back (a peaceful one in it): the retreat is off
             return False
+        y, x = self.pos()
+        boom = [p for p in active if self.soko_exploder_at(p)]
+        if boom:
+            # an awake one that explodes next to us: never hit -- away along the zoo way to the goal square
+            self.soko_stats["zoo_boom_away"] += 1
+            if here != goal and self.soko_zoo_to(lv, st, here, goal, bs, ts):
+                return True
+            return self.soko_wait()
         if here == goal and st.zoo_back_turn is not None:
-            y, x = self.pos()
-            if any(max(abs(p[0] - y), abs(p[1] - x)) == 1 for p, _ in self.visible_hostiles(lv)):
-                st.zoo_back_turn = t
-                return False                               # the one next to us: the fight steps, here
+            near = [p for p, _ in self.visible_hostiles(lv) if max(abs(p[0] - y), abs(p[1] - x)) == 1]
+            if near:
+                st.zoo_back_turn = t                       # the one next to us fought here: an awake one first
+                if self.soko_zoo_fight(active) or self.soko_zoo_fight(near):
+                    return True
             if t - st.zoo_back_turn <= ZOO_WAIT:
                 self.soko_stats["zoo_hold"] += 1
                 self.cur_act = "soko_zoo"
                 return self.soko_wait()                    # waiting for the awake ones to come through the door
             st.zoo_back_turn = None
             st.zoo_active.clear()                          # none came: they cannot -- fought where they stand
-        if active:
-            return False                                   # one awake next to us: the fight steps take it on
+        if active and self.soko_zoo_fight(active):
+            return True                                    # one awake next to us: fought first, not the sleeper on the way
         # from here on soko_prize, not the fight steps, has the turn: those attack whatever sleeps next to us
         # (79016: at a pile in the zoo a panther, then a zruty beside it, at the door a rope golem -- woken, they
         # mauled it, four retreats)

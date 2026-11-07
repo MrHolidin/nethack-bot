@@ -96,6 +96,7 @@ class PickupMixin:
         self._take_state = None        # (food count, encumbrance) frozen while one pickup is judged
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
+        self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
 
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
@@ -109,7 +110,7 @@ class PickupMixin:
         "carry" (worth carrying to sell / use); None: leave it. Never merchandise, known-cursed armor / weapons,
         ammunition without a launcher, rocks / boulders / iron balls; "carry" not while Burdened (the drop step
         would put it down again)."""
-        if "for sale" in text:
+        if "for sale" in text or base_name(text)[2] in self.never_take:
             return None
         food_n, cap = self._take_state or (self.food_count(), self.bl(nh.NLE_BL_CAP))
         ocls, typ = floor_kind(text)
