@@ -138,7 +138,10 @@ class PolicyMixin:
             self.press("<")
             return True
         if lv.key[0] == 2:
-            if self.is_minetown(lv) or self.town_folk_visible():
+            folk = self.town_folk_visible()
+            if self.opts.minetown_folk and folk and lv.key[1] in (3, 4):
+                lv.town_heard = True                  # minetown_folk: its watch / priest / shopkeeper in view
+            if self.is_minetown(lv) or folk:
                 self.minetown_seen = True
             if not self.minetown_seen and lv.key[1] >= 5:
                 self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it

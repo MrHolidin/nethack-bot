@@ -83,7 +83,8 @@ class Level:
         self.shop = np.zeros((ROWS, COLS), dtype=bool)
         self.lep_shut = np.zeros((ROWS, COLS), dtype=bool)   # lep_hall: a room of leprechauns, closed from outside
         self.grotto = False        # Grotto Town (is_grotto)
-        self.town_heard = False    # minetown_sounds: a shop / temple / fountain / sink heard on this Mines level 3-4
+        self.town_heard = False    # Minetown told before seen: heard (minetown_sounds), warned by the watch
+                                   # (minetown_watch), its watch / priest / shopkeeper in view (minetown_folk)
         self.watch_warned = set()  # doors a watchman saw us kick ("Hey, stop damaging that door!")
         self.door_seen = np.zeros((ROWS, COLS), dtype=bool)     # a door / doorway was seen here (an item may cover it)
         self.door_intact = np.zeros((ROWS, COLS), dtype=bool)   # ... an open or closed one: no diagonal moves
@@ -311,7 +312,7 @@ class MapMixin:
         filler Mines levels and Mines' End have none of the three)."""
         if lv is None or lv.key[0] != 2:
             return False
-        if lv.town_heard and (self.opts.minetown_sounds or self.opts.minetown_watch):
+        if lv.town_heard and (self.opts.minetown_sounds or self.opts.minetown_watch or self.opts.minetown_folk):
             return True
         return bool(lv.shop.any() or np.isin(self.terrain_glyphs(lv), (ALTAR_GLYPH, FOUNTAIN_GLYPH)).any())
 
