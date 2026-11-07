@@ -50,14 +50,15 @@ DEFAULTS = {
                                #      be wielded again
     "vault_rob": True,         # A/B +316 [+92, +566]: in a vault with a pick-axe / mattock / wand of digging: take the
                                #      gold, dig down; the guard, if he comes first, is told "Croesus" (nhbot.vault)
-    "vault_bag_out": False,    # A/B: the vault guard asks for every coin, the bag's too (vault.c hidden_gold): taken out
-                               #      of the bag before the gold is dropped
+    "vault_bag_out": True,     # A/B +316 [+84, +574] (9 of 10 guard deaths gone): the vault guard asks for every coin,
+                               #      the bag's too (vault.c hidden_gold): taken out of the bag before the gold is dropped
     "backup_weapon": False,    # A/B: lawful without Excalibur -- the weapon that hits hardest now is wielded (and kept)
                                #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
                                #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
-    "vault_clear": False,      # A/B: a vault we tunnelled into and are leaving: out past its wall (the dug opening is
-                               #      still the vault: in_rooms, the guard comes there), then no other walk back in
+    "vault_clear": True,       # A/B +129 [-3, +274]: a vault we tunnelled into and are leaving: out past its wall (the
+                               #      dug opening is still the vault: in_rooms, the guard comes there), then no other walk
+                               #      back in
     "vault_exit": True,        # A/B -222 [-411, -47] (it looped over gold it would not lift): in a vault we tunnelled
                                #      into (vault_find): out by the tunnel with the gold, no hole down (vault.c: the
                                #      guard comes after 30 turns inside, told "Croesus" if he comes)
