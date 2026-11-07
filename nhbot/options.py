@@ -32,16 +32,17 @@ DEFAULTS = {
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
-    "minetown_sounds": False,  # A/B: on Mines level 3-4 a shop / temple / fountain / sink heard (sounds.c dosounds)
-                               #      makes it Minetown (mapmem.is_minetown) before any of them is seen
+    "minetown_sounds": True,   # accepted (no A/B): on Mines level 3-4 a shop / temple / fountain / sink heard
+                               #      (sounds.c dosounds) makes it Minetown (mapmem.is_minetown) before any is seen
     "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step
                                #      (both ways), not its square -- reached straight from another side it is open
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
                                #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
                                #      Orcish Town: its watch is dead), by shops
-    "trap_noblock": False,     # A/B: a step that failed in the trap we were caught in (bear trap, pit, web) and took its
-                               #      turn counts against no square, however long we are held (not only 30 tries)
+    "trap_noblock": True,      # A/B +76 [-1081, +1220], median +404, starvation 36 -> 24: a step that failed in the
+                               #      trap we were caught in (bear trap, pit, web) and took its turn counts against no
+                               #      square, however long we are held (not only 30 tries)
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while
