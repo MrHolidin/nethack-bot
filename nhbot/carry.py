@@ -259,9 +259,9 @@ class CarryMixin:
                                      or c == nh.WAND_CLASS and "wand of digging" in s):
             return True                      # vault_find: to find a vault and dig to it (nhbot.vault)
         if self.opts.backup_weapon and c == nh.WEAPON_CLASS:
-            bk = self.backup_weapon()
-            if bk is not None and bk.letter == it.letter:
-                return True                  # backup_weapon: what we fight with while the sword is dipped
+            bk = self.backup_best()
+            if bk is not None and bk[1].letter == it.letter:
+                return True                  # backup_weapon: what we fight with while the sword is dipped / rusty
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
         if self.wish_needed(it):

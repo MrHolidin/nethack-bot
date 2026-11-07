@@ -331,6 +331,8 @@ class PolicyMixin:
         if self.opts.loot_now and c.hostiles and self.swapped_for is None and self.tin_slipped is None \
                 and not any(it.wielded for it in self.items()):
             return self.weapon_check()           # loot_now: bare hands in a fight -- the best weapon we carry
+        if self.opts.backup_weapon and c.hostiles and self.swapped_for is None and self.tin_slipped is None:
+            return self.backup_fight_step(c.hostiles)
         return not c.hostiles and self.tin_slipped is None and self.swapped_for is None and self.weapon_check()
 
     def step_wands(self, c):

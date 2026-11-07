@@ -30,6 +30,7 @@ from nhbot import glyphs as G
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
+from nhbot.weapons import SKILL_DMG, SKILL_HIT
 from nhbot.rays import RAY_RESIST, our_protection, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
@@ -174,9 +175,11 @@ class DangerMixin:
         return pmf, 1 - (1 - inst) ** (k + frac / 12)
 
     # ------------------------------------------------------------ our attack: it may die before it acts
-    def our_weapon(self):
-        """(weapon type or None, enchantment, (to-hit die, damage die) of an artifact's attack bonus)."""
-        it = next((i for i in self.items() if i.wielded), None)
+    def our_weapon(self, it=False):
+        """(weapon type or None, enchantment, (to-hit die, damage die) of an artifact's attack bonus) of the weapon
+        in hand -- or of item it (None: bare hands)."""
+        if it is False:
+            it = next((i for i in self.items() if i.wielded), None)
         if it is None:
             return None, 0, (0, 0)
         _, ench, name = base_name(it.text)
@@ -185,13 +188,16 @@ class DangerMixin:
         name = WEAPON_NAME_OF.get(name, name)
         return (name if name in WEAPON_DICE else None), (ench or 0), (0, 0)
 
-    def our_hit_prob(self, name):
-        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20)."""
+    def our_hit_prob(self, name, weapon=False):
+        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20).
+        weapon: an item (None: bare hands) instead of the one in hand, our skill with it counted (weapon_hit_bonus)."""
         pm = PM_BY_NAME[name]
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
         abon = to_hit_abon(st, dx, xl)
-        w, ench, (hit_die, _) = self.our_weapon()
+        w, ench, (hit_die, _) = self.our_weapon(weapon)
         tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
+        if weapon is not False and w:
+            tmp += SKILL_HIT[self.weapon_skill(w)]
         cap = self.bl(nh.NLE_BL_CAP)
         if cap:
             tmp -= cap * 2 - 1                    # encumbrance: near_capacity()
@@ -199,13 +205,16 @@ class DangerMixin:
             return min(max(tmp - 1, 0), 20) / 20
         return sum(min(max(tmp + k - 1, 0), 20) for k in range(1, hit_die + 1)) / (20 * hit_die)   # + rnd(die)
 
-    def our_damage_pmf(self, name):
+    def our_damage_pmf(self, name, weapon=False):
         """weapon.c dmgval -- the small / large die + enchantment (not below 0), then less the erosion (rusty,
-        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die."""
+        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die.
+        weapon: as our_hit_prob (the skill's damage bonus counted: weapon_dam_bonus)."""
         pm = PM_BY_NAME[name]
         dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
-        w, ench, (_, dmg_die) = self.our_weapon()
-        wielded = next((i for i in self.items() if i.wielded), None)
+        w, ench, (_, dmg_die) = self.our_weapon(weapon)
+        if weapon is not False and w:
+            dbon += SKILL_DMG[self.weapon_skill(w)]
+        wielded = next((i for i in self.items() if i.wielded), None) if weapon is False else weapon
         eros = erosion(wielded.text) if w and wielded is not None else 0
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
@@ -302,7 +311,7 @@ class DangerMixin:
                       for k, v in sorted(self.danger_p.items())}}
 
     # ------------------------------------------------------------ the fight to the end
-    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None):
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None, weapon=False):
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
@@ -314,6 +323,7 @@ class DangerMixin:
         monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
         Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
         with and one without the opening see the same monster HP and the same later rolls.
+        weapon (backup_weapon): the fight fought with this item instead of the one in hand (our_hit_prob).
         approach (wand_ev): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
         mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
         only hit monsters next to us (none there: we wait).
@@ -334,7 +344,7 @@ class DangerMixin:
                 continue
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
-            mons.append((max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
+            mons.append((max(lev, 0), self.our_hit_prob(name, weapon), self.our_damage_pmf(name, weapon), rnd_pmf, inst,
                          self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name,
                          self.monster_taint(name), self.monster_turn_pmf(name, 4),
                          bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),

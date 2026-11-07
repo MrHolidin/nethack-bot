@@ -131,8 +131,8 @@ class PickupMixin:
         elif ocls == nh.WEAPON_CLASS and not cursed and typ not in AMMO_TYPES:
             if typ in MISSILE_TYPES:
                 reason = "missile"
-            elif typ in WIELD_TYPES:
-                reason = "weapon"
+            elif typ in WIELD_TYPES or self.backup_wants(text):
+                reason = "weapon"                        # backup_weapon: harder-hitting than the backup we carry
             else:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
@@ -152,7 +152,7 @@ class PickupMixin:
 
     # ------------------------------------------------------------------ explore goals: piles worth a walk
     def weapon_glyphs(self):
-        return WANTED_WEAPON_GLYPH
+        return WANTED_WEAPON_GLYPH | self.backup_glyphs() if self.backup_on() else WANTED_WEAPON_GLYPH
 
     def carry_glyph(self, g):
         """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
