@@ -12,7 +12,8 @@ the boulders (their glyphs) and the traps still open -- and matched against the 
 is the plan's at that state: walk to the square behind the boulder (no squeezing between boulders, never
 diagonally through a door, never onto a trap) and step into it. Nothing in the plan depends on where we stand,
 so a fight, a meal or a pick-up in between is harmless. A state that matches none (a monster's scroll of earth
-dropped boulders): solved afresh from what we see (soko_solver, a few seconds of compute at most). No new plan,
+dropped boulders): solved afresh from what we see (soko_solver, a budget of work for one re-plan and one for the
+game). No new plan,
 a push the game refuses for long, or too many turns on a level: the level is given up and Sokoban with it (we
 go back down). The plan done: up the stairs at full HP -- on the top level kick the zoo's locked door,
 then fetch the prize (bag of holding or amulet of reflection) from its closet -- the zoo crossed by the way with the
@@ -40,7 +41,12 @@ SOKO_BEHIND_WAITS = 10    # waits for a monster beyond the boulder before we go 
 SOKO_RETREAT = 15         # turns away from a peaceful monster that blocks the plan
 SOKO_SEARCH_TURNS = 500  # turns spent searching for hidden passages on the level below the Oracle (no entrance seen)
 SOKO_REPLANS = 3          # re-plans (soko_replan) a level at most
-SOKO_REPLAN_SECS = 2.0    # compute for one re-plan
+# the solver's budget (soko_solver: squares its walks visit, ~2-3 million a second): one re-plan, and all of a game's
+# together -- counted, not timed, so a game runs the same on any machine (the 2 s it had made games differ between
+# CI and here). One re-plan: at most the 2 s it had (measured on every variant from its start: 1.1-2.0 s); the game:
+# five of them (sokst_v2: 18 games of 1000 re-planned 3+ times)
+SOKO_REPLAN_WORK = 3_600_000
+SOKO_GAME_WORK = 5 * SOKO_REPLAN_WORK
 SOKO_TRAPPED_REPLANS = 5  # re-plans at most a level with the way back down shut, one every SOKO_TRAPPED_RETRY turns
 SOKO_TRAPPED_RETRY = 200
 SOKO_DOOR_WAITS = 50      # turns between kicks at a locked door that refused one (wounded legs)
@@ -48,7 +54,8 @@ SOKO_LEAVE_EXPLORE = 500  # ticks of the generic explore to leave a level given 
 SOKO_STUCK = 400          # turns with the plan not advancing (a refused push, an unreachable square): give up
 BEHIND_RE = ("behind the boulder", "on the other side")   # moverock: a monster where the boulder would go
 FILL_RE = ("fills a pit", "plugs a hole", "plugs a trap door")  # do.c boulder_hits_pool / hack.c moverock
-ZOO_NEAR = 1              # two awake hostiles this close: back to the corridor east of the zoo's door (step_soko_zoo)
+ZOO_NEAR = 1              # two awake hostiles this close: back to the corridor east of the zoo's door (step_soko_zoo),
+                          # all the way (a retreat once begun is not given up when they fall behind)
 ZOO_WAIT = 20             # ... where we wait this long for them; none came: they cannot (other monsters in their way)
 ZOO_BACKS = 5             # ... this many times a level at most; then they are fought where they stand
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
@@ -151,6 +158,7 @@ class SokobanMixin:
         self.soko_failed = False        # a level given up: Sokoban is over for this game
         self.soko_stats = Counter()
         self.soko_secs = 0.0            # compute time spent in this module (the tick that acted included)
+        self.soko_work = 0              # the solver's work spent this game (SOKO_GAME_WORK at most)
         self.soko_search_from = None    # turn we began searching the level below the Oracle for the entrance
         self.soko_oracle = None         # the Oracle's Dlvl once seen (soko_oracle_dlvl)
         self.soko_ent = None            # Sokoban's entrance once found (soko_entrance)
@@ -583,17 +591,24 @@ class SokobanMixin:
 
     def soko_replan(self, st, bs, ts, walls=(), force=False):
         """The level no longer matches the plan (a monster's scroll of earth dropped boulders, a wand of striking
-        broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_SECS of compute), at most
-        SOKO_REPLANS times a level (force: whatever the count). True if a new plan was found -- we follow it from
-        its start."""
+        broke one): solve it afresh from what we see (soko_solver, SOKO_REPLAN_WORK of work, what is left of
+        SOKO_GAME_WORK at most), at most SOKO_REPLANS times a level (force: whatever the count). True if a new plan
+        was found -- we follow it from its start."""
         if st.replans >= SOKO_REPLANS and not force:
+            return False
+        left = SOKO_GAME_WORK - self.soko_work
+        if left <= 0:
+            self.soko_stats["replan_no_work"] += 1
             return False
         st.replans += 1
         solver = SOLVERS.get(st.name)
         if solver is None:
             solver = SOLVERS[st.name] = soko_solver.Level(st.lv)
         here = st.from_map(self.pos())
-        plan = solver.solve(budget=SOKO_REPLAN_SECS, start=(bs, ts, here), walls=walls) if here in st.floor else None
+        plan = None
+        if here in st.floor:
+            plan = solver.solve(budget=min(SOKO_REPLAN_WORK, left), start=(bs, ts, here), walls=walls)
+            self.soko_work += solver.spent
         if plan is None:
             self.soko_stats["replan_fail"] += 1
             return False
@@ -966,14 +981,19 @@ class SokobanMixin:
         inside = st.zoo | {st.zoo_door}
         bs, ts = self.soko_state(lv, st)
         t = self.turn()
-        if len(active) >= 2 and here != goal and (st.zoo_back_turn is not None or st.zoo_backs < ZOO_BACKS):
+        # a retreat once begun goes all the way to the goal square: one step back put the two out of reach and the
+        # next went forward again, back and forth for thousands of turns (sokst_v2 79632, 79008: 8335 steps back)
+        if here != goal and (st.zoo_back_turn is not None or (len(active) >= 2 and st.zoo_backs < ZOO_BACKS)):
             # two that stay by the door and never come out (79042: a yeti and a black unicorn, the bot went back and
             # forth 1451 times till it died): ZOO_BACKS times, then they are fought
             if st.zoo_back_turn is None:
                 st.zoo_backs += 1
+                self.soko_stats["zoo_back"] += 1
             st.zoo_back_turn = t
-            self.soko_stats["zoo_back"] += 1
-            return self.soko_zoo_to(lv, st, here, goal, bs, ts)
+            if self.soko_zoo_to(lv, st, here, goal, bs, ts):
+                return True
+            st.zoo_back_turn = None                        # no way back (a peaceful one in it): the retreat is off
+            return False
         if here == goal and st.zoo_back_turn is not None:
             y, x = self.pos()
             if any(max(abs(p[0] - y), abs(p[1] - x)) == 1 for p, _ in self.visible_hostiles(lv)):

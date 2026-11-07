@@ -3,6 +3,10 @@ a plan -- the pushes, in order, that open the way to the goal. tools/soko_solve.
 soko_data.py carries; the bot runs it when a level no longer matches its plan (nhbot/sokoban.py: a monster's
 scroll of earth dropped boulders, a wand of striking broke one) -- from the state it sees, with a budget.
 
+The budget counts work, not seconds: the squares the hero's walks visit (walk(), where the search spends nearly all
+its time -- ~2-3 million a second here on every variant). A search with a budget runs the same on any machine and
+under any load: the bot's game no longer depends on how fast the computer is.
+
 The rules (hack.c moverock / test_move under Sokoban): a boulder is pushed only orthogonally, into a square free
 of walls, doors and boulders; pushed into a pit or hole it fills it (both go); the hero never steps onto an open
 trap, moves diagonally only if the two squares beside the move are not both wall or boulder, and never through a
@@ -10,7 +14,6 @@ doorway diagonally. A plan is the list of pushes, each (boulder square, directio
 pushes is free -- any square the walk reaches.
 """
 import heapq
-import time
 from collections import deque
 
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
@@ -64,6 +67,8 @@ class Level:
             self.steps.append(out)
         self.dirs = tuple(dr * w + dc for dr, dc in ORTHO)
         self._dist = {}
+        self.spent = 0                         # squares the walks visited in the last solve (its budget's unit)
+        self.left = None                       # what is left of that solve's budget (None: no limit)
 
     def blocked(self, i, bs):
         return self.wall[i] or i in bs
@@ -82,7 +87,11 @@ class Level:
                     continue
                 seen.add(n)
                 stack.append(n)
+        self.spent += len(seen)
         return seen
+
+    def out_of_budget(self):
+        return self.left is not None and self.spent >= self.left
 
     def pushes(self, reach, bs, ts):
         wall = self.wall
@@ -117,7 +126,7 @@ class Level:
         dist = self.push_dist(ts)
         return sum(1 for b in bs if b in dist) >= len(ts)
 
-    def fill_one(self, bs, ts, pos, want=4, limit=200_000, weight=2, t_end=None):
+    def fill_one(self, bs, ts, pos, want=4, limit=200_000, weight=2):
         """Best-first over pushes from this state until a trap is filled: up to `want` distinct results
         (boulders left, traps left, hero square, pushes as a linked list). Priority: pushes so far + weight *
         the fewest pushes any boulder needs to some open trap (walls only, push_dist of that trap alone)."""
@@ -133,8 +142,8 @@ class Level:
         heap = [(weight * hmin(bs), 0, tick, bs, pos, ())]
         results = []
         while heap and tick < limit:
-            if t_end is not None and tick & 255 == 0 and time.perf_counter() > t_end:
-                break                          # out of compute (solve's budget)
+            if self.out_of_budget():
+                break                          # solve's budget spent
             _, g, _, cbs, cpos, plan = heapq.heappop(heap)
             reach = self.walk(cpos, cbs, ts)
             for b, d, to in self.pushes(reach, cbs, ts):
@@ -160,9 +169,10 @@ class Level:
                 heapq.heappush(heap, (g + 1 + weight * hv, g + 1, tick, nbf, b, (plan, (b, d))))
         return results
 
-    def solve(self, want=4, budget=600, start=None, walls=()):
+    def solve(self, want=4, budget=None, start=None, walls=()):
         """Trap by trap (fill_one), depth first with backtracking over the alternatives each step offers;
-        returns the plan -- a list of ((row, col), (drow, dcol)) -- or None. budget: seconds (of compute).
+        returns the plan -- a list of ((row, col), (drow, dcol)) -- or None. budget: squares the walks may visit
+        (None: no limit); self.spent tells what this search used.
         start: (boulders, open traps, hero square), (row, col) each -- the level's own start by default.
         walls: more squares taken as wall for this search (a monster that won't leave)."""
         if not walls:
@@ -179,11 +189,11 @@ class Level:
 
     def _solve(self, want, budget, start):
         lv = self.lv
-        t_end = time.perf_counter() + budget
+        self.spent, self.left = 0, budget
         dead = set()
 
         def rec(bs, ts, pos, plan):
-            if time.perf_counter() > t_end:
+            if self.out_of_budget():
                 return None
             reach = self.walk(pos, bs, ts)
             if self.goal in reach:
@@ -191,7 +201,7 @@ class Level:
             key = (bs, ts, min(reach))
             if key in dead or not ts:
                 return None
-            for nb, nt, npos, nplan in self.fill_one(bs, ts, pos, want, t_end=t_end):
+            for nb, nt, npos, nplan in self.fill_one(bs, ts, pos, want):
                 got = rec(nb, nt, npos, (plan, nplan))
                 if got is not None:
                     return got
