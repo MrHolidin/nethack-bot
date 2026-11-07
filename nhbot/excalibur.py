@@ -35,6 +35,7 @@ class ExcaliburMixin:
         self.fhide_stats = Counter()
         self.fountain_leave = None       # fountain_elb: level key to leave by the stairs down after a hide
         self.fountain_rehides = Counter()  # fountain_rehide: level key -> hides on the way off it
+        self.fountain_roam = None        # fountain_stay: level key where what a dip brought out still roams
 
     def long_sword(self):
         for it in self.items():
@@ -347,6 +348,9 @@ class ExcaliburMixin:
         st = self.fhide
         if self.opts.fountain_elb and self.fountain_leave is not None and st is None:
             return self.fountain_leave_step(lv, hostiles)
+        idle = st is None or (st["phase"] == "ready" and not st["hiding"] and self.pos() not in (st["fountain"], st["sq"]))
+        if self.opts.fountain_elb and self.opts.fountain_stay and idle and self.fountain_roam == lv.key and hostiles:
+            return self.fountain_rehide_step(lv, hostiles)   # fountain_stay: caught away from a fountain we dip at
         if not self.opts.fountain_elb or st is None or st["key"] != lv.key or not st["sq"]:
             return False
         here, sq, ftn = self.pos(), st["sq"], st["fountain"]
@@ -440,6 +444,9 @@ class ExcaliburMixin:
             self.fountain_shut.add((lv.key, ftn))        # this fountain is left
         self.fhide_stats["left"] += 1
         self.fhide = None
+        if self.opts.fountain_stay:
+            self.fountain_roam = lv.key                  # fountain_stay: the other fountains here still dipped (when
+            return False                                 # nothing is in view: housekeeping), a hide again if caught
         self.excal_skip.add(lv.key)                      # what came out still roams here: no more dips on this
         self.fountain_leave = lv.key                     # level, and off it by the stairs down
         return False

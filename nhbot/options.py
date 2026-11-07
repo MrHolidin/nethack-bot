@@ -58,6 +58,8 @@ DEFAULTS = {
                                #      Elbereth written there, a hide again, then on our way (not a fight)
     "fountain_retreat": False, # A/B (with fountain_elb): the Elbereth square taken by what the dip brought out -- the
                                #      new one on the first step of our way off the level, not the one fewest are next to
+    "fountain_stay": False,    # A/B (with fountain_elb, fountain_rehide): after a hide the level is not left -- its other
+                               #      fountains are still dipped (nothing in view), caught on the way: a hide again
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
                                #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
     "vault_clear": True,       # A/B +129 [-3, +274]: a vault we tunnelled into and are leaving: out past its wall (the
