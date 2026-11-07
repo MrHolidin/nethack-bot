@@ -117,6 +117,27 @@ class GameMixin:
         self.settle()
         return False
 
+    def call_type(self, letter, name):
+        """#call the type of the inventory item letter: name (C, "the type of an object in inventory"). Its items
+        then read "<appearance> called <name>". True if the name was given."""
+        self.raw_step(ord("C"))
+        if "What do you want to name?" not in self.tty_text():
+            self.settle()
+            return False
+        self.raw_step(ord("o"))
+        if not self.obs["misc"][0] or "call" not in self.message().lower():
+            self.settle()                     # "You don't have anything to call." (all of its kind known)
+            return False
+        self.raw_step(ord(letter))
+        if not self.obs["misc"][1]:
+            self.settle()                     # no name asked: already identified
+            return False
+        for c in name:
+            self.raw_step(ord(c))
+        self.raw_step(13)
+        self.settle()
+        return True
+
     def answer_yn(self, msg):
         m = msg.lower()
         if "offers" in m and "sell" in m:

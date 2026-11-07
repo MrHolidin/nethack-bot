@@ -3,7 +3,8 @@ nhbot/soko_data.py (tools/soko_solve.py made them offline), the prize taken, and
 
 The way in: a main-dungeon level of Dlvl 5-10 with two up staircases, one of them taken to the level above
 (Level.stairs_to) -- the other is Sokoban's (dungeon.def: the branch is up from the Oracle's level + 1); or one
-we took into Sokoban before. With nothing else left to do on that level (explore) and full HP, go up it.
+we took into Sokoban before. With nothing else left to do on that level (explore), full HP and not hungry, go
+up it.
 
 In Sokoban: every level is premapped (sokoban.des FLAGS), so on arrival the walls tell which of the eight
 variants this is and where it lies on the screen (soko_identify). The state is read from the map each tick --
@@ -13,8 +14,9 @@ diagonally through a door, never onto a trap) and step into it. Nothing in the p
 so a fight, a meal or a pick-up in between is harmless. A state that matches none (a monster's scroll of earth
 dropped boulders): solved afresh from what we see (soko_solver, a few seconds of compute at most). No new plan,
 a push the game refuses for long, or too many turns on a level: the level is given up and Sokoban with it (we
-go back down). The plan done: up the stairs -- on the top level kick the zoo's locked door,
-then fetch the prize (bag of holding or amulet of reflection) from its closet, wear an amulet.
+go back down). The plan done: up the stairs at full HP -- on the top level kick the zoo's locked door,
+then fetch the prize (bag of holding or amulet of reflection) from its closet, #call its type by its real name,
+wear an amulet.
 
 While in Sokoban the generic code must not break the puzzle: boulders and traps are impassable to every other
 walk (mapmem.passable_grid), unknown scrolls are not read (scroll of earth makes boulders), and the explore step
@@ -28,7 +30,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot import soko_solver
-from nhbot.consts import COLS, DELTA2KEY, FOUNTAIN_GLYPH, ROWS, ray_squares
+from nhbot.consts import COLS, DELTA2KEY, FOUNTAIN_GLYPH, NOT_HUNGRY, ROWS, ray_squares
 from nhbot.soko_data import LEVELS
 
 SOKO_DNUM = 4             # dungeon.def: Dungeons of Doom 0, Gehennom 1, Mines 2, Quest 3, Sokoban 4
@@ -101,6 +103,7 @@ class SokoLevel:
         self.zoo_hold = 0             # turns spent holding the doorway
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
+        self.inv_outside = None       # soko_prize_items() on the last tick outside the prize closets
         self.filled = set()           # traps our pushes filled (the message said so): closed whatever the map shows
         rows = self.lv["map"]
         self.h, self.w = len(rows), len(rows[0])
@@ -192,11 +195,10 @@ class SokobanMixin:
             return False
         if not nothing_left:
             return False
-        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp < maxhp and not self.visible_hostiles(lv):
-            self.cur_act = "rest"
-            self.soko_stats["rest"] += 1
-            self.press("2"); self.press("0"); self.press("s")
+        if self.bl(nh.NLE_BL_HUNGER) > NOT_HUNGRY:
+            self.soko_stats["hungry_hold"] += 1
+            return False                                   # not up hungry: four levels of pushing ahead
+        if self.soko_rest(lv):
             return True
         mask = np.zeros_like(grids[0], dtype=bool)
         for p in ups:
@@ -579,6 +581,16 @@ class SokobanMixin:
         st.plan, st.states, st.i, st.last_i = plan, plan_states(bs, ts, plan), 0, -1
         return True
 
+    def soko_rest(self, lv):
+        """Below full HP with no hostile in view: rest (20s, the game stops it when something shows up). True if
+        it used the turn."""
+        if self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX) or self.visible_hostiles(lv):
+            return False
+        self.cur_act = "rest"
+        self.soko_stats["rest"] += 1
+        self.press("2"); self.press("0"); self.press("s")
+        return True
+
     def soko_wait(self):
         self.press("s")
         return True
@@ -592,6 +604,8 @@ class SokobanMixin:
         here = st.from_map(self.pos())
         if st.lv["up"] is not None:
             if here == goal:
+                if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX):
+                    return self.soko_rest(lv) or self.soko_wait()     # up the stairs only at full HP
                 self.soko_stats["up"] += 1
                 self.took_stairs = True
                 self.press("<")
@@ -611,6 +625,12 @@ class SokobanMixin:
             st.prize_inv0 = self.soko_prize_items()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         here = st.from_map(self.pos())
+        closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
+        # an amulet or a bag that came while we stand in a closet came from it -- whichever step picked it up
+        if here in closets and st.inv_outside is not None:
+            self.soko_name_prize(self.soko_prize_items() - st.inv_outside)
+        else:
+            st.inv_outside = self.soko_prize_items()
         shut = self.kinds(lv)[st.to_map(st.zoo_door)] == G.DOOR_CLOSED
         if st.solved_turn is None:
             st.solved_turn = self.turn()
@@ -627,7 +647,6 @@ class SokobanMixin:
             self.cur_act = "rest"
             self.press("2"); self.press("0"); self.press("s")
             return True
-        closets = [(p[0], p[1] - 1) for p, s in st.lv["doors"].items() if s == "closed"]
         # a monster of the zoo may have carried the prize off (they go for an amulet of reflection) and dropped
         # it where it died -- under its corpse, the pile shows its top: the piles in the zoo and on its door
         # are looked into too
@@ -639,6 +658,7 @@ class SokobanMixin:
             new = self.soko_prize_items() - had
             if new:
                 self.soko_stats["prize"] += 1
+                self.soko_name_prize(new)
                 # an amulet from a closet is the prize, reflection (one from a pile in the zoo may be anything)
                 am = next((it for it in self.items() if it.letter in new and it.ocls == nh.AMULET_CLASS), None)
                 if am is not None and here in closets:
@@ -661,6 +681,22 @@ class SokobanMixin:
         self.soko_stats["zoo_no_way"] += 1
         st.closet_done.add(tgt)
         return self.soko_wait()
+
+    def soko_name_prize(self, letters):
+        """The prize just taken from a closet is known by where it lay (sokoban.des: the bag of holding or the
+        amulet of reflection): its type called so at once, so everything reading item names knows it -- "reflection"
+        (equipment, rays, jewelry), "bag of holding" (goldbag's bag rank)."""
+        for it in self.items():
+            if it.letter not in letters:
+                continue
+            if it.ocls == nh.AMULET_CLASS and "reflection" not in it.text:
+                name = "reflection"
+            elif "bag" in it.text and "holding" not in it.text:
+                name = "bag of holding"
+            else:
+                continue
+            if self.call_type(it.letter, name):
+                self.soko_stats["prize_named"] += 1
 
     def soko_prize_items(self):
         """Inventory letters of the amulets and bags we carry."""
