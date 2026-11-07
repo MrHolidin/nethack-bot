@@ -56,6 +56,8 @@ DEFAULTS = {
                                #      when it is not the long sword; the sword only goes into fountains (nhbot.weapons)
     "fountain_rehide": False,  # A/B (with fountain_elb): leaving the level after a hide, caught by what beats us --
                                #      Elbereth written there, a hide again, then on our way (not a fight)
+    "fountain_retreat": False, # A/B (with fountain_elb): the Elbereth square taken by what the dip brought out -- the
+                               #      new one on the first step of our way off the level, not the one fewest are next to
     "fountain_elb": False,     # A/B: before a fountain dip, Elbereth written next to it; what the dip brings out beats us
                                #      (P(win) < 0.75): onto it until nothing is near, then that fountain is left
     "vault_clear": True,       # A/B +129 [-3, +274]: a vault we tunnelled into and are leaving: out past its wall (the

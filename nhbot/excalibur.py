@@ -95,14 +95,7 @@ class ExcaliburMixin:
 
     def excal_go_up(self, lv):
         """No fountain here, but one is remembered a few levels up: walk back up to it."""
-        if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
-            return False
-        dl = lv.key[1]
-        targets = [k for k, l in self.levels.items()
-                   if k[0] == 0 and dl - self.opts.excal_up <= k[1] < dl and k not in self.excal_skip
-                   and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH).any()
-                   and not (l.shop.any() and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH)[l.shop].all())]
-        if not targets:
+        if not self.excal_up_wanted(lv):
             return False
         k_mem = self.grids(lv)[0]
         up = k_mem == G.UPSTAIR
@@ -115,6 +108,16 @@ class ExcaliburMixin:
             self.press("<")
             return True
         return self.walk_to(lv, up, max_cost=self.opts.excal_cost_up, act="excal")[0] == "moved"
+
+    def excal_up_wanted(self, lv):
+        """A fountain is remembered a few levels up (not skipped, not all in shops) and trips are left."""
+        if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
+            return False
+        dl = lv.key[1]
+        return any(k[0] == 0 and dl - self.opts.excal_up <= k[1] < dl and k not in self.excal_skip
+                   and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH).any()
+                   and not (l.shop.any() and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH)[l.shop].all())
+                   for k, l in self.levels.items())
 
     def dip(self, lv):
         it = self.long_sword()
@@ -402,7 +405,8 @@ class ExcaliburMixin:
                 if not free:
                     self.fhide = None                    # boxed in: fight as ever
                     return False
-                sq = st["sq"] = min(free, key=lambda q: sum(1 for p, _ in vis if dist(p, q) <= 1))
+                sq = self.fountain_retreat_square(lv, free) if self.opts.fountain_retreat else None
+                sq = st["sq"] = sq or min(free, key=lambda q: sum(1 for p, _ in vis if dist(p, q) <= 1))
                 st["fresh"] = True                       # a new one: written once we stand there
                 self.fhide_stats["moved_square"] += 1
             if dist(here, sq) == 1:
@@ -439,6 +443,31 @@ class ExcaliburMixin:
         self.excal_skip.add(lv.key)                      # what came out still roams here: no more dips on this
         self.fountain_leave = lv.key                     # level, and off it by the stairs down
         return False
+
+    def fountain_leave_goal(self, lv):
+        """Where fountain_leave_step will head off this level: the up stairs while a fountain above is still
+        wanted for Excalibur, else the down stairs we know. None: neither known."""
+        k_mem = self.grids(lv)[0]
+        up = k_mem == G.UPSTAIR
+        if self.excal_eligible() and self.excal_up_wanted(lv) and up.any():
+            return up
+        down = self.kinds(lv) == G.DOWNSTAIR
+        return down if down.any() else None
+
+    def fountain_retreat_square(self, lv, free):
+        """fountain_retreat: of the free squares next to us, the first step of our way off the level
+        (fountain_leave_goal) -- the Elbereth goes there. None: that step is not free (or no way known)."""
+        goal = self.fountain_leave_goal(lv)
+        if goal is None:
+            return None
+        here = self.pos()
+        k_mem, k_live, passable = self.grids(lv)
+        _, prev, reached = self.dijkstra(lv, k_mem, k_live, passable, here, goal, want_dist=False)
+        step = self.first_step(prev, here, reached) if reached is not None else None
+        if step in free:
+            self.fhide_stats["retreat_square"] += 1
+            return step
+        return None
 
     def fountain_rehide_step(self, lv, hostiles):
         """fountain_rehide, on the way off the level after a hide: caught (something next to us) by what beats us
