@@ -140,8 +140,7 @@ class ExploreMixin:
             if self.rest_before_descent(lv):
                 return True
             self.mines_return_descents += self.mines_return_on
-            self.took_stairs = True
-            self.press(">")
+            self.take_stairs(">")
             return True
         return self.walk_to(lv, downstairs, chase="downstairs", grids=grids)[0] == "moved"
 
@@ -321,8 +320,7 @@ class ExploreMixin:
             if not self.go_down(lv, grids, mask):
                 return False
         elif mask[self.pos()]:
-            self.took_stairs = True
-            self.press("<")
+            self.take_stairs("<")
         else:
             return self.walk_to(lv, mask, grids=grids)[0] == "moved"
         if re.search(r"You can't go (?:down|up) here", self.message()):
@@ -369,8 +367,7 @@ class ExploreMixin:
         if up[start]:
             if lv.key[1] == 1:
                 self.pending_mines_mark = True      # next tick, on the branch level: mark its Mines staircase
-            self.took_stairs = True
-            self.press("<")
+            self.take_stairs("<")
             return True
         return up.any() and self.walk_to(lv, up, grids=grids)[0] == "moved"
 

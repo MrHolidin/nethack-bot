@@ -35,32 +35,6 @@ class ElberethMixin:
         self.elb_only_c = 0
         self.elb_stats = collections.Counter()   # reads, confirmed rests, nymph engravings
 
-    def engrave(self, stylus, text):
-        """E with stylus ('-': fingers, or an inventory letter) and write text, answering what comes between:
-        'add to the current engraving?' (no), --More--, and the wish a wand of wishing grants. True if the
-        text was written."""
-        if not self.ask("E", "write with"):
-            return False
-        self.press(stylus, expect_prompt=True)
-        for _ in range(8):
-            if self.obs["misc"][0]:          # "Do you want to add to the current engraving?"
-                self.press("n", expect_prompt=True)
-                continue
-            if "--more--" in self.tty_text().lower():
-                self.raw_step(13)
-                continue
-            if self.obs["misc"][1] and "wish" in self.top_line().lower():
-                self.answer_wish()               # zap.c zapnodir: engraving with a wand of wishing zaps it
-                continue
-            break
-        if self.obs["misc"][1]:
-            for c in text:
-                self.raw_step(ord(c))
-            self.press(13)
-            return True
-        self.settle()
-        return False
-
     def engrave_elbereth(self):
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
             return False                         # hallucinating: each letter garbled 1 in 2 (engrave.c)

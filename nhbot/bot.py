@@ -35,6 +35,7 @@ from nhbot.value import ValueMixin
 from nhbot.wandid import WandIdMixin
 from nhbot.danger import DangerMixin
 from nhbot.tins import TinMixin
+from nhbot.actions import ActionsMixin
 from nhbot.altar import AltarMixin
 from nhbot.potiontest import PotionTestMixin
 from nhbot.jewelry import JewelryMixin
@@ -51,7 +52,7 @@ from nhbot.locktools import LockToolMixin
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
 
-class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
+class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
@@ -115,11 +116,9 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.tick_seq = 0         # msg_seq at the start of this tick
         self.cur_key = None
         self.last_move_target = None
-        self.last_attack_target = None
         self.last_pray = None
         self.prayers = 0
         self.pray_failed = 0
-        self.throws = 0
         self.lycanthropy = False
         self.deadly_prayers = 0
         self.stun_waits = 0
@@ -165,7 +164,6 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.minetown_seen = False
         self.mines_return_log = []
         self.prev_key = None
-        self.took_stairs = False
         self.retrieve = []
         self.elbereths = 0
         self.corpses_eaten = 0
@@ -175,8 +173,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.start_ac = None             # AC once the game is set up (summary)
         self.death_msgs = []
         self.equip_init()
-        self.last_stair_dir = None
-        self.stair_from = None           # (level key, square) of the staircase we last took
+        self.actions_init()
         self.perception_init()
         self.survival_init()
         self.explore_init()

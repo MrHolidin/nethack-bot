@@ -9,7 +9,6 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
 from nhbot.danger import adj_level, dice_pmf
-from nhbot.goals import GOALS
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, PM_BY_NAME, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
@@ -112,27 +111,12 @@ def wand_effect(kind, name, depth, xl):
 class CombatMixin:
     def combat_init(self):
         self.kill_by = Counter()       # our kills, by kind
-        self.zaps = 0
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
         self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
-        self.own_zap_turn = -99        # a bouncing ray of ours is not an enemy shooter
         self.prey_cache = {}             # prey_win by state
-
-    def attack(self, target):
-        self.cur_act = "fight"
-        y, x = self.pos()
-        if (target[0] - y, target[1] - x) not in DELTA2KEY:   # we were moved this tick (e.g. teleported)
-            self.press("s")
-            return
-        key = DELTA2KEY[(target[0] - y, target[1] - x)]
-        self.last_attack_target = target
-        self.attack_turn = self.turn()           # danger: the monster we hit first may not act
-        self.last_move_target = None
-        self.press("F")
-        self.press(key)
 
     def throwables(self):
         if self.handless():
@@ -172,21 +156,6 @@ class CombatMixin:
             if line_clear(k_mem, g, y, x, sy, sx, d):
                 return DELTA2KEY[(sy, sx)], d, (ty, tx), (sy, sx)
         return None
-
-    def throw(self, letter, key, ray):
-        if not self.ask("t", "throw"):
-            return
-        self.press(letter, expect_prompt=True)
-        if "direction" not in self.message().lower() and self.obs["misc"][0] == 0:
-            self.msg_audit["throw_key_without_direction"] += 1
-        if "direction" in self.message().lower() or self.obs["misc"][0] == 0:
-            self.press(key)
-        else:
-            self.settle()
-        self.throws += 1
-        self.elb_scuffed()                       # a throw scuffs the engraving under us
-        self.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
-        self.goal_event("retrieve", "created")
 
     def retrieve_goals(self, lv):
         """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
@@ -384,24 +353,6 @@ class CombatMixin:
                 out.append((letter, kind))
         prio = {"sleep": 0, "striking": 1, "magic missile": 2, "cold": 3, "fire": 4, "lightning": 5}
         return sorted(out, key=lambda t: prio.get(t[1], 9))
-
-    def zap(self, letter, key):
-        self.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
-        seq0 = self.msg_seq
-        wand = next(it for it in self.items() if it.letter == letter)
-        if not self.ask("z", "zap"):
-            return False
-        self.press(letter, expect_prompt=True)
-        m = self.message().lower()
-        if "direction" in m:
-            self.press(key)
-        else:
-            self.settle()
-        msgs = self.text_since(seq0)
-        self.note_wand_use(wand, msgs)                   # charges.py
-        self.zaps += 1
-        self.note_slept(key, msgs)
-        return True
 
     def note_slept(self, key, msgs):
         """Our zap in direction key put these to sleep ("The sleep ray hits the X"): remember the monsters of

@@ -37,17 +37,8 @@ class GameMixin:
     def press(self, key, expect_prompt=False):
         """Send one key, then clear --More-- and unexpected menus/prompts."""
         code = ord(key) if isinstance(key, str) else key
-        if key in ("<", ">"):
-            self.last_stair_dir = key
-            self.stair_from = (self.cur_key, self.pos())    # where this staircase leads: step_level_arrival
         self.raw_step(code)
         self.settle(expect_prompt)
-
-    def search_turns(self, n):
-        """Rest / search n turns: the count, then 's' ("20s"); the game stops early when something shows up."""
-        for c in str(n):
-            self.press(c)
-        self.press("s")
 
     def settle(self, expect_prompt=False):
         for _ in range(50):

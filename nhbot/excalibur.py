@@ -90,7 +90,7 @@ class ExcaliburMixin:
         if up[y, x]:
             self.cur_act = "excal"
             self.excal_trips += 1
-            self.press("<")
+            self.take_stairs("<")
             return True
         return self.walk_to(lv, up, max_cost=self.opts.excal_cost_up, act="excal")[0] == "moved"
 

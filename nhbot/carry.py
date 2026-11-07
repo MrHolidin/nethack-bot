@@ -188,23 +188,6 @@ class CarryMixin:
 
     # ------------------------------------------------------------ pick up
     # ------------------------------------------------------------ never Burdened
-    def drop_units(self, letter, n=None):
-        """Drop n of a stack (all if None); remember the square."""
-        item = next((it for it in self.items() if it.letter == letter), None)
-        s = item.text if item else ""
-        m = re.match(r"^(\d+) ", s)
-        self.last_drop_qty = n or (int(m.group(1)) if m else 1)
-        self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
-        seq0 = self.msg_seq
-        if not self.ask("d", "drop"):
-            return
-        if n:
-            for c in str(n):
-                self.raw_step(ord(c))
-        self.press(letter)
-        if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
-            self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
-
     def carry_drop_step(self, force=False, max_tier=4):
         """Encumbered (or force): drop one unit of the item of lowest value per weight (nhbot.value: what we
         wear / wield / need comes last, being worth VALUE_MAX); max_tier < 4: nothing on the body. True if it

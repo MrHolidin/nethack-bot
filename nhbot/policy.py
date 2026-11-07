@@ -132,7 +132,7 @@ class PolicyMixin:
                 and arrived_by_stairs:
             self.mines_bounced.add(lv.key)
             self.pending_mines_mark = True
-            self.press("<")
+            self.take_stairs("<")
             return True
         if lv.key[0] == 2:
             folk = self.town_folk_visible()
@@ -179,8 +179,7 @@ class PolicyMixin:
         y, x = c.y, c.x
         ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
         if int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5:
-            self.last_attack_target = None
-            self.press("F"); self.press("h")
+            self.attack_engulfer()
             return True
         return False
 
