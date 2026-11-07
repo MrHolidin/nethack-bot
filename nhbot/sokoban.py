@@ -15,13 +15,14 @@ so a fight, a meal or a pick-up in between is harmless. A state that matches non
 dropped boulders): solved afresh from what we see (soko_solver, a few seconds of compute at most). No new plan,
 a push the game refuses for long, or too many turns on a level: the level is given up and Sokoban with it (we
 go back down). The plan done: up the stairs at full HP -- on the top level kick the zoo's locked door,
-then fetch the prize (bag of holding or amulet of reflection) from its closet, #call its type by its real name,
-wear an amulet.
+then fetch the prize (bag of holding or amulet of reflection) from its closet -- the zoo crossed by the way with the
+fewest and weakest monsters, killed one at a time (soko_zoo_step) -- #call its type by its real name, wear an amulet.
 
 While in Sokoban the generic code must not break the puzzle: boulders and traps are impassable to every other
 walk (mapmem.passable_grid), unknown scrolls are not read (scroll of earth makes boulders), and the explore step
 is this module's.
 """
+import heapq
 import time
 from collections import Counter, deque
 
@@ -50,6 +51,8 @@ ZOO_HOLD_MAX = 300        # turns at most spent holding the zoo's doorway
 ZOO_BACK_HP = 0.7         # in the zoo below this share of HP with its monsters moving: back to the doorway
 ZOO_ENTER_HP = 0.85       # into the zoo (its door open) only above this share of HP: rested outside first
 ZOO_PRAY_WAIT = 1500      # turns at most waited at the zoo's door, after the level is solved, for a prayer in hand
+ZOO_KILL_COST = 20        # zoo way: a hostile on a square costs this many steps, plus its level (soko_zoo_walk)
+ZOO_PEACE_TURNS = 50      # a square a look found a peaceful monster on stays closed to the zoo way this long
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
 DIRS8 = ORTHO + ((-1, -1), (-1, 1), (1, -1), (1, 1))
 
@@ -101,6 +104,7 @@ class SokoLevel:
         self.zoo_seen = frozenset()   # top level: the zoo's hostiles in view (variant coords) ...
         self.zoo_moved = -1           # ... and the turn that set last changed
         self.zoo_hold = 0             # turns spent holding the doorway
+        self.zoo_peace = {}           # zoo way: square -> turn a look there found a peaceful monster
         self.solved_turn = None       # turn the plan was done (soko_prize)
         self.prize_inv0 = None        # soko_prize_items() when the prize hunt began
         self.inv_outside = None       # soko_prize_items() on the last tick outside the prize closets
@@ -676,6 +680,8 @@ class SokobanMixin:
         like = self.soko_prize_like(lv, st)
         todo.sort(key=lambda p: (p not in like, p not in closets, abs(p[0] - here[0]) + abs(p[1] - here[1])))
         tgt = todo[0]
+        if not shut and self.soko_zoo_step(lv, st, tgt, bs, ts):
+            return True
         if self.soko_step_to(lv, st, tgt, bs, ts, extra):
             return True
         self.soko_stats["zoo_no_way"] += 1
@@ -697,6 +703,75 @@ class SokobanMixin:
                 continue
             if self.call_type(it.letter, name):
                 self.soko_stats["prize_named"] += 1
+
+    def soko_zoo_walk(self, lv, st, start, goal, bs, ts):
+        """First step (variant coords) of the way from start to goal with the fewest and weakest monsters to kill
+        on it -- a hostile's square costs ZOO_KILL_COST plus its level, a pet's two steps (we swap), a peaceful's is
+        closed -- by Sokoban's rules (soko_walk). None: no way."""
+        g = self.obs["glyphs"]
+        t = self.turn()
+        cost = {}
+        for p in st.floor:
+            k = G.KIND[int(g[st.to_map(p)])]
+            if k == G.PET:
+                cost[p] = 2
+            elif k == G.MONSTER and p != start:
+                mp = st.to_map(p)
+                if t - st.zoo_peace.get(p, -ZOO_PEACE_TURNS) < ZOO_PEACE_TURNS \
+                        or self.peaceful_now(lv, mp, look=False):
+                    cost[p] = None
+                else:
+                    cost[p] = ZOO_KILL_COST + nh.permonst(nh.glyph_to_mon(int(g[mp]))).mlevel
+        free = lambda p: p in st.floor and p not in bs
+        dist, prev = {start: 0}, {start: None}
+        q = [(0, start)]
+        while q:
+            d, cur = heapq.heappop(q)
+            if d > dist[cur]:
+                continue
+            if cur == goal:
+                while prev[cur] != start:
+                    cur = prev[cur]
+                return cur
+            for dr, dc in DIRS8:
+                n = (cur[0] + dr, cur[1] + dc)
+                if not free(n) or n in ts or cost.get(n, 1) is None:
+                    continue
+                if dr and dc and (cur in st.doors or n in st.doors
+                                  or (not free((cur[0] + dr, cur[1])) and not free((cur[0], cur[1] + dc)))):
+                    continue
+                nd = d + cost.get(n, 1)
+                if nd < dist.get(n, 1 << 30):
+                    dist[n], prev[n] = nd, cur
+                    heapq.heappush(q, (nd, n))
+        return None
+
+    def soko_zoo_step(self, lv, st, target, bs, ts):
+        """The zoo's door open (unlocked quietly its monsters still sleep; kicked, the wave is over): along the way
+        with the fewest and weakest monsters to the prize (soko_zoo_walk), killing them one at a time -- the one on
+        the next square is attacked ('F'), the others sleep on. A peaceful one there (a look decides): that square
+        closed for a while, the way chosen afresh. True if it acted."""
+        here = st.from_map(self.pos())
+        nxt = self.soko_zoo_walk(lv, st, here, target, bs, ts)
+        if nxt is None or nxt == here:
+            return False
+        mp = st.to_map(nxt)
+        k = G.KIND[int(self.obs["glyphs"][mp])]
+        self.cur_act = "soko_zoo"
+        if k == G.MONSTER:
+            if self.peaceful_now(lv, mp):
+                st.zoo_peace[nxt] = self.turn()
+                self.soko_stats["zoo_peaceful"] += 1
+                return self.soko_wait()
+            self.soko_stats["zoo_attack"] += 1
+            self.cur_act = "fight"
+            y, x = self.pos()
+            self.press("F")
+            self.press(DELTA2KEY[(mp[0] - y, mp[1] - x)])
+            return True
+        self.soko_stats["zoo_walk"] += 1
+        self.move(mp)
+        return True
 
     def soko_prize_items(self):
         """Inventory letters of the amulets and bags we carry."""
