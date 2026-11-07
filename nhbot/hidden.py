@@ -48,8 +48,14 @@ def dead_x(f):
             min(f["rooms"], 9) / 9.0, f["known_frac"]]
 
 
-SIDE_W = None                    # logistic weights over side_x (fitted on search_log data: see hidden_prob)
-DEAD_W = None                    # ... over dead_x
+# Logistic weights over side_x / dead_x, target "on_way": a hidden square of the candidate lies on a way to the
+# down staircase with the fewest hidden squares (niches and dead extra corridors do not count). Fitted on search_log
+# data, run slog_77k (1000 games, seeds 77000-77999: 2458 main-dungeon levels searched on, 34068 room sides,
+# 3924 dead ends; in 1800 levels the way needs a hidden square, in 1355 of them a candidate holds one). Held-out
+# seeds (30%): sides AUC 0.93 (positive 2.2%), dead ends AUC 0.73 (positive 18%).
+SIDE_W = np.array([-9.289, -0.111, 0.053, -0.2, -0.069, -1.896, -0.106, 2.384, -1.884, -0.425, 1.644, 0.04, 0.3,
+                   0.513, 0.649, -1.083])
+DEAD_W = np.array([-2.686, -0.104, 2.569, 0.435, -0.451, -3.843])
 
 
 def hidden_prob(cand):
