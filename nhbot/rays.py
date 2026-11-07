@@ -197,8 +197,7 @@ RACE_GIVES = {"elf": ("sleep",)}
 
 
 def our_protection(role, race, worn_texts):
-    """What we know protects us: the role / race intrinsics at the start, and what we wear (not intrinsics eaten
-    since -- unknown, so counted as absent)."""
+    """The role / race intrinsics at the start and what we wear (perception.our_resists adds what corpses gave)."""
     out = set(ROLE_GIVES.get(role, ())) | set(RACE_GIVES.get(race, ()))
     for t in worn_texts:
         for name, what in WORN_GIVES:

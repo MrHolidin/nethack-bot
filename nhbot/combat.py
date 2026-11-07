@@ -184,7 +184,7 @@ class CombatMixin:
         else:
             self.settle()
         self.throws += 1
-        self.elb_scuffed()                       # elb_stale: a throw scuffs the engraving under us
+        self.elb_scuffed()                       # a throw scuffs the engraving under us
         self.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
         self.goal_event("retrieve", "created")
 
@@ -568,7 +568,7 @@ class CombatMixin:
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
             self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
-        prot = self.protection()
+        prot = self.our_resists()
         our_p = zap_hit_prob(self.bl(nh.NLE_BL_AC))
         reflect = "reflection" in prot
         resisted = RAY_RESIST.get("death" if maybe_death else kind) in prot
@@ -637,7 +637,7 @@ class CombatMixin:
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
             self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
-        harm = ray_harm("death" if maybe_death else kind, self.protection(), self.bl(nh.NLE_BL_HP))
+        harm = ray_harm("death" if maybe_death else kind, self.our_resists(), self.bl(nh.NLE_BL_HP))
         return p, harm
 
     def ray_risk_note(self, lv, step, d, kind, letter, safe):

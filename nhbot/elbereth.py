@@ -16,7 +16,7 @@ from nhbot.monsters import B_ANGEL_MLET, B_HUMAN_MLET, ELB_IGNORE_NAMES, PM_BY_N
 
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
-ELB_WIPED_RE = re.compile(r"\bYou (?:hit|miss|smite|kill|destroy)\b|The engraving beneath you fades")  # elb_stale
+ELB_WIPED_RE = re.compile(r"\bYou (?:hit|miss|smite|kill|destroy)\b|The engraving beneath you fades")
 
 
 
@@ -141,16 +141,16 @@ class ElberethMixin:
         return not cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF)
 
     def msg_elbereth(self, m, lv):
-        """elb_stale: the Elbereth under us gone or scuffed -- mon.c setmangry deletes it when we attack one that
-        respects it ("The engraving beneath you fades"), a melee blow wipes letters (uhitm.c u_wipe_engr(3)): off
-        lv.elbereth till read back (elb_confirm)."""
+        """The Elbereth under us gone or scuffed -- mon.c setmangry deletes it when we attack one that respects it
+        ("The engraving beneath you fades"), a melee blow wipes letters (uhitm.c u_wipe_engr(3)): off lv.elbereth till
+        read back (elb_confirm). Before, lv.elbereth kept it for good and the wand gate, the nymph rule and the danger
+        model trusted it (A/B elb_stale +609 [-317, +1545], 215 of 1000 games changed -- accepted)."""
         if lv is not None and ELB_WIPED_RE.search(m):
             self.elb_scuffed(lv)
 
     def elb_scuffed(self, lv=None):
-        """elb_stale: our square off lv.elbereth (a throw scuffs it too: dothrow.c u_wipe_engr(2))."""
-        if self.opts.elb_stale:
-            (lv or self.level()).elbereth.discard(self.pos())
+        """Our square off lv.elbereth (a throw scuffs it too: dothrow.c u_wipe_engr(2))."""
+        (lv or self.level()).elbereth.discard(self.pos())
 
     def elb_confirm(self, lv):
         """Read the engraving under us; lv.elbereth follows what it says. True if Elbereth."""

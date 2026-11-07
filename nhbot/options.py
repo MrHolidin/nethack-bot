@@ -17,11 +17,6 @@ DEFAULTS = {
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
                                #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
                                #      Orcish Town: its watch is dead), by shops
-    "elb_stale": False,        # A/B: the Elbereth under us no longer trusted once gone or scuffed -- "The engraving
-                               #      beneath you fades" (mon.c setmangry), our melee blow or throw from it (uhitm.c /
-                               #      dothrow.c u_wipe_engr): off lv.elbereth till read back (elbereth.msg_elbereth)
-    "resist_eaten": False,     # A/B: the ray / fight sums (danger, combat) count the resistances eaten corpses gave
-                               #      too (perception.our_resists), not only role, race and what we wear
     "stair_refuse": False,     # A/B: "You can't go down here" clears a staircase remembered in the terrain layer under an
                                #      item too (not only a shown one): no '>' pressed again and again for no time
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end

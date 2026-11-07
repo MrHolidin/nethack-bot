@@ -601,7 +601,7 @@ class DangerMixin:
             aim = 1.0
         its = self.items()
         free = any(i.ring_on and "free action" in i.text for i in its)
-        prot = self.protection()
+        prot = self.our_resists()
         sp = self.our_speed()
         slow = 12 * 3 // 4 if self.bl(nh.NLE_BL_CAP) >= 1 else 12
         return {"aim": aim, "free_action": free, "int": self.bl(nh.NLE_BL_INT), "speed": sp,
@@ -651,7 +651,7 @@ class DangerMixin:
         if profile is None:
             return None
         ac = self.bl(nh.NLE_BL_AC)
-        prot = self.protection()
+        prot = self.our_resists()
         plan = {"wand": next((k for k in WAND_ORDER if k in profile["wands"]), None), "missile": None,
                 "breath": None, "ray_p": zap_hit_prob(ac), "ac": ac, "prot": prot, "pack": self.pack_profile()}
         mis = profile["missile"]
