@@ -204,6 +204,8 @@ class ExploreMixin:
 
     def search_mode(self, lv, grids):
         k_mem, k_live, passable = grids
+        if self.opts.search_log:
+            self.search_log_note(lv, k_mem)
         self.cur_act = "search"
         start = self.pos()
         dist, prev, _ = self.dijkstra(lv, k_mem, k_live, passable, start, None)

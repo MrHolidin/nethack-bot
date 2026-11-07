@@ -41,6 +41,8 @@ DEFAULTS = {
                                #      the level's up or down staircase is unknown
     "force_read": None,        # experiments: a scroll type ("destroy armor", control "blank paper") read once, the first
                                #      time it is safe (nhbot.scrolls.force_read_step)
+    "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
+                               #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     "shop_browse": False,      # A/B: every shop visited (not only to sell): step on every item for sale to read

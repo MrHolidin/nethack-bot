@@ -39,6 +39,7 @@ from nhbot.altar import AltarMixin
 from nhbot.potiontest import PotionTestMixin
 from nhbot.jewelry import JewelryMixin
 from nhbot.gift import GiftMixin
+from nhbot.hidden import HiddenMixin
 from nhbot.weapons import WeaponsMixin
 from nhbot.wishing import WishMixin
 from nhbot.sacrifice import SacrificeMixin
@@ -53,7 +54,7 @@ MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS,
 class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
-          PotionTestMixin, JewelryMixin, GiftMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
+          PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DigThroughMixin, LockToolMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
@@ -206,6 +207,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.sacrifice_init()
         self.sokoban_init()
         self.gift_init()
+        self.search_logged = set()       # search_log: level keys already logged
+        self.search_log = []             # search_log: one record per level (nhbot.hidden)
         self.potiontest_init()
         self.jewelry_init()
         self.box_init()
@@ -346,6 +349,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "vault": [self.vault_drops, self.vault_moves, self.vault_approach, self.vault_bag_outs], "vault_rob": dict(self.vault_stats), "dig_through": dict(self.dig_stats), "lock_tools": dict(self.lock_stats), "stun_peace_waits": self.stun_peace_waits,
             "items_first": self.items_first_holds,
+            "search_log": self.search_log,
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,
             "msg_audit": dict(self.msg_audit),

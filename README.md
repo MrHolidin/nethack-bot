@@ -22,6 +22,8 @@ can be added later.
 | `elbereth.py` | engraving and standing on Elbereth (`elb_rules.py`: who respects it) |
 | `thieves.py`, `weapons.py` | nymphs and monkeys; wielding the best weapon |
 | `explore.py` | exploration, descending, searching, the Gnomish Mines |
+| `hidden.py` | hidden-passage candidates of the known map (room sides, dead ends) and their features; `search_log` |
+| `truemap.py` | experiments only: the true map of the level read from the game's memory (secret doors and corridors, stairs) -- how, in its docstring |
 | `excalibur.py`, `equipment.py`, `carry.py`, `shop.py`, `scrolls.py`, `pricemem.py`, `focus.py` | Excalibur, armor, valuables and selling, shops, good scrolls, price identification, target choice |
 | `consts.py`, `monsters.py`, `glyphs.py`, `monattacks.py`, `weapondice.py` | shared tables |
 
