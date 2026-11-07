@@ -222,11 +222,13 @@ class ExploreMixin:
         if goal is not None and reach[goal] and passable[goal]:
             best = goal                       # committed: the distance term must not re-pick it every step
         else:
-            best = np.unravel_index(np.argmax(score), score.shape)
-            if score[best] <= -1e8:
-                self.press("s")
-                return
-            best = (int(best[0]), int(best[1]))
+            best = self.search_v2_goal(lv, grids, dist) if self.opts.search_v2 else None
+            if best is None:
+                best = np.unravel_index(np.argmax(score), score.shape)
+                if score[best] <= -1e8:
+                    self.press("s")
+                    return
+                best = (int(best[0]), int(best[1]))
             lv.search_goal = best
         if best == start:
             lv.search_goal = None             # searched here: choose afresh next time

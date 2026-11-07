@@ -209,6 +209,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
         self.gift_init()
         self.search_logged = set()       # search_log: level keys already logged
         self.search_log = []             # search_log: one record per level (nhbot.hidden)
+        self.search_v2_stats = Counter()
         self.potiontest_init()
         self.jewelry_init()
         self.box_init()
@@ -349,7 +350,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, MapMixin, NavMixin, PerceptionMixi
             "unblock": [self.unblocks, self.unblock_throws, self.unblock_melee],
             "vault": [self.vault_drops, self.vault_moves, self.vault_approach, self.vault_bag_outs], "vault_rob": dict(self.vault_stats), "dig_through": dict(self.dig_stats), "lock_tools": dict(self.lock_stats), "stun_peace_waits": self.stun_peace_waits,
             "items_first": self.items_first_holds,
-            "search_log": self.search_log,
+            "search_log": self.search_log, "search_v2": dict(self.search_v2_stats),
             "mines_return_descents": self.mines_return_descents,
             "peaceful_waits": self.peaceful_waits, "peace_shut": self.peace_shut_count,
             "msg_audit": dict(self.msg_audit),

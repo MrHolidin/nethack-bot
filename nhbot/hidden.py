@@ -28,6 +28,46 @@ DOORS = (12, 13, 14, 15, 16)
 ITEM_KINDS = (G.OBJECT, G.GOLD, G.CORPSE, G.BOULDER)
 SIDES = ("N", "E", "S", "W")
 VAULT_AREA = 4
+FIND = 1.0 / 7                   # a search finds a hidden square next to us with this chance (detect.c dosearch0:
+                                 # rnl(7) at Luck 0)
+SEARCH_BURST = 10                # turns searched at a spot before choosing again ("10s")
+SEARCH_V2_MIN = 1e-4             # search_v2: below this expected find per turn anywhere, the old wall count decides
+
+
+def side_x(f):
+    """Predictor inputs of a room side (hidden_candidates features)."""
+    return [1.0, min(f["depth"], 30) / 10.0, f["side"] == 0, f["side"] == 1, f["side"] == 2, f["length"] / 10.0,
+            np.log1p(f["area"]), f["doors"] == 0, min(f["room_doors"], 4) / 4.0, np.log1p(f["space"]),
+            np.log1p(f["band_unknown"]), f["band_frac"], min(f["rooms"], 9) / 9.0,
+            f["rooms_left"] == 0, f["rooms_right"] == 0, f["known_frac"]]
+
+
+def dead_x(f):
+    """Predictor inputs of a dead end."""
+    return [1.0, min(f["depth"], 30) / 10.0, f["unknown_nb"] / 8.0, min(f["edge"], 10) / 10.0,
+            min(f["rooms"], 9) / 9.0, f["known_frac"]]
+
+
+SIDE_W = None                    # logistic weights over side_x (fitted on search_log data: see hidden_prob)
+DEAD_W = None                    # ... over dead_x
+
+
+def hidden_prob(cand):
+    """P(a hidden square is among this candidate's squares), from the known map only."""
+    x, w = (side_x, SIDE_W) if cand["kind"] == "side" else (dead_x, DEAD_W)
+    z = float(np.dot(np.asarray(x(cand["f"]), dtype=float), w))
+    return 1.0 / (1.0 + np.exp(-z))
+
+
+def nb_sum(a):
+    """Sum over the 8 neighbours of every square."""
+    out = np.zeros(a.shape, dtype=float)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dy or dx:
+                out[max(0, dy):ROWS + min(0, dy), max(0, dx):COLS + min(0, dx)] += \
+                    a[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
+    return out
 
 
 def cmap_of(glyphs):
@@ -142,6 +182,36 @@ class HiddenMixin:
                        rooms=len(rooms), known_frac=known_frac,
                        searched=int(sum(lv.searched[p] for p in neighbours8(y, x))))))
         return cands
+
+    # ------------------------------------------------------------------ search_v2
+    def hidden_posterior(self, lv, k_mem):
+        """Per square: the chance a hidden square is there and still unfound. A candidate's prior (hidden_prob)
+        is spread evenly over its squares; every search turn next to a square leaves it unfound with 1 - FIND
+        (Bayes over the candidate: P(there | not found yet))."""
+        miss = (1.0 - FIND) ** nb_sum(lv.searched)
+        post = np.zeros((ROWS, COLS))
+        for c in self.hidden_candidates(lv, k_mem):
+            sq = c["squares"]
+            if not sq:
+                continue
+            p = hidden_prob(c)
+            m = float(np.mean([miss[q] for q in sq]))
+            still = p * m / (1.0 - p + p * m)
+            for q in sq:
+                post[q] += still * miss[q] / (m * len(sq))
+        return post
+
+    def search_v2_goal(self, lv, grids, dist):
+        """search_v2: the reachable square where searching SEARCH_BURST turns finds the most per turn spent
+        (walking there included); None when nothing is worth it (SEARCH_V2_MIN)."""
+        k_mem, _, passable = grids
+        gain = nb_sum(self.hidden_posterior(lv, k_mem)) * (1.0 - (1.0 - FIND) ** SEARCH_BURST)
+        rate = np.where((dist < (1 << 30)) & passable, gain / (np.minimum(dist, 500) + SEARCH_BURST), -1.0)
+        best = np.unravel_index(np.argmax(rate), rate.shape)
+        if rate[best] < SEARCH_V2_MIN:
+            return None
+        self.search_v2_stats["picked"] += 1
+        return int(best[0]), int(best[1])
 
     # ------------------------------------------------------------------ search_log
     def search_log_note(self, lv, k_mem):
