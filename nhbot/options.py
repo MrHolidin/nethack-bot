@@ -28,6 +28,7 @@ DEFAULTS = {
                                #      this many times (an int; True: once) (nhbot.altar)
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
+    "soko_xl": 0,              # with sokoban: up into it only from this experience level on (0: any)
     "soko_zoo": True,          # with sokoban: open the top level's zoo for the prize (False: the four puzzles only --
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again

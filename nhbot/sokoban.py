@@ -177,6 +177,8 @@ class SokobanMixin:
         (nothing_left) and full HP -- up into it. True if it used the turn."""
         if not self.opts.sokoban or self.soko_done or self.soko_failed or lv.key[0] != 0:
             return False
+        if self.bl(nh.NLE_BL_XP) < self.opts.soko_xl:
+            return False                                   # soko_xl: not before this experience level
         ent = self.soko_entrance()
         if ent is None:
             return self.soko_search_step(lv, grids, nothing_left)
