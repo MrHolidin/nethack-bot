@@ -32,6 +32,12 @@ DEFAULTS = {
                                #      kicking its locked door wakes the whole zoo, dokick.c wake_nearby)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
+    "squeeze_edge": False,     # A/B: a diagonal squeeze that stays refused for our weight shuts that diagonal step
+                               #      (both ways), not its square -- reached straight from another side it is open
+    "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
+                               #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
+                               #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban / Minetown / by shops
+    "trap_noblock": False,     # A/B: a step that failed but took a turn (held by a trap, ...) counts against no square
     "squeeze_plan": False,     # A/B: a diagonal squeeze refused for our weight is shut (explored round); only when
                                #      nothing else is left to walk to past it, stand at it and shed a unit per
                                #      refusal till through (explore.squeeze_open_step); "stairs": that only while

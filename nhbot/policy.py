@@ -47,6 +47,7 @@ STEPS = (
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
+    "dig_through",       # dig_through: the corner of a refused squeeze / a boulder that won't move, dug (nhbot.digthrough)
     "ammo_here",
     "retrieve_missiles",
     "eat",
@@ -210,14 +211,17 @@ class PolicyMixin:
 
     def step_weight(self, c):
         if self.squeeze_pending is not None:
-            key, target = self.squeeze_pending
+            key, target, frm = self.squeeze_pending
             self.squeeze_pending = None
             if key == c.lv.key:
                 if self.carry_drop_step(force=True, max_tier=3):
                     self.squeeze_stats["dropped"] += 1
                     return True
                 self.squeeze_stats["nothing_to_drop"] += 1
-                c.lv.blocked[target] = True   # nothing left to shed: the squeeze stays shut
+                if self.opts.squeeze_edge:
+                    c.lv.squeeze_dead |= {(frm, target), (target, frm)}   # that diagonal step only, not the square
+                else:
+                    c.lv.blocked[target] = True   # nothing left to shed: the squeeze stays shut
         return self.carry_drop_step()
 
     # ------------------------------------------------------------------ monsters around
@@ -476,6 +480,9 @@ class PolicyMixin:
             if self.pile_to_inspect(lv, y, x) and self.armor_pickup_here(lv):
                 return True
         return False
+
+    def step_dig_through(self, c):
+        return self.dig_through_step(c.lv, c.hostiles)
 
     def step_vault_find(self, c):
         return self.vault_find_step(c.lv, c.vis)

@@ -96,6 +96,8 @@ class Level:
         self.peace_shut = {}       # peace_shut: square -> turn until which it is closed (a peaceful stood there)
         self.peace_waits = {}      # peace_shut: square -> waits for a peaceful monster standing on it
         self.squeeze_shut = set()  # squeeze_plan: (from, to) diagonal squeezes refused for our weight, both ways
+        self.squeeze_dead = set()  # squeeze_edge: (from, to) diagonal squeezes that stay refused, both ways (for good)
+        self.squeeze_fail = {}     # squeeze_edge: (from, to) -> refusals
         self.not_stairs = set()    # squares where the game said there is no staircase
         self.kill_piles = set()    # squares where we killed a monster that may carry things (monsters.CARRIERS)
         self.elbereth = set()     # positions where we engraved
@@ -330,18 +332,21 @@ class MapMixin:
         if lv and self.last_move_target and "You are carrying too much to get through" in m:
             # a diagonal squeeze needs inventory weight <= 600 (hack.c test_move): the weight step sheds a unit
             self.squeeze_stats["refused"] += 1
-            if self.opts.squeeze_plan and self.squeeze_target != (lv.key, self.pos(), self.last_move_target):
+            if self.dig_through_note(lv, self.pos(), self.last_move_target, "squeeze"):
+                pass                                          # dig_through: a corner dug instead of shedding
+            elif self.opts.squeeze_plan and self.squeeze_target != (lv.key, self.pos(), self.last_move_target):
                 a, b = self.pos(), self.last_move_target      # explore round it first (explore.squeeze_open_step)
                 lv.squeeze_shut |= {(a, b), (b, a)}
                 self.squeeze_stats["shut"] += 1
             else:
-                self.squeeze_pending = (lv.key, self.last_move_target)
+                self.squeeze_pending = (lv.key, self.last_move_target, self.pos())
         elif lv and self.last_move_target and any(s in m for s in (
                 "You try to move the boulder, but in vain",
                 "Perhaps that's why you cannot move past it",
                 "There is a boulder in your way",
                 "You don't have enough room to maneuver")):
-            lv.blocked[self.last_move_target] = True
+            if not self.dig_through_note(lv, self.pos(), self.last_move_target, "boulder"):
+                lv.blocked[self.last_move_target] = True
         if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:
             # can't kick from here (a form without legs; in a pit): kicking the door again would loop
             lv.blocked[self.last_move_target] = True

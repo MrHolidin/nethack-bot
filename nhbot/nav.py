@@ -81,8 +81,8 @@ class NavMixin:
         # an item on a door hides it from k_mem: the doors remembered and the refused diagonals count too
         _pad_door[1:-1, 1:-1] = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
         door = _pad_door.ravel().tolist()
-        blocked = {((a[0] + 1) * _W + a[1] + 1, (b[0] + 1) * _W + b[1] + 1) for a, b in lv.squeeze_shut} \
-            if shut and lv.squeeze_shut else None
+        edges = (lv.squeeze_shut if shut else set()) | lv.squeeze_dead
+        blocked = {((a[0] + 1) * _W + a[1] + 1, (b[0] + 1) * _W + b[1] + 1) for a, b in edges} if edges else None
         tm = None
         if targets_mask is not None:
             _pad_target[1:-1, 1:-1] = targets_mask
@@ -225,6 +225,16 @@ class NavMixin:
             return                                # -- try again; not the square's fault (80014: left after two)
         if self.opts.squeeze_plan and "carrying too much to get through" in self.text_since(seq0):
             return                    # refused for our weight, not the square's fault (explore.squeeze_open_step)
+        if self.opts.squeeze_edge and "carrying too much to get through" in self.text_since(seq0):
+            edge = ((y, x), target)
+            lv.squeeze_fail[edge] = lv.squeeze_fail.get(edge, 0) + 1
+            if lv.squeeze_fail[edge] >= 6:                # squeeze_edge: the diagonal step shut, not the square
+                lv.squeeze_dead |= {edge, (target, (y, x))}
+                self.squeeze_stats["edge_shut"] += 1
+            return
+        if self.opts.trap_noblock and after[:2] == before[:2] and after[2] > before[2]:
+            self.trap_stats["fail_timed"] += 1            # trap_noblock: it took a turn -- held (a trap, a grab), slow:
+            return                                         # the square is not at fault
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
             if self.trapped is not None:
                 self.trap_stats["fail_not_counted"] += 1    # held by a trap: the square is not at fault

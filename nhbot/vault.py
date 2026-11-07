@@ -119,7 +119,7 @@ class VaultMixin:
             return self.vault_walk_out(lv)
         if box is None:
             self.vault_since = None
-            return self.vault_plan is None and self.swap_back("dig")
+            return self.vault_plan is None and self.dig_job is None and self.swap_back("dig")
         if self.vault_plan is not None and self.vault_plan["key"] == lv.key:
             self.vault_done.add(lv.key)               # vault_find: the tunnel is through
             self.vault_out = (lv.key, self.vault_plan["start"])
@@ -198,17 +198,24 @@ class VaultMixin:
         self.swap_in("dig", it)
         return True
 
-    def dig_apply(self, lv, it, key):
-        """Apply the wielded digger in direction key (">" down). The text the game answered."""
+    def apply_digger(self, it, key):
+        """Apply the wielded digger in direction key (">" down). The text the game answered; None: no apply."""
         seq0 = self.msg_seq
         if not self.ask("a", "apply"):
-            return False
+            return None
         self.press(it.letter, expect_prompt=True)
         if "direction" in self.message().lower():
             self.press(key)
         else:
             self.settle()
-        msgs = self.text_since(seq0)
+        return self.text_since(seq0)
+
+    def dig_apply(self, lv, it, key):
+        """Apply the wielded digger in direction key (">" down), noting what the game said. True if it used the
+        turn."""
+        msgs = self.apply_digger(it, key)
+        if msgs is None:
+            return False
         if key == ">":
             self.dig_note(lv, msgs)
         elif "too hard to" in msgs:                   # undiggable walls / rock (W_NONDIGGABLE): no tunnel here
