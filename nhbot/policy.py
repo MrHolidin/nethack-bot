@@ -40,6 +40,7 @@ STEPS = (
     "elbereth",
     "thieves",
     "regen",             # ring of regeneration on below full HP, off at full (nothing next to us)
+    "soko_zoo_back",     # Sokoban's zoo: hurt inside it by more than one -- back to the corridor before any fight
     "weapon",
     "wands",
     "melee",
