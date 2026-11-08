@@ -184,11 +184,9 @@ class ElberethMixin:
             return False
         return self.elb_write(lv)
 
-    def elb_write(self, lv, rest=True, stat=None):
+    def elb_write(self, lv):
         """Engrave and verify by reading. Any failure to reach the text prompt (fountain/altar/stairs,
-        polymorphed into a handless form, levitating, ...) backs off instead of retrying every tick.
-        rest: then rest on it (elb_state, elb_step); False: only write it (nymph_elb: thieves.nymph_step holds
-        still on it by itself). stat: elb_stats counts <stat>_ok / _misspelled / _fail."""
+        polymorphed into a handless form, levitating, ...) backs off instead of retrying every tick."""
         for attempt in range(3):
             ok = self.engrave_elbereth()
             self.elb_engraves += 1
@@ -198,27 +196,13 @@ class ElberethMixin:
                 self.elb_fail_msgs.append(" ".join(m for _, m in list(self.messages)[-2:])[:80])
                 self.elb_fail_at = (lv.key, self.pos(), self.turn())
                 self.elb_state = None
-                if stat:
-                    self.elb_stats[stat + "_fail"] += 1
                 return False
             if self.elb_confirm(lv):
-                if rest:
-                    self.elb_state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
-                                      "last_read": self.turn(), "hp_hist": [self.bl(nh.NLE_BL_HP)]}
-                    self.cur_act = "rest"
-                if stat:
-                    self.elb_stats[stat + "_ok"] += 1
+                self.elb_state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
+                                  "last_read": self.turn(), "hp_hist": [self.bl(nh.NLE_BL_HP)]}
+                self.cur_act = "rest"
                 return True
             self.elb_misspelled += 1
-            if stat:
-                self.elb_stats[stat + "_misspelled"] += 1
         self.elb_state = None
         return True
 
-    def elb_holds(self, lv, foes):
-        """nymph_elb: we stand on an Elbereth -- in lv.elbereth and read back right now (no game time) -- and every
-        one of foes [(pos, name)] respects it: none of them melees us (monmove.c:341-346 distfleeck scares it,
-        dochug then makes no attack), and any blow of ours would erase it (mon.c:2895-2912 setmangry)."""
-        if self.pos() not in lv.elbereth or not all(self.respects(p, n) for p, n in foes):
-            return False
-        return self.elb_confirm(lv)

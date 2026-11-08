@@ -45,18 +45,11 @@ DEFAULTS = {
                                #      we throw too) (nhbot.policy)
     "pile_one": False,         # A/B: one pile mask (pickup.pile_mask) for explore's walk, the inspection where we stand and
                                #      the goal statistics -- food piles only while we carry less than MAX_FOOD (nhbot.pickup)
-    "statue_free": False,      # A/B: a statue is floor for planning (mapmem.kinds, nav.grids), no boulder (cost 15,
-                               #      never walked in Sokoban): no statue stops a step (hack.c test_move)
-    # ranges (all four below at once: -1194 [-2590, +247], 560 games changed) split:
     "spore_range": False,      # A/B: a gas spore is thrown at from 2 on (its explosion covers 3x3, explode.c), not 3
     "shooter_range": False,    # A/B: a shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM), not 8 (nhbot.combat)
     "skill_bonus": False,      # A/B: our to-hit / damage count our weapon skill (#enhance read, weapon.c) (nhbot.danger)
     "helpless_bonus": False,   # A/B: our to-hit +4 on one our sleep ray put down, +2 on one that turned to flee
                                #      (uhitm.c:276-291; threats.fleeing) (nhbot.danger)
-    "nymph_elb": False,        # A/B: on a confirmed Elbereth (read back) a nymph / monkey next to us is not hit (the
-                               #      blow erases it, setmangry) -- we wait, nymph_wait_max turns at most; the
-                               #      nymph's Elbereth is written by elbereth.elb_write (retries a misspelling)
-                               #      (nhbot.thieves.nymph_step)
     "melee_policy": False,     # A/B: one (fight, avoid) answer per monster (perception.melee_policy) for avoid_cells,
                                #      adjacent_hostiles and unblock_step: on a desperate level a never-melee monster is
                                #      walked round below 90% HP too (no walking into a jelly we won't hit). (With the

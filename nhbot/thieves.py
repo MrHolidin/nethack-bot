@@ -24,7 +24,6 @@ class ThievesMixin:
         self.nymph_kills = 0
         self.loot_pickups = 0
         self.nymph_waits = 0
-        self.nymph_holds = 0           # nymph_elb: turns in a row held still on Elbereth by an adjacent thief
         self.nymph_elbs = 0
         self._theft_turn = None
         self.polyd = False             # polymorphed: no wearing / wielding
@@ -104,19 +103,9 @@ class ThievesMixin:
         y, x = self.pos()
         # 1) adjacent thief: hit it first (normal melee would pick the lowest level target)
         adj = [(p, n) for p, n in hostiles if n in THIEVES]
-        if not adj:
-            self.nymph_holds = 0
-        else:
-            if self.opts.nymph_elb and self.nymph_holds < self.opts.nymph_wait_max \
-                    and self.elb_holds(lv, hostiles):
-                # nymph_elb: on an Elbereth it respects the thief can't steal (it steals with a melee hit); our blow
-                # would erase it (setmangry) and hand it the theft -- hold still instead (nymph_wait_max turns in a
-                # row at most)
-                self.nymph_holds += 1
-                self.elb_stats["nymph_hold"] += 1
-                self.cur_act = "fight"
-                self.press("s")
-                return True
+        # (A/B nymph_elb -- hold still on a confirmed Elbereth instead of hitting it: -678 [-1516, +110], thefts
+        # 1849 -> 1946)
+        if adj:
             self.attack(adj[0][0])
             return True
         th = self.thieves_visible(lv)
@@ -149,9 +138,7 @@ class ThievesMixin:
             if close and self.nymph_elbs < 30 and self.elb_can_write(lv):
                 self.nymph_elbs += 1
                 self.cur_act = "fight"
-                if self.opts.nymph_elb:
-                    self.elb_write(lv, rest=False, stat="nymph")     # nymph_elb: elbereth.py's writer, no resting
-                elif not self.engrave_elbereth():
+                if not self.engrave_elbereth():
                     self.elb_fail += 1
                     self.elb_fail_at = (lv.key, self.pos(), self.turn())
                     self.elb_stats["nymph_fail"] += 1

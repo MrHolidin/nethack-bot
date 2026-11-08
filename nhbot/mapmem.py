@@ -179,7 +179,7 @@ class MapMixin:
     def kinds(self, lv):
         """Kind of every remembered square: a trap / staircase / door / water under an item is that feature (the
         terrain layer); the item still shows on the squares nothing special lies under. Item goals (gold, piles,
-        corpses) read the top glyph, lv.under, instead. statue_free: a statue reads as the floor under it."""
+        corpses) read the top glyph, lv.under, instead."""
         k = G.KIND[lv.under]
         tk = G.KIND[lv.terrain]
         hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
@@ -187,12 +187,6 @@ class MapMixin:
             # nothing lies on a closed door: an item there means it was opened or broken since we saw it
             tk = np.where(tk == G.DOOR_CLOSED, G.DOOR_OPEN, tk)
             k = np.where(hidden, tk, k)
-        if self.opts.statue_free:
-            # statue_free: a statue is no boulder (glyphs.STATUE_GLYPH): the feature the terrain layer knows under
-            # it, else floor
-            st = G.STATUE_GLYPH[lv.under]
-            if st.any():
-                k = np.where(st, np.where(G.IS_TERRAIN[tk], tk, G.FLOOR), k).astype(k.dtype)
         return k
 
     def terrain_glyphs(self, lv):

@@ -70,8 +70,8 @@ for g in range(N):
     # swallow/explode/zap stay EFFECT
 
 # statues: KIND calls them BOULDER (cost 15, never walked in Sokoban), though no statue stops a step (hack.c:713-905
-# test_move checks boulders only, hack.c:886) -- statue_free reads them as floor (mapmem.kinds, nav.grids)
-STATUE_GLYPH = np.array([bool(nh.glyph_is_statue(g)) for g in range(N)])
+# test_move checks boulders only, hack.c:886). A/B statue_free (a statue read as floor: cost 1): -1297 [-2973, +360],
+# median 7777 -> 7176, 570 games changed (routes differ from the first levels on).
 
 # kinds that hide the terrain under them (don't overwrite memory)
 TERRAIN = np.array([bool(nh.glyph_is_cmap(g)) for g in range(N)])   # dungeon features: floor, walls, doors,
