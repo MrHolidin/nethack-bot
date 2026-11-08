@@ -78,7 +78,11 @@ DEFAULTS = {
     "slots": False,            # A/B: the 52 inventory letters count: a floor stack that won't merge takes the last
                                #      free letter only if worth more than the stack we'd give up (value.slot_ok),
                                #      and with all 52 taken the drop step drops that one (carry.carry_drop_step)
-    "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
+    "fight_model": False,      # A/B: focus fire (several hostiles next to us) scored with danger's fight model --
+                               #      adjusted monster level (makemon.c adj_lev), the weapon in hand whatever its
+                               #      class, erosion, encumbrance, our speed, the hits danger_tick counted -- not
+                               #      focus.py's own estimates (nhbot.focus.focus_score_model)
+    "gift": None,             # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

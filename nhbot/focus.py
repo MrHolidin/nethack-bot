@@ -16,8 +16,10 @@ import re
 from functools import lru_cache
 
 import nle.nethack as nh
+import numpy as np
 
 from nhbot.monattacks import ATTACKS
+from nhbot.monsters import PM_BY_NAME
 from nhbot.weapondice import WEAPON_DICE
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "TENT", "WEAP"}
@@ -145,7 +147,9 @@ class FocusMixin:
         rec[2] = self.turn()
         self.focus_hits[key] = rec
 
-    def focus_score(self, pos):
+    def focus_score(self, pos, name=None):
+        if self.opts.fight_model:
+            return self.focus_score_model(pos, name)
         g = int(self.obs["glyphs"][pos])
         if not nh.glyph_is_monster(g):
             return 0.0
@@ -158,10 +162,27 @@ class FocusMixin:
         ttk = rem / max(p * dmg, 0.05)
         return mon_dpt(idx, self.bl(nh.NLE_BL_AC)) / max(ttk, 0.5)
 
+    def focus_score_model(self, pos, name):
+        """fight_model: the same rule from danger.py's fight model, the one win_prob and the danger estimate use --
+        damage it deals us per game turn (monster_round: its adjusted level adj_level, mcalcmove speed, the weapon we
+        saw it use, our AC; an instant death counts as all our HP) over the turns we need to kill it (our_hit_prob:
+        the weapon in hand whatever its class, encumbrance, skill; our_damage_pmf: erosion, enchantment, dbon,
+        Excalibur; our_speed actions a turn; its HP left after the hits danger_tick counted, our_remaining_hp)."""
+        if name not in PM_BY_NAME:
+            return 0.0
+        p = self.our_hit_prob(name, pos)
+        dmg = self.our_damage_pmf(name)
+        per_hit = float((np.arange(len(dmg)) * dmg).sum())
+        rem = self.our_remaining_hp(name, self.our_hits.get((self.cur_key, pos), 0))
+        ttk = rem / max(p * per_hit * self.our_speed() / 12, 0.05)
+        rnd, inst = self.monster_round(name)
+        dpt = float((np.arange(len(rnd)) * rnd).sum()) + inst * self.bl(nh.NLE_BL_HP)
+        return dpt / max(ttk, 0.5)
+
     def focus_target(self, hostiles):
         """The (pos, name) hostile to hit among several: the highest focus_score."""
         self.focus_calls += 1
-        best = max(hostiles, key=lambda t: self.focus_score(t[0]))[0]
+        best = max(hostiles, key=lambda t: self.focus_score(t[0], t[1]))[0]
         if best != min(hostiles, key=lambda t: self.mon_level(t[0]))[0]:
             self.focus_picks += 1
         return best

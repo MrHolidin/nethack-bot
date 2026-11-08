@@ -300,6 +300,22 @@ class DangerMixin:
         dies = sum(hp[h] * (cdf(dk, h) - cdf(dk1, h)) for h in range(len(hp)) if hp[h])
         return self.our_hit_prob(name, pos) * dies / alive
 
+    def our_remaining_hp(self, name, hits):
+        """fight_model: E[its HP left | alive] after `hits` hits of ours -- the prior and the damage of our_kill_prob
+        (HP d(adj_level, 8), rnd(4) at level 0; each hit our_damage_pmf). Tougher than the prior allows (a grown-up
+        one): 1."""
+        pm = PM_BY_NAME[name]
+        lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+        hp = dice_pmf(lev, 8) if lev > 0 else dice_pmf(1, 4)
+        one = self.our_damage_pmf(name)
+        dk = np.array([1.0])
+        for _ in range(hits):
+            dk = conv(dk, one)
+        left = np.subtract.outer(np.arange(len(hp)), np.arange(len(dk)))      # HP - damage dealt
+        w = np.outer(hp, dk) * (left > 0)
+        z = float(w.sum())
+        return float((w * left).sum()) / z if z > 1e-9 else 1.0
+
     def danger_parts(self, pos, name):
         pmf, inst = self.monster_round(name)
         pk = self.our_kill_prob(name, self.our_hits.get((self.cur_key, pos), 0), pos) if name in PM_BY_NAME else 0.0
