@@ -51,6 +51,8 @@ DEFAULTS = {
     "prey_cache": False,       # A/B: prey_win's cache keyed also on the monster's square, our hits on it and whether it
                                #      is asleep (all read by win_prob), and kept for one tick only -- it grew without
                                #      limit and went stale (nhbot.combat.prey_win)
+    "statue_free": False,      # A/B: a statue is floor for planning (mapmem.kinds, nav.grids), no boulder (cost 15,
+                               #      never walked in Sokoban): no statue stops a step (hack.c test_move)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

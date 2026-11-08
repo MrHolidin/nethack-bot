@@ -69,6 +69,10 @@ for g in range(N):
         KIND[g] = CMAP_KIND[nh.glyph_to_cmap(g)]
     # swallow/explode/zap stay EFFECT
 
+# statues: KIND calls them BOULDER (cost 15, never walked in Sokoban), though no statue stops a step (hack.c:713-905
+# test_move checks boulders only, hack.c:886) -- statue_free reads them as floor (mapmem.kinds, nav.grids)
+STATUE_GLYPH = np.array([bool(nh.glyph_is_statue(g)) for g in range(N)])
+
 # kinds that hide the terrain under them (don't overwrite memory)
 TERRAIN = np.array([bool(nh.glyph_is_cmap(g)) for g in range(N)])   # dungeon features: floor, walls, doors,
                                                                       # stairs, traps, fountains, altars ...
