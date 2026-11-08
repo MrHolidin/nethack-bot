@@ -111,6 +111,10 @@ DEFAULTS = {
                                #      Mines doors, lock warnings, a squeeze we can't shed for, a boulder given up) in
                                #      Level.no_entry, never forgotten; the stall reset forgets only the learned
                                #      failures (Level.blocked / fail) (nhbot.mapmem.no_entry_mark)
+    "squeeze_path": False,     # A/B: carrying more than 600, a diagonal step between two rock / wall squares (refused:
+                               #      hack.c test_move, cant_squeeze_thru) costs Dijkstra SQUEEZE_COST more -- walked
+                               #      round when a way round exists; the only way, it is still tried and the refusal
+                               #      sheds (squeeze_step) or digs as before (nhbot.nav.dijkstra)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
