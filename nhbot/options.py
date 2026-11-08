@@ -85,6 +85,8 @@ DEFAULTS = {
     "walk_fight_all": False,   # A/B: every win_prob fight played by the full walk_fight model (approach {}): prey_win
                                #      and the water demon check too, not the simple loop that left out paralysis,
                                #      regeneration, sleep, stun, stoning, brain-eating (nhbot.danger.win_prob)
+    "dragon_mc": False,        # A/B: the MC of a worn piece from objects.c a_can (equipment.MC_CAN): dragon scales and
+                               #      dragon scale mail 0, not the 1 every suit got (nhbot.equipment.wear_gain)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

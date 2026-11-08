@@ -133,7 +133,25 @@ PROPS_OF = {"cloak of magic resistance": {"mr"}, "gray dragon scale mail": {"mr"
 PROP_VALUE = 3.0
 
 
-def armor_mc(a):
+# dragon_mc: objects.c a_can of every armor with one (all others 0 -- dragon scales and dragon scale mail too:
+# DRGN_ARMR passes can 0, objects.c:373-375), by name and by the appearances fixed to one type; a shuffled appearance
+# by the least of its group (the four random cloaks: cloak of protection 3, the others 1; mhitu.c:869
+# magic_negation: the best a_can of what we wear -- a cloak of protection's extrinsic Protection keeps it at 3)
+MC_CAN = {"cornuthaum": 1, "plate mail": 2, "crystal plate mail": 2, "bronze plate mail": 1, "splint mail": 1,
+          "banded mail": 1, "dwarvish mithril-coat": 2, "elven mithril-coat": 2, "chain mail": 1, "orcish chain mail": 1,
+          "scale mail": 1, "studded leather armor": 1, "ring mail": 1, "orcish ring mail": 1, "leather armor": 1,
+          "mummy wrapping": 1, "elven cloak": 1, "orcish cloak": 1, "dwarvish cloak": 1, "oilskin cloak": 2, "robe": 2,
+          "alchemy smock": 1, "leather cloak": 1, "cloak of protection": 3, "cloak of invisibility": 1,
+          "cloak of magic resistance": 1, "cloak of displacement": 1,
+          "crude chain mail": 1, "crude ring mail": 1, "faded pall": 1, "coarse mantelet": 1, "hooded cloak": 1,
+          "slippery cloak": 2, "apron": 1,
+          "tattered cape": 1, "opera cloak": 1, "ornamental cope": 1, "piece of cloth": 1}
+
+
+def armor_mc(a, fixed=False):
+    """MC of a worn piece; fixed (dragon_mc): objects.c's (MC_CAN), else MC_OF and 1 for any suit or cloak."""
+    if fixed:
+        return MC_CAN.get(a["name"], 0)
     return MC_OF.get(a["name"], 1 if a["slot"] in (SUIT, CLOAK) else 0)
 
 
@@ -216,9 +234,10 @@ class EquipMixin:
         if a["slot"] == CLOAK and cur is None:
             gain += CLOAK_COVER
         # magic cancellation and magic resistance / reflection count (A/B mc_v1 +289 [-191, +792])
-        others = [armor_mc(w) for s, w in worn.items() if s != a["slot"]]
-        mc_with = max(others + [armor_mc(a)])
-        mc_now = max(others + ([armor_mc(cur)] if cur is not None else []) + [0])
+        fixed = self.opts.dragon_mc
+        others = [armor_mc(w, fixed) for s, w in worn.items() if s != a["slot"]]
+        mc_with = max(others + [armor_mc(a, fixed)])
+        mc_now = max(others + ([armor_mc(cur, fixed)] if cur is not None else []) + [0])
         gain += MC_VALUE * (mc_with - mc_now)
         have = set().union(*[PROPS_OF.get(w["name"], set()) for s, w in worn.items() if s != a["slot"]])
         if any(it.worn and it.ocls == nh.AMULET_CLASS and "reflection" in it.text for it in self.items()):
