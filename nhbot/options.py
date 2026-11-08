@@ -24,13 +24,6 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    # split from shop_facts (-1104 [-2164, -79], median 7726 -> 7696, 314 of 1000 changed; both parts at once):
-    "shop_buys_facts": False,  # A/B: what a shop buys from shknam.c saleable (quality apparel: wands, leather gloves,
-                               #      elven cloaks only; lighting: candles, lamps, potions of oil; the health food
-                               #      store; the delicatessen's drinks), nothing offered it pays 0 for (uncursed water,
-                               #      a cancelled wand) (nhbot.shop.shop_buys, offer_zero)
-    "id_price_cha": False,     # A/B: the cheapest identify scroll by our Charisma (shk.c get_cost), not 20 always
-                               #      (nhbot.jewelry.identify_min_price)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)

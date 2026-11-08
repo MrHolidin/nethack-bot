@@ -12,23 +12,13 @@ from nhbot import glyphs as G
 from nhbot.carry import DIGGER_WORDS, FIXED_LOOK, describe, is_clear_potion
 
 ALL = None
-SHOP_BUYS = {
-    "general store": ALL,
-    "used armor dealership": {nh.ARMOR_CLASS, nh.WEAPON_CLASS},
-    "second-hand bookstore": {nh.SCROLL_CLASS, nh.SPBOOK_CLASS},
-    "liquor emporium": {nh.POTION_CLASS},
-    "antique weapons outlet": {nh.WEAPON_CLASS, nh.ARMOR_CLASS},
-    "delicatessen": {nh.FOOD_CLASS},
-    "jewelers": {nh.RING_CLASS, nh.GEM_CLASS, nh.AMULET_CLASS},
-    "quality apparel and accessories": {nh.WAND_CLASS, nh.ARMOR_CLASS},
-    "hardware store": {nh.TOOL_CLASS},
-    "rare books": {nh.SPBOOK_CLASS, nh.SCROLL_CLASS},
-    "lighting store": {nh.TOOL_CLASS},
-}
 
-# shop_buys_facts: what each shop buys -- shknam.c:205-343 shtypes item lists, as shknam.c:782 saleable reads them: a
+# what each shop buys -- shknam.c:205-343 shtypes item lists, as shknam.c:782 saleable reads them: a
 # class, a (class, type) for an entry of one object type, VEGGY for health food's vegetarian class (shknam.c:373
-# veggy_item: food of VEGGY material, eggs)
+# veggy_item: food of VEGGY material, eggs). (A/B shop_buys_facts -- by class before (armor to quality apparel, every
+# tool to a lighting store, nothing to health food): +473 [-559, +1541], median 8484 -> 8197, 304 of 1000 changed;
+# an item of unknown type is offered when any type it may be is bought -- unidentified potions to a delicatessen /
+# health food / lighting store are mostly refused.)
 VEGGY = "veggy"
 VEGGY_FOOD = {"kelp frond", "eucalyptus leaf", "apple", "orange", "pear", "melon", "banana", "carrot",
               "sprig of wolfsbane", "clove of garlic", "slime mold", "lump of royal jelly", "cream pie", "candy bar",
@@ -178,17 +168,15 @@ class ShopMixin:
 
     # ------------------------------------------------------------ selling
     def sellables(self, lv, stype):
-        buys = SHOP_BUYS.get(stype, set())
-        facts = self.opts.shop_buys_facts
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes()
-                and (self.shop_buys(stype, it) and not self.offer_zero(it) if facts else buys is ALL or it.ocls in buys)
+                and self.shop_buys(stype, it) and not self.offer_zero(it)
                 and not self.needed(it)
                 and (lv.key, it.text) not in self.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and not it.unpaid]
 
     def item_types(self, it):
-        """shop_buys_facts: the object types Item it may be -- one when identified (or a look fixed to one type), else
+        """The object types Item it may be -- one when identified (or a look fixed to one type), else
         what value.type_posterior still allows for its look."""
         if is_clear_potion(it.ocls, it.text):
             return {"water"}
@@ -199,7 +187,7 @@ class ShopMixin:
         return {FIXED_LOOK.get((it.ocls, name), name)}
 
     def shop_buys(self, stype, it):
-        """shop_buys_facts: may a shop of this type buy Item it (shknam.c:782 saleable, SHOP_SELLS)? An item whose type
+        """May a shop of this type buy Item it (shknam.c:782 saleable, SHOP_SELLS)? An item whose type
         we don't know: if any type it may be is bought (the shopkeeper's refusal then goes to sell_tried)."""
         wants = SHOP_SELLS.get(stype, ())
         if wants is ALL:
@@ -221,7 +209,7 @@ class ShopMixin:
 
     @staticmethod
     def offer_zero(it):
-        """shop_buys_facts: an item a shopkeeper offers nothing for, so won't buy (shk.c:3398-3412 getprice: uncursed
+        """An item a shopkeeper offers nothing for, so won't buy (shk.c:3398-3412 getprice: uncursed
         water -- a clear potion not known blessed / cursed --, a cancelled wand, partly eaten food)."""
         if is_clear_potion(it.ocls, it.text):
             return not re.search(r"\b(?:blessed|cursed)\b", it.text) or "uncursed" in it.text
