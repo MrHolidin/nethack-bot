@@ -705,8 +705,7 @@ class SokobanMixin:
                 if self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX):
                     return self.soko_rest(lv) or self.soko_wait()     # up the stairs only at full HP
                 self.soko_stats["up"] += 1
-                self.took_stairs = True
-                self.press("<")
+                self.take_stairs("<")
                 return True
             return self.soko_step_to(lv, st, goal, bs, ts, extra) or self.soko_wait()
         return self.soko_prize(lv, st, bs, ts, extra)
@@ -1171,8 +1170,7 @@ class SokobanMixin:
             arrive = tuple(st.lv["arrive"])
             here = st.from_map(self.pos())
             if here == arrive:
-                self.took_stairs = True
-                self.press(">")
+                self.take_stairs(">")
                 self.soko_stats["left_level"] += 1
                 return True
             bs, ts = self.soko_state(lv, st)
