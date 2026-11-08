@@ -19,7 +19,7 @@ from collections import Counter
 
 import nle.nethack as nh
 
-from nhbot.carry import RANDOM_CLASSES, describe
+from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, describe, singular
 from nhbot.items import base_name, parse_item
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
@@ -31,6 +31,25 @@ CANCELLED_RE = re.compile(r"\(\d+:-1\)")
 UNID_GEM_RE = re.compile(r"^(?:\w+ )?(?:gem|stone)s?$")
 
 BLANK_PAPER_COST = 60
+
+# slots: the 52 inventory letters (invent.c; gold takes none) -- pickup.c:1426-1434 lift_object refuses an item
+# that would need a 53rd ("Your knapsack cannot accommodate any more items.")
+INV_LETTERS = 52
+# what can stack (objects.c oc_merge): the classes whose every type merges, and the weapons that do (missiles,
+# daggers, knives, spears); candles are the common mergeable tool
+MERGE_CLASSES = (nh.FOOD_CLASS, nh.POTION_CLASS, nh.SCROLL_CLASS, nh.GEM_CLASS)
+MERGE_WEAPONS = {"arrow", "elven arrow", "orcish arrow", "silver arrow", "ya", "crossbow bolt", "dart", "shuriken",
+                 "boomerang", "spear", "elven spear", "orcish spear", "dwarvish spear", "silver spear", "javelin",
+                 "dagger", "elven dagger", "orcish dagger", "silver dagger", "athame", "scalpel", "knife", "stiletto",
+                 "worm tooth", "crysknife"}
+
+
+def stack_key(text):
+    """What must agree for two stacks to merge, as far as the text shows (invent.c mergable: the type, BUC and its
+    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular."""
+    t = re.sub(r"\s*\(.*?\)", "", text).strip()
+    t = re.sub(r"^(?:a|an|the|some|\d+)\s+", "", t)
+    return " ".join(singular(w) for w in t.split(" "))
 
 
 def is_water(ocls, text):
@@ -181,6 +200,61 @@ class ValueMixin:
                 d = describe(it.ocls, it.text)
                 wt += d["wt"] * d["qty"]
         return wt
+
+    # ------------------------------------------------------------ the 52 letters (slots)
+    def letters_free(self):
+        """Inventory letters left (gold takes none)."""
+        return INV_LETTERS - sum(1 for it in self.items() if it.ocls != nh.COIN_CLASS)
+
+    def merges_in(self, ocls, text):
+        """slots: a floor stack that would join a stack we carry (no letter of its own) -- a mergeable kind whose
+        text agrees with one of ours (stack_key; hidden differences -- an unknown BUC -- can still keep them apart)."""
+        if ocls == nh.WEAPON_CLASS:
+            name = base_name(text)[2]
+            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(" ".join(singular(w) for w in name.split(" ")), name))
+            if name not in MERGE_WEAPONS:
+                return False
+        elif ocls not in MERGE_CLASSES and not (ocls == nh.TOOL_CLASS and "candle" in text):
+            return False
+        k = stack_key(text)
+        return any(it.ocls == ocls and stack_key(it.text) == k for it in self.items())
+
+    def stack_value(self, it, same=1):
+        """est_value of the whole stack (a letter is freed only by all of it)."""
+        return self.est_value(it, same) * base_name(it.text)[0]
+
+    def slot_victim(self):
+        """slots: the stack whose letter we would give up -- the lowest stack_value among what we may drop: off the
+        body, not refused before, not needed (est_value below VALUE_MAX: not what we wear / wield / need, not
+        safe food, not water), not a corpse carried to an altar. None: nothing."""
+        looks = self.carried_by_look()
+        same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
+        cands = [(self.stack_value(it, same(it)), it) for it in self.items()
+                 if it.ocls != nh.COIN_CLASS and not it.on_body and not it.alternate and not it.quivered
+                 and it.key not in self.cant_drop and not self.sac_carrying(it)
+                 and self.est_value(it, same(it)) < VALUE_MAX]
+        return min(cands, key=lambda c: c[0])[1] if cands else None
+
+    def slot_ok(self, ocls, text, reason):
+        """slots: may this floor stack (take_reason: reason) have a letter? One that merges needs none; while two or
+        more are free, yes; taking the last free one (or none is free), only if it is worth more than the stack
+        slot_victim would give up -- which the drop step (carry.carry_drop_step) then drops, so a letter stays free.
+        An armor upgrade counts as needed (it will be worn)."""
+        if self.merges_in(ocls, text):
+            return True
+        free = self.letters_free()
+        if free >= 2:
+            return True
+        victim = self.slot_victim()
+        if victim is None:
+            return free >= 1
+        looks = self.carried_by_look()
+        k = appearance(text)
+        qty = base_name(text)[0]
+        it = parse_item("?", ocls, text)
+        v = VALUE_MAX if reason == "armor" else self.est_value(it, (looks[k] if k is not None else 0) + qty)
+        vs = looks[appearance(victim.text)] if appearance(victim.text) is not None else 1
+        return v * qty > self.stack_value(victim, vs)
 
     def worth_taking(self, ocls, text):
         """Take a floor stack if it fits without Burdened, or if it is worth more per weight than

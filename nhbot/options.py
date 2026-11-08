@@ -75,6 +75,9 @@ DEFAULTS = {
                                #      avoid_cells, adjacent_hostiles, ranged_target and unblock_step: on a desperate
                                #      level a never-melee monster is walked round below 90% HP too (no walking into
                                #      a jelly we won't hit); missiles at every avoided non-peaceful one alike
+    "slots": False,            # A/B: the 52 inventory letters count: a floor stack that won't merge takes the last
+                               #      free letter only if worth more than the stack we'd give up (value.slot_ok),
+                               #      and with all 52 taken the drop step drops that one (carry.carry_drop_step)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

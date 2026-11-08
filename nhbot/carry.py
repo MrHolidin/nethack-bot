@@ -219,9 +219,16 @@ class CarryMixin:
 
     def carry_drop_step(self, force=False, max_tier=4):
         """Encumbered (or force): drop one unit of the item of lowest value per weight (nhbot.value: what we
-        wear / wield / need comes last, being worth VALUE_MAX); max_tier < 4: nothing on the body. True if it
-        used the turn."""
+        wear / wield / need comes last, being worth VALUE_MAX); max_tier < 4: nothing on the body. slots: not
+        encumbered, but all 52 letters taken and nothing in view: the whole stack value.slot_victim names, so the
+        next item worth a letter finds one (value.slot_ok). True if it used the turn."""
         if self.bl(nh.NLE_BL_CAP) < 1 and not force:
+            if self.opts.slots and self.letters_free() <= 0 and not self.visible_hostiles(self.level()):
+                victim = self.slot_victim()
+                if victim is not None:
+                    self.drop_units(victim.letter)
+                    self.carry_stats["slot_dropped"] = self.carry_stats.get("slot_dropped", 0) + 1
+                    return True
             return False
         inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.cant_drop
                and (max_tier >= 4 or not it.on_body) and not self.sac_carrying(it)]
