@@ -669,7 +669,7 @@ class DangerMixin:
 
     def our_state(self):
         """What our condition does to a fight we simulate: aim -- P(our blow goes where we meant): stunned, a
-        random direction always, confused 1 in 5 (hack.c domove confdir; 1 in 8 random ones is right anyway)."""
+        random direction always, confused 1 in 5 (hack.c:1442 domove confdir; 1 in 8 random ones is right anyway)."""
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & nh.BL_MASK_STUN:
             aim = 1 / 8

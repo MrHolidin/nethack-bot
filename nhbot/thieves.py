@@ -8,7 +8,7 @@ import nle.nethack as nh
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, ROWS, ray_squares
+from nhbot.consts import COLS, ROWS, in_line, ray_squares
 from nhbot.monsters import THIEVES
 from nhbot.items import base_name
 from nhbot.nav import line_clear
@@ -191,7 +191,7 @@ class ThievesMixin:
                 for (ty, tx), _ in th:
                     ry, rx = ty - ny, tx - nx
                     d = max(abs(ry), abs(rx))
-                    if d < 2 or d > 6 or not (ry == 0 or rx == 0 or abs(ry) == abs(rx)):
+                    if d < 2 or d > 6 or not in_line(ry, rx):
                         continue
                     sy, sx = (ry > 0) - (ry < 0), (rx > 0) - (rx < 0)
                     if line_clear(k_mem, g, ny, nx, sy, sx, d):

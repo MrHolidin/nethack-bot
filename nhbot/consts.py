@@ -17,6 +17,11 @@ def in_bounds(y, x):
     return 0 <= y < ROWS and 0 <= x < COLS
 
 
+def in_line(dy, dx):
+    """The offset (dy, dx) lies on a row, a column or a diagonal: what a missile, ray or monster's shot follows."""
+    return dy == 0 or dx == 0 or abs(dy) == abs(dx)
+
+
 def ray_squares(y, x, dy, dx, n=9):
     """The squares a missile thrown from (y, x) in direction (dy, dx) can land on (up to n away)."""
     return [(y + i * dy, x + i * dx) for i in range(1, n + 1) if in_bounds(y + i * dy, x + i * dx)]

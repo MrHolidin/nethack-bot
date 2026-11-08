@@ -259,14 +259,15 @@ class PolicyMixin:
         return not c.hostiles and self.unihorn_step(HORN_FIXES)
 
     def step_stunned(self, c):
-        """Moves and attacks go in random directions while stunned / confused: wait it out."""
+        """Stunned, a move or an attack goes in a random direction; confused, 1 in 5 does (hack.c:1442 domove
+        confdir): wait it out."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
             if not c.hostiles or all(n in PASSIVE_MOLDS for _, n in c.hostiles):
                 self.stun_waits += 1
                 self.press("s")
                 return True
             if self.is_minetown(c.lv) and self.peaceful_next(c.lv, c.hostiles):
-                # a blow could go to the watch (cmd.c getdir confdir: stunned, or confused 1 in 5 -- a random
+                # a blow could go to the watch (hack.c:1442 domove confdir: stunned, or confused 1 in 5 -- a random
                 # direction): no melee in Minetown. A/B stun_peace +164 [-345, +656]; in the 10 games it fired +141
                 # a game, 4 deaths to the watch gone
                 self.stun_peace_waits += 1

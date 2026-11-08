@@ -7,13 +7,12 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
+from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, in_line, ray_squares
 from nhbot.danger import adj_level, dice_pmf
 from nhbot.messages import (KILL_RE, KILLED_RE, MELEE_ON_US_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE,
                             UNSEEN_ATTACK_RE, attacks_on_us)
 from nhbot.monattacks import ATTACKS
-from nhbot.monsters import (CARRIERS, MR_COLD, MR_ELEC, MR_FIRE, MR_SLEEP, PM_BY_NAME, PM_INDEX, RANGED_TARGETS,
-                            permonst_of)
+from nhbot.monsters import CARRIERS, MR_BITS, PM_BY_NAME, PM_INDEX, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
 from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, ray_harm, ray_walk,
@@ -38,7 +37,6 @@ BEAM_WANDS = ("striking",)                                            # no bounc
 
 SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
 SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
-MR_BIT = {"sleep": MR_SLEEP, "fire": MR_FIRE, "cold": MR_COLD, "lightning": MR_ELEC}    # mresists of each ray
 BOLT_LIM = 8               # hack.h:18: monsters fire / zap at us only from closer than this (mthrowu.c m_lined_up)
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
 PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
@@ -51,8 +49,9 @@ def wand_resisted(kind, name):
     pm = PM_BY_NAME.get(name)
     if pm is None:
         return False
-    if kind in MR_BIT:
-        return bool(pm.mresists & MR_BIT[kind])
+    bit = MR_BITS.get(RAY_RESIST.get(kind))
+    if bit is not None:
+        return bool(pm.mresists & bit)
     if kind in ("magic missile", "striking"):
         return name == "baby gray dragon" or any(a[1] in ("MAGM", "RBRE") for a in ATTACKS[PM_INDEX[name]])
     return False
@@ -84,9 +83,9 @@ def wand_effect(kind, name, depth, xl):
     if kind == "sleep":
         return 1 - p_res, None
     dmg = dice_pmf(RAY_DICE[kind][0], 6)
-    if kind == "fire" and pm.mresists & MR_BIT["cold"]:
+    if kind == "fire" and pm.mresists & MR_BITS["cold"]:
         dmg = np.concatenate([np.zeros(7), dmg])
-    if kind == "cold" and pm.mresists & MR_BIT["fire"]:
+    if kind == "cold" and pm.mresists & MR_BITS["fire"]:
         dmg = np.convolve(dmg, dice_pmf(6, 3))
     return 1.0, halved(dmg, p_res, False)
 
@@ -129,8 +128,8 @@ class CombatMixin:
 
     def ranged_target(self, lv):
         """A monster we never melee that a missile may kill (RANGED_TARGETS: floating eye, gas spore -- not closer
-        than spore_throw_min --, the jellies, brown / green mold, cockatrice, chickatrice) among avoid_cells, within 6 in a clear
-        straight line -> (dir_key, dist, pos, step)."""
+        than spore_throw_min --, the jellies, brown / green mold, cockatrice, chickatrice; melee_policy: any of
+        shoot_cells) among avoid_cells, within 6 in a clear straight line -> (dir_key, dist, pos, step)."""
         if not self.avoid_cells:
             return None
         y, x = self.pos()
@@ -139,7 +138,7 @@ class CombatMixin:
         for (ty, tx) in self.avoid_cells:
             dy, dx = ty - y, tx - x
             d = max(abs(dy), abs(dx))
-            if d == 0 or d > 6 or not (dy == 0 or dx == 0 or abs(dy) == abs(dx)):
+            if d == 0 or d > 6 or not in_line(dy, dx):
                 continue
             name = G.monster_name(g[ty, tx])
             if self.opts.melee_policy:
@@ -249,7 +248,7 @@ class CombatMixin:
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
         shoot = blocker in self.shoot_cells if self.opts.melee_policy else True     # melee_policy: not the Oracle
-        if shoot and d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) \
+        if shoot and d <= 6 and in_line(dy, dx) \
                 and not (name == "gas spore" and d < self.spore_throw_min()):
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             clear = line_clear(k_mem, self.obs["glyphs"], y, x, sy, sx, d)
@@ -293,7 +292,7 @@ class CombatMixin:
             self.shot_event = None
             vis = self.visible_hostiles(lv)
             reach = BOLT_LIM - 1 if self.opts.ranges else 8   # ranges: m_lined_up wants distmin < BOLT_LIM
-            lined = [(p, n) for p, n in vis if dist(p) <= reach and (p[0] == y or p[1] == x or abs(p[0] - y) == abs(p[1] - x))]
+            lined = [(p, n) for p, n in vis if dist(p) <= reach and in_line(p[0] - y, p[1] - x)]
             cands = lined
             if ev[1]:
                 cands = [c for c in lined if c[1] == ev[1]] or [c for c in vis if c[1] == ev[1]] or lined
@@ -337,7 +336,7 @@ class CombatMixin:
             if cands:
                 best = min(c[0] for c in cands)
                 pool = [p for d, p in cands if d == best]
-                lined = lambda p: p[0] == ty or p[1] == tx or abs(p[0] - ty) == abs(p[1] - tx)
+                lined = lambda p: in_line(p[0] - ty, p[1] - tx)
                 off = [p for p in pool if not lined(p)]
                 self.cur_act = "hunt"
                 self.hunt_steps += 1
@@ -535,7 +534,7 @@ class CombatMixin:
         terrain = TERRAIN_CODE[self.terrain_glyphs(lv)].copy()
         for (my, mx) in mons:                    # a monster seen in line: the squares up to it are open, not rock
             dy, dx = my - y0, mx - x0
-            if dy == 0 or dx == 0 or abs(dy) == abs(dx):
+            if in_line(dy, dx):
                 n = max(abs(dy), abs(dx))
                 for i in range(1, n + 1):
                     sq = (y0 + i * np.sign(dy), x0 + i * np.sign(dx))
@@ -630,9 +629,9 @@ class CombatMixin:
     def msg_combat(self, m):
         """Our hits and kills, being shot at, being attacked by something unseen."""
         self.focus_note(m)
-        if KILL_RE.search(m):
-            self.kill_count += 1
         mk = KILLED_RE.search(m)
+        if mk or KILL_RE.search(m):                    # KILLED_RE matches only what KILL_RE does
+            self.kill_count += 1
         if mk:
             self.kill_by[mk.group(1)] += 1
         self.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
