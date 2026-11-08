@@ -20,7 +20,7 @@ from nhbot.weapons import THROWABLE
 
 
 THROW_STONES = ("flint stone", "rock")
-CONTAINER_WORDS = ("bag", "sack", "box", "chest")    # keep_rule: never thrown (expendables) -- its contents go too
+CONTAINER_WORDS = ("bag", "sack", "box", "chest")    # never thrown (expendables) -- its contents would go too
 
 
 SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
@@ -192,37 +192,18 @@ class CombatMixin:
         return True
 
     def expendables(self):
-        """Inventory items worth less than a way through: missiles first, then gems/rocks, spare weapons,
-        unworn armor, ordinary tools. keep_rule: missiles first, then what value.keep_reason doesn't keep (no lamp
-        to rub, no wield candidate, no digger) and no container, the least worth (est_gold) first."""
+        """Inventory items worth less than a way through: missiles first (the alternate weapon included), then
+        gems, weapons, armor and tools that value.keep_reason doesn't keep (no lamp to rub, no wield candidate, no
+        digger), no container, not on us, not cursed -- the least worth (est_gold) first."""
         if self.handless():
             return []
-        out = [(0, l, s) for l, s in self.throwables()]          # missiles, the alternate weapon included
-        if self.opts.keep_rule:
-            seen = {l for _, l, _ in out}
-            rest = [(self.est_gold(it.ocls, it.text), it.letter, it.text) for it in self.items()
-                    if it.letter not in seen and not it.on_body and not it.alternate and not it.cursed
-                    and it.ocls in (nh.GEM_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS, nh.TOOL_CLASS)
-                    and not any(w in it.text for w in CONTAINER_WORDS) and self.keep_reason(it) is None]
-            return [(l, s) for _, l, s in out] + [(l, s) for _, l, s in sorted(rest, key=lambda c: c[0])]
-        for it in self.items():
-            if it.on_body or it.alternate or it.cursed:
-                continue
-            letter, ocls, s = it.letter, it.ocls, it.text
-            if ocls == nh.GEM_CLASS:
-                out.append((1, letter, s))
-            elif ocls == nh.WEAPON_CLASS:
-                out.append((2, letter, s))
-            elif ocls == nh.ARMOR_CLASS:
-                out.append((3, letter, s))
-            elif ocls == nh.TOOL_CLASS and not any(w in s for w in ("pick-axe", "mattock", "unicorn horn", "key", "lock pick", "bag", "sack")):
-                out.append((4, letter, s))
-        out.sort()
-        seen, res = set(), []
-        for _, l, s in out:
-            if l not in seen:
-                seen.add(l); res.append((l, s))
-        return res
+        out = self.throwables()
+        seen = {l for l, _ in out}
+        rest = [(self.est_gold(it.ocls, it.text), it.letter, it.text) for it in self.items()
+                if it.letter not in seen and not it.on_body and not it.alternate and not it.cursed
+                and it.ocls in (nh.GEM_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS, nh.TOOL_CLASS)
+                and not any(w in it.text for w in CONTAINER_WORDS) and self.keep_reason(it) is None]
+        return out + [(l, s) for _, l, s in sorted(rest, key=lambda c: c[0])]
 
     def unblock_step(self, lv, grids, goal):
         """Explore/descend goals are reachable only through squares held by monsters we refuse to melee

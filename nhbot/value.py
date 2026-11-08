@@ -9,9 +9,8 @@ est_gold(ocls, text): what a shopkeeper would pay for ONE unit (shk.c set_cost, 
   is likelier when the look belongs to a common type), types already identified this game excluded (they would
   show by name), times the likelihood of every price a shopkeeper showed for this look (pricemem).
 est_value(item, same): est_gold, +20% for an unidentified type of which we would have a single unit
-  (what we may learn or use), VALUE_MAX + est_gold for what we wear / wield, what we need (carry.needed) and
-  safe food up to MAX_FOOD pieces (pickup.food_needed), and water (clear potions); keep_rule: VALUE_MAX + est_gold
-  for what keep_reason keeps (one rule for value, selling, throwing and taking, with quotas).
+  (what we may learn or use), VALUE_MAX + est_gold for what keep_reason keeps (one rule for value, selling,
+  throwing and taking, with quotas: keep_plan).
 Dropping divides by the unit weight: the lowest value per weight goes first. Picking up uses the same order
 (worth_taking): what fits without Burdened, or what is worth more per weight than what would go to make room.
 """
@@ -22,7 +21,7 @@ import nle.nethack as nh
 
 from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, describe
 from nhbot.items import base_name, parse_item, singular_name, unid_gem_look
-from nhbot.pickup import MAX_FOOD, MISSILE_TYPES, SAFE_FOOD, floor_kind
+from nhbot.pickup import KEEP_FOOD, MAX_FOOD, MISSILE_TYPES, floor_kind
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
 VALUE_MAX = 1_000_000.0
@@ -33,10 +32,8 @@ CANCELLED_RE = re.compile(r"\(\d+:-1\)")
 
 BLANK_PAPER_COST = 60
 
-# keep_rule: the quotas of keep_plan
+# the quotas of keep_plan (food: pickup.KEEP_FOOD up to MAX_FOOD pieces)
 MISSILE_KEEP = 10                # missile pieces kept (combat.throwables: daggers, knives, darts, ... not crysknives)
-KEEP_FOOD = tuple(f for f in SAFE_FOOD if not f.endswith(" corpse"))   # food we eat from the pack (survival
-#                                  eat_from_inventory: no corpse -- a lichen / lizard corpse was kept, never eaten)
 DIGGERS = ("pick-axe", "dwarvish mattock")
 
 # slots: the 52 inventory letters (invent.c; gold takes none) -- pickup.c:1426-1434 lift_object refuses an item
@@ -80,7 +77,7 @@ class ValueState:
         self.type_version = 0        # bumped whenever what type_posterior reads changes
         self.deduced = {}            # appearance key -> type worked out though the game did not name it (deduce_type)
         self.post_memo = {}          # text -> (type_version, posterior)
-        self.keep_memo = (None, {})  # keep_rule: (game state key, keep_plan)
+        self.keep_memo = (None, {})  # (game state key, keep_plan)
 
 
 class ValueMixin:
@@ -184,30 +181,28 @@ class ValueMixin:
         return post is not None and len(post) > 1
 
     def est_value(self, it, same=1):
-        """Value of keeping one unit of Item it; same: units of its look we would carry. keep_rule: VALUE_MAX + its
-        gold for whatever keep_reason keeps."""
+        """Value of keeping one unit of Item it; same: units of its look we would carry. VALUE_MAX + its gold for
+        whatever keep_reason keeps."""
         g = self.est_gold(it.ocls, it.text)
-        if self.opts.keep_rule:
-            if self.keep_reason(it) is not None:
-                return VALUE_MAX + g
-        elif it.on_body or self.needed(it) or self.food_needed(it) or is_water(it.ocls, it.text):
+        if self.keep_reason(it) is not None:
             return VALUE_MAX + g
         if same == 1 and self.is_unknown(it.ocls, it.text):
             g *= UNID_BONUS
         return g
 
-    # ------------------------------------------------------------ keep_rule: what we keep, one rule
+    # ------------------------------------------------------------ what we keep, one rule
     def keep_reason(self, it, inv=None):
-        """keep_rule: why we keep Item it among inv (default: what we carry; an item not among them -- a floor stack,
+        """Why we keep Item it among inv (default: what we carry; an item not among them -- a floor stack,
         letter "?" -- is judged as if added), or None: it may be sold, dropped, thrown. The reasons of keep_plan;
-        est_value, sellables, expendables and take_reason all read this."""
+        est_value, sellables, expendables and take_reason all read this. (A/B keep_rule: -731 [-2505, +1053] on 79k;
+        +1451 [-357, +3365], median 8100 -> 8874, 824 of 1000 changed on 80k)"""
         inv = list(self.items()) if inv is None else list(inv)
         if not any(x.letter == it.letter and x.text == it.text for x in inv):
             inv.append(it)
         return self.keep_plan(inv).get(it.letter)
 
     def keep_plan(self, inv):
-        """keep_rule: {letter: reason} of the items of inv we keep (the others are left out):
+        """{letter: reason} of the items of inv we keep (the others are left out):
           worn        on the body (worn, wielded, rings on)
           alternate   the alternate weapon
           water       clear potions (owner's decision)
@@ -277,11 +272,6 @@ class ValueMixin:
             n += base_name(it.text)[0]
         self.value.keep_memo = (key, plan)
         return plan
-
-    def keep_food_pieces(self):
-        """keep_rule: pieces of the food we eat from the pack (KEEP_FOOD) we carry -- the food count."""
-        return sum(base_name(it.text)[0] for it in self.items()
-                   if it.ocls == nh.FOOD_CLASS and floor_kind(it.text)[1] in KEEP_FOOD)
 
     def carried_by_look(self):
         """Units carried per appearance key (unidentified looks only)."""

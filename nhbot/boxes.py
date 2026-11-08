@@ -156,11 +156,7 @@ class BoxMixin:
                 self.raw_step(13)
                 continue
             if "Take out what?" in tty:
-                self.pick.take_food = self.food_count()
-                try:
-                    took = self.menu_pick("Take out what?", lambda t: self.take_reason(t) is not None)
-                finally:
-                    self.pick.take_food = None
+                took = self.menu_pick("Take out what?", lambda t: self.take_reason(t) is not None)
                 continue
             break
         self.settle()

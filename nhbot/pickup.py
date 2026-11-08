@@ -30,7 +30,9 @@ SAFE_FOOD = ("food ration", "cram ration", "lembas wafer", "K-ration", "C-ration
              "candy bar", "lump of royal jelly", "kelp frond", "eucalyptus leaf", "sprig of wolfsbane",
              "clove of garlic", "meatball", "meat stick", "huge chunk of meat", "meat ring",
              "lichen corpse", "lizard corpse")
-MAX_FOOD = 6
+KEEP_FOOD = tuple(f for f in SAFE_FOOD if not f.endswith(" corpse"))   # food we eat from the pack (survival
+#                                  eat_from_inventory: no corpse -- a lichen / lizard corpse was kept, never eaten)
+MAX_FOOD = 6                       # pieces of KEEP_FOOD kept (value.keep_plan)
 
 # ---------------------------------------------------------------- item kinds by type, not substring
 _WEAPONS = {nh.OBJ_NAME(nh.objclass(i)) for i in range(nh.NUM_OBJECTS)
@@ -41,7 +43,6 @@ WIELD_TYPES = {"long sword", "katana"}                                          
 THROW_STONE_TYPES = {"flint stone", "rock"}
 FOOD_NAMES = {nh.OBJ_NAME(nh.objclass(i)) for i in range(nh.NUM_OBJECTS)
               if ord(nh.objclass(i).oc_class) == nh.FOOD_CLASS and nh.OBJ_NAME(nh.objclass(i))}
-SAFE_FOOD_SET = set(SAFE_FOOD)
 CLASS_WORDS = {"potion": nh.POTION_CLASS, "scroll": nh.SCROLL_CLASS, "ring": nh.RING_CLASS, "wand": nh.WAND_CLASS,
                "amulet": nh.AMULET_CLASS, "spellbook": nh.SPBOOK_CLASS}
 CLASS_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s?\b")
@@ -98,7 +99,6 @@ class PickupState:
     def __init__(self):
         self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
         self.stats = Counter()         # why things were taken / refused
-        self.take_food = None          # the food count, frozen while one pickup is judged
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
@@ -133,28 +133,24 @@ class PickupMixin:
         return reason
 
     def take_reason_kind(self, text, worn=None):
-        """take_reason before the letter count. keep_rule: food, missiles, wield candidates and diggers only within
-        what value.keep_plan keeps of our pack with this stack added (food by pieces, no corpses; MISSILE_KEEP
-        missile pieces; one wield candidate and one Excalibur long sword; one digger -- "digger", a dwarvish mattock,
-        worth less than its weight, was never taken)."""
+        """take_reason before the letter count. Food, missiles, wield candidates and diggers only within what
+        value.keep_plan keeps of our pack with this stack added (food by pieces, no corpses; MISSILE_KEEP missile
+        pieces; one wield candidate and one Excalibur long sword; one digger -- "digger", a dwarvish mattock, worth
+        less than its weight, was never taken); tins up to MAX_TINS."""
         if "for sale" in text or base_name(text)[2] in self.pick.never_take:
             return None
-        food_n = self.pick.take_food if self.pick.take_food is not None else self.food_count()
         ocls, typ = floor_kind(text)
         cursed = bool(CURSED_RE.search(text))
-        keep = self.opts.keep_rule
-        kept = self.keep_reason(parse_item("?", ocls, text)) if keep and ocls is not None else None
+        kept = self.keep_reason(parse_item("?", ocls, text)) if ocls is not None else None
         reason = None
-        if keep and kept == "digger" and not cursed:
+        if kept == "digger" and not cursed:
             reason = "digger"
-        elif ocls == nh.FOOD_CLASS and keep and typ != "tin":
-            if kept == "food" and "partly eaten" not in text:
-                reason = "food"
         elif ocls == nh.FOOD_CLASS:
-            if typ in SAFE_FOOD_SET and "partly eaten" not in text and food_n < MAX_FOOD:
+            if typ == "tin":
+                if self.tins_carried() < MAX_TINS:
+                    reason = "tin"
+            elif kept == "food" and "partly eaten" not in text:
                 reason = "food"
-            elif typ == "tin" and self.tins_carried() < MAX_TINS:
-                reason = "tin"
         elif ocls in CARRY_CLASSES:
             reason = "carry"
         elif ocls == nh.ARMOR_CLASS:
@@ -165,9 +161,9 @@ class PickupMixin:
                 reason = "carry"
         elif ocls == nh.WEAPON_CLASS and not cursed and typ not in AMMO_TYPES:
             if typ in MISSILE_TYPES:
-                reason = "missile" if not keep or kept == "missile" else None
+                reason = "missile" if kept == "missile" else None
             elif typ in WIELD_TYPES:
-                reason = "weapon" if not keep or kept in ("wield", "excalibur") else None
+                reason = "weapon" if kept in ("wield", "excalibur") else None
             else:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
@@ -213,15 +209,10 @@ class PickupMixin:
         return bool(self.pile_mask(lv)[y, x])
 
     # ------------------------------------------------------------------ what to take
-    def food_needed(self, it):
-        """Safe food is kept like what we need, while we carry no more than MAX_FOOD pieces."""
-        return it.ocls == nh.FOOD_CLASS and floor_kind(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
-
     def food_count(self):
-        """Food lines in the pack; keep_rule: pieces of the food we eat from it (value.keep_food_pieces)."""
-        if self.opts.keep_rule:
-            return self.keep_food_pieces()
-        return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
+        """Pieces of the food we eat from the pack (KEEP_FOOD) we carry."""
+        return sum(base_name(it.text)[0] for it in self.items()
+                   if it.ocls == nh.FOOD_CLASS and floor_kind(it.text)[1] in KEEP_FOOD)
 
     # ------------------------------------------------------------------ the paths
     def armor_pickup_here(self, lv):
@@ -272,19 +263,14 @@ class PickupMixin:
         """Pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it
         straight back down if want rejects it."""
         seq0 = self.msg_seq
-        self.pick.take_food = self.food_count()    # judged as before the pickup
-        try:
-            how = self.pickup(want, site)
-            lone = None
-            if how == "lone":            # one item, no menu: "f - an orcish dagger." (a menu pickup of several
-                for t in self.msgs_since(seq0):     # items reports them all in one line: not this case)
-                    lone = re.match(r"^([a-zA-Z]) - ([^.]+)", t)
-                    if lone:
-                        break
-            bad = lone is not None and not want(lone.group(2))
-        finally:
-            self.pick.take_food = None
-        if bad:
+        how = self.pickup(want, site)
+        lone = None
+        if how == "lone":                # one item, no menu: "f - an orcish dagger." (a menu pickup of several
+            for t in self.msgs_since(seq0):     # items reports them all in one line: not this case)
+                lone = re.match(r"^([a-zA-Z]) - ([^.]+)", t)
+                if lone:
+                    break
+        if lone is not None and not want(lone.group(2)):
             self.pick.stats["lone_dropped"] += 1
             self.drop_units(lone.group(1))
 
