@@ -82,7 +82,10 @@ DEFAULTS = {
                                #      adjusted monster level (makemon.c adj_lev), the weapon in hand whatever its
                                #      class, erosion, encumbrance, our speed, the hits danger_tick counted -- not
                                #      focus.py's own estimates (nhbot.focus.focus_score_model)
-    "gift": None,             # experiments: item names (wish syntax) put into the inventory at the start, identified
+    "walk_fight_all": False,   # A/B: every win_prob fight played by the full walk_fight model (approach {}): prey_win
+                               #      and the water demon check too, not the simple loop that left out paralysis,
+                               #      regeneration, sleep, stun, stoning, brain-eating (nhbot.danger.win_prob)
+    "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
     "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view

@@ -388,7 +388,7 @@ class DangerMixin:
         monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
         Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
         with and one without the opening see the same monster HP and the same later rolls.
-        approach (wand_ev): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
+        approach (wand_ev; walk_fight_all: {} when not given -- every fight by walk_fight): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
         mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
         only hit monsters next to us (none there: we wait).
         ranged (with approach): {pos: threats.ranged_profile} -- the ranged attacks we saw that monster make, used
@@ -415,6 +415,8 @@ class DangerMixin:
                          self.monster_effects(name)))
         if not mons:
             return 1.0
+        if approach is None and self.opts.walk_fight_all:
+            approach = {}                        # walk_fight_all: everyone already next to us, the full model
         index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
         # the pmfs drawn from, as choice's tables, by object (they all live in mons for the whole call)
         cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m[2], m[3], m[7][0], m[11][0])}
