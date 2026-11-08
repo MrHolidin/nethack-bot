@@ -31,6 +31,43 @@ ATTACKER_NAME_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|bites|sting
 #   only as it starts fleeing (seen, not fleeing already)
 FLEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) turns to flee\.")
 
+# ---------------------------------------------------------------- attacked_us: one table, one parser
+# How the game tells that a monster attacks US, subject first ("The <name>", "It" unseen, "Something", a proper name
+# -- a shopkeeper, a priest). A monster-vs-monster line (mhitm.c) names its target after the verb and has no '!'
+# right after it: "The jackal bites the little dog.", "The gnome swings her axe at the jackal.", "The kobold throws
+# a dart at the newt!" -- those are not attacks on us. The four readings above disagreed on exactly that.
+ATTACK_ON_US_VERBS = (
+    # melee -- mhitu.c:46-75 hitmsg, :92 missmu, :40-43 a seduction, :100-108 mswings (no "at <target>", which
+    # mhitm.c:1566-1576 mswingsm adds), :980 a hug, :1818 an engulf, steal.c:413
+    ("melee", r"(?:hits|misses|just misses|bites|stings|butts)!|kicks[!.]|touches you!|grabs you!|engulfs you!|"
+              r"charms you\.|(?:smiles at|talks to) you\b|pretends to be friendly\.|"
+              r"(?:thrusts|swings) (?:one of )?(?:his|her|its) (?:(?! at )[^.!?])+\."),
+    # melee, the subject possessive (hitmsg AT_TENT)
+    ("melee", r"tentacles suck you!"),
+    # ranged -- mthrowu.c:277-279 monshoot ("at <target>" only at a monster), :782 / :827 venom and breath (the same
+    # line at a monster: counted, as before), mcastu.c:249 / :263 / :858, muse.c:186
+    ("ranged", r"(?:shoots|throws) (?:(?! at )[^!?])+!|zaps (?!(?:him|her|it)self)(?:you with )?(?:an? |the )?[^!?]*!|breathes [^!?]+!|"
+               r"spits venom!|casts (?:a spell|at )"),
+)
+ATTACK_ON_US_RE = re.compile(
+    r"(?:^|(?<=[.!?])\s+)(?P<who>The [^.!?]+?|It|Something|(?!You\b|Your\b)[A-Z][\w'-]*(?: [A-Z][\w'-]*)*?)(?:'s?)? "
+    r"(?:" + "|".join(f"(?P<{kind}{i}>{pat})" for i, (kind, pat) in enumerate(ATTACK_ON_US_VERBS)) + ")")
+
+
+def attacks_on_us(m):
+    """attacked_us: the attacks on us a message line tells, [(who, kind)] -- who "The <name>", "It", "Something" or a
+    proper name; kind "melee" / "ranged" (ATTACK_ON_US_VERBS)."""
+    out = []
+    for mm in ATTACK_ON_US_RE.finditer(m):
+        kind = next(k for k, v in mm.groupdict().items() if v is not None and k != "who")
+        out.append((mm.group("who"), kind.rstrip("0123456789")))
+    return out
+
+
+def attacker_kind(who):
+    """'The jackal' -> 'jackal'; None for It / Something / a proper name."""
+    return who[4:] if who.startswith("The ") else None
+
 # ---------------------------------------------------------------- shot at from a distance
 # SHOT_AT_RE (combat.msg_combat -> last_shot_turn, hunt_shooter): somebody attacked us from a distance (mthrowu.c
 #   monshoot / thitu, zap.c buzz, muse.c), seen or not ...

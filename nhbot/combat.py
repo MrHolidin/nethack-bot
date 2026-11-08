@@ -10,7 +10,7 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, ray_squares
 from nhbot.danger import adj_level, dice_pmf
 from nhbot.messages import (KILL_RE, KILLED_RE, MELEE_ON_US_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE,
-                            UNSEEN_ATTACK_RE)
+                            UNSEEN_ATTACK_RE, attacks_on_us)
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import (CARRIERS, MR_COLD, MR_ELEC, MR_FIRE, MR_SLEEP, PM_BY_NAME, PM_INDEX, RANGED_TARGETS,
                             permonst_of)
@@ -635,7 +635,14 @@ class CombatMixin:
             self.last_shot_turn = self.turn()
             mm = SHOOTER_RE.search(m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
-        if UNSEEN_ATTACK_RE.search(m):
-            self.it_attacked = True           # blind_strike: an unseen monster attacked us this turn
-        if MELEE_ON_US_RE.search(m):
-            self.melee_on_us = True           # hallu_strike: something attacked us in melee this turn
+        if self.opts.attacked_us:
+            # attacked_us: the one parser of attacks on us (messages.attacks_on_us) -- "It ..." an unseen one, a named
+            # one in melee (hallucinating, the name is random)
+            melee = [who for who, kind in attacks_on_us(m) if kind == "melee"]
+            self.it_attacked |= "It" in melee
+            self.melee_on_us |= any(who.startswith("The ") for who in melee)
+        else:
+            if UNSEEN_ATTACK_RE.search(m):
+                self.it_attacked = True       # blind_strike: an unseen monster attacked us this turn
+            if MELEE_ON_US_RE.search(m):
+                self.melee_on_us = True       # hallu_strike: something attacked us in melee this turn

@@ -68,6 +68,9 @@ DEFAULTS = {
                                #      blow erases it, setmangry) -- we wait, nymph_wait_max turns at most; the
                                #      nymph's Elbereth is written by elbereth.elb_write (retries a misspelling)
                                #      (nhbot.thieves.nymph_step)
+    "attacked_us": False,      # A/B: one table / parser of the attacks on us (messages.attacks_on_us) for every reader
+                               #      -- the threat tracker (no longer "The jackal bites the little dog."), the
+                               #      peaceful-attacker marks, blind_strike / hallu_strike ("thrusts" / "swings" lines)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

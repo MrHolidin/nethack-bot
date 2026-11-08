@@ -9,7 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
-from nhbot.messages import MELEE_BY_NAME_RE
+from nhbot.messages import MELEE_BY_NAME_RE, attacks_on_us
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import (ALWAYS_AVOID, M2_DWARF, M2_ELF, M2_GNOME, M2_HOSTILE, M2_HUMAN, M2_ORC, M2_PEACEFUL,
                             MR_COLD, MR_DISINT, MR_ELEC, MR_FIRE, MR_POISON, MR_SLEEP, MS_GUARDIAN, MS_LEADER,
@@ -153,8 +153,12 @@ class PerceptionMixin:
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
                and G.KIND[g[y + dy, x + dx]] == G.MONSTER]
-        for mm in MELEE_BY_NAME_RE.finditer(m):
-            who = mm.group(1) or mm.group(2)
+        if self.opts.attacked_us:
+            # attacked_us: the one parser of attacks on us (messages.attacks_on_us), melee ones
+            whos = [who for who, kind in attacks_on_us(m) if kind == "melee" and who != "Something"]
+        else:
+            whos = [mm.group(1) or mm.group(2) for mm in MELEE_BY_NAME_RE.finditer(m)]
+        for who in whos:
             if who in ("You", "It") or who.startswith("You "):
                 continue
             if who.startswith("The "):

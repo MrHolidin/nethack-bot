@@ -19,7 +19,8 @@ gives it unlimited use of them):
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.messages import ATTACKER_NAME_RE, FLEE_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE
+from nhbot.messages import (ATTACKER_NAME_RE, FLEE_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE, attacker_kind,
+                            attacks_on_us)
 from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
@@ -80,7 +81,13 @@ class ThreatMixin:
         if not self.mon_tracks:
             return
         t = self.turn()
-        for name in ATTACKER_NAME_RE.findall(m):
+        if self.opts.attacked_us:
+            # attacked_us: only attacks on us (messages.attacks_on_us), melee or ranged -- not "The jackal bites the
+            # little dog."
+            names = [n for who, _ in attacks_on_us(m) if (n := attacker_kind(who)) is not None]
+        else:
+            names = ATTACKER_NAME_RE.findall(m)
+        for name in names:
             tr = self.track_named(name)
             if tr is not None:
                 tr["attacked"] = t
