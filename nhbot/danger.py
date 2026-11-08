@@ -228,7 +228,7 @@ class DangerMixin:
                 if w or name not in self.danger.mon_unarmed:
                     dmg = conv(dmg, dice_pmf(1, WEAPON_DICE[w][0]) if w else dice_pmf(1, 6))
             dmg = ac_reduce(dmg, ac)                         # before the poison's own losehp (attrib.c poisoned)
-            # (A/B dmg_ac -- negative AC takes rnd(-AC) off each hit: -1141 [-2242, -60], 7523)
+            # (mhitu.c:1699-1703; alone it lost its A/B as dmg_ac: -1141 [-2242, -60], 7523; part of fight_model2_all)
             if ad in POISON and not self.surv.poison_res:
                 alive *= 1 - p / 240                         # poisoned 1 in 8, deadly 1 in 30
                 extra = np.concatenate([np.zeros(6), np.full(10, 0.1)])     # rn1(10, 6): 6..15
