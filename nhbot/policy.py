@@ -374,9 +374,10 @@ class PolicyMixin:
         return not self.hallu_blind_ranged() and self.hunt_step(c.lv)
 
     def step_rest_on_elbereth(self, c):
-        """Hurt, on a square read as Elbereth just now, no hostile in view: rest."""
-        if (c.y, c.x) not in c.lv.elbereth or c.hp * 2 >= c.maxhp or self.visible_hostiles(c.lv) \
-                or not self.elb_confirm(c.lv):
+        """Hurt -- below rest_frac of max HP, as step_rest --, on a square read as Elbereth just now, no hostile in
+        view: rest."""
+        if (c.y, c.x) not in c.lv.elbereth or c.hp >= c.maxhp * self.opts.rest_frac \
+                or self.visible_hostiles(c.lv) or not self.elb_confirm(c.lv):
             return False
         self.elb_stats["rest_confirmed"] += 1
         self.cur_act = "rest"
