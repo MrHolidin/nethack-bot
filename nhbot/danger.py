@@ -22,6 +22,7 @@ wand to zap (combat.wand_ev_pairs), a fountain dip that may bring a water demon 
 import re
 from bisect import bisect_right
 from collections import defaultdict
+from typing import NamedTuple
 
 import numpy as np
 import nle.nethack as nh
@@ -108,6 +109,43 @@ def cdf_draw(rng, cdf):
 def cdf_draws(rng, cdf, n):
     """int(rng.choice(len(p), size=n, p=p).sum()) for cdf = pmf_cdf(p): the same n uniform draws."""
     return sum(bisect_right(cdf, u) for u in rng.random(n))
+
+class FightMon(NamedTuple):
+    """One monster of a fight win_prob samples."""
+    lev: int            # its level (adj_level), at least 0
+    hit: float          # P(our blow hits it) (our_hit_prob)
+    dmg: object         # our damage pmf on it (our_damage_pmf)
+    rnd: object         # its round's damage pmf (monster_round) -- the simple model
+    inst: float         # P(its round kills us at once) -- the simple model
+    hits: int           # our hits on it so far (their damage is off its HP)
+    pos: object         # its square, None for one not there yet
+    turn: tuple         # (damage pmf, P(instant death)) of one of its moves (monster_turn_pmf)
+    speed: int          # its mmove
+    name: str
+    taint: tuple        # (P(a hit taints us), explodes) (monster_taint)
+    turn_helpless: tuple  # turn while we sleep / are frozen: +4 to hit us
+    regen: bool         # M1_REGEN
+    plys: tuple         # (P(a move freezes us), passive paralysis dice or None) (monster_paralysis)
+    never: bool         # a kind we never melee (perception.never_melee)
+    effects: tuple      # monster_effects of its hits
+
+
+def opening_hooks(index, alive, hps):
+    """win_prob's opening (a zap) sees the fight through these: alive_at(pos) -- a monster of the fight still at pos
+    --, apply(pos, damage or None for asleep) -- the zap's effect on it."""
+    def alive_at(pos):
+        return pos in index and index[pos] in alive
+
+    def apply(pos, dmg):
+        jj = index[pos]
+        if dmg is None:
+            alive.remove(jj)                 # asleep: out of the fight
+        else:
+            hps[jj] -= dmg
+            if hps[jj] <= 0:
+                alive.remove(jj)
+    return alive_at, apply
+
 
 class DangerMixin:
     def danger_init(self):
@@ -389,7 +427,8 @@ class DangerMixin:
         monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
         Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
         with and one without the opening see the same monster HP and the same later rolls.
-        approach (wand_ev; walk_fight_all: {} when not given -- every fight by walk_fight): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
+        approach (wand_ev; walk_fight_all: {} when not given -- every fight by walk_fight): {pos: squares it still
+        has to walk} -- such a monster spends its moves (mcalcmove:
         mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
         only hit monsters next to us (none there: we wait).
         ranged (with approach): {pos: threats.ranged_profile} -- the ranged attacks we saw that monster make, used
@@ -409,20 +448,20 @@ class DangerMixin:
                 continue
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
-            mons.append((max(lev, 0), self.our_hit_prob(name, pos), self.our_damage_pmf(name), rnd_pmf, inst,
-                         self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove, name,
-                         self.monster_taint(name), self.monster_turn_pmf(name, 4),
-                         bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),
-                         self.monster_effects(name)))
+            mons.append(FightMon(max(lev, 0), self.our_hit_prob(name, pos), self.our_damage_pmf(name), rnd_pmf, inst,
+                                 self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove,
+                                 name, self.monster_taint(name), self.monster_turn_pmf(name, 4),
+                                 bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),
+                                 self.monster_effects(name)))
         if not mons:
             return 1.0
         if approach is None and self.opts.walk_fight_all:
             approach = {}                        # walk_fight_all: everyone already next to us, the full model
-        index = {m[6]: j for j, m in enumerate(mons) if m[6] is not None}
+        index = {m.pos: j for j, m in enumerate(mons) if m.pos is not None}
         # the pmfs drawn from, as choice's tables, by object (they all live in mons for the whole call)
-        cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m[2], m[3], m[7][0], m[11][0])}
+        cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m.dmg, m.rnd, m.turn[0], m.turn_helpless[0])}
         state = self.our_state() if approach is not None else None
-        plans = [self.ranged_plan(ranged.get(m[6]), m[9]) if ranged else None for m in mons]
+        plans = [self.ranged_plan(ranged.get(m.pos), m.name) if ranged else None for m in mons]
         zrng = self.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
@@ -430,7 +469,7 @@ class DangerMixin:
         for _ in range(sims):
             hps = []
             hcap = []
-            for lev, _, dmg, _, _, hits, _, _, _, _, _, _, _, _, _, _ in mons:
+            for lev, dmg, hits in ((m.lev, m.dmg, m.hits) for m in mons):
                 for _try in range(20):
                     h = full = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
                     if hits:
@@ -441,8 +480,8 @@ class DangerMixin:
                 hcap.append(max(full, h, 1))             # regeneration stops at its full HP
             hp, alive, asleep = hp0, list(range(len(mons))), 0
             if approach is not None:
-                end, tainted = self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs, plans,
-                                               hcap, state)
+                end, tainted = self.walk_fight(mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs,
+                                               plans, hcap, state)
                 if end > 0:
                     wins += TAINTED_WIN if tainted else 1
                 continue
@@ -452,21 +491,10 @@ class DangerMixin:
                     if not alive:
                         break
                     j = alive[0]
-                    hit = rng.random() < mons[j][1]
-                    d = cdf_draw(rng, cdfs[id(mons[j][2])]) if hit else 0
+                    hit = rng.random() < mons[j].hit
+                    d = cdf_draw(rng, cdfs[id(mons[j].dmg)]) if hit else 0
                     if opening is not None and _turn == 0 and _a == 0:
-                        def alive_at(pos):
-                            return pos in index and index[pos] in alive
-
-                        def apply(pos, dmg):
-                            jj = index[pos]
-                            if dmg is None:
-                                alive.remove(jj)                 # asleep: out of the fight
-                            else:
-                                hps[jj] -= dmg
-                                if hps[jj] <= 0:
-                                    alive.remove(jj)
-                        lost, asleep, _ = opening(zrng, alive_at, apply)
+                        lost, asleep, _ = opening(zrng, *opening_hooks(index, alive, hps))
                         hp -= lost
                         continue
                     if asleep > 0:
@@ -481,10 +509,10 @@ class DangerMixin:
                 if hp <= 0:
                     break
                 for j in alive:
-                    if rng.random() < mons[j][4]:
+                    if rng.random() < mons[j].inst:
                         hp = 0
                         break
-                    hp -= cdf_draw(rng, cdfs[id(mons[j][3])])
+                    hp -= cdf_draw(rng, cdfs[id(mons[j].rnd)])
                 if hp <= 0:
                     break
             if hp > 0:
@@ -503,7 +531,7 @@ class DangerMixin:
         (state) our blow goes astray as domove's confdir sends it; we never hit the kinds we never melee
         (perception.never_melee: a floating eye, a cockatrice when we hold no weapon)."""
         state = state or self.our_state()
-        left = [approach.get(m[6], 0) for m in mons]
+        left = [approach.get(m.pos, 0) for m in mons]
         plans = plans or [None] * len(mons)
         cool = [0] * len(mons)                   # breath: turns until it can breathe again
         alive, asleep, tainted = list(range(len(mons))), 0, False
@@ -516,23 +544,12 @@ class DangerMixin:
             for _a in range(acts):
                 if not alive:
                     break
-                ready = [j for j in alive if left[j] == 0 and not mons[j][14]]      # never_melee: a floating eye
+                ready = [j for j in alive if left[j] == 0 and not mons[j].never]      # never_melee: a floating eye
                 j = ready[0] if ready else None
-                hit = j is not None and rng.random() < mons[j][1] * aim
-                d = cdf_draw(rng, cdfs[id(mons[j][2])]) if hit else 0
+                hit = j is not None and rng.random() < mons[j].hit * aim
+                d = cdf_draw(rng, cdfs[id(mons[j].dmg)]) if hit else 0
                 if opening is not None and _turn == 0 and _a == 0:
-                    def alive_at(pos):
-                        return pos in index and index[pos] in alive
-
-                    def apply(pos, dmg):
-                        jj = index[pos]
-                        if dmg is None:
-                            alive.remove(jj)
-                        else:
-                            hps[jj] -= dmg
-                            if hps[jj] <= 0:
-                                alive.remove(jj)
-                    lost, asleep, blind = opening(zrng, alive_at, apply)
+                    lost, asleep, blind = opening(zrng, *opening_hooks(index, alive, hps))
                     hp -= lost
                     tainted |= blind
                     continue
@@ -547,10 +564,10 @@ class DangerMixin:
                 else:
                     # dmg_cube: uhitm.c:628 hitum calls passive on a miss too (2 in 3 while it lives,
                     # uhitm.c:2873) -- if the blow went at it: a stunned / confused one may have gone astray
-                    p, a = mons[j][1], aim
+                    p, a = mons[j].hit, aim
                     p_passive = 2 / 3 * a * (1 - p) / (1 - p * a) if p * a < 1 else 0.0
-                if mons[j][13][1] and not state["free_action"] and rng.random() < p_passive:
-                    n, die = mons[j][13][1]              # uhitm.c passive: a gelatinous cube freezes us
+                if mons[j].plys[1] and not state["free_action"] and rng.random() < p_passive:
+                    n, die = mons[j].plys[1]              # uhitm.c passive: a gelatinous cube freezes us
                     asleep = max(asleep, min(127, int(rng.integers(1, die + 1, size=n).sum())))
             if not alive or hp <= 0:
                 break
@@ -558,11 +575,11 @@ class DangerMixin:
             us["stun"] -= 1
             us["conf"] -= 1
             for j in list(alive):
-                if mons[j][12] and hcap is not None and hps[j] < hcap[j]:
+                if mons[j].regen and hcap is not None and hps[j] < hcap[j]:
                     hps[j] += 1                          # mon_regen
-                (one, inst), speed, (p_taint, explodes) = mons[j][7], mons[j][8], mons[j][10]
+                (one, inst), speed, (p_taint, explodes) = mons[j].turn, mons[j].speed, mons[j].taint
                 if asleep > 0:
-                    one, inst = mons[j][11]              # we are helpless: +4 to hit us
+                    one, inst = mons[j].turn_helpless     # we are helpless: +4 to hit us
                 mk, mf = divmod(speed, 12)
                 moves = mk + (1 if mf and rng.random() < mf / 12 else 0)
                 plan = plans[j]
@@ -592,10 +609,10 @@ class DangerMixin:
                     hp -= cdf_draw(rng, cdfs[id(one)])
                     if p_taint and rng.random() < p_taint:
                         tainted = True
-                    p_plys = mons[j][13][0]
+                    p_plys = mons[j].plys[0]
                     if p_plys and asleep <= 0 and not state["free_action"] and rng.random() < p_plys:
                         asleep = int(rng.integers(1, 11))    # mhitu.c AD_PLYS: nomul(-rnd(10))
-                    for p, kind, n, die in mons[j][15]:
+                    for p, kind, n, die in mons[j].effects:
                         if rng.random() >= p:
                             continue
                         if kind == "ston":
