@@ -18,6 +18,7 @@ import nle.nethack as nh
 
 from nhbot.game import MENU_RE
 from nhbot.items import base_name, erosion, parse_item
+from nhbot.pricemem import ARMOR_APPEAR
 
 HELM, CLOAK, SUIT, SHIELD, GLOVES, BOOTS, SHIRT = "helm", "cloak", "suit", "shield", "gloves", "boots", "shirt"
 TEST_KEEP_ENCH = 3               # strip_for_test: pieces this enchanted or more come off before an untested scroll
@@ -64,16 +65,15 @@ _add(BOOTS, 2, "high boots", "jackboots", "iron shoes", "hard shoes")
 # mummy wrapping, orcish/dwarvish cloak (AC 0), shirts (AC 0).
 
 # items we never put on ourselves, but must recognise when worn (they occupy a slot)
-UNSAFE = {}
+# the shuffled helmet / gloves / boots appearances (pricemem.ARMOR_APPEAR; the cloaks are in ARMOR): the slot and
+# AC of their group's first type
+UNSAFE = {look: ARMOR[types[0]] for look, types in ARMOR_APPEAR.items() if look not in ARMOR}
 for n in ("fedora", "cornuthaum", "dunce cap", "conical hat"):
     UNSAFE[n] = (HELM, 0)
-for n in ("plumed helmet", "etched helmet", "crested helmet", "visored helmet", "helm of opposite alignment",
-          "helm of caution"):
+for n in ("helm of opposite alignment", "helm of caution"):
     UNSAFE[n] = (HELM, 1)
-for n in ("old gloves", "padded gloves", "riding gloves", "fencing gloves", "gauntlets of fumbling"):
-    UNSAFE[n] = (GLOVES, 1)
-for n in ("combat boots", "jungle boots", "hiking boots", "mud boots", "buckled boots", "riding boots",
-          "snow boots", "fumble boots", "levitation boots"):
+UNSAFE["gauntlets of fumbling"] = (GLOVES, 1)
+for n in ("fumble boots", "levitation boots"):
     UNSAFE[n] = (BOOTS, 1)
 for n in ("mummy wrapping", "orcish cloak", "coarse mantelet", "dwarvish cloak", "hooded cloak"):
     UNSAFE[n] = (CLOAK, 0)

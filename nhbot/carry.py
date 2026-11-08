@@ -25,17 +25,14 @@ from nhbot import glyphs as G
 from nhbot.equipment import parse_armor
 from nhbot.vault import FIND_SCROLLS
 from nhbot.items import CORPSE_WEIGHT, GEM_LOOKS, base_name, corpse_kind, singular_name, unid_gem_look
-from nhbot.pricemem import appearance
+from nhbot.pricemem import ARMOR_APPEAR, appearance
+from nhbot.rays import ATTACK_WANDS
+from nhbot.weapons import THROWABLE
 
 CARRY_CLASSES = (nh.WAND_CLASS, nh.RING_CLASS, nh.AMULET_CLASS, nh.SCROLL_CLASS, nh.POTION_CLASS)
 RANDOM_CLASSES = CARRY_CLASSES + (nh.SPBOOK_CLASS,)
 CLASS_WEIGHT = {nh.WAND_CLASS: 7, nh.RING_CLASS: 3, nh.AMULET_CLASS: 20, nh.SCROLL_CLASS: 5,
                 nh.POTION_CLASS: 20, nh.SPBOOK_CLASS: 50}
-RANDOM_ARMOR = {"plumed helmet", "etched helmet", "crested helmet", "visored helmet", "old gloves",
-                "padded gloves", "riding gloves", "fencing gloves", "combat boots", "jungle boots",
-                "hiking boots", "mud boots", "buckled boots", "riding boots", "snow boots", "tattered cape",
-                "opera cloak", "ornamental cope", "piece of cloth"}
-ATTACK_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning", "striking")
 HEAL_POTIONS = ("full healing", "extra healing", "healing")
 
 ALL = None
@@ -102,7 +99,6 @@ for _i in range(nh.NUM_OBJECTS):
     _oc = nh.objclass(_i)
     if ord(_oc.oc_class) == nh.WEAPON_CLASS and nh.OBJ_DESCR(_oc):
         WEAPON_NAME_OF.setdefault(nh.OBJ_DESCR(_oc), nh.OBJ_NAME(_oc))
-KEEP_WEAPONS = ("dagger", "knife", "dart", "shuriken", "javelin", "spear")   # combat.THROWABLE: thrown, kept
 NO_TOOLS = {"chest", "large box", "ice box", "beartrap", "land mine"}
 # also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks), and diggers
 DIGGER_WORDS = ("pick-axe", "dwarvish mattock", "broad pick")
@@ -194,7 +190,7 @@ def describe(ocls, s, fixed=False):
     elif ocls == nh.ARMOR_CLASS:
         a = parse_armor(s)
         nm = a["name"] if a else t
-        unid = nm in RANDOM_ARMOR
+        unid = nm in ARMOR_APPEAR
         name = nm
     else:
         name = t
@@ -345,7 +341,7 @@ class CarryMixin:
             return True                      # jewelry: identify scrolls, amulets and rings to identify
         if c == nh.WEAPON_CLASS:
             d = self.describe_item(c, s)["key"][1]
-            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in KEEP_WEAPONS):
+            if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in THROWABLE):
                 return True                  # wield candidates (weapons.weapon_rank) and missiles we throw
         return False
 
@@ -357,7 +353,7 @@ class CarryMixin:
                 and (self.shop_buys(stype, it) and not self.offer_zero(it) if facts else buys is ALL or it.ocls in buys)
                 and (self.keep_reason(it) is None if self.opts.keep_rule else not self.needed(it))
                 and (lv.key, it.text) not in self.sell_tried
-                and not it.on_body and not it.alternate and not it.quivered and "unpaid" not in it.text]
+                and not it.on_body and not it.alternate and not it.quivered and not it.unpaid]
 
     def item_types(self, it):
         """shop_facts: the object types Item it may be -- one when identified (or a look fixed to one type), else

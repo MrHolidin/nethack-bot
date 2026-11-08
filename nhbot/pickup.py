@@ -17,10 +17,10 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_GLYPH, NO_TOOLS, OBJ_INFO,
                          TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, one_of)
-from nhbot.combat import THROWABLE
 from nhbot.equipment import GLOVES, parse_armor
 from nhbot.items import CURSED_RE, base_name, parse_item
 from nhbot.tins import MAX_TINS
+from nhbot.weapons import THROWABLE
 from nhbot.wishing import LAMP_NAMES
 
 # safe permanent food (no eggs: could be cockatrice; no tins: slow; no unknown corpses)

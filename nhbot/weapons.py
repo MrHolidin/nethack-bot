@@ -8,6 +8,9 @@ from nhbot.items import base_name, erosion
 
 
 OPENERS = ("dagger", "knife", "stiletto", "athame", "crysknife")   # opens tins, forces locks (a blade we can lose)
+# missiles we throw, by a word of the name -- a crysknife too, being named "knife" (combat.throwables, kept by
+# carry.needed); pickup.MISSILE_TYPES, the types we pick up to throw, leaves it out
+THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
 
 
 class WeaponsMixin:

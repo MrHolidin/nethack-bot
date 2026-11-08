@@ -15,24 +15,13 @@ from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, MR_BITS, PM_BY_NAME, PM_INDEX, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
 from nhbot.pricemem import appearance
-from nhbot.rays import (RAY_DICE, RAY_RESIST, REFLECTORS, TERRAIN_CODE, beam_walk, ray_harm, ray_walk,
-                        self_hit_prob, zap_hit_prob, ROOM as ROOM_CODE, STONE as STONE_CODE)
-
-
-THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
+from nhbot.rays import (ATTACK_WANDS, RAY_DICE, RAY_RESIST, RAY_WANDS, REFLECTORS, TERRAIN_CODE, beam_walk, ray_harm,
+                        ray_walk, self_hit_prob, zap_hit_prob, ROOM as ROOM_CODE, STONE as STONE_CODE)
+from nhbot.weapons import THROWABLE
 
 
 THROW_STONES = ("flint stone", "rock")
 CONTAINER_WORDS = ("bag", "sack", "box", "chest")    # keep_rule: never thrown (expendables) -- its contents go too
-
-
-# =====================================================================================
-# Attack wands (wiki: Wand of sleep and the ray wand pages)
-# =====================================================================================
-RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")   # rays bounce off walls
-
-
-BEAM_WANDS = ("striking",)                                            # no bounce
 
 
 SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
@@ -364,7 +353,7 @@ class CombatMixin:
             if ocls != nh.WAND_CLASS or self.wand_spent(it):
                 continue
             kind = self.wand_kind(it)            # by name, or narrowed by an engraving test (wandid)
-            if kind in RAY_WANDS or kind in BEAM_WANDS:
+            if kind in ATTACK_WANDS:
                 out.append((letter, kind))
         prio = {"sleep": 0, "striking": 1, "magic missile": 2, "cold": 3, "fire": 4, "lightning": 5}
         return sorted(out, key=lambda t: prio.get(t[1], 9))

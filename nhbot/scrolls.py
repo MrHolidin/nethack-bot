@@ -32,6 +32,7 @@ from nhbot import glyphs as G
 from nhbot.consts import DELTA2KEY, NEIGH
 from nhbot.game import PAGE_RE
 from nhbot.pricemem import appearance
+from nhbot.rays import ATTACK_WANDS
 
 GOOD_TYPES = {"enchant armor", "enchant weapon", "remove curse"}
 GOOD_RE = re.compile(r"\bscrolls? of (?:enchant armor|enchant weapon|remove curse)\b")    # a stack: "3 scrolls of"
@@ -40,7 +41,7 @@ TESTING_ENDS = {"enchant armor", "identify"}            # untested scrolls: once
 TEST_MIN_HP = 40                                        # untested scrolls: only above this HP
 GENOCIDE_SPECIES = ("water nymph", "mountain nymph", "wood nymph")
 GENOCIDE_CLASS = ("n",)
-CHARGE_FIRST = ("sleep", "magic missile", "fire", "cold", "lightning", "striking", "digging")
+CHARGE_FIRST = ATTACK_WANDS + ("digging",)
 DISCO_SCROLL_RE = re.compile(r"scroll of ([a-z ]+?) \(")
 # read.c / wield.c: "Your <xname> [violently ]glow(s) <colour> for a moment|while[, then evaporate(s)]" (an
 # artifact by name: "Excalibur glows blue ...")

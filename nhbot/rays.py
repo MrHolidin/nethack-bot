@@ -33,6 +33,10 @@ for _i in range(1, 12):
     _CMAP[_i] = WALL                        # walls and corners (a secret door / corridor looks like one)
 
 REFLECTORS = ("silver dragon", "chromatic dragon")          # muse.c mon_reflects: by species
+# our attack wands (wiki: Wand of sleep and the ray wand pages): rays bounce off walls, a beam does not
+RAY_WANDS = ("sleep", "magic missile", "fire", "cold", "lightning")
+BEAM_WANDS = ("striking",)
+ATTACK_WANDS = RAY_WANDS + BEAM_WANDS
 RANGES = range(7, 14)                                        # rn1(7, 7)
 
 
