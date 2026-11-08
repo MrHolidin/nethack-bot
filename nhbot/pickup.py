@@ -16,10 +16,10 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_GLYPH, NO_TOOLS, OBJ_INFO,
-                         TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, one_of)
+                         TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF)
 from nhbot.equipment import GLOVES, parse_armor
 from nhbot.game import MENU_RE
-from nhbot.items import CURSED_RE, base_name
+from nhbot.items import CURSED_RE, base_name, singular_name
 from nhbot.tins import MAX_TINS
 from nhbot.weapons import THROWABLE
 from nhbot.wishing import LAMP_NAMES
@@ -58,13 +58,15 @@ for _g in range(nh.MAX_GLYPH):
 
 def floor_kind(text):
     """Floor / menu text -> (object class or None, type name): identified name for weapons and food, else the
-    bare name."""
+    bare name -- in the singular (items.singular_name)."""
+    # (name_parse, accepted without A/B by the user -- see carry.describe): the singular by makeplural inverted,
+    # not word by word ("knives" was "knif", no weapon; "cloves of garlic" no food)
     _, _, name = base_name(text)
-    one = one_of(name)
+    one = singular_name(name)
     if re.search(r"\bgold pieces?\b", name):
         return nh.COIN_CLASS, "gold piece"
     if re.search(r"\bcorpses?$", name):
-        return nh.FOOD_CLASS, re.sub(r"s$", "", name)
+        return nh.FOOD_CLASS, one
     if name in FOOD_NAMES or one in FOOD_NAMES:
         return nh.FOOD_CLASS, name if name in FOOD_NAMES else one
     a = parse_armor(text)                   # before the class words: "ring mail" is armor, not a ring

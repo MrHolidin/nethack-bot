@@ -11,7 +11,7 @@ from nhbot.carry import HEAL_POTIONS
 from nhbot.consts import DELTA2KEY, FAINTING, HUNGRY, NOT_HUNGRY, SATIATED, WEAK
 from nhbot.game import PAGE_RE
 from nhbot.goals import GOALS
-from nhbot.items import base_name
+from nhbot.items import base_name, singular_name
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
 from nhbot.weapondice import SKILL_LEVEL
@@ -172,7 +172,9 @@ class SurvivalMixin:
                 continue
             if self.eat_prompt():
                 self.press(letter)
-                self.nutrition_add(FOOD_NUTRITION.get(base_name(s)[2], 200))
+                # one piece of a stack: "2 food rations" -> food ration, 800 (was 200)
+                # (name_parse, accepted without A/B by the user -- see carry.describe)
+                self.nutrition_add(FOOD_NUTRITION.get(singular_name(base_name(s)[2]), 200))
             else:
                 self.settle()
             return True

@@ -19,8 +19,8 @@ from collections import Counter
 
 import nle.nethack as nh
 
-from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, describe, one_of
-from nhbot.items import base_name, parse_item
+from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, describe
+from nhbot.items import base_name, parse_item, singular_name, unid_gem_look
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
 VALUE_MAX = 1_000_000.0
@@ -28,7 +28,6 @@ UNID_BONUS = 1.2
 UNID_GEM_OFFER = 5.0
 UNID_SHK = 1 - 0.25 * 0.25       # 3/4 from one shopkeeper in 4
 CANCELLED_RE = re.compile(r"\(\d+:-1\)")
-UNID_GEM_RE = re.compile(r"^(?:\w+ )?(?:gem|stone)s?$")
 
 BLANK_PAPER_COST = 60
 
@@ -46,10 +45,11 @@ MERGE_WEAPONS = {"arrow", "elven arrow", "orcish arrow", "silver arrow", "ya", "
 
 def stack_key(text):
     """What must agree for two stacks to merge, as far as the text shows (invent.c mergable: the type, BUC and its
-    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular."""
+    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular
+    (items.singular_name)."""
     t = re.sub(r"\s*\(.*?\)", "", text).strip()
     t = re.sub(r"^(?:a|an|the|some|\d+)\s+", "", t)
-    return one_of(t)
+    return singular_name(t)     # (name_parse, accepted without A/B by the user -- see carry.describe)
 
 
 def is_water(ocls, text):
@@ -135,7 +135,7 @@ class ValueMixin:
         _, ench, t = base_name(text)
         if ocls == nh.WAND_CLASS and CANCELLED_RE.search(text):
             return 0.0
-        if ocls == nh.GEM_CLASS and UNID_GEM_RE.match(t):
+        if ocls == nh.GEM_CLASS and unid_gem_look(t):
             return UNID_GEM_OFFER
         if ocls == nh.POTION_CLASS and re.match(r"^clear potions?$", t):
             return 0.0 if not re.search(r"\b(blessed|cursed)\b", text) or "uncursed" in text else 100 / div
@@ -159,8 +159,11 @@ class ValueMixin:
         return gp / div * (UNID_SHK if d["unid"] else 1.0)
 
     def is_unknown(self, ocls, text):
-        """More than one type is still possible for it."""
-        if ocls == nh.GEM_CLASS and UNID_GEM_RE.match(base_name(text)[2]):
+        """More than one type is still possible for it. An unidentified gem: any gem / glass / gray stone look
+        (items.unid_gem_look)."""
+        # (name_parse, accepted without A/B by the user -- see carry.describe): replaced a pattern of one word
+        # before "gem" / "stone" -- "yellowish brown gem" failed it: valued 0, dropped first
+        if ocls == nh.GEM_CLASS and unid_gem_look(base_name(text)[2]):
             return True
         post = self.type_posterior(text)
         return post is not None and len(post) > 1
@@ -212,7 +215,7 @@ class ValueMixin:
         text agrees with one of ours (stack_key; hidden differences -- an unknown BUC -- can still keep them apart)."""
         if ocls == nh.WEAPON_CLASS:
             name = base_name(text)[2]
-            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(one_of(name), name))
+            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(singular_name(name), name))
             if name not in MERGE_WEAPONS:
                 return False
         elif ocls not in MERGE_CLASSES and not (ocls == nh.TOOL_CLASS and "candle" in text):

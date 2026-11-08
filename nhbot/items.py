@@ -15,6 +15,8 @@ import re
 from dataclasses import dataclass
 from functools import lru_cache
 
+import nle.nethack as nh
+
 WIELD_RE = re.compile(r"\((?:tethered )?weapon in (\w+)")
 CURSED_RE = re.compile(r"\bcursed\b")               # not "uncursed"
 WAND_SPENT_RE = re.compile(r"\(\d+:(?:0|-1)\)")     # a wand known to have no charges (-1: cancelled)
@@ -125,3 +127,174 @@ def base_name(s, called=False):
         t = t[m.end():]
     return qty, ench, t.strip()
 
+
+# ---------------------------------------------------------------- plural names
+# objnam.c makeplural (objnam.c:2328) -- what xname does to a name for a stack of more than one -- and its tables
+# (objnam.c:2149-2196 one_off / as_is, 2283 singplur_compound, 2622 badman). singular_name inverts it over the
+# names the game uses: of the singulars whose makeplural is the text, the object / monster name. Every item name
+# is made singular by it (carry.describe, pickup.floor_kind, value.stack_key, survival's nutrition of a piece).
+# (name_parse, accepted without A/B by the user; it replaced a word-by-word singular -- "knives" was "knif",
+# "cloves of garlic" no food; see carry.describe for its A/B)
+ONE_OFF = (("child", "children"), ("cubus", "cubi"), ("culus", "culi"), ("djinni", "djinn"), ("erinys", "erinyes"),
+           ("foot", "feet"), ("fungus", "fungi"), ("goose", "geese"), ("knife", "knives"), ("labrum", "labra"),
+           ("louse", "lice"), ("mouse", "mice"), ("mumak", "mumakil"), ("nemesis", "nemeses"), ("ovum", "ova"),
+           ("ox", "oxen"), ("passerby", "passersby"), ("rtex", "rtices"), ("serum", "sera"), ("staff", "staves"),
+           ("tooth", "teeth"))
+AS_IS = ("boots", "shoes", "gloves", "lenses", "scales", "eyes", "gauntlets", "iron bars", "bison", "deer", "elk",
+         "fish", "fowl", "tuna", "yaki", "-hai", "krill", "manes", "moose", "ninja", "sheep", "ronin", "roshi",
+         "shito", "tengu", "ki-rin", "Nazgul", "gunyoki", "piranha", "samurai", "shuriken")
+COMPOUNDS = (" of ", " labeled ", " called ", " named ", " above", " versus ", " from ", " in ", " on ", " a la ",
+             " with", " de ", " d'", " du ", "-in-", "-at-")
+NO_MEN = ("albu", "antihu", "anti", "ata", "auto", "bildungsro", "cai", "cay", "ceru", "corner", "decu", "des", "dura",
+          "fir", "hanu", "het", "infrahu", "inhu", "nonhu", "otto", "out", "prehu", "protohu", "subhu", "superhu",
+          "talis", "unhu", "sha", "hu", "un", "le", "re", "so", "to", "at", "a")
+VOWELS = "aeiou"
+
+
+def _badman(base):
+    """objnam.c badman, to plural: a *man word without a *men plural (human, shaman)."""
+    if len(base) < 4:
+        return False
+    low = base.lower()
+    for p in NO_MEN:
+        start = len(low) - (len(p) + 3)
+        if start >= 0 and low[start:start + len(p)] == p and (start == 0 or low[start - 1] == " "):
+            return True
+    return False
+
+
+def _compound_at(s):
+    low = s.lower()
+    hits = [i for i in (low.find(c) for c in COMPOUNDS) if i >= 0]
+    return min(hits) if hits else -1
+
+
+def makeplural(name):
+    """objnam.c:2328 makeplural (the cases of our object and monster names)."""
+    s = name.strip()
+    if s.lower().startswith("pair of "):
+        return s
+    at = _compound_at(s)
+    head, excess = (s[:at], s[at:]) if at >= 0 else (s, "")
+    head = head.rstrip()
+    low = head.lower()
+    n = len(head)
+    if n == 1 or not head[-1].isalpha():
+        return head + "'s" + excess
+    if low.endswith("ae") or low.endswith("matzot") or low == "ya" or low.endswith(" ya"):
+        return head + excess
+    for a in AS_IS:
+        if low.endswith(a.lower()):
+            return head + excess
+    if n > 5 and low.endswith("craft"):
+        return head + excess
+    if low in ("slice", "mongoose"):
+        return head + "s" + excess
+    if n > 2 and low.endswith("ox") and not (n > 5 and low.endswith("muskox")):
+        return head + "es" + excess
+    if n > 2 and low.endswith("man") and _badman(head):
+        return head + "s" + excess
+    for sing, plur in ONE_OFF:
+        if low.endswith(plur):
+            return head + excess
+        if low.endswith(sing):
+            return head[:-len(sing)] + plur + excess
+    if n >= 3 and low.endswith("man"):
+        return head[:-2] + "en" + excess
+    if low[-1] == "f" and not (n >= 3 and low.endswith("erf")) and n >= 2 and (low[-2] in "lr" or low[-2] in VOWELS):
+        return head[:-1] + "ves" + excess
+    if n >= 3 and low.endswith("ium"):
+        return head[:-2] + "a" + excess
+    if low.endswith(("alga", "hypha", "larva", "amoeba", "vertebra")):
+        return head + "e" + excess
+    if n > 3 and low.endswith("us") and not low.endswith(("lotus", "wumpus")):
+        return head[:-2] + "i" + excess
+    if n >= 3 and low.endswith("sis"):
+        return head[:-2] + "es" + excess
+    if n >= 6 and low.endswith(("matzoh", "matzah")):
+        return head[:-2] + "ot" + excess
+    if n >= 5 and low.endswith(("matzo", "matza")):
+        return head[:-1] + "ot" + excess
+    if n >= 5 and low.endswith(("dex", "dix", "tex")) and not low.endswith("index"):
+        return head[:-2] + "ices" + excess
+    if low[-1] in "zxs" or (n >= 2 and low[-1] == "h" and low[-2] in "cs"
+                            and not (n >= 4 and ((low[-3] == "e" and low[-4] in "mt")
+                                                 or (low[-3] == "o" and low[-4] in "lp")))) \
+            or (n >= 4 and low.endswith("ato")) or (n >= 5 and low.endswith("dingo")):
+        return head + "es" + excess
+    if low[-1] == "y" and n >= 2 and low[-2] not in VOWELS:
+        return head[:-1] + "ies" + excess
+    return head + "s" + excess
+
+
+_NAMES = set()
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    for _w in (nh.OBJ_NAME(_oc), nh.OBJ_DESCR(_oc)):
+        if _w:
+            _NAMES.add(_w)
+MONSTER_NAMES = {nh.permonst(_i).mname for _i in range(nh.NUMMONS)}
+_NAMES |= MONSTER_NAMES | {m + " corpse" for m in MONSTER_NAMES} | {m + " egg" for m in MONSTER_NAMES}
+_NOUNS = ("potion", "scroll", "ring", "wand", "amulet", "spellbook", "gem", "stone", "corpse", "egg", "tin", "glass",
+          "figurine", "statue", "pair", "set")
+_WORDS = {w for n in _NAMES for w in n.split()} | set(_NOUNS)
+
+
+def _singular_heads(head):
+    """Candidate singulars of a plural head (before any compound), by undoing each makeplural rule."""
+    low = head.lower()
+    out = [head]
+    for sing, plur in ONE_OFF:
+        if low.endswith(plur):
+            out.append(head[:-len(plur)] + sing)
+    for suf, reps in (("'s", ("",)), ("men", ("man",)), ("ves", ("f", "ve")), ("ia", ("ium",)), ("ae", ("a",)),
+                      ("i", ("us",)), ("ses", ("sis",)), ("ot", ("oh", "ah", "o", "a")), ("ices", ("ex", "ix")),
+                      ("ies", ("y",)), ("es", ("",)), ("s", ("",)), ("oxen", ("ox",))):
+        if low.endswith(suf):
+            out += [head[:-len(suf)] + r for r in reps]
+    return out
+
+
+@lru_cache(maxsize=1 << 14)
+def singular_name(name):
+    """The singular of an object / monster name as xname wrote it for a stack (makeplural inverted):
+    "knives" -> knife, "cloves of garlic" -> clove of garlic, "quarterstaves" -> quarterstaff, "jackal corpses" ->
+    jackal corpse, "scrolls labeled FOO" -> scroll labeled FOO. Of the candidates whose makeplural is the name: a
+    name the game uses, else one whose last word it uses, else the first."""
+    s = name.strip()
+    if not s:
+        return s
+    at = _compound_at(s)
+    head, excess = (s[:at], s[at:]) if at >= 0 else (s, "")
+    best, score = None, -1
+    for cand in _singular_heads(head.rstrip()):
+        if not cand or makeplural(cand + excess) != s:
+            continue
+        full = cand + excess
+        sc = 3 if full in _NAMES else 2 if cand in _NAMES else 1 if cand.split()[-1] in _WORDS else 0
+        if sc > score:
+            best, score = full, sc
+    return best if best is not None else s
+
+
+CORPSE_WEIGHT = {nh.permonst(_i).mname: nh.permonst(_i).cwt for _i in range(nh.NUMMONS)}
+GEM_LOOKS = {}                    # gem / glass / gray stone description -> the least weight of its types (objects.c)
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    if ord(_oc.oc_class) == nh.GEM_CLASS and nh.OBJ_DESCR(_oc):
+        _d = nh.OBJ_DESCR(_oc)
+        GEM_LOOKS[_d] = min(GEM_LOOKS.get(_d, 10 ** 6), _oc.oc_weight)
+UNID_GEM_NAME_RE = re.compile(r"^(.+) (?:gem|stone)$")
+
+
+def unid_gem_look(name):
+    """The description of an unidentified gem / glass / gray stone named "<description> gem" /
+    "<description> stone" in the singular (objnam.c xname: "yellowish brown gem", "gray stone"), else None."""
+    m = UNID_GEM_NAME_RE.match(singular_name(name))
+    return m.group(1) if m and m.group(1) in GEM_LOOKS else None
+
+
+def corpse_kind(name):
+    """The monster of a corpse name in the singular ("lichen corpse" -> lichen), else None."""
+    one = singular_name(name)
+    return one[:-len(" corpse")] if one.endswith(" corpse") and one[:-len(" corpse")] in CORPSE_WEIGHT else None

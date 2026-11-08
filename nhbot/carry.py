@@ -22,7 +22,7 @@ import nle.nethack as nh
 
 from nhbot.equipment import parse_armor
 from nhbot.vault import FIND_SCROLLS
-from nhbot.items import base_name
+from nhbot.items import CORPSE_WEIGHT, GEM_LOOKS, base_name, corpse_kind, singular_name, unid_gem_look
 from nhbot.pricemem import ARMOR_APPEAR, appearance
 from nhbot.rays import ATTACK_WANDS
 from nhbot.weapons import THROWABLE
@@ -123,14 +123,14 @@ def singular(w):
     return w
 
 
-def one_of(t):
-    """The singular of a name: word by word (singular)."""
-    return " ".join(singular(w) for w in t.split(" "))
-
-
 def describe(ocls, s):
-    """Inventory/floor text -> dict(qty, unit weight, unit cost (None if unknown), unidentified, key)."""
-    # (A/B name_parse -- one singular-name resolver, corpse / gem weights: -649 [-2301, +1045], 7638)
+    """Inventory/floor text -> dict(qty, unit weight, unit cost (None if unknown), unidentified, key). Names made
+    singular by items.singular_name (makeplural inverted); a corpse weighs its monster's cwt, an unidentified gem /
+    glass / gray stone its type's weight (objects.c)."""
+    # (name_parse, accepted without A/B by the user; its A/B: -649 [-2301, +1045], median 7726 -> 7638, 716 changed --
+    # in every divergence checked on real games the new parse is the game's: gems weigh 1, cloves of garlic / cream
+    # pies are food, fencing gloves / hiking boots looks, a stack's piece nutrition). It replaced a word-by-word
+    # singular ("knives" was "knif", "cloves of garlic" no food) and a gem weight of 10.
     qty, _, t = base_name(s)
     t = re.sub(r"^(pair|set)s? of ", "", t).strip()
     unid, name = False, None
@@ -149,22 +149,24 @@ def describe(ocls, s):
     else:
         name = t
         if ocls == nh.WEAPON_CLASS:
-            name = WEAPON_NAME_OF.get(t, WEAPON_NAME_OF.get(one_of(t), t))
-        if ocls == nh.TOOL_CLASS and singular(t) in TOOL_LOOKS and (ocls, singular(t)) not in OBJ_INFO:
+            name = WEAPON_NAME_OF.get(t, WEAPON_NAME_OF.get(singular_name(t), t))
+        one = singular_name(t)
+        if ocls == nh.TOOL_CLASS and one in TOOL_LOOKS and (ocls, one) not in OBJ_INFO:
             unid = True                      # "bag", "lamp", "flute": several types share the look
     if name is not None and (ocls, name) not in OBJ_INFO:
-        words = name.split(" ")
-        for i in range(len(words)):
-            cand = " ".join(words[:i] + [singular(words[i])] + words[i + 1:])
-            if (ocls, cand) in OBJ_INFO:
-                name = cand
-                break
+        one = singular_name(name)
+        head = one.split(" of ")[0]
+        name = head if (ocls, one) not in OBJ_INFO and (ocls, head) in OBJ_INFO else one     # "tins of X meat": tin
     if (ocls, name) in OBJ_INFO:
         wt, cost = OBJ_INFO[(ocls, name)]
+    elif ocls == nh.FOOD_CLASS and corpse_kind(t):
+        wt, cost = CORPSE_WEIGHT[corpse_kind(t)], None          # mkobj.c weight(): the monster's cwt
+    elif ocls == nh.GEM_CLASS and unid_gem_look(t):
+        wt, cost = GEM_LOOKS[unid_gem_look(t)], None
     else:
         wt = CLASS_WEIGHT.get(ocls) or APPEAR_WEIGHT.get(singular(t), APPEAR_WEIGHT.get(t, 10))
         cost = None
-    app = " ".join(singular(w) if w.islower() else w for w in t.split(" "))
+    app = singular_name(t)
     return {"qty": qty, "wt": max(wt, 1), "cost": cost, "unid": unid, "key": (ocls, app if unid else name)}
 
 
