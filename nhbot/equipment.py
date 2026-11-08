@@ -149,6 +149,19 @@ def armor_mc(a):
     return MC_CAN.get(a["name"], 0)
 
 
+# the helmets, shields, gloves and boots that burn (mkobj.c:1705 is_flammable: material up to WOOD, not LIQUID --
+# objects.c:339-528 leather, cloth, wood), by name and fixed appearance; a shuffled appearance by the share of its
+# group that burns (o_init.c: the four gloves 3 of 4 leather, the seven magic boots 6 of 7)
+FLAMMABLE = {"elven leather helm": 1.0, "leather hat": 1.0, "fedora": 1.0, "cornuthaum": 1.0, "dunce cap": 1.0,
+             "conical hat": 1.0, "small shield": 1.0, "elven shield": 1.0, "blue and green shield": 1.0,
+             "leather gloves": 1.0, "gauntlets of fumbling": 1.0, "gauntlets of dexterity": 1.0,
+             "old gloves": 0.75, "padded gloves": 0.75, "riding gloves": 0.75, "fencing gloves": 0.75,
+             "low boots": 1.0, "walking shoes": 1.0, "high boots": 1.0, "jackboots": 1.0, "speed boots": 1.0,
+             "water walking boots": 1.0, "jumping boots": 1.0, "elven boots": 1.0, "fumble boots": 1.0,
+             "levitation boots": 1.0, "combat boots": 6 / 7, "jungle boots": 6 / 7, "hiking boots": 6 / 7,
+             "mud boots": 6 / 7, "buckled boots": 6 / 7, "riding boots": 6 / 7, "snow boots": 6 / 7}
+
+
 def value(a):
     """AC the piece gives: do_wear.c ARM_BONUS = a_ac + spe - min(greatest erosion, a_ac); an unknown
     enchantment counts UNKNOWN_ENCH. (A/B erosion_value: +257 [-298, +877].)"""
@@ -204,6 +217,31 @@ class EquipMixin:
             a["letter"] = letter
             out.append(a)
         return out
+
+    def our_mc(self):
+        """mhitu.c:869-912 magic_negation for us: the best a_can of the armor we wear (armor_mc); a ring of
+        protection on (extrinsic Protection) adds 1, up to 3; else the protection a temple priest gave us (intrinsic,
+        u.ublessed > 0) makes it at least 1."""
+        mc = max((armor_mc(a) for a in self.armor_inventory() if a["worn"]), default=0)
+        if any(i.ring_on and "ring of protection" in i.text for i in self.items()):
+            return min(mc + 1, 3)
+        return max(mc, 1) if self.altar.prot_bought > 0 else mc
+
+    def burn_body_prob(self):
+        """P(trap.c:56-129 burnarmor reports a body hit -- what lets a fire ray at us go on to our pack, zap.c:3790):
+        each round it picks one of five spots; the body (the cloak / suit / shirt) ends it TRUE, a worn helmet,
+        shield, gloves or boots that burns (FLAMMABLE; not thoroughly burnt or known fireproof: trap.c:204, 230
+        erode_obj gives ER_NOTHING and it picks again; blessed: spared 1 in 4, trap.c:210 rnl(4)) ends it FALSE --
+        1 / (1 + the burnable pieces)."""
+        k = 0.0
+        for a in self.armor_inventory():
+            if not a["worn"] or a["slot"] not in (HELM, SHIELD, GLOVES, BOOTS):
+                continue
+            t = a.get("text", "")
+            if "thoroughly burnt" in t or "fireproof" in t:
+                continue
+            k += FLAMMABLE.get(a["name"], 0.0) * (0.75 if BLESSED_RE.search(t) else 1.0)
+        return 1 / (1 + k)
 
     def worn_by_slot(self, inv=None):
         inv = inv if inv is not None else self.armor_inventory()

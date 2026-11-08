@@ -8,7 +8,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, in_line, ray_squares
-from nhbot.danger import adj_level, dice_pmf
+from nhbot.danger import adj_level, cdf_draw, dice_pmf
 from nhbot.goals import GOALS
 from nhbot.messages import KILL_RE, KILLED_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE, attacks_on_us
 from nhbot.monattacks import ATTACKS
@@ -568,6 +568,7 @@ class CombatMixin:
 
         p_charged = (self.wand_p_charged(it) if it is not None else 0.0) * self.our_state()["aim"]   # astray: wasted
         pack = self.pack_profile()
+        blast = self.ray_blasts().get(kind) if self.opts.elem_dmg else None     # pack_destroy's table
 
         def opening(rng, alive_at, apply):
             got = {"dmg": 0, "sleep": 0, "blind": False}
@@ -581,7 +582,10 @@ class CombatMixin:
                     if reflect:
                         return (True, True)
                     got["blind"] |= kind == "lightning"       # zap.c flashburn, resisted or not
-                    got["dmg"] += self.pack_blast(kind, pack, prot, rng)
+                    if self.opts.elem_dmg:
+                        got["dmg"] += cdf_draw(rng, blast) if blast is not None else 0
+                    else:
+                        got["dmg"] += self.pack_blast(kind, pack, prot, rng)
                     if maybe_death and not resisted:
                         got["dmg"] += 10 ** 4                 # judged as death (ray_risk does the same)
                     elif kind == "sleep" and not resisted:

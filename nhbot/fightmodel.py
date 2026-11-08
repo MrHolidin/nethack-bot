@@ -6,7 +6,9 @@ scratchpad zi/fight_calib.py):
   * negative AC: every hit's damage less rnd(-AC), at least 1 (mhitu.c:1696-1703);
   * our weapon skill, read from the advance messages (weapon.c skill_advance / weapon_hit_bonus / weapon_dam_bonus);
   * a monster's HP prior (makemon.c newmonhp) and, after the hits we landed, the expected number of our attacks
-    still needed to kill it.
+    still needed to kill it;
+  * what fire / cold / shock does to our pack (zap.c destroy_item): the HP our own boiling potions and exploding
+    wands take, the items lost -- one implementation for melee hits, spells and rays (pack_destroy).
 """
 from functools import lru_cache
 
@@ -124,7 +126,9 @@ def cast_profile(ad, ml, n, d, us):
       DEATH_TOUCH 378-396 kills unless magic resistance when rn2(ml) > 12; GEYSER 535-543 d(8, 6); FIRE_PILLAR
       544-559 d(8, 6) unless we resist fire; LIGHTNING 560-578 d(8, 6) unless reflection / shock resistance. The rest
       (stun, weaken, destroy armor, curse, summon, aggravate, paralyse, blind, confuse, haste, invisible) do no HP
-      damage here."""
+      damage here. us["blast"] (elem_dmg): {FIRE_PILLAR / LIGHTNING: the damage pmf of what that spell's
+      destroy_item calls do to our pack (pack_destroy)} -- added to the spell's, resisted or not (but for a
+      reflected lightning bolt, 563-569)."""
     res = us["resists"]
     magic = "magic" in res
     base = dice(ml // 2 + n, d) if d else dice(ml // 2 + 1, 6)
@@ -141,19 +145,10 @@ def cast_profile(ad, ml, n, d, us):
         halved[(v + 1) // 2] += p
     big = dice(8, 6)
     none = np.array([1.0])
-    if ad == "SPEL":
-        picks = [(p, mage_spell(v, magic)) for v, p in enumerate(_spell_values(ml, 24)) if p]
-    else:
-        picks = [(p * q, s) for v, p in enumerate(_spell_values(ml, 15)) if p for q, s in cleric_spells(v)]
-    useless = {CLONE_WIZ} if ad == "SPEL" and not us.get("wizard") else set()
-    if not us.get("hurt"):
-        useless |= {CURE_SELF} if ad == "SPEL" else {CLC_CURE_SELF}
-    if ad == "CLRC" and us.get("blind"):
-        useless.add(BLIND_YOU)
-    picks = [(p, s) for p, s in picks if s not in useless]
-    z = sum(p for p, _ in picks)
+    picks, z = spell_picks(ad, ml, us)
     if z <= 0:
         return none, 0.0
+    blast = us.get("blast")
     pmf, death = np.zeros(max(len(base), len(big))), 0.0
     for p, s in picks:
         p /= z
@@ -168,8 +163,30 @@ def cast_profile(ad, ml, n, d, us):
             q = big
         else:
             q = none
+        if blast is not None and ad == "CLRC" and s in blast and (s != LIGHTNING or "reflection" not in res):
+            q = np.convolve(q, blast[s])                    # 555-557, 574-575: our pack burns / is zapped (elem_dmg)
+            if len(q) > len(pmf):
+                pmf = np.concatenate([pmf, np.zeros(len(q) - len(pmf))])
         pmf[:len(q)] += p * q
     return pmf, death
+
+
+def spell_picks(ad, ml, us):
+    """([(weight, spell)], their sum) -- the spells an AD_SPEL / AD_CLRC caster of level ml picks (_spell_values,
+    mage_spell / cleric_spells), without the useless ones (mcastu.c:767-834 spell_would_be_useless: CLONE_WIZ but
+    for the Wizard, CURE_SELF while it is not hurt, BLIND_YOU while we are blind); us as cast_profile's."""
+    magic = "magic" in us["resists"]
+    if ad == "SPEL":
+        picks = [(p, mage_spell(v, magic)) for v, p in enumerate(_spell_values(ml, 24)) if p]
+    else:
+        picks = [(p * q, s) for v, p in enumerate(_spell_values(ml, 15)) if p for q, s in cleric_spells(v)]
+    useless = {CLONE_WIZ} if ad == "SPEL" and not us.get("wizard") else set()
+    if not us.get("hurt"):
+        useless |= {CURE_SELF} if ad == "SPEL" else {CLC_CURE_SELF}
+    if ad == "CLRC" and us.get("blind"):
+        useless.add(BLIND_YOU)
+    picks = [(p, s) for p, s in picks if s not in useless]
+    return picks, sum(p for p, _ in picks)
 
 
 def cast_chance(ad, ml, mmove):
@@ -241,3 +258,93 @@ def unseen_level(depth, xl):
     """makemon.c:1546-1550 rndmonst: a random monster's level lies between depth / 6 and (depth + XL) / 2 -- an
     unseen one taken at the middle."""
     return (depth // 6 + (depth + xl) // 2) // 2
+
+
+# ------------------------------------------------------------------ our pack under fire, cold and shock
+RESIST_OF = {"FIRE": "fire", "COLD": "cold", "ELEC": "shock"}
+PACK_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.SPBOOK_CLASS, nh.WAND_CLASS, nh.RING_CLASS)
+# mhitu.c:1066-1071, 1084-1085, 1097-1100 hitmu (an uncancelled hit): destroy_item(class) when m_lev > rn2(n)
+MELEE_DESTROY = {"FIRE": ((20, nh.SCROLL_CLASS), (20, nh.POTION_CLASS), (25, nh.SPBOOK_CLASS)),
+                 "COLD": ((20, nh.POTION_CLASS),),
+                 "ELEC": ((20, nh.WAND_CLASS), (20, nh.RING_CLASS))}
+# zap.c:3790-3797, 3808-3809, 3865-3868 zhitu: a ray at us (fire: after burnarmor's body hit, the caller's gate)
+RAY_DESTROY = {"fire": ((1 / 3, nh.POTION_CLASS, "FIRE"), (1 / 3, nh.SCROLL_CLASS, "FIRE"),
+                        (1 / 5, nh.SPBOOK_CLASS, "FIRE")),
+               "cold": ((1 / 3, nh.POTION_CLASS, "COLD"),),
+               "lightning": ((1 / 3, nh.WAND_CLASS, "ELEC"), (1 / 3, nh.RING_CLASS, "ELEC"))}
+# mcastu.c:555-557 fire pillar, 574-575 lightning: every time
+SPELL_DESTROY = {FIRE_PILLAR: ((1.0, nh.SCROLL_CLASS, "FIRE"), (1.0, nh.POTION_CLASS, "FIRE"),
+                               (1.0, nh.SPBOOK_CLASS, "FIRE")),
+                 LIGHTNING: ((1.0, nh.WAND_CLASS, "ELEC"), (1.0, nh.RING_CLASS, "ELEC"))}
+
+
+def uncancelled(mc):
+    """mhitu.c:967-968: P(rn2(10) >= 3 * MC) -- an elemental hit's effect lands (a monster not cancelled)."""
+    return max(0, 10 - 3 * mc) / 10
+
+
+def melee_destroy_events(ad, level):
+    """The destroy_item calls of an uncancelled hit of damage type ad by a monster of level `level`, as
+    ((P, class, ad), ...) (MELEE_DESTROY: P(m_lev > rn2(n)) = min(m_lev, n) / n)."""
+    return tuple((min(max(level, 0), n) / n, cls, ad) for n, cls in MELEE_DESTROY.get(ad, ()))
+
+
+def destroy_damage(cls, name, ad, resists):
+    """zap.c:4811-4900 destroy_one_item: the HP damage pmf of one stack of this class and name going (None: never
+    destroyed). Cold: potions but oil, rnd(4). Fire: potions rnd(6) (cold or fire resistance never helps: xresist
+    leaves potions out), scrolls / spellbooks 1 (none with fire resistance); not a scroll of fire, a spellbook of
+    fireball, the Book of the Dead. Shock: wands but lightning rnd(10) (none with shock resistance), rings but shock
+    resistance 0."""
+    if ad == "COLD":
+        return dice(1, 4) if cls == nh.POTION_CLASS and name != "potion of oil" else None
+    if ad == "FIRE":
+        if cls == nh.POTION_CLASS:
+            return dice(1, 6)
+        if cls == nh.SCROLL_CLASS and name != "scroll of fire" or \
+                cls == nh.SPBOOK_CLASS and name not in ("spellbook of fireball", "Book of the Dead"):
+            return np.array([1.0]) if "fire" in resists else np.array([0.0, 1.0])
+        return None
+    if ad == "ELEC":
+        if cls == nh.WAND_CLASS and name != "wand of lightning":
+            return np.array([1.0]) if "shock" in resists else dice(1, 10)
+        if cls == nh.RING_CLASS and name != "ring of shock resistance":
+            return np.array([1.0])
+    return None
+
+
+@lru_cache(maxsize=1 << 14)
+def pack_destroy(stacks, events, resists):
+    """What these destroy_item calls do to our pack: (HP damage pmf, ((class, expected units lost, expected stacks
+    hit), ...)). stacks: ((class, quantity, bare name), ...) of our pack (danger.pack_stacks); events: ((P,
+    class, ad), ...), each call made with its P, independently; resists: frozenset (perception.our_resists).
+    zap.c:4958-5037 destroy_item -> 4900-4915 destroy_one_item: each unit of an eligible stack goes 1 in 3, and a
+    stack that loses any does its damage once (destroy_damage). Cached by its arguments: the arrays it returns
+    are shared, never to be written."""
+    pmf = np.array([1.0])
+    loss = {}
+    for p, cls, ad in events:
+        if p <= 0:
+            continue
+        one = np.array([1.0])
+        units = stacks_hit = 0.0
+        for c, qty, name in stacks:
+            if c != cls:
+                continue
+            dmg = destroy_damage(c, name, ad, resists)
+            if dmg is None:
+                continue
+            q = 1 - (2 / 3) ** qty                         # rn2(3) == 0 for some unit of it
+            hit = np.zeros(max(len(dmg), 1))
+            hit[0] = 1 - q
+            hit[:len(dmg)] += q * dmg
+            one = np.convolve(one, hit)
+            units += qty / 3
+            stacks_hit += q
+        if units:
+            mixed = np.zeros(len(one))
+            mixed[0] = 1 - p
+            mixed += p * one
+            pmf = np.convolve(pmf, mixed)
+            u, h = loss.get(cls, (0.0, 0.0))
+            loss[cls] = (u + p * units, h + p * stacks_hit)
+    return pmf, tuple((c, u, h) for c, (u, h) in sorted(loss.items()))

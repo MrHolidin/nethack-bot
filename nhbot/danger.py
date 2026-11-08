@@ -11,6 +11,9 @@ extra one), per melee attack i of its type (monattacks.ATTACKS):
   poison   a hit of a poisoning attack poisons 1 in 8: deadly 1 in 30 without poison resistance, else
            rn1(10, 6) more damage 5 in 30
   spells   AT_MAGC: fightmodel.cast_chance / cast_profile; a leprechaun doesn't attack us while we carry no gold
+  elem_dmg (A/B flag) fire / cold / shock hits only when uncancelled (our MC), none while we resist them, plus the
+           HP our own potions / wands they destroy take (fightmodel.pack_destroy, also for spells and rays); the
+           items lost: statistics (summary danger.items)
 Our attack comes first in the turn: the monster we attack doesn't act if this hit kills it -- P(hit) by
 uhitm.c find_roll_to_hit (Luck taken as 0) and P(kill | alive) from its HP (fightmodel.hp_prior, makemon.c
 newmonhp) against our damage dice (dmgval + enchantment + dbon), both with our weapon skill (focus.weapon_skill),
@@ -31,8 +34,10 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
-from nhbot.fightmodel import ac_reduce, cast_chance, cast_profile, hp_prior
-from nhbot.items import base_name, erosion
+from nhbot.fightmodel import (FIRE_PILLAR, LIGHTNING, PACK_CLASSES, RAY_DESTROY, RESIST_OF, SPELL_DESTROY, ac_reduce,
+                              cast_chance, cast_profile, hp_prior, melee_destroy_events, pack_destroy, spell_picks,
+                              uncancelled)
+from nhbot.items import base_name, erosion, singular_name
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_REGEN, PM_BY_NAME, PM_INDEX, PM_INDICES
 from nhbot.weapondice import WEAPON_DICE, str_dbon, to_hit_abon
@@ -59,6 +64,15 @@ WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her
 # a seen monster's melee hit or miss (mhitu.c hitmsg default "%s hits!", missmu); a weapon attack with a weapon in hand
 # says "swings" / "thrusts" first (mhitu.c:767-772, 100-106 mswings, a seen monster) -- without it, none
 MON_MELEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|just misses)!")
+# zap.c:4797-4805 destroy_strings, 4920-4922 destroy_one_item "%s %s %s!" -- one of our stacks lost one or more units
+DESTROY_RE = re.compile(r"\b(?:Your|One of your|Some of your|Both of your|All of your) (.+?) (freezes? and shatters?|"
+                        r"boils? and explodes?|ignites? and explodes?|catch(?:es)? fire and burns?|"
+                        r"turns to dust and vanishes|breaks apart and explodes)!")
+DESTROY_VERB_CLASS = {"free": nh.POTION_CLASS, "boil": nh.POTION_CLASS, "igni": nh.POTION_CLASS,
+                      "turn": nh.RING_CLASS, "brea": nh.WAND_CLASS}       # "catch": a scroll or a spellbook
+CLASS_NAME = {nh.POTION_CLASS: "potion", nh.SCROLL_CLASS: "scroll", nh.SPBOOK_CLASS: "spellbook",
+              nh.WAND_CLASS: "wand", nh.RING_CLASS: "ring"}
+RAY_OF_AD = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning"}     # a breath that is a ray destroy_item follows
 WIN_SIMS = 200                   # win_prob: sampled fights
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
@@ -163,6 +177,10 @@ class DangerState:
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
         self.mean = defaultdict(lambda: [0, 0.0, 0.0])           # bin -> [n, sum predicted, sum actual]
         self.p = defaultdict(lambda: [0, 0.0, 0])                # bin -> [n, sum predicted, deaths]
+        # elem_dmg statistics (items_tick): the item loss predicted for the next turn, scored like pending
+        self.items_pending = None                # (turn, [(pos, {class: (units, stacks)}, P(we kill it), scared)])
+        self.items_window = defaultdict(int)     # class -> our stacks destroyed since the last tick
+        self.items = {k: defaultdict(float) for k in ("exp_units", "exp_stacks", "act_stacks", "all_stacks")}
 
 
 class DangerMixin:
@@ -170,6 +188,13 @@ class DangerMixin:
         self.danger = DangerState()
 
     def danger_msg(self, m):
+        if self.opts.elem_dmg and self.steps != self.acts.attack_step + 1:   # not the message 'F' logs again
+            for name, verb in DESTROY_RE.findall(m):
+                if "glob" in name:
+                    continue                             # a glob of green slime (food) boiling
+                cls = DESTROY_VERB_CLASS.get(verb[:4], nh.SPBOOK_CLASS if "spellbook" in name else nh.SCROLL_CLASS)
+                self.danger.items_window[cls] += 1
+                self.danger.items["all_stacks"][CLASS_NAME[cls]] += 1
         for mon, weapon in WIELD_RE.findall(m):
             w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon
             if w in WEAPON_DICE:
@@ -194,7 +219,8 @@ class DangerMixin:
         damage less rnd(-AC) at a negative AC (fightmodel.ac_reduce), a weapon attack of a kind we saw hit / miss
         without swinging one: its own dice only (mon_unarmed), its spells (AT_MAGC: fightmodel.cast_chance /
         cast_profile; hurt: we hit it -- it may cure itself), and a leprechaun does not attack us while we carry no
-        gold."""
+        gold. elem_dmg: a fire / cold / shock hit by elem_hit_pmf (resistance, MC, our potions / wands it destroys),
+        a cleric's fire pillar / lightning bolt with what it destroys in our pack (cast_profile's us["blast"])."""
         idx = PM_INDEX.get(name)
         if idx is None:
             return np.array([1.0]), 0.0
@@ -206,12 +232,15 @@ class DangerMixin:
         level = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
         pmf, alive = np.array([1.0]), 1.0
         ac = self.bl(nh.NLE_BL_AC)
+        elem = self.opts.elem_dmg
         for i, (at, ad, n, d) in enumerate(ATTACKS[idx]):
             if at == "MAGC":
                 q = cast_chance(ad, level, pm.mmove)
                 if q:
-                    us = {"resists": self.our_resists(), "hurt": hurt, "wizard": name == "Wizard of Yendor",
-                          "blind": bool(int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND)}
+                    us = self.cast_us(name, hurt)
+                    if elem and ad == "CLRC":
+                        us["blast"] = {s: pack_destroy(self.pack_stacks(), SPELL_DESTROY[s],
+                                                       frozenset(us["resists"]))[0] for s in SPELL_DESTROY}
                     cast, death = cast_profile(ad, level, n, d, us)
                     pmf = conv(pmf, self._mix(np.array([1.0]), cast, q))
                     alive *= 1 - q * death
@@ -219,6 +248,9 @@ class DangerMixin:
             if at not in MELEE:
                 continue
             p = self.hit_prob(level, i, bonus)
+            if elem and ad in RESIST_OF:
+                pmf = conv(pmf, self._mix(np.array([1.0]), self.elem_hit_pmf(ad, level, n, d, ac), p))
+                continue
             # a cold hit is zeroed only when we resist cold (mhitu.c AD_COLD 1076)
             # (A/B dmg_cold: 0, median 7726 -> 7726, 0 of 1000 changed)
             zero = ad in NO_DAMAGE or (ad == "COLD" and "cold" in self.our_resists())
@@ -238,6 +270,76 @@ class DangerMixin:
             hit = self._mix(np.array([1.0]), dmg, p)
             pmf = conv(pmf, hit)
         return pmf, 1 - alive
+
+    def cast_us(self, name, hurt):
+        """cast_profile's us for this caster: our resistances, whether we hit it, the Wizard, our blindness."""
+        return {"resists": self.our_resists(), "hurt": hurt, "wizard": name == "Wizard of Yendor",
+                "blind": bool(int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND)}
+
+    def elem_hit_pmf(self, ad, level, n, d, ac):
+        """(elem_dmg) The damage pmf of one landed AD_FIRE / AD_COLD / AD_ELEC hit (mhitu.c:1053-1104 hitmu): only
+        when uncancelled -- rn2(10) >= 3 * our MC (967-968, our_mc), else none (1074, 1087, 1103) --: d(n, d), none
+        while we resist it (1062, 1080, 1094: Fire_ / Cold_ / Shock_resistance), less rnd(-AC) at a negative AC
+        (1696-1703), plus what its destroy_item calls do to our pack (melee_destroy_events, pack_destroy: our own
+        boiling potions hurt us even resisting fire)."""
+        res = self.our_resists()
+        dmg = dice_pmf(n, d) if n and d and RESIST_OF[ad] not in res else np.array([1.0])
+        dmg = ac_reduce(dmg, ac)
+        blast, _ = pack_destroy(self.pack_stacks(), melee_destroy_events(ad, level), frozenset(res))
+        return self._mix(np.array([1.0]), conv(dmg, blast), uncancelled(self.our_mc()))
+
+    def pack_stacks(self):
+        """((class, quantity, singular bare name), ...) of the stacks fire, cold and shock may destroy
+        (pack_destroy) -- potions, scrolls, spellbooks, wands, rings; not artifacts (zap.c:4993)."""
+        out = []
+        for it in self.items():
+            if it.ocls in PACK_CLASSES and " named " not in it.text:
+                qty, _, name = base_name(it.text)
+                out.append((it.ocls, qty, singular_name(name)))
+        return tuple(sorted(out))
+
+    def monster_item_loss(self, name, hurt=False):
+        """(elem_dmg) {class: (expected units lost, expected stacks hit)} in one game turn of this monster next to
+        us (mcalcmove: mmove / 12 moves): its landed, uncancelled elemental hits (hit_prob x uncancelled x
+        pack_destroy of melee_destroy_events) and its fire pillars / lightning bolts (cast_chance x their share of
+        spell_picks x pack_destroy of SPELL_DESTROY; a reflected bolt destroys nothing)."""
+        idx = PM_INDEX.get(name)
+        if idx is None or name == "leprechaun" and not self.bl(nh.NLE_BL_GOLD):
+            return {}
+        pm = nh.permonst(idx)
+        level = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
+        res = self.our_resists()
+        out = defaultdict(lambda: [0.0, 0.0])
+        for i, (at, ad, n, d) in enumerate(ATTACKS[idx]):
+            if at in MELEE and ad in RESIST_OF:
+                w = self.hit_prob(level, i) * uncancelled(self.our_mc())
+                losses = [(w, pack_destroy(self.pack_stacks(), melee_destroy_events(ad, level), frozenset(res))[1])]
+            elif at == "MAGC" and ad == "CLRC" and (q := cast_chance(ad, level, pm.mmove)):
+                picks, z = spell_picks(ad, level, self.cast_us(name, hurt))
+                losses = [(q * sum(p for p, s in picks if s == sp) / z,
+                           pack_destroy(self.pack_stacks(), SPELL_DESTROY[sp], frozenset(res))[1])
+                          for sp in (FIRE_PILLAR, LIGHTNING) if z > 0 and (sp != LIGHTNING or "reflection" not in res)]
+            else:
+                continue
+            for w, loss in losses:
+                for cls, units, stacks in loss:
+                    out[cls][0] += w * units * pm.mmove / 12
+                    out[cls][1] += w * stacks * pm.mmove / 12
+        return {c: tuple(v) for c, v in out.items()}
+
+    def ray_blasts(self):
+        """(elem_dmg) {ray kind: choice table (pmf_cdf) of the HP damage what it destroys in our pack does} for a
+        fire / cold / lightning ray or breath hitting us (zap.c zhitu: RAY_DESTROY, pack_destroy) -- a fire ray's
+        only after burnarmor's body hit (equipment.burn_body_prob)."""
+        res = frozenset(self.our_resists())
+        stacks = self.pack_stacks()
+        out = {}
+        for kind, events in RAY_DESTROY.items():
+            pmf = pack_destroy(stacks, events, res)[0]
+            if kind == "fire":
+                pmf = self._mix(np.array([1.0]), pmf, self.burn_body_prob())
+            out[kind] = pmf_cdf(pmf)
+        return out
 
     @staticmethod
     def _mix(a, b, w):
@@ -366,6 +468,32 @@ class DangerMixin:
                 self.danger_score((pt, php, mean, pd), php - hp, died=False)
         if adjacent:
             self.danger.pending = (t, hp, [self.danger_parts(pos, name) for pos, name in adjacent])
+        if self.opts.elem_dmg:
+            self.items_tick(t, adjacent)
+
+    def items_tick(self, t, adjacent=(), final=False):
+        """(elem_dmg, statistics only) Score the item loss predicted for the last turn (monster_item_loss of the
+        hostiles next to us; on Elbereth one that respects it doesn't melee us unless we attacked, the one we
+        attacked may have died first -- as danger_combine) against our stacks destroyed since (danger_msg,
+        DESTROY_RE); predict the next turn's for the adjacent (pos, name) danger.pending was just made for. final: the
+        game ended -- score what is pending."""
+        d = self.danger
+        pend, d.items_pending = d.items_pending, None
+        if pend is not None and (final or t == pend[0] + 1):
+            target = self.acts.last_attack_target if self.acts.attack_turn == pend[0] else None
+            for pos, loss, pk, scared in pend[1]:
+                if scared and target is None:
+                    continue
+                keep = 1 - pk if pos == target else 1.0
+                for cls, (units, stacks) in loss.items():
+                    d.items["exp_units"][CLASS_NAME[cls]] += keep * units
+                    d.items["exp_stacks"][CLASS_NAME[cls]] += keep * stacks
+            for cls, k in d.items_window.items():
+                d.items["act_stacks"][CLASS_NAME[cls]] += k
+        d.items_window.clear()
+        if adjacent:
+            d.items_pending = (t, [(pos, self.monster_item_loss(name, hurt=self.focus_hits_on(pos) > 0), pk, scared)
+                                   for (pos, name), (_, _, _, pk, scared) in zip(adjacent, d.pending[2])])
 
     def danger_score(self, pend, actual, died):
         _, hp0, mean, pd = pend
@@ -383,10 +511,17 @@ class DangerMixin:
             mean, pd = self.danger_combine(parts, target, php)
             self.danger_score((pt, php, mean, pd), php, died=True)
             self.danger.pending = None
-        return {"mean": {f"{MEAN_EDGES[k]}-{MEAN_EDGES[k + 1]}": [v[0], round(v[1], 1), v[2]]
-                         for k, v in sorted(self.danger.mean.items())},
-                "p": {f"{P_EDGES[k]}-{P_EDGES[k + 1]}": [v[0], round(v[1], 3), v[2]]
-                      for k, v in sorted(self.danger.p.items())}}
+        out = {"mean": {f"{MEAN_EDGES[k]}-{MEAN_EDGES[k + 1]}": [v[0], round(v[1], 1), v[2]]
+                        for k, v in sorted(self.danger.mean.items())},
+               "p": {f"{P_EDGES[k]}-{P_EDGES[k + 1]}": [v[0], round(v[1], 3), v[2]]
+                     for k, v in sorted(self.danger.p.items())}}
+        if self.opts.elem_dmg:
+            if self.done and not self.truncated and self.danger.items_pending is not None:
+                self.items_tick(None, final=True)
+            # per class: units / stacks the model expected the hostiles next to us to destroy, stacks destroyed
+            # in those turns (act_stacks) and in the whole game, by anything (all_stacks)
+            out["items"] = {k: {c: round(v, 3) for c, v in sorted(d.items())} for k, d in self.danger.items.items()}
+        return out
 
     # ------------------------------------------------------------ the fight to the end
     def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None):
@@ -692,7 +827,9 @@ class DangerMixin:
         """Damage from our own items a ray of `kind` destroyed (zap.c zhitu / destroy_one_item: fire 1 in 3,
         each potion stack goes when one of its potions does (2 in 3 each spared), rnd(6); cold the same, rnd(4);
         lightning 1 in 3, each wand stack, rnd(10) unless we resist shock). Resisting the ray itself does not
-        save the potions."""
+        save the potions. (elem_dmg: ray_blasts instead -- this one leaves out burnarmor's body-hit gate of a fire
+        ray, zap.c:3790, the scrolls / spellbooks it burns, 1 HP each without fire resistance, zap.c:3793-3796 /
+        4851-4858, and counts a potion of oil frozen, zap.c:4829.)"""
         dmg = 0
         if kind in ("fire", "cold") and pack["potions"] and rng.random() < 1 / 3:
             for q in pack["potions"]:
@@ -727,6 +864,8 @@ class DangerMixin:
         prot = self.our_resists()
         plan = {"wand": next((k for k in WAND_ORDER if k in profile["wands"]), None), "missile": None,
                 "breath": None, "ray_p": zap_hit_prob(ac), "ac": ac, "prot": prot, "pack": self.pack_profile()}
+        if self.opts.elem_dmg:
+            plan["blast"] = self.ray_blasts()
         mis = profile["missile"]
         if mis:
             plan["missile"] = (MISSILE_DIE.get(mis["kind"], WEAPON_DICE.get(mis["kind"], (6,))[0]), mis["counts"],
@@ -736,6 +875,8 @@ class DangerMixin:
             br = next((a for a in ATTACKS[idx] if a[0] == "BREA"), None) if idx is not None else None
             if br is not None:
                 plan["breath"] = (BREATH_KIND.get(br[1], "fire"), br[2])
+                if self.opts.elem_dmg:
+                    plan["breath"] += (RAY_OF_AD.get(br[1], ""),)   # acid, poison gas: nothing in the pack goes
         return plan
 
     @staticmethod
@@ -749,11 +890,15 @@ class DangerMixin:
         fights on instead."""
         ac, prot = plan["ac"], plan["prot"]
 
-        def ray(kind, nd):
+        def ray(kind, nd, element=None):
             if rng.random() >= plan["ray_p"] or "reflection" in prot:
                 return 0, 0, False
             blind = kind == "lightning"                  # zap.c flashburn, resisted or not
-            blast = DangerMixin.pack_blast(kind, plan["pack"], prot, rng)
+            if "blast" in plan:                          # elem_dmg: pack_destroy (ray_blasts), a breath by its element
+                table = plan["blast"].get(kind if element is None else element)
+                blast = cdf_draw(rng, table) if table is not None else 0
+            else:
+                blast = DangerMixin.pack_blast(kind, plan["pack"], prot, rng)
             if kind == "death":
                 return (0, 0, False) if "magic" in prot else (10 ** 6, 0, False)
             if RAY_RESIST.get(kind) in prot:
