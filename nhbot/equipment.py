@@ -276,7 +276,7 @@ class EquipMixin:
             return False                      # do_wear.c: very small / handless forms can't ("Don't even bother.")
         inv = self.armor_inventory()
         worn = self.worn_by_slot(inv)
-        # 1) wear something better we already carry
+        # wear something better we already carry
         cands = [a for a in inv if not a["worn"] and self.improves(a, worn)]
         if cands:
             best = max(cands, key=lambda a: self.wear_gain(a, worn))

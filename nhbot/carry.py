@@ -265,16 +265,16 @@ class CarryMixin:
         self.squeeze_pending = None
         if key != lv.key:
             return False
-        if self.carry_drop_step(force=True, max_tier=3):
+        if self.carry_drop_step(force=True, keep_body=True):
             self.squeeze_stats["dropped"] += 1
             return True
         self.squeeze_stats["nothing_to_drop"] += 1
         self.no_entry_mark(lv, target)
         return False
 
-    def carry_drop_step(self, force=False, max_tier=4):
+    def carry_drop_step(self, force=False, keep_body=False):
         """Encumbered (or force): drop one unit of the item of lowest value per weight (nhbot.value: what we
-        wear / wield / need comes last, being worth VALUE_MAX); max_tier < 4: nothing on the body. slots: not
+        wear / wield / need comes last, being worth VALUE_MAX); keep_body: nothing on the body. slots: not
         encumbered, but all 52 letters taken and nothing in view: the whole stack value.slot_victim names, so the
         next item worth a letter finds one (value.slot_ok). True if it used the turn."""
         if self.bl(nh.NLE_BL_CAP) < 1 and not force:
@@ -286,7 +286,7 @@ class CarryMixin:
                     return True
             return False
         inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.cant_drop
-               and (max_tier >= 4 or not it.on_body) and not self.sac_carrying(it)]
+               and not (keep_body and it.on_body) and not self.sac_carrying(it)]
         if not inv:
             return False
         looks = self.carried_by_look()
@@ -460,9 +460,9 @@ class CarryMixin:
         return [it.letter for it in self.items() if any(w in it.text for w in DIGGER_WORDS) and not it.held]
 
     def stash_request(self):
-        """shk.c: 'Will you please leave your pick-axe outside?' -- the keeper blocks the way in while one is
-        in the open inventory: put it down next to the door, outside the shop (a dwarvish mattock too:
-        DIGGER_WORDS)."""
+        """shk.c:626-663 u_entered_shop: 'Will you please leave your pick-axe outside?' -- the keeper blocks the
+        way in while one is in the open inventory, a dwarvish mattock too (DIGGER_WORDS): put it down next to the
+        door, outside the shop."""
         if self.cur_key is None:
             return
         self.stash_stats["asked"] += 1
