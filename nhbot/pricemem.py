@@ -263,10 +263,6 @@ class PriceMemoryMixin:
             return None
         return {n: p / z for n, p in post.items() if p > 0}
 
-    def price_of_text(self, text):
-        key = appearance(text)
-        return None if key is None else self.price_posterior(key)
-
     def price_report(self):
         out = {}
         for key in self.price_reads:

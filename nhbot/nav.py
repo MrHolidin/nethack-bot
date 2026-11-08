@@ -28,16 +28,8 @@ def line_clear(k_mem, glyphs, y, x, dy, dx, d):
 # than numpy scalar indexing); heap entries (cost, flat index) pop in the same order as (cost, y, x)
 _W = COLS + 2
 _N = (ROWS + 2) * _W
-_STEPS = tuple((dy * _W + dx, bool(dy and dx), dy * _W, dx) for dy, dx in NEIGH)   # + the two orthogonal offsets
+_STEPS = tuple((dy * _W + dx, bool(dy and dx)) for dy, dx in NEIGH)
 _INF = 1 << 30
-# squeeze_path: hack.c:834-852 test_move -- a diagonal step between two bad_rock squares (rock, walls, trees, a raised
-# drawbridge: rm.h IS_ROCK, typ < POOL; not iron bars) is refused while inv_weight() + weight_cap() -- what we carry
-# -- is above 600 (hack.c:687-689 cant_squeeze_thru). Planned only when no way round costs less than this more:
-# then the refusal's old answer (carry.squeeze_step sheds, dig_through digs a corner) still opens it
-SQUEEZE_WEIGHT = 600
-SQUEEZE_COST = 100
-_BARS_GLYPH = nh.GLYPH_CMAP_OFF + 17
-_pad_rock = np.zeros((ROWS + 2, _W), dtype=bool)
 _STEP_COST = np.ones(256, dtype=np.int64)           # cost of stepping into a square, by remembered kind
 _STEP_COST[G.TRAP], _STEP_COST[G.BOULDER], _STEP_COST[G.DOOR_CLOSED] = 40, 15, 3
 _LIVE_COST = np.zeros(256, dtype=np.int64)          # extra cost by what is seen there now
@@ -80,7 +72,6 @@ class NavMixin:
         self.trap_stats = Counter()
         self.door_stats = Counter()
         self.mines_kick_stats = Counter()
-        self._squeeze_heavy = (None, False)  # squeeze_path: (game state, carrying more than SQUEEZE_WEIGHT)
 
     def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True):
         """Shortest paths from start: (dist array or None without want_dist, prev, the first target square
@@ -98,11 +89,6 @@ class NavMixin:
         # an item on a door hides it from k_mem: the doors remembered and the refused diagonals count too
         _pad_door[1:-1, 1:-1] = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
         door = _pad_door.ravel().tolist()
-        rock = None
-        if self.opts.squeeze_path and self.squeeze_heavy():
-            _pad_rock[1:-1, 1:-1] = (((k_mem == G.WALL) & (self.terrain_glyphs(lv) != _BARS_GLYPH))
-                                     | (k_mem == G.UNKNOWN))
-            rock = _pad_rock.ravel().tolist()
         tm = None
         if targets_mask is not None:
             _pad_target[1:-1, 1:-1] = targets_mask
@@ -124,14 +110,13 @@ class NavMixin:
             if d > max_cost:
                 break
             di = door[i]
-            for off, diag, oy, ox in _STEPS:
+            for off, diag in _STEPS:
                 j = i + off
                 c = cost[j]
                 if c < 0 or (diag and (di or door[j])):
                     continue
                 nd = d + c
-                if diag and rock is not None and rock[i + oy] and rock[i + ox]:
-                    nd += SQUEEZE_COST                       # squeeze_path: a squeeze our load is refused
+                # (A/B squeeze_path -- heavy, a rock-to-rock diagonal costs 100 more: -3571 [-5255, -1958], 6603)
                 if nd < dist[j]:
                     dist[j] = nd
                     prev[j] = i
@@ -141,13 +126,6 @@ class NavMixin:
         else:
             dist = None
         return dist, PathPrev(prev), reached
-
-    def squeeze_heavy(self):
-        """squeeze_path: we carry more than SQUEEZE_WEIGHT (value.inventory_weight, gold too), once per game state."""
-        key = (self.tick_no, self.steps)
-        if self._squeeze_heavy[0] != key:
-            self._squeeze_heavy = (key, self.inventory_weight() > SQUEEZE_WEIGHT)
-        return self._squeeze_heavy[1]
 
     @staticmethod
     def first_step(prev, start, goal):
@@ -205,9 +183,10 @@ class NavMixin:
         before = (y, x, self.turn())
         lv = self.level()
         self.trap_held(lv)                    # forgets the trap once we are out of it
-        if self.opts.door_kick_stale and target in lv.locked and self.kinds(lv)[target] != G.DOOR_CLOSED:
-            # door_kick_stale: a monster opened it or it was broken since "This door is locked." -- kicking an open /
-            # broken door is "You kick at empty space." (dokick.c:1251-1257), a turn each, for ever
+        if target in lv.locked and self.kinds(lv)[target] != G.DOOR_CLOSED:
+            # a monster opened it or it was broken since "This door is locked." -- kicking an open / broken door is
+            # "You kick at empty space." (dokick.c:1251-1257), a turn each, for ever
+            # (A/B door_kick_stale: -83 [-537, +375], median 7726 -> 7850, 52 of 1000 changed)
             lv.locked.discard(target)
             self.door_stats["stale_locked"] += 1
         if target in lv.locked:
@@ -253,9 +232,10 @@ class NavMixin:
         if self.opts.door_resists and "The door resists!" in self.text_since(seq0):
             self.door_stats["resisted"] += 1    # lock.c doopen: a stuck door, opened with P ~ (Str+Dex+Con)/3 in 20 a try
             return                                # -- try again; not the square's fault (80014: left after two)
-        if self.opts.door_open_ok and "The door opens." in self.text_since(seq0):
-            # door_open_ok: autoopen opened it (hack.c:798 test_move -> lock.c doopen_indir, a turn) -- no failed step
-            # into the square (door_stale, which also let "locked" / "resists" off, lost -2049: 40807 such steps)
+        if "The door opens." in self.text_since(seq0):
+            # autoopen opened it (hack.c:798 test_move -> lock.c doopen_indir, a turn) -- no failed step into the
+            # square (door_stale, which also let "locked" / "resists" off, lost -2049: 40807 such steps)
+            # (A/B door_open_ok: -1920 [-3808, -6], median 7726 -> 7768, 966 of 1000 changed)
             self.door_stats["door_opened"] += 1
             return
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):

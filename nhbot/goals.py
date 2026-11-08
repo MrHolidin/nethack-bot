@@ -78,13 +78,9 @@ class GoalsMixin:
             return self.altar_mask(lv)
         if kind == "box":
             return self.box_targets(lv)
-        if kind == "gold":
-            m = G.KIND[lv.under] == G.GOLD
-        elif self.opts.pile_one:
-            return self.pile_mask(lv)
-        else:
-            m = G.ARMOR_GLYPH[lv.under] | G.FOOD_GLYPH[lv.under]
-            m |= self.carry_targets(lv)
+        if kind != "gold":
+            return self.pile_mask(lv)         # (A/B pile_one: -494 [-980, +4], median 7726 -> 7726, 67 of 1000 changed)
+        m = G.KIND[lv.under] == G.GOLD
         for p in self.goal_closed_set(kind, lv.key):
             m[p] = False
         return m & ~lv.shop
@@ -172,11 +168,7 @@ class GoalsMixin:
         pile = np.zeros_like(gold)
         if ok:
             im = passable & ~lv.shop
-            if self.opts.pile_one:
-                pile |= self.pile_mask(lv) & im
-            else:
-                pile |= self.armor_targets(lv, G) & im
-                pile |= self.carry_targets(lv) & im
+            pile |= self.pile_mask(lv) & im
         out["pile"] = pile
         out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
         # boxes: opened by housekeeping, so only with no hostile in view (its gate; boxes.box_goal_mask)

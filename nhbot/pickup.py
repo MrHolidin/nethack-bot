@@ -19,7 +19,7 @@ from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_
                          TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, one_of)
 from nhbot.equipment import GLOVES, parse_armor
 from nhbot.game import MENU_RE
-from nhbot.items import CURSED_RE, base_name, parse_item
+from nhbot.items import CURSED_RE, base_name
 from nhbot.tins import MAX_TINS
 from nhbot.weapons import THROWABLE
 from nhbot.wishing import LAMP_NAMES
@@ -56,16 +56,15 @@ for _g in range(nh.MAX_GLYPH):
                                                           or bool(_wc and _wc[1] >= _wc[0]))
 
 
-def floor_kind(text, fixed=False):
+def floor_kind(text):
     """Floor / menu text -> (object class or None, type name): identified name for weapons and food, else the
-    bare name -- in the singular (fixed, name_parse: by items.singular_name -- "knives" was "knif", no weapon;
-    "cloves of garlic" no food)."""
+    bare name."""
     _, _, name = base_name(text)
-    one = one_of(name, fixed)
+    one = one_of(name)
     if re.search(r"\bgold pieces?\b", name):
         return nh.COIN_CLASS, "gold piece"
     if re.search(r"\bcorpses?$", name):
-        return nh.FOOD_CLASS, one if fixed else re.sub(r"s$", "", name)
+        return nh.FOOD_CLASS, re.sub(r"s$", "", name)
     if name in FOOD_NAMES or one in FOOD_NAMES:
         return nh.FOOD_CLASS, name if name in FOOD_NAMES else one
     a = parse_armor(text)                   # before the class words: "ring mail" is armor, not a ring
@@ -102,10 +101,6 @@ class PickupMixin:
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
         self.food_picked = 0           # food stacks taken from piles (armor_pickup_here)
 
-    def kind_of(self, text):
-        """floor_kind, names made singular by items.singular_name with name_parse."""
-        return floor_kind(text, self.opts.name_parse)
-
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
         """Could what lies at pos be merchandise? On a shop square; a shopkeeper in view counts only while no
@@ -125,29 +120,19 @@ class PickupMixin:
         "carry" (worth carrying to sell / use); None: leave it. Never merchandise, known-cursed armor / weapons,
         ammunition without a launcher, rocks / boulders / iron balls. Only with a letter for it (value.slot_ok)."""
         reason = self.take_reason_kind(text, worn)
-        if reason is not None and not self.slot_ok(self.kind_of(text)[0], text, reason):
+        if reason is not None and not self.slot_ok(floor_kind(text)[0], text, reason):
             return None
         return reason
 
     def take_reason_kind(self, text, worn=None):
-        """take_reason before the letter count. keep_rule: food, missiles, wield candidates and diggers only within
-        what value.keep_plan keeps of our pack with this stack added (food by pieces, no corpses; MISSILE_KEEP
-        missile pieces; one wield candidate and one Excalibur long sword; one digger -- "digger", a dwarvish mattock,
-        worth less than its weight, was never taken)."""
+        """take_reason before the letter count."""
         if "for sale" in text or base_name(text)[2] in self.never_take:
             return None
         food_n = self._take_food if self._take_food is not None else self.food_count()
-        ocls, typ = self.kind_of(text)
+        ocls, typ = floor_kind(text)
         cursed = bool(CURSED_RE.search(text))
-        keep = self.opts.keep_rule
-        kept = self.keep_reason(parse_item("?", ocls, text)) if keep and ocls is not None else None
         reason = None
-        if keep and kept == "digger" and not cursed:
-            reason = "digger"
-        elif ocls == nh.FOOD_CLASS and keep and typ != "tin":
-            if kept == "food" and "partly eaten" not in text:
-                reason = "food"
-        elif ocls == nh.FOOD_CLASS:
+        if ocls == nh.FOOD_CLASS:
             if typ in SAFE_FOOD_SET and "partly eaten" not in text and food_n < MAX_FOOD:
                 reason = "food"
             elif typ == "tin" and self.tins_carried() < MAX_TINS:
@@ -162,9 +147,9 @@ class PickupMixin:
                 reason = "carry"
         elif ocls == nh.WEAPON_CLASS and not cursed and typ not in AMMO_TYPES:
             if typ in MISSILE_TYPES:
-                reason = "missile" if not keep or kept == "missile" else None
+                reason = "missile"
             elif typ in WIELD_TYPES:
-                reason = "weapon" if not keep or kept in ("wield", "excalibur") else None
+                reason = "weapon"
             else:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
@@ -179,38 +164,16 @@ class PickupMixin:
         elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS):
             if ocls == nh.SPBOOK_CLASS or not (typ == "gray stone" or typ in THROW_STONE_TYPES):
                 reason = "carry"
-        if reason in ("carry", "digger") and not self.worth_taking(ocls, text):
+        if reason == "carry" and not self.worth_taking(ocls, text):
             return None
         return reason
 
     # ------------------------------------------------------------------ explore goals: piles worth a walk
-    def carry_glyph(self, g):
-        """Is this remembered glyph an item carry goes for? The SAME test makes it an explore goal and
-        makes the step that inspects it (and so removes the goal) run."""
-        return bool(CARRY_GLYPH[g] or MORE_GLYPH[g] or WANTED_WEAPON_GLYPH[g] or ALL_GLYPH[g])
-
-    def carry_targets(self, lv):
-        glyphs = CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH
-        mask = glyphs[lv.under] & ~lv.shop
-        for p in self.goal_closed_set("pile", lv.key):
-            mask[p] = False
-        return mask
-
-    def armor_targets(self, lv, glyphs_mod):
-        """Mask of remembered '[' (and '%' food when low on food) piles not yet inspected."""
-        mask = glyphs_mod.ARMOR_GLYPH[lv.under].copy()
-        if self.food_count() < MAX_FOOD:
-            mask = mask | glyphs_mod.FOOD_GLYPH[lv.under]
-        for p in self.corpse_piles(lv):
-            mask[p] = True
-        for p in self.goal_closed_set("pile", lv.key):
-            mask[p] = False
-        return mask
-
     def pile_mask(self, lv):
-        """pile_one: the piles worth a look -- the one mask explore walks to, housekeeping inspects (pile_to_inspect)
+        """The piles worth a look -- the one mask explore walks to, housekeeping inspects (pile_to_inspect)
         and the goal statistics count (goals.goal_raw): '[' piles, '%' food while we carry less than MAX_FOOD
-        pieces, what carry goes for, the corpses on what our kills carried; not in a shop, not looked at yet."""
+        pieces, what carry goes for, the corpses on what our kills carried; not in a shop, not looked at yet.
+        (A/B pile_one: -494 [-980, +4], median 7726 -> 7726, 67 of 1000 changed)"""
         mask = G.ARMOR_GLYPH[lv.under] | (CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH)[lv.under]
         if self.food_count() < MAX_FOOD:
             mask |= G.FOOD_GLYPH[lv.under]
@@ -228,23 +191,16 @@ class PickupMixin:
 
     def pile_to_inspect(self, lv, y, x):
         """An armor / food / carried-class pile under us (or a corpse on what a kill carried) that we have not
-        looked at, outside a shop (pile_one: pile_mask -- food only while we carry less than MAX_FOOD, as explore
-        walks to it)."""
-        if self.opts.pile_one:
-            return bool(self.pile_mask(lv)[y, x])
-        return bool((G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
-                     or self.carry_glyph(lv.under[y, x]) or (y, x) in self.corpse_piles(lv))
-                    and (y, x) not in self.goal_closed_set("pile", lv.key) and not lv.shop[y, x])
+        looked at, outside a shop: pile_mask -- food only while we carry less than MAX_FOOD, as explore walks to it."""
+        return bool(self.pile_mask(lv)[y, x])
 
     # ------------------------------------------------------------------ what to take
     def food_needed(self, it):
         """Safe food is kept like what we need, while we carry no more than MAX_FOOD pieces."""
-        return it.ocls == nh.FOOD_CLASS and self.kind_of(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
+        return it.ocls == nh.FOOD_CLASS and floor_kind(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
 
     def food_count(self):
-        """Food lines in the pack; keep_rule: pieces of the food we eat from it (value.keep_food_pieces)."""
-        if self.opts.keep_rule:
-            return self.keep_food_pieces()
+        """Food lines in the pack."""
         return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
 
     # ------------------------------------------------------------------ the paths
@@ -284,7 +240,7 @@ class PickupMixin:
         """A missile of ours to pick up: a missile weapon or a stone we throw, not for sale, not cursed."""
         if "for sale" in t or CURSED_RE.search(t):
             return False
-        ocls, typ = self.kind_of(t)
+        ocls, typ = floor_kind(t)
         return (ocls == nh.WEAPON_CLASS and typ in MISSILE_TYPES) or (ocls == nh.GEM_CLASS and typ in THROW_STONE_TYPES)
 
     def take_ammo(self):
@@ -383,7 +339,7 @@ class PickupMixin:
         if self.lift_last is None or self.turn() - self.lift_last[1] > LIFT_UNDO_TURNS:
             self.lift_last = None
             return it
-        lifted = next((x for x in inv if self.kind_of(x.text)[1] == self.lift_last[0]), None)
+        lifted = next((x for x in inv if floor_kind(x.text)[1] == self.lift_last[0]), None)
         if lifted is None or lifted.letter == it.letter:
             return it
         if self.value_per_weight(it, same(it)) >= self.value_per_weight(lifted, same(lifted)):
@@ -408,12 +364,12 @@ class PickupMixin:
         name = mm.group(1)
         tags = self.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for
         texts = [name] + ["%s (for sale, %d zorkmids)" % (t, pr) for t, pr in tags.items() if t in name or name in t]
-        ocls = self.kind_of(name)[0]
+        ocls = floor_kind(name)[0]
         # worth_taking: worth more per weight than what the drop step sheds for it -- not only "carry" picks pass
         # it (armor to wear, food, weapons don't), and one that fails would be the first thing dropped again
         ok = any(want(t) for t in texts) and ocls is not None and self.worth_taking(ocls, name)
         if ok:
-            self.lift_last = (self.kind_of(name)[1], self.turn())
+            self.lift_last = (floor_kind(name)[1], self.turn())
         k = "lift_heavy_" + ("yes" if ok else "no")
         self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
         return ok

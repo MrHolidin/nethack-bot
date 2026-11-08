@@ -60,13 +60,14 @@ class ScrollMixin:
         self.enchant_log = []            # (turn, effect, item) of the first ENCHANT_LOG of them
 
     def scroll_is_good(self, s):
-        """Identified as one of GOOD_TYPES, or every type its shop prices allow is one of them. posterior_one: every
-        type value.type_posterior leaves (known types out, oc_prob prior, deductions) -- not pricemem's uniform one."""
+        """Identified as one of GOOD_TYPES, or every type value.type_posterior leaves (known types out, oc_prob prior,
+        shop prices, deductions) is one of them -- not pricemem's uniform price-only one.
+        (A/B posterior_one: -37 [-150, +77], median 7726 -> 7726, 2 of 1000 changed)"""
         if GOOD_RE.search(s):
             return True
         if "labeled" not in s:
             return False
-        post = self.type_posterior(s) if self.opts.posterior_one else self.price_of_text(s)
+        post = self.type_posterior(s)
         return bool(post) and set(post) <= GOOD_TYPES
 
     # ------------------------------------------------------------ what enchanting did
@@ -109,15 +110,12 @@ class ScrollMixin:
         return self.scroll_known
 
     def unknown_readable(self, s):
-        """A scroll worth reading untested: its price group unknown, or 20 / 60 zm (posterior_one: the types
-        value.type_posterior leaves, known ones out)."""
+        """A scroll worth reading untested: its price group unknown, or the types value.type_posterior leaves (known
+        ones out) all among the 20 / 60 zm ones (UNKNOWN_READ_TYPES)."""
         key = appearance(s)
         if key is None:
             return False                       # known by name, or blank paper ("unlabeled": not shuffled)
-        if self.opts.posterior_one:
-            return not self.price_reads.get(key) or set(self.type_posterior(s)) <= UNKNOWN_READ_TYPES
-        post = self.price_of_text(s)
-        return not post or set(post) <= UNKNOWN_READ_TYPES
+        return not self.price_reads.get(key) or set(self.type_posterior(s)) <= UNKNOWN_READ_TYPES
 
     def test_safe(self):
         """Safe enough to read a scroll that may be harmful: full HP and more than TEST_MIN_HP (earth drops a

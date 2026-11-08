@@ -78,7 +78,7 @@ class Level:
         self.searched = np.zeros((ROWS, COLS), dtype=np.int32)
         self.blocked = np.zeros((ROWS, COLS), dtype=bool)   # learned failures (forgotten by step_progress's stall reset)
         self.fail = np.zeros((ROWS, COLS), dtype=np.int32)
-        self.no_entry = np.zeros((ROWS, COLS), dtype=bool)  # blocked_split: squares a standing rule keeps us out of
+        self.no_entry = np.zeros((ROWS, COLS), dtype=bool)  # squares a standing rule keeps us out of
                                                             # (no_entry_mark) -- never forgotten
         self.locked = set()
         self.avoid_down = set()    # downstairs leading into the Gnomish Mines
@@ -98,7 +98,7 @@ class Level:
         self.turns_here = 0
         self.progress_count = 0
         self.last_progress = 0
-        self.progress_here = 0     # turns_here at the last progress (desperate_level: step_progress counts turns here)
+        self.progress_here = 0     # turns_here at the last progress (step_progress counts turns here)
         self.last_reset = 0        # turn the learned obstacles were last forgotten
                                    # (step_progress)
         self.entered_turn = None
@@ -214,8 +214,7 @@ class MapMixin:
         p = G.PASSABLE[k_mem].copy()
         p |= (k_mem == G.BOULDER) | (k_live == G.BOULDER)   # try pushing; failures mark blocked
         p[lv.blocked] = False
-        if self.opts.blocked_split:
-            p[lv.no_entry] = False
+        p[lv.no_entry] = False
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.strike_scope_ok(lv):
             p[k_live == G.MONSTER] = False    # a step into an unrecognisable monster is an attack: route around
         if not lv.shop[self.pos()] and not self.shop_active(lv):
@@ -329,9 +328,10 @@ class MapMixin:
     def no_entry_mark(self, lv, sq):
         """A square a standing rule keeps us out of -- a door the watch warned us off, a closed-for-inventory shop's
         door, a door in the Mines (never kicked), a lock we were warned off, a squeeze we can't shed enough for, a
-        boulder dig_through gave up on. blocked_split: Level.no_entry, kept for good (step_progress's stall reset
-        forgets only the learned failures, Level.blocked / fail); else Level.blocked, as the learned ones."""
-        (lv.no_entry if self.opts.blocked_split else lv.blocked)[sq] = True
+        boulder dig_through gave up on: Level.no_entry, kept for good (step_progress's stall reset forgets only the
+        learned failures, Level.blocked / fail). (A/B blocked_split: -149 [-498, +190], median 7726 -> 7567, 61 of
+        1000 changed)"""
+        lv.no_entry[sq] = True
 
     def stairs_mask(self, lv, kind, k_mem=None):
         """The squares of the remembered staircases of kind (G.UPSTAIR / G.DOWNSTAIR) we may walk to and take:

@@ -18,11 +18,6 @@ from nhbot import glyphs as G
 from nhbot.monattacks import ATTACK_TYPES
 from nhbot.monsters import M1_ANIMAL, M1_MINDLESS, M1_NOHANDS, M2_MINION, PM_INDICES, S_ANGEL, S_HUMAN
 
-IGNORES_BY_NAME = {
-    "minotaur": "minotaur",
-    "shopkeeper": "shopkeeper", "guard": "vault guard", "aligned priest": "priest", "high priest": "priest",
-    "Death": "Rider", "Pestilence": "Rider", "Famine": "Rider",
-}
 RANGED = {"BREA": "breath", "SPIT": "spit", "GAZE": "gaze", "MAGC": "spells"}
 
 GEHENNOM_DNUM, ENDGAME_DNUM = 1, 7
@@ -32,7 +27,7 @@ RIDERS = {"Death", "Pestilence", "Famine"}
 
 
 def onscary_ignores(pm):
-    """elb_respect: why a monster of this kind is never scared by a written Elbereth, or None -- monmove.c:134-181
+    """Why a monster of this kind is never scared by a written Elbereth, or None -- monmove.c:134-181
     onscary by what the kind tells: the Wizard of Yendor, lawful minions and Angels (every M2_MINION kind of monst.c
     is a lawful A), the Riders, humans and elves (S_HUMAN: shopkeepers, guards, priests, the watch, the Oracle
     among them), minotaurs. Who is peaceful or blind, and Gehennom / the endgame, are the callers' to judge."""
@@ -47,21 +42,13 @@ def onscary_ignores(pm):
     return None
 
 
-def reason(mon_idx, onscary=False):
-    """None if Elbereth fully protects against this monster type, else why not. onscary (elb_respect): who ignores
-    it by onscary_ignores, the rule elbereth.respects uses too."""
+def reason(mon_idx):
+    """None if Elbereth fully protects against this monster type, else why not. Who ignores it by onscary_ignores,
+    the rule elbereth.respects uses too. (A/B elb_respect: 0, median 7726 -> 7726, 0 of 1000 changed)"""
     pm = nh.permonst(mon_idx)
-    name = pm.mname
-    if onscary:
-        why = onscary_ignores(pm)
-        if why is not None:
-            return why + " ignores Elbereth"
-    elif pm.mlet == S_HUMAN:
-        return "@ ignores Elbereth"
-    elif name in IGNORES_BY_NAME:
-        return IGNORES_BY_NAME[name] + " ignores Elbereth"
-    elif pm.mlet == S_ANGEL or pm.mflags2 & M2_MINION:
-        return "angelic/minion may ignore Elbereth"
+    why = onscary_ignores(pm)
+    if why is not None:
+        return why + " ignores Elbereth"
     atk = ATTACK_TYPES[mon_idx]
     for a in atk:
         if a in RANGED:
@@ -74,7 +61,6 @@ def reason(mon_idx, onscary=False):
 
 
 _REASON = [reason(i) for i in range(nh.NUMMONS)]
-_REASON_ONSCARY = [reason(i, onscary=True) for i in range(nh.NUMMONS)]       # elb_respect
 
 # Class C: blocked only because they MIGHT carry missiles or a wand (makemon.c m_initweap gives a launcher
 # or throwables to a minority of them: gnome 4/14, gnome lord 4/12, hill orc 1/4, ...). A scared monster
@@ -82,15 +68,12 @@ _REASON_ONSCARY = [reason(i, onscary=True) for i in range(nh.NUMMONS)]       # e
 # it really has something to throw (thrwmu / find_offensive).
 MAYBE_ARMED = frozenset(i for i, r in enumerate(_REASON)
                         if r and r.startswith(("weapon user", "has hands and a mind")))
-MAYBE_ARMED_ONSCARY = frozenset(i for i, r in enumerate(_REASON_ONSCARY)
-                                if r and r.startswith(("weapon user", "has hands and a mind")))
 
 
-def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=(), onscary=False):
+def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=()):
     """[(name, reason)] for every visible non-peaceful monster that makes Elbereth useless, plus unseen
     attackers ('I' markers) within 2 squares.  Empty list = Elbereth is worth writing.
-    optimistic: class-C monsters (MAYBE_ARMED) don't block. onscary (elb_respect): reasons by onscary_ignores."""
-    table, maybe_armed = (_REASON_ONSCARY, MAYBE_ARMED_ONSCARY) if onscary else (_REASON, MAYBE_ARMED)
+    optimistic: class-C monsters (MAYBE_ARMED) don't block."""
     if dnum in (GEHENNOM_DNUM, ENDGAME_DNUM):
         return [("-", "Elbereth has no power here")]
     out = []
@@ -106,8 +89,8 @@ def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=(), on
                 out.append(("unseen", "can't tell what it is"))
             elif k == G.MONSTER and (y, x) not in peaceful_pos:
                 idx = nh.glyph_to_mon(g)
-                r = table[idx]
-                if r and optimistic and idx in maybe_armed:
+                r = _REASON[idx]
+                if r and optimistic and idx in MAYBE_ARMED:
                     continue
                 if r and G.monster_name(g) not in skip_names:
                     out.append((G.monster_name(g), r))

@@ -18,7 +18,7 @@ from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_sq
 from nhbot.mapmem import Level
 from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 from nhbot.items import CURSED_RE
-from nhbot.pickup import MISSILE_TYPES
+from nhbot.pickup import MISSILE_TYPES, floor_kind
 from nhbot.survival import HORN_FIXES, HORN_SICK
 
 
@@ -176,13 +176,11 @@ class PolicyMixin:
             lv.blocked[:] = False
             lv.last_reset = t
             self.resets += 1
-        if self.opts.desperate_level:
-            # desperate_level: desperation by the level's own clock, turns spent on it (Level.turns_here) -- counted
-            # from the first arrival, a level re-entered had been "stalled" the whole time away: desperate at once.
-            # The obstacle reset above keeps its old timing (desperate_time, which moved both, lost -1027)
-            stall, age = lv.turns_here - lv.progress_here, lv.turns_here
-        else:
-            age = t - lv.entered_turn
+        # desperation by the level's own clock, turns spent on it (Level.turns_here) -- counted from the first
+        # arrival, a level re-entered had been "stalled" the whole time away: desperate at once. The obstacle reset
+        # above keeps its old timing (desperate_time, which moved both, lost -1027)
+        # (A/B desperate_level: -88 [-793, +632], median 7726 -> 7860, 136 of 1000 changed)
+        stall, age = lv.turns_here - lv.progress_here, lv.turns_here
         if not lv.desperate and (stall > 1500 or (age > 2500 and
                                                  not (self.kinds(lv) == G.DOWNSTAIR).any())):
             lv.desperate = True
@@ -382,16 +380,15 @@ class PolicyMixin:
 
     # ------------------------------------------------------------------ items and food
     def step_ammo_here(self, c):
-        """Missiles lying where we stand (our own thrown ones). ammo_one: what take_ammo takes (pickup.ammo_want:
-        the stones we throw too, weapons class only) -- not a looser test of its own."""
+        """Missiles lying where we stand (our own thrown ones)."""
         sh = self.seen_here
         y, x = c.y, c.x
         hw = self.here_window
         # the pile window lists what "Things that are here" leaves out
         txt = (sh[2] if sh else "") + (" | " + hw[2] if hw and sh and hw[:2] == sh[:2] else "")
         if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws and not c.lv.shop[y, x] \
-                and any((self.ammo_want(t) if self.opts.ammo_one else
-                         self.kind_of(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t))
+                and any(floor_kind(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
+                        # (A/B ammo_one -- stop for what take_ammo takes, stones too: -3134 [-4643, -1533], 6747)
                         for t in re.split(r" \| |You see here |\.$", txt) if t.strip()):
             self.seen_here = None
             self.take_ammo()

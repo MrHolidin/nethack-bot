@@ -98,8 +98,6 @@ SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
 #   - each letter engraved in the dust is garbled 1 in 25 (engrave.c doengrave): ~28% of Elbereths are misspelled
 #     and do nothing -> always read it back
 # =====================================================================================
-ELB_IGNORE_NAMES = {"minotaur", "shopkeeper", "guard", "watchman", "watch captain", "aligned priest",
-                    "high priest", "Oracle"}
 
 
 def permonst_of(g):

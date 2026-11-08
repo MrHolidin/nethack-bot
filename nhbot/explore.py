@@ -44,9 +44,10 @@ class ExploreMixin:
         for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
         downstairs = self.stairs_mask(lv, G.DOWNSTAIR, k_mem)
-        # level_time: turns spent on this level (Level.turns_here) -- since the first arrival, a level re-entered
-        # counted the whole time away: descend_after / the mines_after hatch ran out at once
-        on_level = lv.turns_here if self.opts.level_time else self.turn() - lv.entered_turn
+        # turns spent on this level (Level.turns_here) -- since the first arrival, a level re-entered counted the
+        # whole time away: descend_after / the mines_after hatch ran out at once
+        # (A/B level_time: -466 [-1860, +966], median 7726 -> 7768, 470 of 1000 changed)
+        on_level = lv.turns_here
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)
         hatch = self.turn() - self.mines_done_turn if self.mines_done else on_level

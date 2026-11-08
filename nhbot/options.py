@@ -24,27 +24,6 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    "desperate_level": False,  # A/B: step_progress's desperation (1500-turn stall, the 2500-turn rule) counts turns
-                               #      spent ON the level (Level.turns_here), not since the first arrival -- a level
-                               #      re-entered went desperate at once; the 500-turn obstacle reset as before
-    "door_kick_stale": False,  # A/B: a door in Level.locked is kicked only while the map shows it closed (else
-                               #      forgotten: opened / broken since -- "You kick at empty space.") (nhbot.nav.move)
-    "door_open_ok": False,     # A/B: "The door opens." (autoopen, a turn) is no failed step into the square (nhbot.nav)
-    # danger's melee model corrected, one fix a flag (dmg_model, all five at once, lost -1300 [-2630, +9]):
-    "dmg_nodmg": False,        # A/B: rust / corrode / disenchant / slime / gold-stealing hits do their d(n, d)
-                               #      (mhitu.c hitmu) (nhbot.danger.monster_turn_pmf)
-    "dmg_ac": False,           # A/B: negative AC takes rnd(-AC) off each damaging hit (mhitu.c:1699-1703)
-    "dmg_poison": False,       # A/B: a poisonous hit's extra rn1(10, 6) damage 24 in 240, not 5 (attrib.c poisoned)
-    "dmg_cube": False,         # A/B: a gelatinous cube's passive paralysis d(1, 4), and on our misses too (uhitm.c
-                               #      passive) (nhbot.danger monster_paralysis / the fight simulator)
-    "dmg_cold": False,         # A/B: a cold hit zeroed only when we resist cold (our_resists), not always
-    "posterior_one": False,    # A/B: scroll_is_good / unknown_readable read value.type_posterior (known types left out,
-                               #      oc_prob prior, deductions) like every other item decision, not pricemem's uniform
-                               #      price-only posterior (nhbot.scrolls)
-    "ammo_one": False,         # A/B: step_ammo_here stops for what take_ammo takes (pickup.ammo_want: the flint / rocks
-                               #      we throw too) (nhbot.policy)
-    "pile_one": False,         # A/B: one pile mask (pickup.pile_mask) for explore's walk, the inspection where we stand and
-                               #      the goal statistics -- food piles only while we carry less than MAX_FOOD (nhbot.pickup)
     "spore_range": False,      # A/B: a gas spore is thrown at from 2 on (its explosion covers 3x3, explode.c), not 3
     "shooter_range": False,    # A/B: a shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM), not 8 (nhbot.combat)
     "skill_bonus": False,      # A/B: our to-hit / damage count our weapon skill (#enhance read, weapon.c) (nhbot.danger)
@@ -68,54 +47,13 @@ DEFAULTS = {
     "drink_prompt": False,     # A/B: 'q' on a fountain / sink answers "Drink from the fountain?" 'n' and goes on to the
                                #      potion question -- the heal / quaff_test steps typed the potion letter into it
                                #      (game.ask_drink)
-    "fight_model": False,      # A/B: focus fire (several hostiles next to us) scored with danger's fight model --
-                               #      adjusted monster level (makemon.c adj_lev), the weapon in hand whatever its
-                               #      class, erosion, encumbrance, our speed, the hits danger_tick counted -- not
-                               #      focus.py's own estimates (nhbot.focus.focus_score_model)
-    "walk_fight_all": False,   # A/B: every win_prob fight played by the full walk_fight model (approach {}): prey_win
-                               #      and the water demon check too, not the simple loop that left out paralysis,
-                               #      regeneration, sleep, stun, stoning, brain-eating (nhbot.danger.win_prob)
-    "dragon_mc": False,        # A/B: the MC of a worn piece from objects.c a_can (equipment.MC_CAN): dragon scales and
-                               #      dragon scale mail 0, not the 1 every suit got (nhbot.equipment.wear_gain)
-    "excal_sword": False,      # A/B: any one long sword of ours is dipped for Excalibur -- cursed or named too (fountain.c
-                               #      dipfountain asks neither, and blesses it); not an artifact (nhbot.excalibur.long_sword)
-    "level_time": False,       # A/B: explore's descend_after and the mines_after hatch count turns spent ON the level
-                               #      (Level.turns_here), not since the first arrival (nhbot.explore.explore)
-    "elb_respect": False,      # A/B: one rule who ignores a written Elbereth (elb_rules.onscary_ignores, monmove.c
-                               #      onscary: @, minotaurs, lawful minions / Angels, the Riders) for both elb_blocked
-                               #      and elbereth.respects -- respects let the Riders count as scared
-    "food_facts": False,       # A/B: a prayer that fixes hunger sets nutrition to 900 ("Your stomach feels content.",
-                               #      pray.c / eat.c init_uhunger; the golden glow too), a slime mold is 250; no
-                               #      mimic corpse (helpless), violet fungus / yellow mold (hallucination), quantum
-                               #      mechanic while Fast (speed lost) -- tins too (nhbot.survival)
-    "shop_facts": False,       # A/B: what a shop buys from shknam.c saleable (quality apparel: wands, leather gloves,
+    # split from shop_facts (-1104 [-2164, -79], median 7726 -> 7696, 314 of 1000 changed; both parts at once):
+    "shop_buys_facts": False,  # A/B: what a shop buys from shknam.c saleable (quality apparel: wands, leather gloves,
                                #      elven cloaks only; lighting: candles, lamps, potions of oil; the health food
                                #      store; the delicatessen's drinks), nothing offered it pays 0 for (uncursed water,
-                               #      a cancelled wand); the cheapest identify scroll by our Charisma (shk.c get_cost)
-                               #      (nhbot.shop.shop_buys, jewelry.identify_min_price)
-    "excal_travel": False,     # A/B: Excalibur's walk back up by level_travel_step toward the nearest level with a
-                               #      fountain we may use -- no up staircase known to lead elsewhere (Sokoban's), only the
-                               #      one known to lead there while one is; one fountain mask (excalibur.fountains) for
-                               #      the dip, the climb and the target (nhbot.excalibur.excal_go_up)
-    "blocked_split": False,    # A/B: squares a standing rule keeps us out of (watch-warned / closed-for-inventory /
-                               #      Mines doors, lock warnings, a squeeze we can't shed for, a boulder given up) in
-                               #      Level.no_entry, never forgotten; the stall reset forgets only the learned
-                               #      failures (Level.blocked / fail) (nhbot.mapmem.no_entry_mark)
-    "squeeze_path": False,     # A/B: carrying more than 600, a diagonal step between two rock / wall squares (refused:
-                               #      hack.c test_move, cant_squeeze_thru) costs Dijkstra SQUEEZE_COST more -- walked
-                               #      round when a way round exists; the only way, it is still tried and the refusal
-                               #      sheds (squeeze_step) or digs as before (nhbot.nav.dijkstra)
-    "name_parse": False,       # A/B: item names made singular by one resolver (items.singular_name: objnam.c
-                               #      makeplural inverted over the object / monster names -- "knives" was "knif",
-                               #      "cloves of garlic" no food); a corpse weighs its monster's cwt, an unidentified
-                               #      gem its type's weight (1, was 10) and any gem look counts as unidentified
-                               #      ("yellowish brown gem" was worth 0); a stack's food counts one piece's nutrition
-                               #      (carry.describe, pickup.floor_kind, value.stack_key / unid_gem, survival)
-    "keep_rule": False,        # A/B: one rule what we keep (value.keep_reason / keep_plan) for est_value, selling,
-                               #      throwing (expendables) and taking: worn, the alternate weapon, water, one digger
-                               #      (taken now: "digger"), the best wield candidate (+ a long sword for Excalibur),
-                               #      MISSILE_KEEP missile pieces (no crysknife), MAX_FOOD pieces of food we eat (no
-                               #      corpses, no tins), what carry.needed keeps; no lamp to rub thrown, no water sold
+                               #      a cancelled wand) (nhbot.shop.shop_buys, offer_zero)
+    "id_price_cha": False,     # A/B: the cheapest identify scroll by our Charisma (shk.c get_cost), not 20 always
+                               #      (nhbot.jewelry.identify_min_price)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
@@ -131,7 +69,8 @@ DEFAULTS = {
     "wandid_hp": 0.6,          # engrave-test a wand only from this on
     "excal_hp": 0.7,           # Excalibur trip / dip only from this on
     # ---- parameters
-    "pray_gap": 1000,          # turns since the last prayer before praying for HP
+    "pray_gap": 500,           # turns since the last prayer before praying for HP (A/B pray500, 1000 -> 500: +639
+                               # [+75, +1200], median 7726 -> 8016, 170 of 1000 changed)
     "hunger_gap": 500,         # ... before praying when Weak
     "faint_wait": 200,         # turns Fainting before the emergency prayer
     "descend_after": 2000,     # turns on a level before descending anyway

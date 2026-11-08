@@ -4,7 +4,6 @@ import re
 
 import nle.nethack as nh
 
-from nhbot import glyphs as G
 from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
 from nhbot.items import base_name
@@ -30,16 +29,14 @@ class ExcaliburMixin:
         self.demon_win = (None, 0.0)     # (state key, P(we beat a water demon))
 
     def long_sword(self):
-        """(letter, text) of a long sword of ours to dip for Excalibur, or None. excal_sword: fountain.c:371-373
-        dipfountain asks only for one long sword (quantity 1) that is no artifact -- a cursed one or one we named is
-        fine (it comes out blessed: bless(obj)); without the flag no cursed or named one."""
+        """(letter, text) of a long sword of ours to dip for Excalibur, or None. fountain.c:371-373 dipfountain
+        asks only for one long sword (quantity 1) that is no artifact -- a cursed one or one we named is fine (it
+        comes out blessed: bless(obj)). (A/B excal_sword: +341 [+81, +613], median 7726 -> 7726, 35 of 1000
+        changed)"""
         for it in self.items():
             if it.ocls != nh.WEAPON_CLASS or not re.search(r"\blong sword\b", it.text) or "Excalibur" in it.text:
                 continue
-            if self.opts.excal_sword:
-                if base_name(it.text)[0] == 1 and not LONG_SWORD_ARTIFACT_RE.search(it.text):
-                    return it.letter, it.text
-            elif "named" not in it.text and not it.cursed:
+            if base_name(it.text)[0] == 1 and not LONG_SWORD_ARTIFACT_RE.search(it.text):
                 return it.letter, it.text
         return None
 
@@ -61,16 +58,9 @@ class ExcaliburMixin:
             self.fountain_levels.add(lv.key)
         if not self.excal_eligible():
             return False
-        if self.opts.excal_travel:
-            # excal_travel: the fountains we may use (fountains: no shop's, none in the Mines, none on a level given
-            # up -- before, a level given up was walked at again every tick)
-            fmask = self.fountains(lv)
-        if not fmask.any():
-            return self.excal_go_up(lv)
-        if lv.shop.any() and fmask[lv.shop].any():
-            fmask &= ~lv.shop
-        if lv.key[0] == 2:
-            fmask[:] = False          # Minetown: a fountain drying up angers the watch
+        # the fountains we may use (fountains: no shop's, none in the Mines -- Minetown's watch --, none on a level
+        # given up -- else a level given up was walked at again every tick)
+        fmask = self.fountains(lv)
         if not fmask.any():
             return self.excal_go_up(lv)
         y, x = self.pos()
@@ -93,33 +83,21 @@ class ExcaliburMixin:
         return min(keys, key=lambda k: abs(k[1] - dl)) if keys else None
 
     def excal_go_up(self, lv):
-        """No fountain here, but one is remembered a few levels up: walk back up to it. excal_travel: toward the
-        nearest such level by level_travel_step (no staircase known to lead elsewhere -- Sokoban's --, only the one
-        known to lead up there while one is), each staircase taken a trip."""
-        if self.opts.excal_travel:
-            target = self.excal_up_target(lv)
-            if target is None:
-                return False
-            if not self.level_travel_step(lv, self.grids(lv), target, "excal", "excal_travel", known_only=True,
-                                          max_cost=self.opts.excal_cost_up):
-                return False
-            self.excal_trips += self.took_stairs
-            return True
-        if not self.excal_up_wanted(lv):
+        """No fountain here, but one is remembered a few levels up: walk back up to it, toward the nearest such
+        level by level_travel_step (no staircase known to lead elsewhere -- Sokoban's --, only the one known to lead
+        up there while one is), each staircase taken a trip. (A/B excal_travel: -202 [-522, +128], median 7726 ->
+        7567, 42 of 1000 changed)"""
+        target = self.excal_up_target(lv)
+        if target is None:
             return False
-        up = self.stairs_mask(lv, G.UPSTAIR, self.grids(lv)[0])
-        if not up.any():
+        if not self.level_travel_step(lv, self.grids(lv), target, "excal", "excal_travel", known_only=True,
+                                      max_cost=self.opts.excal_cost_up):
             return False
-        y, x = self.pos()
-        if up[y, x]:
-            self.cur_act = "excal"
-            self.excal_trips += 1
-            self.take_stairs("<")
-            return True
-        return self.walk_to(lv, up, max_cost=self.opts.excal_cost_up, act="excal")[0] == "moved"
+        self.excal_trips += self.took_stairs
+        return True
 
     def excal_up_target(self, lv):
-        """excal_travel: the nearest main-dungeon level at most excal_up above this one with a fountain we may use
+        """The nearest main-dungeon level at most excal_up above this one with a fountain we may use
         (fountains), while trips are left; None."""
         if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
             return None
@@ -127,16 +105,6 @@ class ExcaliburMixin:
         keys = [k for k, l in self.levels.items()
                 if k[0] == 0 and dl - self.opts.excal_up <= k[1] < dl and self.fountains(l).any()]
         return max(keys, key=lambda k: k[1]) if keys else None
-
-    def excal_up_wanted(self, lv):
-        """A fountain is remembered a few levels up (not skipped, not all in shops) and trips are left."""
-        if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
-            return False
-        dl = lv.key[1]
-        return any(k[0] == 0 and dl - self.opts.excal_up <= k[1] < dl and k not in self.excal_skip
-                   and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH).any()
-                   and not (l.shop.any() and (self.terrain_glyphs(l) == FOUNTAIN_GLYPH)[l.shop].all())
-                   for k, l in self.levels.items())
 
     def dip(self, lv):
         it = self.long_sword()

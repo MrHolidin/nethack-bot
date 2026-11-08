@@ -1,8 +1,7 @@
 """Shop visits: the shared state for a visit, selling, paying, and the digger a shopkeeper wants left outside.
 
 Sell: in a shop that buys the class (general store: everything), drop each item we have no use for deep
-inside the shop and accept the offer; take back what the shopkeeper won't buy (what we keep: carry.needed,
-keep_rule value.keep_reason).
+inside the shop and accept the offer; take back what the shopkeeper won't buy (what we keep: carry.needed).
 """
 import re
 
@@ -10,7 +9,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.carry import DIGGER_WORDS, FIXED_LOOK, is_clear_potion
+from nhbot.carry import DIGGER_WORDS, FIXED_LOOK, describe, is_clear_potion
 
 ALL = None
 SHOP_BUYS = {
@@ -27,9 +26,9 @@ SHOP_BUYS = {
     "lighting store": {nh.TOOL_CLASS},
 }
 
-# shop_facts: what each shop buys -- shknam.c:205-343 shtypes item lists, as shknam.c:782 saleable reads them: a class,
-# a (class, type) for an entry of one object type, VEGGY for health food's vegetarian class (shknam.c:373 veggy_item:
-# food of VEGGY material, eggs)
+# shop_buys_facts: what each shop buys -- shknam.c:205-343 shtypes item lists, as shknam.c:782 saleable reads them: a
+# class, a (class, type) for an entry of one object type, VEGGY for health food's vegetarian class (shknam.c:373
+# veggy_item: food of VEGGY material, eggs)
 VEGGY = "veggy"
 VEGGY_FOOD = {"kelp frond", "eucalyptus leaf", "apple", "orange", "pear", "melon", "banana", "carrot",
               "sprig of wolfsbane", "clove of garlic", "slime mold", "lump of royal jelly", "cream pie", "candy bar",
@@ -180,27 +179,27 @@ class ShopMixin:
     # ------------------------------------------------------------ selling
     def sellables(self, lv, stype):
         buys = SHOP_BUYS.get(stype, set())
-        facts = self.opts.shop_facts
+        facts = self.opts.shop_buys_facts
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes()
                 and (self.shop_buys(stype, it) and not self.offer_zero(it) if facts else buys is ALL or it.ocls in buys)
-                and (self.keep_reason(it) is None if self.opts.keep_rule else not self.needed(it))
+                and not self.needed(it)
                 and (lv.key, it.text) not in self.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and not it.unpaid]
 
     def item_types(self, it):
-        """shop_facts: the object types Item it may be -- one when identified (or a look fixed to one type), else
+        """shop_buys_facts: the object types Item it may be -- one when identified (or a look fixed to one type), else
         what value.type_posterior still allows for its look."""
         if is_clear_potion(it.ocls, it.text):
             return {"water"}
         post = self.type_posterior(it.text)
         if post is not None:
             return set(post)
-        name = self.describe_item(it.ocls, it.text)["key"][1]
+        name = describe(it.ocls, it.text)["key"][1]
         return {FIXED_LOOK.get((it.ocls, name), name)}
 
     def shop_buys(self, stype, it):
-        """shop_facts: may a shop of this type buy Item it (shknam.c:782 saleable, SHOP_SELLS)? An item whose type
+        """shop_buys_facts: may a shop of this type buy Item it (shknam.c:782 saleable, SHOP_SELLS)? An item whose type
         we don't know: if any type it may be is bought (the shopkeeper's refusal then goes to sell_tried)."""
         wants = SHOP_SELLS.get(stype, ())
         if wants is ALL:
@@ -208,7 +207,7 @@ class ShopMixin:
         types = None
         for w in wants:
             if w == VEGGY:
-                ok = it.ocls == nh.FOOD_CLASS and self.describe_item(it.ocls, it.text)["key"][1] in VEGGY_FOOD
+                ok = it.ocls == nh.FOOD_CLASS and describe(it.ocls, it.text)["key"][1] in VEGGY_FOOD
             elif isinstance(w, tuple):
                 if it.ocls != w[0]:
                     continue
@@ -222,7 +221,7 @@ class ShopMixin:
 
     @staticmethod
     def offer_zero(it):
-        """shop_facts: an item a shopkeeper offers nothing for, so won't buy (shk.c:3398-3412 getprice: uncursed
+        """shop_buys_facts: an item a shopkeeper offers nothing for, so won't buy (shk.c:3398-3412 getprice: uncursed
         water -- a clear potion not known blessed / cursed --, a cancelled wand, partly eaten food)."""
         if is_clear_potion(it.ocls, it.text):
             return not re.search(r"\b(?:blessed|cursed)\b", it.text) or "uncursed" in it.text

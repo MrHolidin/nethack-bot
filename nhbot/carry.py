@@ -22,7 +22,7 @@ import nle.nethack as nh
 
 from nhbot.equipment import parse_armor
 from nhbot.vault import FIND_SCROLLS
-from nhbot.items import CORPSE_WEIGHT, GEM_LOOKS, base_name, corpse_kind, singular_name, unid_gem_look
+from nhbot.items import base_name
 from nhbot.pricemem import ARMOR_APPEAR, appearance
 from nhbot.rays import ATTACK_WANDS
 from nhbot.weapons import THROWABLE
@@ -123,15 +123,14 @@ def singular(w):
     return w
 
 
-def one_of(t, fixed=False):
-    """The singular of a name: word by word (singular); fixed (name_parse): items.singular_name, makeplural inverted."""
-    return singular_name(t) if fixed else " ".join(singular(w) for w in t.split(" "))
+def one_of(t):
+    """The singular of a name: word by word (singular)."""
+    return " ".join(singular(w) for w in t.split(" "))
 
 
-def describe(ocls, s, fixed=False):
-    """Inventory/floor text -> dict(qty, unit weight, unit cost (None if unknown), unidentified, key). fixed
-    (name_parse): names made singular by items.singular_name ("knives" was "knif", "cloves of garlic" no food); a
-    corpse weighs its monster's cwt, an unidentified gem / glass / gray stone its type's weight (objects.c)."""
+def describe(ocls, s):
+    """Inventory/floor text -> dict(qty, unit weight, unit cost (None if unknown), unidentified, key)."""
+    # (A/B name_parse -- one singular-name resolver, corpse / gem weights: -649 [-2301, +1045], 7638)
     qty, _, t = base_name(s)
     t = re.sub(r"^(pair|set)s? of ", "", t).strip()
     unid, name = False, None
@@ -150,15 +149,10 @@ def describe(ocls, s, fixed=False):
     else:
         name = t
         if ocls == nh.WEAPON_CLASS:
-            name = WEAPON_NAME_OF.get(t, WEAPON_NAME_OF.get(one_of(t, fixed), t))
-        one = singular_name(t) if fixed else singular(t)
-        if ocls == nh.TOOL_CLASS and one in TOOL_LOOKS and (ocls, one) not in OBJ_INFO:
+            name = WEAPON_NAME_OF.get(t, WEAPON_NAME_OF.get(one_of(t), t))
+        if ocls == nh.TOOL_CLASS and singular(t) in TOOL_LOOKS and (ocls, singular(t)) not in OBJ_INFO:
             unid = True                      # "bag", "lamp", "flute": several types share the look
-    if fixed and name is not None and (ocls, name) not in OBJ_INFO:
-        one = singular_name(name)
-        head = one.split(" of ")[0]
-        name = head if (ocls, one) not in OBJ_INFO and (ocls, head) in OBJ_INFO else one     # "tins of X meat": tin
-    if not fixed and name is not None and (ocls, name) not in OBJ_INFO:
+    if name is not None and (ocls, name) not in OBJ_INFO:
         words = name.split(" ")
         for i in range(len(words)):
             cand = " ".join(words[:i] + [singular(words[i])] + words[i + 1:])
@@ -167,14 +161,10 @@ def describe(ocls, s, fixed=False):
                 break
     if (ocls, name) in OBJ_INFO:
         wt, cost = OBJ_INFO[(ocls, name)]
-    elif fixed and ocls == nh.FOOD_CLASS and corpse_kind(t):
-        wt, cost = CORPSE_WEIGHT[corpse_kind(t)], None          # mkobj.c weight(): the monster's cwt
-    elif fixed and ocls == nh.GEM_CLASS and unid_gem_look(t):
-        wt, cost = GEM_LOOKS[unid_gem_look(t)], None
     else:
         wt = CLASS_WEIGHT.get(ocls) or APPEAR_WEIGHT.get(singular(t), APPEAR_WEIGHT.get(t, 10))
         cost = None
-    app = singular_name(t) if fixed else " ".join(singular(w) if w.islower() else w for w in t.split(" "))
+    app = " ".join(singular(w) if w.islower() else w for w in t.split(" "))
     return {"qty": qty, "wt": max(wt, 1), "cost": cost, "unid": unid, "key": (ocls, app if unid else name)}
 
 
@@ -185,10 +175,6 @@ class CarryMixin:
         self.squeeze_stats = Counter()
         self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
-
-    def describe_item(self, ocls, s):
-        """describe, its names made singular by items.singular_name with name_parse."""
-        return describe(ocls, s, self.opts.name_parse)
 
     def carry_classes(self):
         return CARRY_CLASSES + MORE_CLASSES + (nh.WEAPON_CLASS, nh.SPBOOK_CLASS, nh.GEM_CLASS)
@@ -253,7 +239,7 @@ class CarryMixin:
             self.drop_units(it.letter)
             self.carry_stats["dropped"][4] += 1
             return True
-        d = self.describe_item(it.ocls, it.text)
+        d = describe(it.ocls, it.text)
         self.drop_units(it.letter, 1 if d["qty"] > 1 else None)
         self.carry_stats["dropped"][2 if self.is_unknown(it.ocls, it.text) else 3] += 1
         return True
@@ -289,7 +275,7 @@ class CarryMixin:
         if self.jewelry_needed(it):
             return True                      # jewelry: identify scrolls, amulets and rings to identify
         if c == nh.WEAPON_CLASS:
-            d = self.describe_item(c, s)["key"][1]
+            d = describe(c, s)["key"][1]
             if d in ("long sword", "katana") or "Excalibur" in s or any(k in d for k in THROWABLE):
                 return True                  # wield candidates (weapons.weapon_rank) and missiles we throw
         return False

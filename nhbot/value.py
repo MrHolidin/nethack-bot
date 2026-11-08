@@ -19,9 +19,8 @@ from collections import Counter
 
 import nle.nethack as nh
 
-from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, one_of
-from nhbot.items import base_name, parse_item, unid_gem_look
-from nhbot.pickup import MAX_FOOD, MISSILE_TYPES, SAFE_FOOD
+from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, describe, one_of
+from nhbot.items import base_name, parse_item
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
 VALUE_MAX = 1_000_000.0
@@ -32,12 +31,6 @@ CANCELLED_RE = re.compile(r"\(\d+:-1\)")
 UNID_GEM_RE = re.compile(r"^(?:\w+ )?(?:gem|stone)s?$")
 
 BLANK_PAPER_COST = 60
-
-# keep_rule: the quotas of keep_plan
-MISSILE_KEEP = 10                # missile pieces kept (combat.throwables: daggers, knives, darts, ... not crysknives)
-KEEP_FOOD = tuple(f for f in SAFE_FOOD if not f.endswith(" corpse"))   # food we eat from the pack (survival
-#                                  eat_from_inventory: no corpse -- a lichen / lizard corpse was kept, never eaten)
-DIGGERS = ("pick-axe", "dwarvish mattock")
 
 # slots: the 52 inventory letters (invent.c; gold takes none) -- pickup.c:1426-1434 lift_object refuses an item
 # that would need a 53rd ("Your knapsack cannot accommodate any more items.")
@@ -51,13 +44,12 @@ MERGE_WEAPONS = {"arrow", "elven arrow", "orcish arrow", "silver arrow", "ya", "
                  "worm tooth", "crysknife"}
 
 
-def stack_key(text, fixed=False):
+def stack_key(text):
     """What must agree for two stacks to merge, as far as the text shows (invent.c mergable: the type, BUC and its
-    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular (fixed --
-    name_parse: by items.singular_name)."""
+    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular."""
     t = re.sub(r"\s*\(.*?\)", "", text).strip()
     t = re.sub(r"^(?:a|an|the|some|\d+)\s+", "", t)
-    return one_of(t, fixed)
+    return one_of(t)
 
 
 def is_water(ocls, text):
@@ -79,7 +71,6 @@ class ValueMixin:
         self.type_version = 0        # bumped whenever what type_posterior reads changes
         self.deduced = {}            # appearance key -> type worked out though the game did not name it (deduce_type)
         self._post_memo = {}         # text -> (type_version, posterior)
-        self._keep_memo = (None, {})  # keep_rule: (game state key, keep_plan)
 
     def note_known_types(self):
         inv = self.inventory()
@@ -88,7 +79,7 @@ class ValueMixin:
         self._known_inv = inv
         for it in self.items():
             if appearance(it.text) is None and (it.ocls in RANDOM_CLASSES or it.ocls in (nh.ARMOR_CLASS, nh.TOOL_CLASS)):
-                key = self.describe_item(it.ocls, it.text)["key"]
+                key = describe(it.ocls, it.text)["key"]
                 if key in TYPE_PROB and key not in self.known_types:
                     self.known_types.add(key)
                     self.type_version += 1
@@ -144,7 +135,7 @@ class ValueMixin:
         _, ench, t = base_name(text)
         if ocls == nh.WAND_CLASS and CANCELLED_RE.search(text):
             return 0.0
-        if ocls == nh.GEM_CLASS and self.unid_gem(t):
+        if ocls == nh.GEM_CLASS and UNID_GEM_RE.match(t):
             return UNID_GEM_OFFER
         if ocls == nh.POTION_CLASS and re.match(r"^clear potions?$", t):
             return 0.0 if not re.search(r"\b(blessed|cursed)\b", text) or "uncursed" in text else 100 / div
@@ -157,7 +148,7 @@ class ValueMixin:
             for n, p in post.items():
                 tot += p * sum(pk * gp for gp, pk in _unit_prices(n, _cls_of(n, key)))
             return tot / div * UNID_SHK
-        d = self.describe_item(ocls, text)
+        d = describe(ocls, text)
         if d["cost"] is None:
             return 0.0
         gp = d["cost"]
@@ -167,117 +158,22 @@ class ValueMixin:
             gp = 0
         return gp / div * (UNID_SHK if d["unid"] else 1.0)
 
-    def unid_gem(self, name):
-        """A gem's bare name is an unidentified look: UNID_GEM_RE; name_parse: any gem / glass / gray stone description
-        before "gem" / "stone" ("yellowish brown gem" failed the pattern: valued 0, dropped first)."""
-        return unid_gem_look(name) is not None if self.opts.name_parse else UNID_GEM_RE.match(name) is not None
-
     def is_unknown(self, ocls, text):
         """More than one type is still possible for it."""
-        if ocls == nh.GEM_CLASS and self.unid_gem(base_name(text)[2]):
+        if ocls == nh.GEM_CLASS and UNID_GEM_RE.match(base_name(text)[2]):
             return True
         post = self.type_posterior(text)
         return post is not None and len(post) > 1
 
     def est_value(self, it, same=1):
-        """Value of keeping one unit of Item it; same: units of its look we would carry. keep_rule: VALUE_MAX + its
-        gold for whatever keep_reason keeps."""
+        """Value of keeping one unit of Item it; same: units of its look we would carry."""
         g = self.est_gold(it.ocls, it.text)
-        if self.opts.keep_rule:
-            if self.keep_reason(it) is not None:
-                return VALUE_MAX + g
-        elif it.on_body or self.needed(it) or self.food_needed(it) or is_water(it.ocls, it.text):
+        # (A/B keep_rule -- one keep rule with quotas for value, selling, throwing, taking: -731 [-2505, +1053], 7183)
+        if it.on_body or self.needed(it) or self.food_needed(it) or is_water(it.ocls, it.text):
             return VALUE_MAX + g
         if same == 1 and self.is_unknown(it.ocls, it.text):
             g *= UNID_BONUS
         return g
-
-    # ------------------------------------------------------------ keep_rule: what we keep, one rule
-    def keep_reason(self, it, inv=None):
-        """keep_rule: why we keep Item it among inv (default: what we carry; an item not among them -- a floor stack,
-        letter "?" -- is judged as if added), or None: it may be sold, dropped, thrown. The reasons of keep_plan;
-        est_value, sellables, expendables and take_reason all read this."""
-        inv = list(self.items()) if inv is None else list(inv)
-        if not any(x.letter == it.letter and x.text == it.text for x in inv):
-            inv.append(it)
-        return self.keep_plan(inv).get(it.letter)
-
-    def keep_plan(self, inv):
-        """keep_rule: {letter: reason} of the items of inv we keep (the others are left out):
-          worn        on the body (worn, wielded, rings on)
-          alternate   the alternate weapon
-          water       clear potions (owner's decision)
-          digger      one digger (pick-axe before dwarvish mattock; the one in hand first)
-          wield       the best wield candidate (weapons.weapon_rank above 0, not known cursed), in hand or not
-          excalibur   lawful without Excalibur: the best long sword too (excalibur.long_sword's rule)
-          missile     missiles (pickup.MISSILE_TYPES -- no crysknife) up to MISSILE_KEEP pieces: quivered first,
-                      then the biggest stacks
-          food        food we eat from the pack (KEEP_FOOD: no corpses, no tins) up to MAX_FOOD pieces, the most
-                      nutrition per weight first
-          needed      what carry.needed keeps (attack wands, healing, good scrolls, a lamp to rub, jewelry, the
-                      lock tool, ...) -- for weapons only by the rules above
-        Cached for the game state (tick, keys sent, the texts)."""
-        key = (self.tick_no, self.steps, tuple((x.letter, x.ocls, x.text) for x in inv))
-        if self._keep_memo[0] == key:
-            return self._keep_memo[1]
-        from nhbot.survival import FOOD_NUTRITION
-        plan = {}
-        lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
-        diggers, wield, swords, missiles, food = [], [], [], [], []
-        for it in inv:
-            if it.ocls == nh.COIN_CLASS:
-                continue
-            if it.on_body:
-                plan[it.letter] = "worn"
-            elif it.alternate:
-                plan[it.letter] = "alternate"
-            elif is_water(it.ocls, it.text):
-                plan[it.letter] = "water"
-            name = self.describe_item(it.ocls, it.text)["key"][1]
-            if name in DIGGERS:
-                diggers.append(it)
-            elif it.ocls == nh.WEAPON_CLASS:
-                rank = self.weapon_rank(it.text)
-                if rank[0] > 0 and not it.cursed:
-                    wield.append((rank, it))
-                    if lawful and not self.excalibur and name == "long sword" and "Excalibur" not in it.text \
-                            and base_name(it.text)[0] == 1:
-                        swords.append((rank, it))
-                elif name in MISSILE_TYPES and not it.cursed:
-                    missiles.append(it)
-            elif it.ocls == nh.FOOD_CLASS:
-                kind = self.kind_of(it.text)[1]
-                if kind in KEEP_FOOD:
-                    wt = self.describe_item(it.ocls, it.text)["wt"]
-                    food.append((-FOOD_NUTRITION.get(kind, 200) / wt, it))
-            elif it.letter not in plan and self.needed(it):
-                plan[it.letter] = "needed"
-        if diggers:
-            best = min(diggers, key=lambda x: (not x.held, "mattock" in x.text or "broad pick" in x.text))
-            plan.setdefault(best.letter, "digger")
-        if wield:
-            plan.setdefault(max(wield, key=lambda c: c[0])[1].letter, "wield")
-        if swords:
-            plan.setdefault(max(swords, key=lambda c: c[0])[1].letter, "excalibur")
-        n = 0
-        for it in sorted(missiles, key=lambda x: (not x.quivered, -base_name(x.text)[0])):
-            if n >= MISSILE_KEEP:
-                break
-            plan.setdefault(it.letter, "missile")
-            n += base_name(it.text)[0]
-        n = 0
-        for _, it in sorted(food, key=lambda c: c[0]):
-            if n >= MAX_FOOD:
-                break
-            plan.setdefault(it.letter, "food")
-            n += base_name(it.text)[0]
-        self._keep_memo = (key, plan)
-        return plan
-
-    def keep_food_pieces(self):
-        """keep_rule: pieces of the food we eat from the pack (KEEP_FOOD) we carry -- the food count."""
-        return sum(base_name(it.text)[0] for it in self.items()
-                   if it.ocls == nh.FOOD_CLASS and self.kind_of(it.text)[1] in KEEP_FOOD)
 
     def carried_by_look(self):
         """Units carried per appearance key (unidentified looks only)."""
@@ -289,7 +185,7 @@ class ValueMixin:
         return out
 
     def value_per_weight(self, it, same=1):
-        return self.est_value(it, same) / self.describe_item(it.ocls, it.text)["wt"]
+        return self.est_value(it, same) / describe(it.ocls, it.text)["wt"]
 
     # ------------------------------------------------------------ the same comparison for picking up
     def weight_capacity(self):
@@ -302,7 +198,7 @@ class ValueMixin:
             if it.ocls == nh.COIN_CLASS:
                 wt += (base_name(it.text)[0] + 50) // 100           # invent.c: 100 coins weigh 1
             else:
-                d = self.describe_item(it.ocls, it.text)
+                d = describe(it.ocls, it.text)
                 wt += d["wt"] * d["qty"]
         return wt
 
@@ -316,14 +212,13 @@ class ValueMixin:
         text agrees with one of ours (stack_key; hidden differences -- an unknown BUC -- can still keep them apart)."""
         if ocls == nh.WEAPON_CLASS:
             name = base_name(text)[2]
-            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(one_of(name, self.opts.name_parse), name))
+            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(one_of(name), name))
             if name not in MERGE_WEAPONS:
                 return False
         elif ocls not in MERGE_CLASSES and not (ocls == nh.TOOL_CLASS and "candle" in text):
             return False
-        fixed = self.opts.name_parse
-        k = stack_key(text, fixed)
-        return any(it.ocls == ocls and stack_key(it.text, fixed) == k for it in self.items())
+        k = stack_key(text)
+        return any(it.ocls == ocls and stack_key(it.text) == k for it in self.items())
 
     def stack_value(self, it, same=1):
         """est_value of the whole stack (a letter is freed only by all of it)."""
@@ -366,7 +261,7 @@ class ValueMixin:
         """Take a floor stack if it fits without Burdened, or if it is worth more per weight than
         the cheapest things (off the body) we would drop to make room for it -- the order carry_drop_step drops
         in, so we never pick up what the drop step would put straight back down."""
-        d = self.describe_item(ocls, text)
+        d = describe(ocls, text)
         wt = d["wt"] * d["qty"]
         free = self.weight_capacity() - self.inventory_weight()
         if wt <= free:
@@ -382,7 +277,7 @@ class ValueMixin:
         for v, it in drop:
             if v >= vpw:
                 return False
-            dd = self.describe_item(it.ocls, it.text)
+            dd = describe(it.ocls, it.text)
             need -= dd["wt"] * dd["qty"]
             if need <= 0:
                 return True
