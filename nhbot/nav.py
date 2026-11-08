@@ -1,7 +1,6 @@
 """Path finding and single steps: Dijkstra over the remembered map, moving (door kicks, peaceful
 monsters in the way, failed moves), walking toward a square or a set of squares."""
 import heapq
-import re
 from array import array
 from collections import Counter
 
@@ -15,7 +14,6 @@ from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 # door at map (50, 6) in every one of its terrain variants; the way to that door has closed doors only
 GROTTO_STAIR_DOOR = (6, 52)
 # lock.c doopen_indir's answers to a step into a closed door (autoopen): lock.c:709-723, 735
-DOOR_MSG_RE = re.compile(r"The door opens\.|This door is locked\.|The door resists!")
 
 
 def line_clear(k_mem, glyphs, y, x, dy, dx, d):
@@ -209,8 +207,8 @@ class NavMixin:
         before = (y, x, self.turn())
         lv = self.level()
         self.trap_held(lv)                    # forgets the trap once we are out of it
-        if self.opts.door_stale and target in lv.locked and self.kinds(lv)[target] != G.DOOR_CLOSED:
-            # door_stale: a monster opened it or it was broken since "This door is locked." -- kicking an open /
+        if self.opts.door_kick_stale and target in lv.locked and self.kinds(lv)[target] != G.DOOR_CLOSED:
+            # door_kick_stale: a monster opened it or it was broken since "This door is locked." -- kicking an open /
             # broken door is "You kick at empty space." (dokick.c:1251-1257), a turn each, for ever
             lv.locked.discard(target)
             self.door_stats["stale_locked"] += 1
@@ -257,10 +255,10 @@ class NavMixin:
         if self.opts.door_resists and "The door resists!" in self.text_since(seq0):
             self.door_stats["resisted"] += 1    # lock.c doopen: a stuck door, opened with P ~ (Str+Dex+Con)/3 in 20 a try
             return                                # -- try again; not the square's fault (80014: left after two)
-        if self.opts.door_stale and DOOR_MSG_RE.search(self.text_since(seq0)):
-            # door_stale: autoopen answered (hack.c:798 test_move -> lock.c doopen_indir): opened (a turn), locked
-            # (no time; msg_map notes it in Level.locked) or stuck -- none is a failed step into the square
-            self.door_stats["door_msg"] += 1
+        if self.opts.door_open_ok and "The door opens." in self.text_since(seq0):
+            # door_open_ok: autoopen opened it (hack.c:798 test_move -> lock.c doopen_indir, a turn) -- no failed step
+            # into the square (door_stale, which also let "locked" / "resists" off, lost -2049: 40807 such steps)
+            self.door_stats["door_opened"] += 1
             return
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
             if self.trapped is not None and self.trapped[1:] == (lv.key, (y, x)) and after[2] > before[2]:
@@ -290,5 +288,5 @@ class NavMixin:
         else:
             self.settle()
         m = self.text_since(seq0)
-        if "crashes open" in m or "shatters" in m or "breaks open" in m:
+        if "crashes open" in m or "shatters" in m:     # dokick.c:1286-1290
             self.level().locked.discard(self.last_move_target)

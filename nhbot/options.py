@@ -24,27 +24,20 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    "desperate_time": False,   # A/B: step_progress's stall (500: obstacles forgotten, 1500: desperate) and its 2500-turn
-                               #      rule count turns spent ON the level (Level.turns_here), not since the first
-                               #      arrival -- a level re-entered went desperate at once (nhbot.policy)
-    "safe_pickup": False,      # A/B: ',' only after a ':' look (no game time): a lone item (taken without a menu,
-                               #      pickup.c AUTOSELECT_SINGLE) only if want accepts it; never a cockatrice /
-                               #      chickatrice corpse without gloves (nhbot.pickup)
-    "mines_mask": False,       # A/B: the closed Mines staircase explore keeps away from is mines_stairs (linked
-                               #      arrival marks, stairs taken, two_down), not only the avoid_down marks (nhbot.explore)
-    "goal_here": False,        # A/B: explore's targets leave out our own square -- a goal there whose step declined
-                               #      (an altar with a hostile in view) no longer ends exploring (nhbot.explore)
-    "door_stale": False,       # A/B: a door in Level.locked is kicked only while the map shows it closed (else
-                               #      forgotten: opened / broken since); door messages ("The door opens.", "This door
-                               #      is locked.", "The door resists!") are no failed step (nhbot.nav.move)
-    "heal_first": False,       # A/B: the heal step (a healing potion below 1/3 HP) before unihorn / stunned / blind:
-                               #      a non-cursed healing potion cures blindness too (nhbot.policy step order)
-    "engrave_more": False,     # A/B: Elbereth (and the engrave tests) also on stairs, ladders, a throne, a sink --
-                               #      engrave.c doengrave refuses none of them (nhbot.elbereth)
-    "dmg_model": False,        # A/B: danger's melee model corrected (mhitu.c / attrib.c / uhitm.c): rust / corrode /
-                               #      disenchant / slime / gold-stealing hits do damage, negative AC takes rnd(-AC)
-                               #      off each hit, poison's extra damage 24 in 240, a gelatinous cube's passive
-                               #      d(1, 4) on misses too, cold zeroed only when we resist it (nhbot.danger)
+    "desperate_level": False,  # A/B: step_progress's desperation (1500-turn stall, the 2500-turn rule) counts turns
+                               #      spent ON the level (Level.turns_here), not since the first arrival -- a level
+                               #      re-entered went desperate at once; the 500-turn obstacle reset as before
+    "door_kick_stale": False,  # A/B: a door in Level.locked is kicked only while the map shows it closed (else
+                               #      forgotten: opened / broken since -- "You kick at empty space.") (nhbot.nav.move)
+    "door_open_ok": False,     # A/B: "The door opens." (autoopen, a turn) is no failed step into the square (nhbot.nav)
+    # danger's melee model corrected, one fix a flag (dmg_model, all five at once, lost -1300 [-2630, +9]):
+    "dmg_nodmg": False,        # A/B: rust / corrode / disenchant / slime / gold-stealing hits do their d(n, d)
+                               #      (mhitu.c hitmu) (nhbot.danger.monster_turn_pmf)
+    "dmg_ac": False,           # A/B: negative AC takes rnd(-AC) off each damaging hit (mhitu.c:1699-1703)
+    "dmg_poison": False,       # A/B: a poisonous hit's extra rn1(10, 6) damage 24 in 240, not 5 (attrib.c poisoned)
+    "dmg_cube": False,         # A/B: a gelatinous cube's passive paralysis d(1, 4), and on our misses too (uhitm.c
+                               #      passive) (nhbot.danger monster_paralysis / the fight simulator)
+    "dmg_cold": False,         # A/B: a cold hit zeroed only when we resist cold (our_resists), not always
     "history_always": False,   # A/B: perception and the fight record (danger_tick -- our hits counted for win_prob --,
                                #      summary 'hist') every tick before the steps that act, not only in ticks no
                                #      step before 'history' (pray, heal, blind, ...) acted in (nhbot.policy.tick)

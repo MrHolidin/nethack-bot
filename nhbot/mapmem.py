@@ -97,8 +97,8 @@ class Level:
         self.turns_here = 0
         self.progress_count = 0
         self.last_progress = 0
-        self.progress_here = 0     # turns_here at the last progress (desperate_time: step_progress counts turns here)
-        self.last_reset = 0        # turn (desperate_time: turns_here) the learned obstacles were last forgotten
+        self.progress_here = 0     # turns_here at the last progress (desperate_level: step_progress counts turns here)
+        self.last_reset = 0        # turn the learned obstacles were last forgotten
                                    # (step_progress)
         self.entered_turn = None
         self.entered_xl = None     # experience level at the first arrival (stats)
@@ -388,11 +388,9 @@ class MapMixin:
             lv.locked.add(self.last_move_target)
         if self.squeeze_msg(m, lv):                           # carry.py: a diagonal squeeze refused for our weight
             pass
-        elif lv and self.last_move_target and any(s in m for s in (
-                "You try to move the boulder, but in vain",
-                "Perhaps that's why you cannot move past it",
-                "There is a boulder in your way",
-                "You don't have enough room to maneuver")):
+        elif lv and self.last_move_target and "You try to move the boulder, but in vain" in m:
+            # hack.c:332 moverock (the only boulder message a step gets that stays true; a monster behind it,
+            # "Perhaps that's why you cannot move it." (hack.c:172), moves on: left to the step-failure count)
             if not self.dig_through_note(lv, self.pos(), self.last_move_target, "boulder"):
                 lv.blocked[self.last_move_target] = True
         if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:

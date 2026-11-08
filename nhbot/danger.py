@@ -37,9 +37,9 @@ from nhbot.rays import RAY_RESIST, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
 NO_DAMAGE = {"RUST", "CORR", "DCAY", "SGLD", "SEDU", "SSEX", "SLIM", "ENCH", "CURS", "STON", "COLD"}
-# dmg_model: the d(n, d) of a rust / corrode / disenchant / slime / gold-stealing hit lands (mhitu.c hitmu: AD_RUST
-# 1436, AD_CORR 1448, AD_ENCH 1654, AD_SLIM 1636, AD_SGLD 1320 keep dmg); cold only when we resist it (AD_COLD 1076)
-NO_DAMAGE_FIXED = NO_DAMAGE - {"RUST", "CORR", "ENCH", "SLIM", "SGLD", "COLD"}
+# dmg_nodmg: the d(n, d) of a rust / corrode / disenchant / slime / gold-stealing hit lands (mhitu.c hitmu: AD_RUST
+# 1436, AD_CORR 1448, AD_ENCH 1654, AD_SLIM 1636, AD_SGLD 1320 keep dmg)
+NO_DAMAGE_HITS = {"RUST", "CORR", "ENCH", "SLIM", "SGLD"}
 POISON = {"DRST", "DRDX", "DRCO"}
 MAX_D = 400
 TAINT_AD = {"BLND": 1.0, "WERE": 0.25, "SEDU": 1.0, "SITM": 1.0, "SSEX": 1.0, "SGLD": 1.0}   # a hit blinds /
@@ -149,34 +149,35 @@ class DangerMixin:
             return np.array([1.0]), 0.0
         pm = nh.permonst(idx)
         level = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
-        fixed = self.opts.dmg_model
-        no_damage = NO_DAMAGE_FIXED if fixed else NO_DAMAGE
+        o = self.opts
+        no_damage = NO_DAMAGE - (NO_DAMAGE_HITS if o.dmg_nodmg else set()) - ({"COLD"} if o.dmg_cold else set())
         ac = self.bl(nh.NLE_BL_AC)
         pmf, alive = np.array([1.0]), 1.0
         for i, (at, ad, n, d) in enumerate(ATTACKS[idx]):
             if at not in MELEE:
                 continue
             p = self.hit_prob(level, i, bonus)
-            zero = ad in no_damage or (fixed and ad == "COLD" and "cold" in self.our_resists())
+            # dmg_cold: a cold hit is zeroed only when we resist cold (mhitu.c AD_COLD 1076)
+            zero = ad in no_damage or (o.dmg_cold and ad == "COLD" and "cold" in self.our_resists())
             dmg = dice_pmf(n, d) if n and d and not zero else np.array([1.0])
             if at == "WEAP":
                 w = self.mon_weapon.get(name)
                 dmg = conv(dmg, dice_pmf(1, WEAPON_DICE[w][0]) if w else dice_pmf(1, 6))
-            if fixed and ac < 0:
+            if o.dmg_ac and ac < 0:
                 dmg = self.ac_reduce(dmg, -ac)
             if ad in POISON and not self.poison_res:
                 alive *= 1 - p / 240                         # poisoned 1 in 8, deadly 1 in 30
                 extra = np.concatenate([np.zeros(6), np.full(10, 0.1)])     # rn1(10, 6): 6..15
                 # attrib.c:311-320 poisoned: i = rn2(30), 0 deadly, 1..5 an attribute, 6..29 the extra HP damage
-                # (dmg_model: 24 in 30 of the 1 in 8; a direct losehp, not cut by negative AC)
-                dmg = self._mix(dmg, conv(dmg, extra), (24 if fixed else 5) / 240)
+                # (dmg_poison: 24 in 30 of the 1 in 8; a direct losehp, not cut by negative AC)
+                dmg = self._mix(dmg, conv(dmg, extra), (24 if o.dmg_poison else 5) / 240)
             hit = self._mix(np.array([1.0]), dmg, p)
             pmf = conv(pmf, hit)
         return pmf, 1 - alive
 
     @staticmethod
     def ac_reduce(dmg, k):
-        """dmg_model: a hit's damage pmf against our negative AC -k: mhitu.c:1699-1703, a hit that does damage loses
+        """dmg_ac: a hit's damage pmf against our negative AC -k: mhitu.c:1699-1703, a hit that does damage loses
         rnd(k) of it, at least 1 left."""
         n = len(dmg)
         out = np.zeros(max(n, 2))
@@ -507,7 +508,7 @@ class DangerMixin:
         cool = [0] * len(mons)                   # breath: turns until it can breathe again
         alive, asleep, tainted = list(range(len(mons))), 0, False
         us = {"stun": 0, "conf": 0, "slow": False, "int": state.get("int", 18)}
-        passive_miss = self.opts.dmg_model
+        passive_miss = self.opts.dmg_cube
         for _turn in range(max_turns):
             k, frac = divmod(state["speed_slow"] if us["slow"] else state.get("speed", self.our_speed()), 12)
             acts = k + (1 if frac and rng.random() < frac / 12 else 0)
@@ -544,7 +545,7 @@ class DangerMixin:
                         continue
                     p_passive = 2 / 3
                 else:
-                    # dmg_model: uhitm.c:628 hitum calls passive on a miss too (2 in 3 while it lives,
+                    # dmg_cube: uhitm.c:628 hitum calls passive on a miss too (2 in 3 while it lives,
                     # uhitm.c:2873) -- if the blow went at it: a stunned / confused one may have gone astray
                     p, a = mons[j][1], aim
                     p_passive = 2 / 3 * a * (1 - p) / (1 - p * a) if p * a < 1 else 0.0
@@ -649,7 +650,7 @@ class DangerMixin:
     def monster_paralysis(self, name):
         """(P(one move of its melee freezes us): mhitu.c AD_PLYS, 1 in 3 of the hits, for rnd(10) turns; the
         dice of its passive paralysis when we hit it and it lives -- uhitm.c passive, 2 in 3: d(level + 1, die)
-        turns (dmg_model: d(damn, damd), and when we miss it too) -- or None)."""
+        turns (dmg_cube: d(damn, damd), and when we miss it too) -- or None)."""
         keep, passive = 1.0, None
         idx = PM_INDEX.get(name)
         if idx is None:
@@ -660,8 +661,8 @@ class DangerMixin:
                 continue
             if at == "NONE":
                 # uhitm.c:2755-2758 passive: d(damn, damd) -- d(m_lev + 1, damd) only when damn is 0 (a floating eye);
-                # a gelatinous cube's is d(1, 4) (dmg_model; before: level + 1 dice always)
-                passive = (n, d) if self.opts.dmg_model and n else (level + 1, d)
+                # a gelatinous cube's is d(1, 4) (dmg_cube; before: level + 1 dice always)
+                passive = (n, d) if self.opts.dmg_cube and n else (level + 1, d)
             elif at in MELEE:
                 keep *= 1 - self.hit_prob(level, i) / 3
         return 1 - keep, passive

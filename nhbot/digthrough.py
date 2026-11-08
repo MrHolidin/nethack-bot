@@ -1,10 +1,11 @@
 """dig_through: what the Mines' caves shut with -- a diagonal squeeze refused for our weight (hack.c test_move: more
-than 600 carried), a boulder that won't move (a monster or another boulder behind it) -- opened with a digger
-instead of shedding our things or giving the way up: one of the squeeze's two corners dug (dig.c: a wall or rock
-square becomes a passage; a wand of digging zapped that way), a boulder broken by the pick-axe / mattock applied
-at it (dig.c dig: "you hit the boulder with all your might" -- fracture_rock). Not in Sokoban (boulders are the
-puzzle), not on a Minetown level (the watch minds dug walls: dig.c watch_dig) but Orcish Town (all of them dead),
-not next to a shop (shopdig)."""
+than 600 carried), a boulder that won't move ("You try to move the boulder, but in vain.": another boulder or a wall
+behind it -- a monster behind is "Perhaps that's why you cannot move it.", left to the step-failure count) -- opened
+with a digger instead of shedding our things or giving the way up: one of the squeeze's two corners dug (dig.c: a
+wall or rock square becomes a passage; a wand of digging zapped that way), a boulder broken by the pick-axe /
+mattock applied at it (dig.c dig: "you hit the boulder with all your might" -- fracture_rock). Not in Sokoban
+(boulders are the puzzle), not on a Minetown level (the watch minds dug walls: dig.c watch_dig) but Orcish Town (all
+of them dead), not next to a shop (shopdig)."""
 from nhbot import glyphs as G
 from nhbot.nav import DELTA2KEY
 

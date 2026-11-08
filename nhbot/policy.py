@@ -6,7 +6,7 @@ acts (returns True) ends the tick. A step that only updates bookkeeping returns 
 emergencies first, then fighting, then food and items, then exploring.
 """
 import re
-from collections import deque
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from functools import cached_property
 
@@ -29,12 +29,14 @@ STEPS = (
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
     "weight",            # a squeeze refused for our weight: shed a unit (carry.squeeze_step); never Burdened
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
+    "heal",              # a known healing potion below 1/3 HP -- before unihorn / stunned / blind, which wait while it
+                         # would mend the HP and blindness too (potion.c:993-1010 healup's cureblind)
+                         # (A/B heal_first: -206 [-412, 0], 2 games of 1000 changed)
     "unihorn",           # blind / confused / stunned / hallucinating, nothing next to us: the horn
     "stunned",
     "vault_guard",
     "vault_rob",         # vault_rob: the gold of a vault we stand in, then down through the floor (nhbot.vault)
     "blind",
-    "heal",
     "history",           # per-tick record of the fight state (summary 'hist')
     "loot_here",         # loot_now: standing where our things fell -- picked up at once, fight or not
     "elbereth",
@@ -65,14 +67,9 @@ STEPS = (
 
 
 def step_order(opts):
-    """STEPS as the options order them. heal_first: heal right after perceive -- before unihorn, stunned and blind,
-    which wait (or apply the horn) while a known healing potion would mend the HP -- and blindness too
-    (potion.c:993-1010 peffects: healup's cureblind -- healing when not cursed, extra / full healing always).
-    history_always: perceive and history out of the list -- tick runs them first, every tick."""
+    """STEPS as the options order them. history_always: perceive and history out of the list -- tick runs them
+    first, every tick."""
     order = list(STEPS)
-    if opts.heal_first:
-        order.remove("heal")
-        order.insert(order.index("perceive") + 1, "heal")
     if opts.history_always:
         order.remove("perceive")             # history_always: both run every tick ahead of the list (tick)
         order.remove("history")
@@ -131,6 +128,7 @@ class PolicyMixin:
         self.tick_seq = 0                # msg_seq at the start of this tick
         self.hist = deque()              # step_history: the fight state of the last 40 ticks (summary 'hist')
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0     # step_progress: the no-time loop guard
+        self.loop_by = Counter()         # the guard fired: "last step/activity" then (summary 'loop_by')
         self.resets = 0
         self.desperations = 0
         self.pet_last_seen = 0
@@ -181,23 +179,24 @@ class PolicyMixin:
             self.loop_turn, self.loop_steps = t, self.steps
         elif self.steps - self.loop_steps > 300:      # stuck in a no-time loop
             self.loops += 1
+            self.loop_by[f"{self.last_step}/{self.cur_act}"] += 1
             self.loop_steps = self.steps
             self.raw_step(27); self.press("s")
             return True
-        if self.opts.desperate_time:
-            # desperate_time: the level's own clock, turns spent on it (Level.turns_here) -- counted from the first
-            # arrival, a level re-entered had been "stalled" for the whole time away: desperate at once, its
-            # learned obstacles wiped
-            clock, since, age = lv.turns_here, lv.progress_here, lv.turns_here
-        else:
-            clock, since, age = t, max(lv.last_progress, lv.entered_turn), t - lv.entered_turn
-        stall = clock - since
-        if stall > 500 and clock - lv.last_reset > 500:
+        stall = t - max(lv.last_progress, lv.entered_turn)
+        if stall > 500 and t - lv.last_reset > 500:
             # forget learned obstacles: they are often transient (monsters, misreads)
             lv.fail[:] = 0
             lv.blocked[:] = False
-            lv.last_reset = clock
+            lv.last_reset = t
             self.resets += 1
+        if self.opts.desperate_level:
+            # desperate_level: desperation by the level's own clock, turns spent on it (Level.turns_here) -- counted
+            # from the first arrival, a level re-entered had been "stalled" the whole time away: desperate at once.
+            # The obstacle reset above keeps its old timing (desperate_time, which moved both, lost -1027)
+            stall, age = lv.turns_here - lv.progress_here, lv.turns_here
+        else:
+            age = t - lv.entered_turn
         if not lv.desperate and (stall > 1500 or (age > 2500 and
                                                  not (self.kinds(lv) == G.DOWNSTAIR).any())):
             lv.desperate = True

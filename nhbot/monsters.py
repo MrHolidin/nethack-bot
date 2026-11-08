@@ -79,8 +79,6 @@ SWARMERS = {"killer bee", "soldier ant", "fire ant", "giant ant"}
 ELB_IGNORE_NAMES = {"minotaur", "shopkeeper", "guard", "watchman", "watch captain", "aligned priest",
                     "high priest", "Oracle"}
 
-VALK_RANKS = {"stripling", "skirmisher", "fighter", "man-at-arms", "woman-at-arms", "warrior",
-              "swashbuckler", "hero", "heroine", "champion", "lord", "lady"}
 
 def permonst_of(g):
     m = nh.glyph_to_mon(int(g))

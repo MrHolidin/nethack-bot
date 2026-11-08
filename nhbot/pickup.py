@@ -296,16 +296,15 @@ class PickupMixin:
     # ------------------------------------------------------------------ the menu
     def pickup(self, want, site):
         """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
-        without a menu). Returns "menu", or "lone" when there was no menu; safe_pickup: "none" when it pressed
-        nothing (a lone item want rejects)."""
-        if self.opts.safe_pickup:
-            want = self.touch_safe(want)
-            here = self.look_here()            # ':' costs no game time
-            if len(here) == 1 and not want(here[0]):
-                # pickup.c:869 query_objlist AUTOSELECT_SINGLE: one object here is taken without a menu, whatever
-                # it is -- a cockatrice corpse killed us so
-                self.pickup_stats["lone_refused"] += 1
-                return "none"
+        without a menu). Returns "menu", or "lone" when there was no menu; "none" when it pressed nothing (a lone
+        item want rejects). The square is read first (':' costs no game time): pickup.c:869 query_objlist
+        AUTOSELECT_SINGLE takes one object here without a menu, whatever it is -- a cockatrice corpse killed us so.
+        A/B safe_pickup (1000 games, 79000..): +386 [-312, +1103], median 7777 -> 7850."""
+        want = self.touch_safe(want)
+        here = self.look_here()
+        if len(here) == 1 and not want(here[0]):
+            self.pickup_stats["lone_refused"] += 1
+            return "none"
         seq0 = self.msg_seq
         self.lift_want = want                  # lift_heavy: a lone item lifted into Burdened, if want takes it
         self.press(",", expect_prompt=True)

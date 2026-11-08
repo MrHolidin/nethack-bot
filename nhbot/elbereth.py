@@ -9,11 +9,9 @@ import re
 import nle.nethack as nh
 
 from nhbot import elb_rules as ELB
-from nhbot import glyphs as G
-from nhbot.consts import ENGRAVE_REFUSED_CMAP, NO_ENGRAVE_CMAP
+from nhbot.consts import NO_ENGRAVE_CMAP
 from nhbot.messages import ELB_WIPED_RE
-from nhbot.monsters import (ELB_IGNORE_NAMES, M1_NOHANDS, PM_BY_NAME, PM_INDICES, S_ANGEL, S_HUMAN, SWARMERS,
-                            VALK_RANKS)
+from nhbot.monsters import ELB_IGNORE_NAMES, M1_NOHANDS, PM_BY_NAME, PM_INDICES, S_ANGEL, S_HUMAN, SWARMERS
 
 _HANDLESS = {}                     # polymorph form name -> handless (permonst lookup is slow for were forms)
 
@@ -53,12 +51,13 @@ class ElberethMixin:
         return found[-1] if found else ""
 
     def poly_form(self):
-        """Name of the form we are polymorphed into (the status line shows it instead of the rank), else None."""
-        line = bytes(self.obs["tty_chars"][22]).decode("latin1")
-        m = re.match(r"\S+ the (.+?)\s{2,}St:", line)
-        if not m or m.group(1).lower() in VALK_RANKS:
+        """Name of the form we are polymorphed into, else None. Polymorphed, the second status line shows "HD:n"
+        instead of "Xp:n/m" (botl.c bot2: Upolyd) and the first the form instead of the rank title -- any role's
+        (a Valkyrie-only rank list took every other role's title for a handless form: no Elbereth)."""
+        if not re.search(r"\bHD:\d", bytes(self.obs["tty_chars"][23]).decode("latin1")):
             return None
-        return m.group(1).lower()
+        m = re.match(r"\S+ the (.+?)\s{2,}St:", bytes(self.obs["tty_chars"][22]).decode("latin1"))
+        return m.group(1).lower() if m else None
 
     def handless(self):
         """Polymorphed into a form that can't wear or wield (nohands / very small: do_wear.c, wield.c)."""
@@ -77,8 +76,7 @@ class ElberethMixin:
         counts: an item lying on an altar hides it, and Elbereth "written" on an altar angers its god
         (engrave.c altar_wrath) and writes nothing."""
         g = int(self.terrain_glyphs(lv)[self.pos()])
-        if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in (ENGRAVE_REFUSED_CMAP if self.opts.engrave_more
-                                                           else NO_ENGRAVE_CMAP):
+        if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in NO_ENGRAVE_CMAP:
             return False
         return not self.handless()
 
@@ -108,11 +106,9 @@ class ElberethMixin:
         return bool(bl)
 
     def elb_can_write(self, lv):
-        """Engraving is possible here and now: square, hands, not the square that just failed, not stairs,
+        """Engraving is possible here and now: square, hands, not the square that just failed,
         not levitating / blind / stunned / confused."""
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
-            return False
-        if self.kinds(lv)[self.pos()] in (G.UPSTAIR, G.DOWNSTAIR) and not self.opts.engrave_more:
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & nh.BL_MASK_HALLU:
