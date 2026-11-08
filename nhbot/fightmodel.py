@@ -1,5 +1,6 @@
-"""fight_model2: the parts of the melee model that danger.py's simulator does not have, as plain functions (NetHack
-3.6.6; calibrated against the true game state on real games, scratchpad zi/fight_calib.py):
+"""fight_model2: the parts of the melee model beyond the plain attack dice, as plain functions danger.py (the danger
+estimate, win_prob) and focus.py use (NetHack 3.6.6; calibrated against the true game state on real games,
+scratchpad zi/fight_calib.py):
 
   * monster spells (mcastu.c castmu): which spell a caster of level ml picks, the damage it does, how often it can cast;
   * negative AC: every hit's damage less rnd(-AC), at least 1 (mhitu.c:1696-1703);

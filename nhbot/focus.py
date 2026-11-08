@@ -103,7 +103,7 @@ class FocusMixin:
         """focus_score's parts for the hostile at pos: P(our blow hits) and its damage pmf (danger our_hit_prob /
         our_damage_pmf with our weapon skill), our hits on it (focus.hits), its HP left (the newmonhp prior of its
         adj_level -- golems their fixed HP -- after those hits: fightmodel.remaining_hp), the game turns we need to
-        kill it (fightmodel.hits_to_kill / P(hit), at our_speed), the damage it deals per turn (monster_round model2:
+        kill it (fightmodel.hits_to_kill / P(hit), at our_speed), the damage it deals per turn (monster_round:
         negative AC, its weapon or none, spells; an instant death as all our HP). An unseen one ('I'): the HP unseen
         attackers took per turn lately (focus.unseen) over a typical monster of the level's kill time
         (fightmodel.unseen_level / typical_monster). None for a name we know nothing of."""
@@ -128,7 +128,7 @@ class FocusMixin:
             dpt = sum(d for _, d in self.focus.unseen) / UNSEEN_WINDOW if self.focus.unseen else 0.0
             inst = 0.0
         else:
-            rnd, inst = self.monster_round(name, model2=True, hurt=hits > 0)
+            rnd, inst = self.monster_round(name, hurt=hits > 0)
             dpt = float((np.arange(len(rnd)) * rnd).sum()) + inst * self.bl(nh.NLE_BL_HP)
         return {"p": p, "dmg": float((np.arange(len(dmg)) * dmg).sum()), "hits": hits,
                 "rem": float((np.arange(len(left)) * left).sum()), "ttk": ttk, "dpt": dpt, "inst": inst, "lev": lev,

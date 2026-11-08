@@ -59,9 +59,9 @@ MON_BREATHES_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) breathes ")
 # KILL_RE (combat.msg_combat: the kill count) -- a space after the verb; KILLED_RE: the name of what we killed
 KILL_RE = re.compile(r"You (kill|destroy) ")
 KILLED_RE = re.compile(r"You (?:kill|destroy) (?:the |an? )?(.+?)!")
-# KILL_WORD_RE (danger.danger_msg: our hits on it forgotten) -- word boundaries instead of the space
+# KILL_WORD_RE (focus.focus_note: our hits on it forgotten) -- word boundaries instead of the space
 KILL_WORD_RE = re.compile(r"\bYou (?:kill|destroy)\b")
-# OUR_HIT_RE (danger.danger_msg: hit_seen) -- a melee blow of ours that landed
+# OUR_HIT_RE (focus.focus_note: our hits on it counted) -- a melee blow of ours that landed
 OUR_HIT_RE = re.compile(r"\bYou (?:hit|smite|strike|bite|kick|butt|sting|touch)\b")
 # ELB_WIPED_RE (elbereth.msg_elbereth): a blow of ours, landed or not, or a kill -- it scuffs the Elbereth under us
 #   (uhitm.c u_wipe_engr) -- or mon.c setmangry erased it
