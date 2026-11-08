@@ -62,6 +62,9 @@ DEFAULTS = {
                                #      terrain layer: a staircase under an item is a staircase (mapmem.note_feature_here)
     "engulf_memory": False,    # A/B: the map memory is not written while engulfed (the blank screen wiped the level's
                                #      memory, its terrain layer too) (mapmem.update_memory)
+    "look_under": False,       # A/B: no way down known, nothing left to explore: stand once on every item / statue square
+                               #      before searching -- the staircase may be under it (explore.look_under_step; reads
+                               #      "There is a staircase down here." as feature_here does; a statue hides terrain)
     "drink_prompt": False,     # A/B: 'q' on a fountain / sink answers "Drink from the fountain?" 'n' and goes on to the
                                #      potion question -- the heal / quaff_test steps typed the potion letter into it
                                #      (game.ask_drink)

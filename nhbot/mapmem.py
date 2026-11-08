@@ -198,6 +198,8 @@ class MapMixin:
         k = G.KIND[lv.under]
         tk = G.KIND[lv.terrain]
         hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
+        if self.opts.look_under:
+            hidden |= G.STATUE_GLYPH[lv.under] & G.IS_TERRAIN[tk]     # look_under: a statue hides it too
         if hidden.any():
             # nothing lies on a closed door: an item there means it was opened or broken since we saw it
             tk = np.where(tk == G.DOOR_CLOSED, G.DOOR_OPEN, tk)
@@ -373,7 +375,7 @@ class MapMixin:
         terrain layer under us: an
         item on a staircase hid it -- kinds read the item, and the level stayed "no way down" for thousands of turns
         searching (79337, 79099, 79276: the true down staircase under an item we had stood on)."""
-        if not self.opts.feature_here:
+        if not (self.opts.feature_here or self.opts.look_under):
             return
         lv = self.levels.get((self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)))
         if lv is None:
