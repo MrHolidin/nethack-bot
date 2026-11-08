@@ -26,6 +26,7 @@ class ActionsMixin:
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
         self.last_attack_target = target
         self.attack_turn = self.turn()           # danger: the monster we hit first may not act
+        self.attack_step = self.steps            # after 'F' NLE still shows the last message: logged again then
         self.last_move_target = None
         self.press("F")
         self.press(key)

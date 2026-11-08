@@ -24,6 +24,10 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "fight_model2": False,     # A/B: focus fire (several hostiles next to us) scored by focus.fm2_parts -- danger's
+                               #      model where it matched the true game state, fixed where not: spells, negative AC,
+                               #      unarmed weapon users, our weapon skill, HP left and kill time after our hits, an
+                               #      unseen attacker by the HP it took (nhbot.fightmodel)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
