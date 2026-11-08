@@ -28,12 +28,11 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
-from nhbot.focus import str_dbon, to_hit_abon
 from nhbot.items import base_name, erosion
 from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_REGEN, PM_BY_NAME, PM_INDEX, PM_INDICES
-from nhbot.weapondice import WEAPON_DICE, WEAPON_SKILL, skill_dmg_bonus, skill_hit_bonus
+from nhbot.weapondice import WEAPON_DICE, WEAPON_SKILL, skill_dmg_bonus, skill_hit_bonus, str_dbon, to_hit_abon
 from nhbot.rays import RAY_RESIST, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}

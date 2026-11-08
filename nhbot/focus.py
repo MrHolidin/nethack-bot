@@ -20,7 +20,7 @@ import numpy as np
 
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import PM_BY_NAME
-from nhbot.weapondice import WEAPON_DICE
+from nhbot.weapondice import WEAPON_DICE, str_dbon, to_hit_abon
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "TENT", "WEAP"}
 NO_DAMAGE_AD = {"SSEX", "SEDU", "SGLD", "SITM", "STCK", "STON"}   # steal/seduce/stick: no HP damage
@@ -71,25 +71,6 @@ def expected_remaining_hp(level, dealt):
     if z <= 1e-9:
         return 1.0                       # tougher than the prior allows (grown / higher level): ~1 hit left
     return sum((h - dealt) * p for h, p in alive.items()) / z
-
-
-def str_dbon(s):
-    if s < 6: return -1
-    if s < 16: return 0
-    if s < 18: return 1
-    if s == 18: return 2
-    if s <= 18 + 75: return 3
-    if s <= 18 + 90: return 4
-    if s < 18 + 100: return 5
-    return 6
-
-
-def to_hit_abon(s, dex, xl):
-    sb = -2 if s < 6 else -1 if s < 8 else 0 if s < 17 else 1 if s <= 18 + 50 else 2 if s < 18 + 100 else 3
-    if xl < 3:
-        sb += 1
-    db = -3 if dex < 4 else -2 if dex < 6 else -1 if dex < 8 else 0 if dex < 14 else dex - 14
-    return sb + db
 
 
 class FocusMixin:
