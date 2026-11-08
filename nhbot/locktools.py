@@ -17,10 +17,20 @@ LOCK_RE = re.compile(r"\b(skeleton key|key|lock pick|credit card)s?\b", re.I)
 LOCK_TRIES = 3                 # attempts (up to 50 turns each) at one door or box before the old ways
 
 
+class LockToolState:
+    """State of unlocking boxes with tools (LockToolMixin)."""
+    def __init__(self):
+        self.tries = Counter()           # (level key, square) -> unlocking attempts there
+        self.stats = Counter()
+
+
 class LockToolMixin:
     def lock_init(self):
-        self.lock_tries = Counter()      # (level key, square) -> unlocking attempts there
-        self.lock_stats = Counter()
+        self.lock = LockToolState()
+
+    def lock_summary(self):
+        """Game summary entries."""
+        return {"lock_tools": dict(self.lock.stats)}
 
     @staticmethod
     def lock_rank(text):
@@ -43,35 +53,35 @@ class LockToolMixin:
         old ways (kick, or the door stays shut)."""
         it = self.lock_tool()
         key = (lv.key, target)
-        if it is None or self.lock_tries[key] >= LOCK_TRIES or target in lv.watch_warned \
+        if it is None or self.lock.tries[key] >= LOCK_TRIES or target in lv.watch_warned \
                 or (self.is_minetown(lv) and not self.is_orctown(lv)):
             return False
         y, x = self.pos()
-        self.lock_tries[key] += 1
-        self.lock_stats["door_try"] += 1
+        self.lock.tries[key] += 1
+        self.lock.stats["door_try"] += 1
         said = self.lock_apply(it, DELTA2KEY[(target[0] - y, target[1] - x)])
         if "You succeed in" in said or "Lock it?" in said or "no door" in said or "is broken" in said \
                 or "open door" in said:                       # lock.c: "unlocking the door" / "picking the lock"
             lv.locked.discard(target)
-            self.lock_stats["door_open"] += 1
+            self.lock.stats["door_open"] += 1
         elif "stop picking that lock" in said or "under arrest" in said:
             lv.watch_warned.add(target)
             self.no_entry_mark(lv, target)
-            self.lock_stats["door_warned"] += 1
+            self.lock.stats["door_warned"] += 1
         return True
 
     def lock_box_step(self, key):
         """box_step, a locked box under us: unlock it with the tool. True if it used the turn; False: #force /
         kick as before."""
         it = self.lock_tool()
-        if it is None or self.lock_tries[key] >= LOCK_TRIES:
+        if it is None or self.lock.tries[key] >= LOCK_TRIES:
             return False
-        self.lock_tries[key] += 1
-        self.lock_stats["box_try"] += 1
+        self.lock.tries[key] += 1
+        self.lock.stats["box_try"] += 1
         self.cur_act = "box"
         said = self.lock_apply(it, None)
         if "You succeed in" in said:
-            self.lock_stats["box_open"] += 1
+            self.lock.stats["box_open"] += 1
         return True
 
     def lock_apply(self, it, dirkey):

@@ -13,14 +13,29 @@ OPENERS = ("dagger", "knife", "stiletto", "athame", "crysknife")   # opens tins,
 THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
 
 
-class WeaponsMixin:
-    def weapons_init(self):
+class WeaponsState:
+    """State of wielding: the main weapon and dagger swaps (WeaponsMixin)."""
+    def __init__(self):
         self.main_weapon = None
         self.rewields = 0
-        self._wield_tried = set()      # wield candidates already tried
+        self.wield_tried = set()       # wield candidates already tried
         self.swapped_for = None        # "tin" / "box": a dagger swapped in for that job
         self.swap_main = None          # the letter to wield back after it ('w'); None: 'x' swaps back
         self.swap_welded = 0           # swap_in put a cursed dagger in our hands
+
+
+class WeaponsMixin:
+    def weapons_init(self):
+        self.weapons = WeaponsState()
+
+    def weapons_summary(self):
+        """Game summary entries."""
+        return {"rewields": self.weapons.rewields}
+
+    def wield_forget(self, names):
+        """Wield candidates with these bare names may be tried again (weapon_upgrade tries each once: a lost one
+        may come back)."""
+        self.weapons.wield_tried = {(l, t) for l, t in self.weapons.wield_tried if base_name(t)[2] not in names}
 
     def dagger_alternate(self):
         """The alternate weapon, if it is a dagger / knife (not known cursed); else None."""
@@ -32,30 +47,30 @@ class WeaponsMixin:
     def swap_in(self, job, it=None):
         """A dagger into our hands for job (swap_back undoes it): the alternate weapon with 'x', another one
         with 'w' (the main weapon is wielded back after)."""
-        self.swapped_for = job
+        self.weapons.swapped_for = job
         self.cur_act = job
         if it is None or it.alternate:
-            self.swap_main = None
+            self.weapons.swap_main = None
             self.press("x")
             return
         main = next((i for i in self.items() if i.wielded), None)
-        self.swap_main = main.letter if main is not None else None
+        self.weapons.swap_main = main.letter if main is not None else None
         seq0 = self.msg_seq
         self.wield(it.letter)
         if "welded" in self.text_since(seq0):
-            self.swap_welded += 1             # a cursed one: stuck with it until uncursed (weapon_upgrade can't)
-            self.swapped_for = None
+            self.weapons.swap_welded += 1             # a cursed one: stuck with it until uncursed (weapon_upgrade can't)
+            self.weapons.swapped_for = None
 
     def swap_back(self, job=None):
         """Back to the main weapon after a swap_in (for job, or any). True if it used the turn."""
-        if self.swapped_for is None or (job is not None and self.swapped_for != job):
+        if self.weapons.swapped_for is None or (job is not None and self.weapons.swapped_for != job):
             return False
-        self.cur_act = self.swapped_for
-        self.swapped_for = None
-        if self.swap_main is None:
+        self.cur_act = self.weapons.swapped_for
+        self.weapons.swapped_for = None
+        if self.weapons.swap_main is None:
             self.press("x")
-        elif any(it.letter == self.swap_main for it in self.items()):
-            self.wield(self.swap_main)
+        elif any(it.letter == self.weapons.swap_main for it in self.items()):
+            self.wield(self.weapons.swap_main)
         return True
 
     def wield(self, letter):
@@ -67,9 +82,9 @@ class WeaponsMixin:
         (main_weapon: its base name); before that nothing is wielded here."""
         inv = self.inventory()
         wielded = [it.text for it in self.items() if it.wielded]
-        if self.main_weapon is None:
+        if self.weapons.main_weapon is None:
             if wielded:
-                self.main_weapon = base_name(wielded[0])[2]
+                self.weapons.main_weapon = base_name(wielded[0])[2]
             return False
         return self.weapon_upgrade(inv)
 
@@ -101,7 +116,7 @@ class WeaponsMixin:
         cur = cur_it.text if cur_it else None
         if cur_it is not None and cur_it.cursed:
             return False
-        tried = self._wield_tried
+        tried = self.weapons.wield_tried
         cands = [(self.weapon_rank(it.text), it.letter, it.text) for it in items
                  if it.ocls == nh.WEAPON_CLASS and not it.held and not it.cursed
                  and not re.search(r"\b(arrows?|bolts?|ya|darts?|shuriken|bows?|crossbows?|yumi|sling)\b", it.text)
@@ -119,6 +134,6 @@ class WeaponsMixin:
         if "Don't be ridiculous" in self.text_since(seq0):
             self.polyd = True                # a form we failed to notice; retry after "You return to ... form"
             return True
-        self._wield_tried = tried | {(l, s)}
-        self.rewields += 1
+        self.weapons.wield_tried = tried | {(l, s)}
+        self.weapons.rewields += 1
         return True

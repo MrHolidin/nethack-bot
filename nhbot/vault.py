@@ -94,7 +94,7 @@ class VaultMixin:
 
     def vault_rob_ready(self):
         """In a vault, a way to dig, the floor here not refused (answer_guard: the guard is told "Croesus" then)."""
-        return self.cur_key not in self.dig_refused and self.vault_box() is not None \
+        return self.cur_key not in self.digging.refused and self.vault_box() is not None \
             and self.dig_means() is not None
 
     def answer_guard(self):
@@ -116,13 +116,13 @@ class VaultMixin:
             return self.vault_walk_out(lv)
         if box is None:
             self.vault.since = None
-            return self.vault.plan is None and self.dig_job is None and self.dig_unwield()
+            return self.vault.plan is None and self.dig_through.job is None and self.dig_unwield()
         if self.vault.plan is not None and self.vault.plan["key"] == lv.key:
             self.vault.done.add(lv.key)               # vault_find: the tunnel is through
             self.vault.out = (lv.key, self.vault.plan["start"])
             self.vault.plan = None
             self.vault.stats["tunnel_in"] += 1
-        if hostiles and any(n != "guard" for _, n in hostiles) or lv.key in self.dig_refused:
+        if hostiles and any(n != "guard" for _, n in hostiles) or lv.key in self.digging.refused:
             return False
         means = self.dig_means()
         if means is None:
@@ -203,7 +203,7 @@ class VaultMixin:
 
     def dig_note(self, lv, msgs):
         if "too hard to" in msgs or "cannot reach the" in msgs:
-            self.dig_refused.add(lv.key)
+            self.digging.refused.add(lv.key)
             self.vault.stats["refused"] += 1
         if "You dig a hole through" in msgs or "fall through" in msgs:
             self.vault.stats["dug_out"] += 1
@@ -301,7 +301,7 @@ class VaultMixin:
         if hostiles_in_view or lv.key in self.vault.done or lv.key[0] != 0:
             return False
         means = self.dig_means()
-        if means is None or lv.key in self.dig_refused:
+        if means is None or lv.key in self.digging.refused:
             return False
         if self.bl(nh.NLE_BL_HUNGER) >= WEAK or self.hp_below(self.opts.vault_dig_hp):
             return False

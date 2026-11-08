@@ -536,7 +536,7 @@ class CombatMixin:
         mines = bool(lv.key and lv.key[0] == 2)
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
-            self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
+            self.wandid.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
         prot = self.our_resists()
         our_p = zap_hit_prob(self.bl(nh.NLE_BL_AC))
         reflect = "reflection" in prot
@@ -605,7 +605,7 @@ class CombatMixin:
                           mines=bool(lv.key and lv.key[0] == 2))
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
-            self.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
+            self.wandid.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
         harm = ray_harm("death" if maybe_death else kind, self.our_resists(), self.bl(nh.NLE_BL_HP))
         return p, harm
 

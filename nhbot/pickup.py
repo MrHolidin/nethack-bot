@@ -93,15 +93,21 @@ def floor_kind(text):
 LIFT_UNDO_TURNS = 30     # lift_heavy: turns after a pick-up into Burdened its drops are watched (lift_undo)
 
 
-class PickupMixin:
-    def pickup_init(self):
+class PickupState:
+    """State of picking things up (PickupMixin)."""
+    def __init__(self):
         self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
-        self.pickup_stats = Counter()  # why things were taken / refused
-        self._take_food = None         # the food count, frozen while one pickup is judged
+        self.stats = Counter()         # why things were taken / refused
+        self.take_food = None          # the food count, frozen while one pickup is judged
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
         self.food_picked = 0           # food stacks taken from piles (armor_pickup_here)
+
+
+class PickupMixin:
+    def pickup_init(self):
+        self.pick = PickupState()
 
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
@@ -128,9 +134,9 @@ class PickupMixin:
 
     def take_reason_kind(self, text, worn=None):
         """take_reason before the letter count."""
-        if "for sale" in text or base_name(text)[2] in self.never_take:
+        if "for sale" in text or base_name(text)[2] in self.pick.never_take:
             return None
-        food_n = self._take_food if self._take_food is not None else self.food_count()
+        food_n = self.pick.take_food if self.pick.take_food is not None else self.food_count()
         ocls, typ = floor_kind(text)
         cursed = bool(CURSED_RE.search(text))
         reason = None
@@ -217,11 +223,11 @@ class PickupMixin:
             return False
         for r in reasons:
             if r:
-                self.pickup_stats[r] += 1
-                self.carry_stats["picked"] += r in ("carry", "missile", "weapon")
-                self.food_picked += r == "food"
+                self.pick.stats[r] += 1
+                self.carry.stats["picked"] += r in ("carry", "missile", "weapon")
+                self.pick.food_picked += r == "food"
         self.take_here(lambda t: self.take_reason(t, worn) is not None, "pile")
-        self.equip_events.append((self.turn(), "pickup", ",".join(n for n, r in zip(names, reasons) if r)))
+        self.equip.events.append((self.turn(), "pickup", ",".join(n for n, r in zip(names, reasons) if r)))
         return True
 
     def pickup_all(self):
@@ -232,8 +238,8 @@ class PickupMixin:
         def want(t):
             if "for sale" in t:
                 return False
-            if base_name(t)[2] in self.stolen_names:
-                self.pickup_stats["loot_stolen"] += 1
+            if base_name(t)[2] in self.pick.stolen_names:
+                self.pick.stats["loot_stolen"] += 1
                 return True
             return self.take_reason(t) is not None
         self.take_here(want, "loot")
@@ -254,7 +260,7 @@ class PickupMixin:
         """Pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it
         straight back down if want rejects it."""
         seq0 = self.msg_seq
-        self._take_food = self.food_count()    # judged as before the pickup
+        self.pick.take_food = self.food_count()    # judged as before the pickup
         try:
             how = self.pickup(want, site)
             lone = None
@@ -265,9 +271,9 @@ class PickupMixin:
                         break
             bad = lone is not None and not want(lone.group(2))
         finally:
-            self._take_food = None
+            self.pick.take_food = None
         if bad:
-            self.pickup_stats["lone_dropped"] += 1
+            self.pick.stats["lone_dropped"] += 1
             self.drop_units(lone.group(1))
 
     # ------------------------------------------------------------------ the square
@@ -305,15 +311,15 @@ class PickupMixin:
         want = self.touch_safe(want)
         here = self.look_here()
         if len(here) == 1 and not want(here[0]):
-            self.pickup_stats["lone_refused"] += 1
+            self.pick.stats["lone_refused"] += 1
             return "none"
         seq0 = self.msg_seq
-        self.lift_want = want                  # lift_heavy: a lone item lifted into Burdened, if want takes it
+        self.pick.lift_want = want                  # lift_heavy: a lone item lifted into Burdened, if want takes it
         self.press(",", expect_prompt=True)
         tty = self.tty_text()
         if "Pick up what?" not in tty:
             self.settle()
-            self.lift_want = None
+            self.pick.lift_want = None
             for t in self.msgs_since(seq0):
                 mm = re.match(r"^[a-zA-Z] - (.+?)\.?$", t)
                 if mm and not want(mm.group(1)):
@@ -321,10 +327,10 @@ class PickupMixin:
             return "lone"
         if re.search(r"\(1 of \d+\)", tty):
             self.msg_audit["pickup_multipage_" + site] += 1
-        self.lift_want = lambda t: True        # what the menu selected is what want took
+        self.pick.lift_want = lambda t: True        # what the menu selected is what want took
         self.menu_pick("Pick up what?", want)
         self.settle()
-        self.lift_want = None
+        self.pick.lift_want = None
         return "menu"
 
     def touch_safe(self, want):
@@ -338,16 +344,16 @@ class PickupMixin:
         """lift_heavy: it, the next thing the drop step would shed, while we are Burdened after letting a pick-up
         through -- worth as much per weight as what we lifted, or more (our weight estimate missed: more has to
         go than worth_taking reckoned): the lifted thing goes instead. it otherwise."""
-        if self.lift_last is None or self.turn() - self.lift_last[1] > LIFT_UNDO_TURNS:
-            self.lift_last = None
+        if self.pick.lift_last is None or self.turn() - self.pick.lift_last[1] > LIFT_UNDO_TURNS:
+            self.pick.lift_last = None
             return it
-        lifted = next((x for x in inv if floor_kind(x.text)[1] == self.lift_last[0]), None)
+        lifted = next((x for x in inv if floor_kind(x.text)[1] == self.pick.lift_last[0]), None)
         if lifted is None or lifted.letter == it.letter:
             return it
         if self.value_per_weight(it, same(it)) >= self.value_per_weight(lifted, same(lifted)):
-            self.lift_last = None
+            self.pick.lift_last = None
             k = "lift_heavy_undone"
-            self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
+            self.carry.stats[k] = self.carry.stats.get(k, 0) + 1
             return lifted
         return it
 
@@ -360,20 +366,20 @@ class PickupMixin:
             #                                   gold left lying had vault_rob / vault_exit walk back for it; out of
             #                                   the bag -- pickup.c out_container -- for the vault guard / a priest)
         mm = re.search(r"a little trouble lifting (.+?)\.\s+Continue\?", m)
-        want = self.lift_want
+        want = self.pick.lift_want
         if not (mm and want is not None):           # (A/B lift_heavy +248)
             return False
         name = mm.group(1)
-        tags = self.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for
+        tags = self.prices.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for
         texts = [name] + ["%s (for sale, %d zorkmids)" % (t, pr) for t, pr in tags.items() if t in name or name in t]
         ocls = floor_kind(name)[0]
         # worth_taking: worth more per weight than what the drop step sheds for it -- not only "carry" picks pass
         # it (armor to wear, food, weapons don't), and one that fails would be the first thing dropped again
         ok = any(want(t) for t in texts) and ocls is not None and self.worth_taking(ocls, name)
         if ok:
-            self.lift_last = (floor_kind(name)[1], self.turn())
+            self.pick.lift_last = (floor_kind(name)[1], self.turn())
         k = "lift_heavy_" + ("yes" if ok else "no")
-        self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
+        self.carry.stats[k] = self.carry.stats.get(k, 0) + 1
         return ok
 
     def pickup_matching(self, words, no_sale=False, own=False):

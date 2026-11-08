@@ -88,11 +88,21 @@ def neighbours8(y, x):
                 yield y + dy, x + dx
 
 
-class HiddenMixin:
-    def hidden_init(self):
+class HiddenState:
+    """State of searching for hidden passages (HiddenMixin)."""
+    def __init__(self):
         self.search_logged = set()       # search_log: level keys already logged
         self.search_log = []             # search_log: one record per level
         self.search_v2_stats = Counter()
+
+
+class HiddenMixin:
+    def hidden_init(self):
+        self.hidden = HiddenState()
+
+    def hidden_summary(self):
+        """Game summary entries."""
+        return {"search_log": self.hidden.search_log, "search_v2": dict(self.hidden.search_v2_stats)}
 
     # ------------------------------------------------------------------ the known map
     def known_rooms(self, lv):
@@ -220,15 +230,15 @@ class HiddenMixin:
         best = np.unravel_index(np.argmax(rate), rate.shape)
         if rate[best] < SEARCH_V2_MIN:
             return None
-        self.search_v2_stats["picked"] += 1
+        self.hidden.search_v2_stats["picked"] += 1
         return int(best[0]), int(best[1])
 
     # ------------------------------------------------------------------ search_log
     def search_log_note(self, lv, k_mem):
         """search_log: the first search on this level -- its candidates, labelled from the true map."""
-        if lv.key in self.search_logged:
+        if lv.key in self.hidden.search_logged:
             return
-        self.search_logged.add(lv.key)
+        self.hidden.search_logged.add(lv.key)
         from nhbot.truemap import SCORR, SDOOR, read_true_map   # experiments only
         tm = read_true_map(self.env)
         hidden = (tm.typ == SDOOR) | (tm.typ == SCORR)
@@ -238,7 +248,7 @@ class HiddenMixin:
             sq = c["squares"]
             recs.append(dict(c["f"], kind=c["kind"], hidden=int(any(hidden[p] for p in sq)),
                              on_way=int(any(p in way and hidden[p] for p in sq))))
-        self.search_log.append(dict(key=list(lv.key), turn=self.turn(), down=tm.down is not None,
+        self.hidden.search_log.append(dict(key=list(lv.key), turn=self.turn(), down=tm.down is not None,
                                     way_hidden=sum(1 for p in way if hidden[p]), cands=recs))
 
 

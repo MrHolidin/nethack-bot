@@ -189,11 +189,21 @@ TAG_RE = re.compile(r"(?:You see here |There (?:is|are) [^.;]*?here;? )?((?:an?|
 OFFER_RE = re.compile(r"offers (\d+) gold pieces? for your (.+?)\.\s+Sell (?:it|them)")
 
 
+class PriceState:
+    """State of price identification: price readings, shop tags (PriceMemoryMixin)."""
+    def __init__(self):
+        self.reads = {}              # appearance key -> {reading id: reading}
+        self.stats = {"buy": 0, "sell": 0}
+        self.for_sale = {}           # (level key, square) -> {floor text: price} from the tags read there
+
+
 class PriceMemoryMixin:
     def price_init(self):
-        self.price_reads = {}        # appearance key -> {reading id: reading}
-        self.price_stats = {"buy": 0, "sell": 0}
-        self.for_sale = {}           # (level key, square) -> {floor text: price} from the tags read there
+        self.prices = PriceState()
+
+    def price_summary(self):
+        """Game summary entries."""
+        return {"price_memory": dict(self.prices.stats, appearances=self.price_report())}
 
     def sucker(self):
         """Visible dunce cap or a shirt with nothing over it: shopkeepers add 1/3 to what we buy and offer a third
@@ -215,11 +225,11 @@ class PriceMemoryMixin:
         if qty is None:
             qty = base_name(text)[0]
         r = (kind, price, qty, self.bl(nh.NLE_BL_CHA), self.sucker())
-        bucket = self.price_reads.setdefault(key, {})
+        bucket = self.prices.reads.setdefault(key, {})
         if rid not in bucket:
             bucket[rid] = r
-            self.price_stats[kind] += 1
-            self.type_version += 1           # value.type_posterior reads the price readings
+            self.prices.stats[kind] += 1
+            self.value.type_version += 1           # value.type_posterior reads the price readings
 
     def price_note_text(self, text):
         """Any text with price tags (look_here lines, 'You see here ...' messages)."""
@@ -231,7 +241,7 @@ class PriceMemoryMixin:
             if m:
                 item, price = m.group(1).strip(), int(m.group(2))
                 self._record(item, "buy", price, ("buy", lk, self.pos(), item, price))
-                self.for_sale.setdefault((lk, self.pos()), {})[item] = price
+                self.prices.for_sale.setdefault((lk, self.pos()), {})[item] = price
 
     def price_note_offer(self, msg):
         if "offers only" in msg:
@@ -242,12 +252,12 @@ class PriceMemoryMixin:
         offer, item = int(m.group(1)), m.group(2).strip()
         shk = msg.split(" offers ")[0].split(".")[-1].strip()
         # "for your scrolls labeled X": the offer is for the whole stack, whose size the message omits
-        qty = self.last_drop_qty if re.search(r"\b(potions|scrolls|rings|wands|amulets|spellbooks|pairs)\b", item) else 1
+        qty = self.carry.last_drop_qty if re.search(r"\b(potions|scrolls|rings|wands|amulets|spellbooks|pairs)\b", item) else 1
         self._record(item, "sell", offer, ("sell", shk, item, offer, qty), qty)
 
     def price_posterior(self, key):
         """{type: probability} for an appearance, or None without (consistent) evidence."""
-        reads = list(self.price_reads.get(key, {}).values())
+        reads = list(self.prices.reads.get(key, {}).values())
         if not reads:
             return None
         post = {}
@@ -265,8 +275,8 @@ class PriceMemoryMixin:
 
     def price_report(self):
         out = {}
-        for key in self.price_reads:
+        for key in self.prices.reads:
             post = self.price_posterior(key)
             top = sorted((post or {}).items(), key=lambda x: -x[1])[:4]
-            out[f"{key[0]}:{key[1]}"] = {"n": len(self.price_reads[key]), "top": [(n, round(p, 3)) for n, p in top]}
+            out[f"{key[0]}:{key[1]}"] = {"n": len(self.prices.reads[key]), "top": [(n, round(p, 3)) for n, p in top]}
         return out

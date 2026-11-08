@@ -170,13 +170,19 @@ def describe(ocls, s):
     return {"qty": qty, "wt": max(wt, 1), "cost": cost, "unid": unid, "key": (ocls, app if unid else name)}
 
 
-class CarryMixin:
-    def carry_init(self):
+class CarryState:
+    """State of what we carry: drops, squeezes, carry statistics (CarryMixin)."""
+    def __init__(self):
         self.cant_drop = set()     # Item.key of items the game refused to drop (a cursed loadstone): never again
         self.squeeze_pending = None  # (level key, square) a diagonal squeeze refused for our weight (squeeze_step)
         self.squeeze_stats = Counter()
-        self.carry_stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
+        self.stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
         self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
+
+
+class CarryMixin:
+    def carry_init(self):
+        self.carry = CarryState()
 
     def carry_classes(self):
         return CARRY_CLASSES + MORE_CLASSES + (nh.WEAPON_CLASS, nh.SPBOOK_CLASS, nh.GEM_CLASS)
@@ -187,24 +193,24 @@ class CarryMixin:
         squeeze_step sheds a unit next tick, unless dig_through digs a corner instead. True if m said so."""
         if not (lv and self.last_move_target and "You are carrying too much to get through" in m):
             return False
-        self.squeeze_stats["refused"] += 1
+        self.carry.squeeze_stats["refused"] += 1
         if not self.dig_through_note(lv, self.pos(), self.last_move_target, "squeeze"):
-            self.squeeze_pending = (lv.key, self.last_move_target)
+            self.carry.squeeze_pending = (lv.key, self.last_move_target)
         return True
 
     def squeeze_step(self, lv):
         """The squeeze refused last tick on this level: drop one unit (nothing on the body); nothing left to shed --
         the squeeze stays shut (Level.blocked). True if it used the turn."""
-        if self.squeeze_pending is None:
+        if self.carry.squeeze_pending is None:
             return False
-        key, target = self.squeeze_pending
-        self.squeeze_pending = None
+        key, target = self.carry.squeeze_pending
+        self.carry.squeeze_pending = None
         if key != lv.key:
             return False
         if self.carry_drop_step(force=True, keep_body=True):
-            self.squeeze_stats["dropped"] += 1
+            self.carry.squeeze_stats["dropped"] += 1
             return True
-        self.squeeze_stats["nothing_to_drop"] += 1
+        self.carry.squeeze_stats["nothing_to_drop"] += 1
         self.no_entry_mark(lv, target)
         return False
 
@@ -219,10 +225,10 @@ class CarryMixin:
                 victim = self.slot_victim()
                 if victim is not None:
                     self.drop_units(victim.letter)
-                    self.carry_stats["slot_dropped"] = self.carry_stats.get("slot_dropped", 0) + 1
+                    self.carry.stats["slot_dropped"] = self.carry.stats.get("slot_dropped", 0) + 1
                     return True
             return False
-        inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.cant_drop
+        inv = [it for it in self.items() if it.ocls != nh.COIN_CLASS and it.key not in self.carry.cant_drop
                and not (keep_body and it.on_body) and not self.sac_carrying(it)]
         if not inv:
             return False
@@ -239,11 +245,11 @@ class CarryMixin:
                 if not self.take_off(a):
                     return False
             self.drop_units(it.letter)
-            self.carry_stats["dropped"][4] += 1
+            self.carry.stats["dropped"][4] += 1
             return True
         d = describe(it.ocls, it.text)
         self.drop_units(it.letter, 1 if d["qty"] > 1 else None)
-        self.carry_stats["dropped"][2 if self.is_unknown(it.ocls, it.text) else 3] += 1
+        self.carry.stats["dropped"][2 if self.is_unknown(it.ocls, it.text) else 3] += 1
         return True
 
     # ------------------------------------------------------------ what we keep

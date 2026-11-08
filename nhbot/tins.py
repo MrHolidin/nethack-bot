@@ -62,54 +62,60 @@ for _n in PM_BY_NAME:
         SINGULAR.setdefault(_p, _n)
 
 
+class TinState:
+    """State of opening and eating tins (TinMixin)."""
+    def __init__(self):
+        self.stats = Counter()
+        self.eaten_by = Counter()
+        self.glib_until = -1             # turn: our fingers are slippery until then
+        self.vomit_until = -1            # turn: vomiting until then
+        self.slipped = None              # (level key, square, name, turn) of the weapon the grease made us drop
+
+
 class TinMixin:
     def tins_init(self):
-        self.tin_stats = Counter()
-        self.tin_eaten_by = Counter()
-        self.tin_glib_until = -1         # turn: our fingers are slippery until then
-        self.tin_vomit_until = -1        # turn: vomiting until then
-        self.tin_slipped = None          # (level key, square, name, turn) of the weapon the grease made us drop
+        self.tin = TinState()
 
     def tin_glib(self):
-        return self.turn() < self.tin_glib_until
+        return self.turn() < self.tin.glib_until
 
     def tin_wait_step(self, lv):
         """No threat in view (the caller checks): wait out the slippery fingers / the vomiting of a tin, then
         pick up the weapon that slipped and wield it again. True if it used the turn."""
-        if self.turn() < max(self.tin_glib_until, self.tin_vomit_until):
+        if self.turn() < max(self.tin.glib_until, self.tin.vomit_until):
             self.cur_act = "tin_wait"
-            self.tin_stats["wait"] += 1
+            self.tin.stats["wait"] += 1
             self.press("s")
             return True
-        if self.tin_slipped is None:
+        if self.tin.slipped is None:
             return False
-        key, sq, name, t0 = self.tin_slipped
+        key, sq, name, t0 = self.tin.slipped
         mine = next((it for it in self.items() if base_name(it.text)[2] == name and not it.on_body), None)
         if mine is not None:
-            self.tin_slipped = None
+            self.tin.slipped = None
             if any(it.wielded for it in self.items()):
                 return False
-            self.tin_stats["rewielded"] += 1
+            self.tin.stats["rewielded"] += 1
             self.cur_act = "tin"
             self.wield(mine.letter)                     # the swapped state again: swap_back still applies
             return True
         if key != lv.key or self.turn() > t0 + RECOVER_TURNS:
-            self.tin_slipped = None
-            self.tin_stats["slip_lost"] += 1
+            self.tin.slipped = None
+            self.tin.stats["slip_lost"] += 1
             return self.swap_back("tin")
         if self.pos() != sq:
             mask = np.zeros(lv.under.shape, dtype=bool)
             mask[sq] = True
             if self.walk_to(lv, mask, max_cost=200, act="tin")[0] == "moved":
                 return True
-            self.tin_slipped = None
-            self.tin_stats["slip_lost"] += 1
+            self.tin.slipped = None
+            self.tin.stats["slip_lost"] += 1
             return self.swap_back("tin")
         self.cur_act = "tin"
         self.pickup(lambda t: base_name(t)[2] == name and "for sale" not in t, "tin")
         if not any(base_name(it.text)[2] == name for it in self.items()):
-            self.tin_slipped = None                     # not here after all
-            self.tin_stats["slip_lost"] += 1
+            self.tin.slipped = None                     # not here after all
+            self.tin.stats["slip_lost"] += 1
         return True
 
     def tin_letters(self):
@@ -150,9 +156,9 @@ class TinMixin:
                 gain = TIN_NUTRITION.get(what, 500)
                 if ok and self.nutrition + gain >= CHOKE:
                     ok = False
-                    self.tin_stats["too_full"] += 1
-                self.tin_stats["eaten" if ok else "refused"] += 1
-                self.tin_eaten_by[what] += ok
+                    self.tin.stats["too_full"] += 1
+                self.tin.stats["eaten" if ok else "refused"] += 1
+                self.tin.eaten_by[what] += ok
                 wielded = next((it for it in self.items() if it.wielded), None)
                 seq1 = self.msg_seq
                 self.press("y" if ok else "n")
@@ -164,7 +170,7 @@ class TinMixin:
                 continue
             break
         self.settle()
-        self.tin_stats["not_opened"] += 1              # interrupted, empty, or no prompt: try again later
+        self.tin.stats["not_opened"] += 1              # interrupted, empty, or no prompt: try again later
         return True
 
     def tin_eaten(self, what, gain, wielded, text):
@@ -173,11 +179,11 @@ class TinMixin:
         variety = m.group(1) if m else None
         if variety is not None:
             gain = VARIETY_NUT[variety]
-            self.tin_stats["v_" + variety.replace(" ", "_")] += 1
+            self.tin.stats["v_" + variety.replace(" ", "_")] += 1
         self.nutrition_add(gain)
         if variety == "rotten":
-            self.tin_vomit_until = self.turn() + VOMIT_TURNS
+            self.tin.vomit_until = self.turn() + VOMIT_TURNS
         if variety in GREASY or "very slippery" in text:
-            self.tin_glib_until = self.turn() + GLIB_TURNS
+            self.tin.glib_until = self.turn() + GLIB_TURNS
             if wielded is not None:
-                self.tin_slipped = (self.level().key, self.pos(), base_name(wielded.text)[2], self.turn())
+                self.tin.slipped = (self.level().key, self.pos(), base_name(wielded.text)[2], self.turn())

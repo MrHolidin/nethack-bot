@@ -18,9 +18,19 @@ SPE_OFFSET = 48                  # struct obj: nobj, v, cobj (8 each), o_id (4),
                                  # quan (8), spe
 
 
+class GiftState:
+    """State of the starting-inventory gift (GiftMixin)."""
+    def __init__(self):
+        self.stats = {}                  # name -> {"given", "held_end", "on_body_end", "first_on_body"}
+
+
 class GiftMixin:
     def gift_init(self):
-        self.gift_stats = {}             # name -> {"given", "held_end", "on_body_end", "first_on_body"}
+        self.gift = GiftState()
+
+    def gift_summary(self):
+        """Game summary entries."""
+        return {"gift": self.gift.stats}
 
     def gift_apply(self):
         gifts = self.opts.gift
@@ -41,7 +51,7 @@ class GiftMixin:
         for name in names:
             buf = ctypes.create_string_buffer(name.encode(), 256)    # readobjnam edits its buffer
             obj = lib.readobjnam(buf, None)
-            st = self.gift_stats.setdefault(name, {"given": 0, "held_end": False, "on_body_end": False,
+            st = self.gift.stats.setdefault(name, {"given": 0, "held_end": False, "on_body_end": False,
                                                    "first_on_body": None})
             if obj:
                 m = re.search(r"(?:^|\s)([+-]\d+)\s", name)
@@ -63,7 +73,7 @@ class GiftMixin:
         return all(w.rstrip("s") in text for w in words[-2:])
 
     def gift_check(self):
-        for name, st in self.gift_stats.items():
+        for name, st in self.gift.stats.items():
             held = [it for it in self.items() if self.gift_match(name, it.text)]
             st["held_end"] = bool(held)
             st["on_body_end"] = any(it.on_body for it in held)

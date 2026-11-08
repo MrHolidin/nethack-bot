@@ -12,14 +12,24 @@ from nhbot.nav import DELTA2KEY
 DIG_THROUGH_TRIES = 3          # applies / zaps at one square before it is given up
 
 
+class DigThroughState:
+    """State of digging through a squeeze or boulder (DigThroughMixin)."""
+    def __init__(self):
+        self.job = None                # (level key, stand square, square to dig, kind "squeeze" / "boulder", tries)
+        self.given_up = set()          # (level key, square to dig) that would not give way
+        self.stats = {}
+
+
 class DigThroughMixin:
     def dig_through_init(self):
-        self.dig_job = None            # (level key, stand square, square to dig, kind "squeeze" / "boulder", tries)
-        self.dig_given_up = set()      # (level key, square to dig) that would not give way
-        self.dig_stats = {}
+        self.dig_through = DigThroughState()
+
+    def dig_through_summary(self):
+        """Game summary entries."""
+        return {"dig_through": dict(self.dig_through.stats)}
 
     def dig_note_stat(self, k):
-        self.dig_stats[k] = self.dig_stats.get(k, 0) + 1
+        self.dig_through.stats[k] = self.dig_through.stats.get(k, 0) + 1
 
     def dig_through_note(self, lv, here, target, kind):
         """A squeeze from here to target refused for our weight, or the boulder on target that won't move:
@@ -41,9 +51,9 @@ class DigThroughMixin:
             if not corners:
                 return False
             sq = corners[0]
-        if (lv.key, sq) in self.dig_given_up or not (orcs or self.dig_ok(lv, sq)):
+        if (lv.key, sq) in self.dig_through.given_up or not (orcs or self.dig_ok(lv, sq)):
             return False
-        self.dig_job = (lv.key, here, sq, kind, 0)
+        self.dig_through.job = (lv.key, here, sq, kind, 0)
         self.dig_note_stat("planned_" + kind)
         return True
 
@@ -55,15 +65,15 @@ class DigThroughMixin:
     def dig_through_step(self, lv, hostiles):
         """dig_through: the job's square dug from where we stood when refused; once it gives way the way on is
         walked by explore as ever. True if it used the turn."""
-        job = self.dig_job
+        job = self.dig_through.job
         if job is None:
             return False
         key, here, sq, kind, tries = job
         if key != lv.key or self.pos() != here or hostiles:
-            self.dig_job = None                        # moved off (or a fight): explore meets it again if need be
+            self.dig_through.job = None                        # moved off (or a fight): explore meets it again if need be
             return False
         if self.is_minetown(lv) and not self.is_orctown(lv):
-            self.dig_job = None                        # known as Minetown only now (a watch warning): stop
+            self.dig_through.job = None                        # known as Minetown only now (a watch warning): stop
             self.dig_note_stat("town_stop")
             return False
         k = self.kinds(lv)
@@ -73,13 +83,13 @@ class DigThroughMixin:
             lv.blocked[sq] = False
             lv.fail[sq] = 0
             lv.no_entry[sq] = False
-            self.dig_job = None
+            self.dig_through.job = None
             self.dig_note_stat("opened_" + kind)
             return False
         means = self.dig_means()
         if means is None or tries >= DIG_THROUGH_TRIES:
-            self.dig_given_up.add((key, sq))
-            self.dig_job = None
+            self.dig_through.given_up.add((key, sq))
+            self.dig_through.job = None
             self.dig_note_stat("gave_up")
             if kind == "boulder":
                 self.no_entry_mark(lv, sq)
@@ -87,7 +97,7 @@ class DigThroughMixin:
         d = DELTA2KEY[(sq[0] - here[0], sq[1] - here[1])]
         self.cur_act = "dig_through"
         kind_m, it = means
-        self.dig_job = (key, here, sq, kind, tries + 1)
+        self.dig_through.job = (key, here, sq, kind, tries + 1)
         if kind_m == "wand":
             self.dig_note_stat("zap")
             self.zap(it.letter, d)
@@ -97,5 +107,5 @@ class DigThroughMixin:
         self.dig_note_stat("apply")
         msgs = self.apply_digger(it, d) or ""
         if "too hard to" in msgs:
-            self.dig_job = (key, here, sq, kind, DIG_THROUGH_TRIES)   # it won't give way: given up next tick
+            self.dig_through.job = (key, here, sq, kind, DIG_THROUGH_TRIES)   # it won't give way: given up next tick
         return True

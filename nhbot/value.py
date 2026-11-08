@@ -64,25 +64,31 @@ for _i in range(nh.NUM_OBJECTS):
         TYPE_PROB.setdefault((ord(_oc.oc_class), nh.OBJ_NAME(_oc)), _oc.oc_prob)
 
 
-class ValueMixin:
-    def value_init(self):
+class ValueState:
+    """State of item identification: known types, deductions, the posterior memo (ValueMixin)."""
+    def __init__(self):
         self.known_types = set()     # (class, name) seen identified in our inventory this game
-        self._known_inv = None       # the inventory note_known_types last read
+        self.known_inv = None        # the inventory note_known_types last read
         self.type_version = 0        # bumped whenever what type_posterior reads changes
         self.deduced = {}            # appearance key -> type worked out though the game did not name it (deduce_type)
-        self._post_memo = {}         # text -> (type_version, posterior)
+        self.post_memo = {}          # text -> (type_version, posterior)
+
+
+class ValueMixin:
+    def value_init(self):
+        self.value = ValueState()
 
     def note_known_types(self):
         inv = self.inventory()
-        if inv == self._known_inv:
+        if inv == self.value.known_inv:
             return                   # the same inventory adds nothing new
-        self._known_inv = inv
+        self.value.known_inv = inv
         for it in self.items():
             if appearance(it.text) is None and (it.ocls in RANDOM_CLASSES or it.ocls in (nh.ARMOR_CLASS, nh.TOOL_CLASS)):
                 key = describe(it.ocls, it.text)["key"]
-                if key in TYPE_PROB and key not in self.known_types:
-                    self.known_types.add(key)
-                    self.type_version += 1
+                if key in TYPE_PROB and key not in self.value.known_types:
+                    self.value.known_types.add(key)
+                    self.value.type_version += 1
 
     def type_posterior(self, text):
         """{type: probability} for an unidentified appearance, None for an identified item (or no look)."""
@@ -90,29 +96,29 @@ class ValueMixin:
         if key is None:
             return None
         self.note_known_types()
-        memo = self._post_memo.get(text)
-        if memo is not None and memo[0] == self.type_version:
+        memo = self.value.post_memo.get(text)
+        if memo is not None and memo[0] == self.value.type_version:
             return dict(memo[1])
         post = self._type_posterior(key)
-        self._post_memo[text] = (self.type_version, post)
+        self.value.post_memo[text] = (self.value.type_version, post)
         return dict(post)
 
     def deduce_type(self, ocls, key, name):
         """We worked out that an appearance is this type (quaff_test: restore ability doesn't name itself, potion.c
         unkn): its posterior is that type alone, and no other appearance is it."""
-        if self.deduced.get(key) != name:
-            self.deduced[key] = name
-            self.known_types.add((ocls, name))
-            self.type_version += 1
+        if self.value.deduced.get(key) != name:
+            self.value.deduced[key] = name
+            self.value.known_types.add((ocls, name))
+            self.value.type_version += 1
 
     def _type_posterior(self, key):
-        if key in self.deduced:
-            return {self.deduced[key]: 1.0}
-        cands = [n for n in candidates(key) if (_cls_of(n, key), n) not in self.known_types] or list(candidates(key))
-        engraved = self.wand_engraved.get(key)              # wandid: the engraving test narrowed the types
+        if key in self.value.deduced:
+            return {self.value.deduced[key]: 1.0}
+        cands = [n for n in candidates(key) if (_cls_of(n, key), n) not in self.value.known_types] or list(candidates(key))
+        engraved = self.wandid.wand_engraved.get(key)              # wandid: the engraving test narrowed the types
         if engraved:
             cands = [n for n in cands if n in engraved] or cands
-        reads = list(self.price_reads.get(key, {}).values())
+        reads = list(self.prices.reads.get(key, {}).values())
         for prior in (lambda n: TYPE_PROB.get((_cls_of(n, key), n), 0), lambda n: 1.0):
             post = {}
             for n in cands:
@@ -235,7 +241,7 @@ class ValueMixin:
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         cands = [(self.stack_value(it, same(it)), it) for it in self.items()
                  if it.ocls != nh.COIN_CLASS and not it.on_body and not it.alternate and not it.quivered
-                 and it.key not in self.cant_drop and not self.sac_carrying(it)
+                 and it.key not in self.carry.cant_drop and not self.sac_carrying(it)
                  and self.est_value(it, same(it)) < VALUE_MAX]
         return min(cands, key=lambda c: c[0])[1] if cands else None
 
@@ -275,7 +281,7 @@ class ValueMixin:
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         need = wt - free
         drop = sorted(((self.value_per_weight(it, same(it)), it) for it in self.items()
-                       if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.cant_drop),
+                       if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.carry.cant_drop),
                       key=lambda x: x[0])
         for v, it in drop:
             if v >= vpw:

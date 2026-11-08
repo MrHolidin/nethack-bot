@@ -83,12 +83,22 @@ def wear_name(it):
     return m.group(1).replace(" ", "_") if m else "unidentified"
 
 
+class JewelryState:
+    """State of identifying and wearing rings and amulets (JewelryMixin)."""
+    def __init__(self):
+        self.stats = Counter()
+        self.pay_fails = 0
+        self.refused = set()             # letters the game would not put on / take off
+        self.id_menu_open, self.id_picked = False, 0     # answer_identify_menu: pages of one menu
+
+
 class JewelryMixin:
     def jewelry_init(self):
-        self.jewelry_stats = Counter()
-        self.pay_fails = 0
-        self.jewelry_refused = set()     # letters the game would not put on / take off
-        self.id_menu_open, self.id_picked = False, 0     # answer_identify_menu: pages of one menu
+        self.jewel = JewelryState()
+
+    def jewelry_summary(self):
+        """Game summary entries."""
+        return {"jewelry": dict(self.jewel.stats)}
 
     # ------------------------------------------------------------ what we have
     def unknown_jewelry(self):
@@ -139,13 +149,13 @@ class JewelryMixin:
             on = [it for it in items if it.ocls == ocls and (it.worn or it.ring_on)]
             cands = [(wear_rank(it), it) for it in items
                      if it.ocls == ocls and not it.on_body and not it.cursed and not it.unpaid
-                     and wear_rank(it) is not None and it.letter not in self.jewelry_refused
+                     and wear_rank(it) is not None and it.letter not in self.jewel.refused
                      and not is_regen(it)]                                  # regen_step's ring
             if not cands:
                 continue
             rank, best = min(cands, key=lambda c: c[0])
             if len(on) >= slots:
-                free = [it for it in on if not it.cursed and it.letter not in self.jewelry_refused
+                free = [it for it in on if not it.cursed and it.letter not in self.jewel.refused
                         and not is_regen(it)]
                 if not free:
                     continue
@@ -164,18 +174,18 @@ class JewelryMixin:
         if self.polyd or self.handless():
             return False
         rings = [it for it in self.items() if it.ocls == nh.RING_CLASS]
-        regen = [it for it in rings if is_regen(it) and it.letter not in self.jewelry_refused]
+        regen = [it for it in rings if is_regen(it) and it.letter not in self.jewel.refused]
         if not regen:
             return False
         full = self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX)
         on = [it for it in regen if it.ring_on]
         if full and on:
-            self.jewelry_stats["regen_off"] += 1
+            self.jewel.stats["regen_off"] += 1
             return self.jewelry_remove(on[0])
         if not full and not on and sum(it.ring_on for it in rings) < 2:
             off = [it for it in regen if not it.cursed and not it.unpaid]
             if off:
-                self.jewelry_stats["regen_on"] += 1
+                self.jewel.stats["regen_on"] += 1
                 return self.jewelry_put_on(off[0])
         return False
 
@@ -187,14 +197,14 @@ class JewelryMixin:
         else:
             self.settle()
         if any(i.letter == it.letter and i.on_body for i in self.items()):
-            self.jewelry_refused.add(it.letter)        # cursed: stays on ("You remove an uncursed ring" said cursed)
-        self.jewelry_stats["removed"] += 1
+            self.jewel.refused.add(it.letter)        # cursed: stays on ("You remove an uncursed ring" said cursed)
+        self.jewel.stats["removed"] += 1
         return True
 
     def jewelry_put_on(self, it):
         self.cur_act = "jewelry"
         if not self.ask("P", "put on"):
-            self.jewelry_refused.add(it.letter)
+            self.jewel.refused.add(it.letter)
             return True
         self.press(it.letter, expect_prompt=True)
         if self.obs["misc"][0] and "ring-finger" in self.message():
@@ -202,10 +212,10 @@ class JewelryMixin:
         else:
             self.settle()
         if not any(i.letter == it.letter and i.on_body for i in self.items()):
-            self.jewelry_refused.add(it.letter)        # cursed gloves, a form without hands, ...
-            self.jewelry_stats["wear_failed"] += 1
+            self.jewel.refused.add(it.letter)        # cursed gloves, a form without hands, ...
+            self.jewel.stats["wear_failed"] += 1
         else:
-            self.jewelry_stats["worn_" + wear_name(it)] += 1
+            self.jewel.stats["worn_" + wear_name(it)] += 1
         return True
 
     # ------------------------------------------------------------ identify
@@ -222,7 +232,7 @@ class JewelryMixin:
         self.cur_act = "identify"
         if not self.read_scroll(lv, scrolls[0].letter):        # the menu: answer_identify_menu
             return False
-        self.jewelry_stats["read"] += 1
+        self.jewel.stats["read"] += 1
         return True
 
     def identify_choice(self):
@@ -242,28 +252,28 @@ class JewelryMixin:
         """settle: is a page of an identify menu on screen (its header, or a later page of the one we answer)? An
         identify menu closed some other way is forgotten."""
         if not menu and ID_MENU not in tty:
-            self.id_menu_open = False
-        return ID_MENU in tty or bool(menu and self.id_menu_open)
+            self.jewel.id_menu_open = False
+        return ID_MENU in tty or bool(menu and self.jewel.id_menu_open)
 
     def answer_identify_menu(self, tty):
         """settle: an identify menu page is on screen (page 2 on has no header: every "x - ..." line is an
         entry). Pick identify_choice on this page, next page, and at the end confirm -- or ESC with nothing
         picked (the menu would come back)."""
-        if not self.id_menu_open:
-            self.id_menu_open, self.id_picked = True, 0
+        if not self.jewel.id_menu_open:
+            self.jewel.id_menu_open, self.jewel.id_picked = True, 0
         want = self.identify_choice()
         items = self.menu_items(tty, ID_MENU) if ID_MENU in tty else \
             [(m.group(1), m.group(2)) for l in tty.split("\n") for m in [MENU_ITEM_RE.match(l.strip())] if m]
         for l in [l for l, _ in items if l in want]:
             self.raw_step(ord(l))
-            self.id_picked += 1
+            self.jewel.id_picked += 1
         page = PAGE_RE.search(tty)
         if page and int(page.group(1)) < int(page.group(2)):
             self.raw_step(ord(">"))
             return
-        self.jewelry_stats["picked"] += self.id_picked
-        self.raw_step(13 if self.id_picked else 27)
-        self.id_menu_open = False              # a blessed scroll may ask for the next ones: a new menu
+        self.jewel.stats["picked"] += self.jewel.id_picked
+        self.raw_step(13 if self.jewel.id_picked else 27)
+        self.jewel.id_menu_open = False              # a blessed scroll may ask for the next ones: a new menu
 
     # ------------------------------------------------------------ buy
     def shop_buy_step(self, lv):
@@ -272,17 +282,17 @@ class JewelryMixin:
         unpaid = [it for it in self.items() if it.unpaid]
         if unpaid:
             self.cur_act = "buy"
-            if self.pay_fails >= 3:                # can't pay: put it back
+            if self.jewel.pay_fails >= 3:                # can't pay: put it back
                 self.drop_units(unpaid[0].letter)
-                self.jewelry_stats["put_back"] += 1
+                self.jewel.stats["put_back"] += 1
                 return True
             gold0 = self.bl(nh.NLE_BL_GOLD)
             self.pay()
             if self.bl(nh.NLE_BL_GOLD) < gold0:
-                self.jewelry_stats["bought"] += 1
-                self.pay_fails = 0
+                self.jewel.stats["bought"] += 1
+                self.jewel.pay_fails = 0
             else:
-                self.pay_fails += 1
+                self.jewel.pay_fails += 1
             return True
         gold = self.bl(nh.NLE_BL_GOLD)
         if not self.identify_wanted() or not lv.shop.any() or gold < self.identify_min_price():
@@ -293,15 +303,15 @@ class JewelryMixin:
             return self.is_identify(t) and price <= gold
 
         goals = np.zeros(lv.under.shape, dtype=bool)
-        for (k, p), tags in self.for_sale.items():
+        for (k, p), tags in self.prices.for_sale.items():
             if k == lv.key and lv.shop[p] and any(affordable(t, pr) for t, pr in tags.items()):
                 goals[p] = True
         if goals[here]:
             self.cur_act = "buy"
             self.pickup(lambda t: "for sale" in t and PRICE_RE.search(t) is not None
                         and affordable(t, int(PRICE_RE.search(t).group(1))), "buy")
-            self.for_sale.pop((lv.key, here), None)
-            self.jewelry_stats["picked_up"] += 1
+            self.prices.for_sale.pop((lv.key, here), None)
+            self.jewel.stats["picked_up"] += 1
             return True
         if goals.any() and self.walk_to(lv, goals, act="buy")[0] == "moved":
             return True

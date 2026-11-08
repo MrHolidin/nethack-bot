@@ -21,17 +21,23 @@ NEW_CHARGES = range(4, 9)                  # rn1(5, 4): a directional wand
 EMPTY_RE = re.compile(r"Nothing happens|You wrest|too worn out to engrave|turns to dust")
 
 
+class WandChargeState:
+    """State of wand charge records (WandChargeMixin)."""
+    def __init__(self):
+        self.wand_recs = {}                # inventory letter -> {"base", "used", "empty"}
+
+
 class WandChargeMixin:
     def charges_init(self):
-        self.wand_recs = {}                # inventory letter -> {"base", "used", "empty"}
+        self.charges = WandChargeState()
 
     def wand_rec(self, it):
         """The record of the wand it (create / reset it when the letter now holds another wand)."""
         base = base_name(it.text)[2]
-        rec = self.wand_recs.get(it.letter)
+        rec = self.charges.wand_recs.get(it.letter)
         if rec is None or (rec["base"] != base and not (base.startswith("wand of")
                                                         and not rec["base"].startswith("wand of"))):
-            rec = self.wand_recs[it.letter] = {"base": base, "used": 0, "empty": False}
+            rec = self.charges.wand_recs[it.letter] = {"base": base, "used": 0, "empty": False}
         rec["base"] = base
         return rec
 

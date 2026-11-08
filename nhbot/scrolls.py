@@ -50,14 +50,24 @@ ENCHANT_RE = re.compile(r"((?:Your )?[\w'-]+(?: [\w'-]+)*?) (violently )?glows? 
 ENCHANT_LOG = 20
 
 
-class ScrollMixin:
-    def scroll_init(self):
-        self.scroll_stats = {"read": 0, "read_names": []}
-        self.scroll_known = None         # scroll types known by name (discoveries); None: ask again
+class ScrollState:
+    """State of reading scrolls and their enchant effects (ScrollMixin)."""
+    def __init__(self):
+        self.stats = {"read": 0, "read_names": []}
+        self.known = None                # scroll types known by name (discoveries); None: ask again
         self.genocide_typed = set()      # names given to a genocide question (never twice)
         self.read_seq = 0                # msg_seq when the last read began
         self.enchant_stats = Counter()   # msg_enchant: what enchant armor / weapon did, from the game's words
         self.enchant_log = []            # (turn, effect, item) of the first ENCHANT_LOG of them
+
+
+class ScrollMixin:
+    def scroll_init(self):
+        self.scroll = ScrollState()
+
+    def scroll_summary(self):
+        """Game summary entries."""
+        return {"enchant": dict(self.scroll.enchant_stats, log=self.scroll.enchant_log), "scrolls": dict(self.scroll.stats)}
 
     def scroll_is_good(self, s):
         """Identified as one of GOOD_TYPES, or every type value.type_posterior leaves (known types out, oc_prob prior,
@@ -82,16 +92,16 @@ class ScrollMixin:
                 effect = "down"
             else:
                 effect = "armor_up" if colour == "silver" else "weapon_up"
-            self.enchant_stats[effect] += 1
-            if len(self.enchant_log) < ENCHANT_LOG:
-                self.enchant_log.append((self.turn(), effect, item))
+            self.scroll.enchant_stats[effect] += 1
+            if len(self.scroll.enchant_log) < ENCHANT_LOG:
+                self.scroll.enchant_log.append((self.turn(), effect, item))
         if "Your skin glows then fades" in m:
-            self.enchant_stats["skin"] += 1
+            self.scroll.enchant_stats["skin"] += 1
 
     # ------------------------------------------------------------ what we know
     def known_scroll_types(self):
         """Scroll types known by name: the discoveries list ('\\'), read once after every scroll we read."""
-        if self.scroll_known is None:
+        if self.scroll.known is None:
             self.raw_step(ord("\\"))
             text = ""
             for _ in range(10):
@@ -106,8 +116,8 @@ class ScrollMixin:
                     self.raw_step(27)
                     break
             self.settle()
-            self.scroll_known = set(DISCO_SCROLL_RE.findall(text))
-        return self.scroll_known
+            self.scroll.known = set(DISCO_SCROLL_RE.findall(text))
+        return self.scroll.known
 
     def unknown_readable(self, s):
         """A scroll worth reading untested: its price group unknown, or the types value.type_posterior leaves (known
@@ -115,7 +125,7 @@ class ScrollMixin:
         key = appearance(s)
         if key is None:
             return False                       # known by name, or blank paper ("unlabeled": not shuffled)
-        return not self.price_reads.get(key) or set(self.type_posterior(s)) <= UNKNOWN_READ_TYPES
+        return not self.prices.reads.get(key) or set(self.type_posterior(s)) <= UNKNOWN_READ_TYPES
 
     def test_safe(self):
         """Safe enough to read a scroll that may be harmful: full HP and more than TEST_MIN_HP (earth drops a
@@ -162,7 +172,7 @@ class ScrollMixin:
             if maybe_armor:
                 ready = self.strip_for_enchant()      # the pieces it could evaporate come off first
                 if ready == "acted":
-                    self.scroll_stats["stripped"] = self.scroll_stats.get("stripped", 0) + 1
+                    self.scroll.stats["stripped"] = self.scroll.stats.get("stripped", 0) + 1
                     return True
                 if ready == "wait":
                     continue
@@ -171,12 +181,12 @@ class ScrollMixin:
             state = self.read_state()
             if not self.read_scroll(lv, letter):
                 return False
-            self.scroll_stats["read"] += 1
-            self.scroll_stats["read_names"].append(s[:60])
+            self.scroll.stats["read"] += 1
+            self.scroll.stats["read_names"].append(s[:60])
             if why == "unknown":
-                self.scroll_stats["tested"] = self.scroll_stats.get("tested", 0) + 1
-                self.scroll_stats.setdefault("tested_log", []).append(
-                    dict(state, said=self.text_since(self.read_seq)[-90:]))
+                self.scroll.stats["tested"] = self.scroll.stats.get("tested", 0) + 1
+                self.scroll.stats.setdefault("tested_log", []).append(
+                    dict(state, said=self.text_since(self.scroll.read_seq)[-90:]))
             return True
         return False
 
@@ -185,9 +195,9 @@ class ScrollMixin:
         game did not ask what to read."""
         if not self.ask("r", "read"):
             return False
-        seq0 = self.read_seq = self.msg_seq
+        seq0 = self.scroll.read_seq = self.msg_seq
         self.press(letter)
-        self.scroll_known = None
+        self.scroll.known = None
         said = self.text_since(seq0) + " " + self.top_line()
         if "center the explosion" in said:
             self.aim_away(lv)                      # blessed fire
@@ -197,7 +207,7 @@ class ScrollMixin:
         tail = " ".join(self.msgs_since(seq0))
         for name in ("genocide", "charg", "explosion", "cloud", "identify"):
             if name in tail.lower():
-                self.scroll_stats["asked_" + name] = self.scroll_stats.get("asked_" + name, 0) + 1
+                self.scroll.stats["asked_" + name] = self.scroll.stats.get("asked_" + name, 0) + 1
         return True
 
     # ------------------------------------------------------------ answers
@@ -220,12 +230,12 @@ class ScrollMixin:
     def answer_genocide(self, prompt):
         """getlin: the genocide question. A class (blessed) or a species (uncursed, or cursed: reverse)."""
         names = GENOCIDE_CLASS if "class" in prompt.lower() else GENOCIDE_SPECIES
-        name = next((n for n in names if n not in self.genocide_typed), None)
+        name = next((n for n in names if n not in self.scroll.genocide_typed), None)
         if name is None:
             self.raw_step(27)
             return
-        self.genocide_typed.add(name)
-        self.scroll_stats["genocide"] = name
+        self.scroll.genocide_typed.add(name)
+        self.scroll.stats["genocide"] = name
         for c in name:
             self.raw_step(ord(c))
         self.raw_step(13)
@@ -241,5 +251,5 @@ class ScrollMixin:
             self.raw_step(27)
             return
         it = min(wands, key=rank)
-        self.scroll_stats["charged"] = it.text[:40]
+        self.scroll.stats["charged"] = it.text[:40]
         self.raw_step(ord(it.letter))

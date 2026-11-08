@@ -4,10 +4,16 @@ of digging, a pick-axe, a dwarvish mattock), the pick-axe / mattock into our han
 import nle.nethack as nh
 
 
+class DiggingState:
+    """State of digging down (DiggingMixin)."""
+    def __init__(self):
+        self.refused = set()           # level keys whose floor would not be dug ("too hard to dig in"), or where a
+                                       # cursed shield keeps a mattock out of our hands (dig_wield)
+
+
 class DiggingMixin:
     def digging_init(self):
-        self.dig_refused = set()       # level keys whose floor would not be dug ("too hard to dig in"), or where a
-                                       # cursed shield keeps a mattock out of our hands (dig_wield)
+        self.digging = DiggingState()
 
     def dig_means(self):
         """How we can dig down: ("wand", item) a wand of digging with charges left, ("pick", item) a pick-axe,
@@ -38,7 +44,7 @@ class DiggingMixin:
         shield = next((a for a in self.armor_inventory() if a["worn"] and a["slot"] == "shield"), None)
         if kind == "mattock" and shield is not None:
             if not self.take_off(shield):             # a two-handed digger: not with a shield on (wield.c)
-                self.dig_refused.add(lv.key)          # a cursed shield: no mattock
+                self.digging.refused.add(lv.key)          # a cursed shield: no mattock
             return True
         self.swap_in("dig", it)
         return True

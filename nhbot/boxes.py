@@ -56,7 +56,7 @@ class BoxMixin:
 
     def box_summary(self):
         """Game summary entries (welded: weapons.swap_in put a cursed dagger in our hands)."""
-        return {"boxes": dict(self.box.stats, welded=self.swap_welded)}
+        return {"boxes": dict(self.box.stats, welded=self.weapons.swap_welded)}
 
     # ------------------------------------------------------------------ goal
     def box_targets(self, lv):
@@ -120,11 +120,11 @@ class BoxMixin:
         if r != "locked":
             self.box_done(lv, pos, "no_box" if r == "none" else "failed")
             return True
-        if self.swapped_for is None and self.lock_box_step(key):
+        if self.weapons.swapped_for is None and self.lock_box_step(key):
             return True                          # lock_tools: unlocked with the tool, nothing broken
-        if self.swapped_for == "box" and self.box.forces[key] < FORCE_TRIES:
+        if self.weapons.swapped_for == "box" and self.box.forces[key] < FORCE_TRIES:
             return self.box_force(key)
-        opener = self.dagger_alternate() if self.swapped_for is None and self.box.forces[key] < FORCE_TRIES else None
+        opener = self.dagger_alternate() if self.weapons.swapped_for is None and self.box.forces[key] < FORCE_TRIES else None
         if opener is not None:
             self.swap_in("box", opener)
             return True
@@ -156,11 +156,11 @@ class BoxMixin:
                 self.raw_step(13)
                 continue
             if "Take out what?" in tty:
-                self._take_food = self.food_count()
+                self.pick.take_food = self.food_count()
                 try:
                     took = self.menu_pick("Take out what?", lambda t: self.take_reason(t) is not None)
                 finally:
-                    self._take_food = None
+                    self.pick.take_food = None
                 continue
             break
         self.settle()
@@ -195,7 +195,7 @@ class BoxMixin:
             self.box.stats["forced"] += 1
         elif "broke" in said:
             self.box.stats["dagger_broke"] += 1
-            self.swapped_for = None              # the dagger is gone: nothing to swap back from
+            self.weapons.swapped_for = None              # the dagger is gone: nothing to swap back from
         return True
 
     def box_kick_step(self, lv):

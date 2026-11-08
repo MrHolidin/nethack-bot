@@ -136,7 +136,7 @@ class AltarMixin:
 
     def altar_untested(self):
         return [it for it in self.items()
-                if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.cant_drop
+                if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.carry.cant_drop
                 and not BUC_RE.search(it.text) and buc_key(it.text) not in self.altar.known
                 and not it.unpaid]
 

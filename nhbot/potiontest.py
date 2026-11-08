@@ -19,18 +19,28 @@ EFFECTS = (("much better", "extra healing"), ("feel better", "healing"), ("where
            ("makes you feel", "restore ability"))     # statistics only: the first message that matches
 
 
+class PotionTestState:
+    """State of test-quaffing unknown potions (PotionTestMixin)."""
+    def __init__(self):
+        self.tested = set()              # appearance keys drunk
+        self.refused = set()             # (level key, square) where Elbereth would not stay written
+        self.tries = Counter()           # (level key, square) -> Elbereth engravings for a test there
+        self.stats = Counter()
+
+
 class PotionTestMixin:
     def potiontest_init(self):
-        self.quaff_tested = set()        # appearance keys drunk
-        self.quaff_refused = set()       # (level key, square) where Elbereth would not stay written
-        self.quaff_tries = Counter()     # (level key, square) -> Elbereth engravings for a test there
-        self.quaff_stats = Counter()
+        self.ptest = PotionTestState()
+
+    def potiontest_summary(self):
+        """Game summary entries."""
+        return {"quaff_test": dict(self.ptest.stats)}
 
     def potion_100(self, text):
         """An unidentified potion whose possible types (by the prices seen) all cost TEST_PRICE: healing, extra
         healing, restore ability, confusion, hallucination, sleeping."""
         key = appearance(text)
-        if key is None or key in self.deduced:
+        if key is None or key in self.value.deduced:
             return False
         post = self.type_posterior(text)
         return bool(post) and all(OBJ[_INDEX[(_cls_of(n, key), n)]][3] == TEST_PRICE for n in post)
@@ -40,7 +50,7 @@ class PotionTestMixin:
             if it.ocls != nh.POTION_CLASS or it.unpaid:
                 continue
             key = appearance(it.text)
-            if key is None or key in self.quaff_tested:
+            if key is None or key in self.ptest.tested:
                 continue
             if self.potion_100(it.text):
                 return it, key
@@ -52,34 +62,34 @@ class PotionTestMixin:
         if not lv.explored:
             return False
         it, key = self.potion_to_test()
-        if it is None or (lv.key, self.pos()) in self.quaff_refused or not self.elb_can_write(lv):
+        if it is None or (lv.key, self.pos()) in self.ptest.refused or not self.elb_can_write(lv):
             return False
         if self.peaceful_seen(lv):
             return False                     # hallucinating or confused, we'd hit one: shopkeeper, watch, priest
         if not self.elb_confirm(lv):
             here = (lv.key, self.pos())
-            if self.quaff_tries[here] >= 2:
-                self.quaff_refused.add(here)
-                self.quaff_stats["elb_refused"] += 1
+            if self.ptest.tries[here] >= 2:
+                self.ptest.refused.add(here)
+                self.ptest.stats["elb_refused"] += 1
                 return False
-            self.quaff_tries[here] += 1
+            self.ptest.tries[here] += 1
             self.cur_act = "quaff_test"
-            self.quaff_stats["elb_written"] += 1
+            self.ptest.stats["elb_written"] += 1
             if not self.engrave_elbereth():
-                self.quaff_refused.add(here)
+                self.ptest.refused.add(here)
             return True
         self.cur_act = "quaff_test"
-        self.quaff_tested.add(key)
+        self.ptest.tested.add(key)
         seq0 = self.msg_seq
         if not self.ask_drink():
-            self.quaff_stats["no_prompt"] += 1
+            self.ptest.stats["no_prompt"] += 1
             return True
         self.press(it.letter)
         msgs = self.text_since(seq0).lower()
         if "this makes you feel" in msgs:      # "Wow! This makes you feel good!" / "Ulch! ... mediocre!"
             self.deduce_type(nh.POTION_CLASS, key, "restore ability")
-            self.quaff_stats["deduced_restore_ability"] += 1
+            self.ptest.stats["deduced_restore_ability"] += 1
         what = next((n for s, n in EFFECTS if s in msgs), "unknown")
-        self.quaff_stats["drunk"] += 1
-        self.quaff_stats["got_" + what.replace(" ", "_")] += 1
+        self.ptest.stats["drunk"] += 1
+        self.ptest.stats["got_" + what.replace(" ", "_")] += 1
         return True

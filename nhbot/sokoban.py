@@ -792,13 +792,13 @@ class SokobanMixin:
         wield or need comes last; never an amulet or a bag) dropped here, never picked up again (pickup.never_take).
         True: it dropped one."""
         inv = [it for it in self.items() if it.ocls not in (nh.COIN_CLASS, nh.AMULET_CLASS) and "bag" not in it.text
-               and not it.on_body and it.key not in self.cant_drop and not self.sac_carrying(it)]
+               and not it.on_body and it.key not in self.carry.cant_drop and not self.sac_carrying(it)]
         if not inv:
             return False
         looks = self.carried_by_look()
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         it = min(inv, key=lambda it: self.est_value(it, same(it)))
-        self.never_take.add(base_name(it.text)[2])
+        self.pick.never_take.add(base_name(it.text)[2])
         self.soko_stats["room_dropped"] += 1
         self.drop_units(it.letter)
         return True

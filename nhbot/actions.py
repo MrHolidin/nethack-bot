@@ -115,7 +115,7 @@ class ActionsMixin:
     def drop_units(self, letter, n=None):
         """Drop n of a stack (all if None); remember the square."""
         item = next((it for it in self.items() if it.letter == letter), None)
-        self.last_drop_qty = n or (base_name(item.text)[0] if item else 1)
+        self.carry.last_drop_qty = n or (base_name(item.text)[0] if item else 1)
         self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
         seq0 = self.msg_seq
         if not self.ask("d", "drop"):
@@ -125,4 +125,4 @@ class ActionsMixin:
                 self.raw_step(ord(c))
         self.press(letter)
         if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
-            self.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
+            self.carry.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"

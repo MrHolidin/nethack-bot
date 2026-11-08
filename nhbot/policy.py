@@ -327,12 +327,12 @@ class PolicyMixin:
             return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.rub_rewield()
         if self.tin_glib():
             return False                         # tins: slippery fingers, whatever we wield now slips too
-        if self.swapped_for is not None:
+        if self.weapons.swapped_for is not None:
             # the dagger was swapped in for a tin / a box / digging; a threat: back. No other wielding meanwhile:
             # the main weapon in hand would make the job use it (a long sword forcing a lock can break) and the
             # later swap_back put the dagger in our hands
             return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.swap_back()
-        if self.tin_slipped is not None:
+        if self.tin.slipped is not None:
             return False
         if c.hostiles:
             return not any(it.wielded for it in self.items()) and self.weapon_check()   # bare hands in a fight

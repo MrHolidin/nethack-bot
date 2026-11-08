@@ -71,7 +71,7 @@ class ThievesMixin:
     # ================================================================== nymphs
     def msg_thieves(self, m):
         for what in STOLE_RE.findall(m):                    # "She stole a +0 orcish helm." / "It steals ...!"
-            self.stolen_names.add(base_name(what)[2])
+            self.pick.stolen_names.add(base_name(what)[2])
         stole = (re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m) and \
             (any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m)
         if stole or "It stole" in m or "It steals" in m or "She charms you" in m:
@@ -193,9 +193,8 @@ class ThievesMixin:
         names = {base_name(it.text)[2] for it in self.items()}
         if self.poly_new:
             lost = self.poly_inv - names
-            self.stolen_names |= lost
-            # weapons.weapon_upgrade tries each once: a lost one may come back
-            self._wield_tried = {(l, t) for l, t in self._wield_tried if base_name(t)[2] not in lost}
+            self.pick.stolen_names |= lost
+            self.wield_forget(lost)
             self.poly_stats["turned"] += 1
             self.poly_stats["lost_items"] += len(lost)
             self.poly_new = False

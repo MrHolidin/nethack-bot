@@ -162,24 +162,30 @@ def enchant_risk(a):
     return a["ench"] is not None and a["ench"] > (5 if "elven" in a["name"] else 3)
 
 
-class EquipMixin:
-    """Mixed into Bot. Needs: press, raw_step, settle, inventory, obs, messages, tty_text, ..."""
-
-    def equip_init(self):
+class EquipState:
+    """State of armor: worn pieces, failures, wishes (EquipMixin)."""
+    def __init__(self):
         self.no_shield = False
         self.no_suit = False
         self.cursed_slots = set()
         self.test_stripped = set()    # strip_for_test: slots taken off before a test read, until worn again
         self.test_strip_refused = set()   # letters of pieces that would not come off
         self.wear_failed = set()
-        self.equip_events = []        # (turn, action, name)
+        self.events = []              # (turn, action, name)
         self.wishes = []              # (turn, what we asked for, what came)
         self.armor_called = {}        # appearance -> type, for armor we wished for ("fencing gloves" -> power)
+
+
+class EquipMixin:
+    """Mixed into Bot. Needs: press, raw_step, settle, inventory, obs, messages, tty_text, ..."""
+
+    def equip_init(self):
+        self.equip = EquipState()
 
     # ---------------------------------------------------------- inventory view
     def armor_true_text(self, s):
         """Inventory text with the appearance of a type we know (wished for) replaced by the type's name."""
-        for look, name in self.armor_called.items():
+        for look, name in self.equip.armor_called.items():
             if look in s:
                 return s.replace(look, name)
         return s
@@ -208,9 +214,9 @@ class EquipMixin:
         return worn
 
     def slot_allowed(self, slot):
-        if slot == SHIELD and (self.no_shield or self.two_handed()):
+        if slot == SHIELD and (self.equip.no_shield or self.two_handed()):
             return False
-        if slot == SUIT and self.no_suit:
+        if slot == SUIT and self.equip.no_suit:
             return False
         return True
 
@@ -248,13 +254,13 @@ class EquipMixin:
         safe = a.get("safe") or self.cover_cloak_ok(a)
         if a["slot"] is None or not safe or not self.slot_allowed(a["slot"]):
             return False
-        if (a["name"], a.get("letter")) in self.wear_failed:
+        if (a["name"], a.get("letter")) in self.equip.wear_failed:
             return False
         cur = worn.get(a["slot"])
         gain = self.wear_gain(a, worn)
         if cur is None:
             return gain > 0.5
-        if cur.get("cursed") or a["slot"] in self.cursed_slots:
+        if cur.get("cursed") or a["slot"] in self.equip.cursed_slots:
             return False
         if abs(gain) <= 0.5 and BLESSED_RE.search(a.get("text", "")) \
                 and not BLESSED_RE.search(cur.get("text", "")):
@@ -287,7 +293,7 @@ class EquipMixin:
             return "ready" if worn else "wait"
         if len(risky) == len(worn):
             return "wait"
-        if any(a["cursed"] or a["slot"] in self.cursed_slots or (a["slot"] == SUIT and any(w["slot"] == CLOAK for w in worn))
+        if any(a["cursed"] or a["slot"] in self.equip.cursed_slots or (a["slot"] == SUIT and any(w["slot"] == CLOAK for w in worn))
                for a in risky):
             return "wait"
         self.cur_act = "enchant_strip"
@@ -310,14 +316,14 @@ class EquipMixin:
 
     def take_off_for_test(self, a):
         """strip_for_test: take a off unless it can't come off. True if it used the turn."""
-        if a["cursed"] or a["slot"] in self.cursed_slots or a["letter"] in self.test_strip_refused:
+        if a["cursed"] or a["slot"] in self.equip.cursed_slots or a["letter"] in self.equip.test_strip_refused:
             return False
         self.cur_act = "test_strip"
         if self.take_off(a):
-            self.test_stripped.add(a["slot"])
-            self.scroll_stats["test_strip"] = self.scroll_stats.get("test_strip", 0) + 1
+            self.equip.test_stripped.add(a["slot"])
+            self.scroll.stats["test_strip"] = self.scroll.stats.get("test_strip", 0) + 1
         else:
-            self.test_strip_refused.add(a["letter"])     # it would not come off: don't try every tick
+            self.equip.test_strip_refused.add(a["letter"])     # it would not come off: don't try every tick
         return True
 
     def answer_wish(self):
@@ -332,8 +338,8 @@ class EquipMixin:
             look = re.sub(r"^(pair|set) of ", "", base_name(got.group(2))[2])
             real = want.split(" ", 2)[2]
             if look != real and look not in ARMOR:
-                self.armor_called[look] = real          # the game shows its appearance: we know what it is
-        self.wishes.append((self.turn(), want, got.group(2) if got else self.message()[:60]))
+                self.equip.armor_called[look] = real          # the game shows its appearance: we know what it is
+        self.equip.wishes.append((self.turn(), want, got.group(2) if got else self.message()[:60]))
 
     # ---------------------------------------------------------- actions
     def wear(self, a, worn):
@@ -341,11 +347,11 @@ class EquipMixin:
         # body armor goes under the cloak
         if slot == SUIT and CLOAK in worn:
             if not self.take_off(worn[CLOAK]):
-                self.no_suit = True
+                self.equip.no_suit = True
                 return
         if slot in worn:
             if not self.take_off(worn[slot]):
-                self.cursed_slots.add(slot)
+                self.equip.cursed_slots.add(slot)
                 return
         seq0 = self.msg_seq
         if not self.ask("W", "what do you want to wear"):
@@ -355,16 +361,16 @@ class EquipMixin:
         self.press(a["letter"])
         msgs = self.text_since(seq0)
         if "two-handed" in msgs:
-            self.no_shield = True
+            self.equip.no_shield = True
         now = [x for x in self.armor_inventory() if x["letter"] == a["letter"]]
         if not (now and now[0]["worn"]):
-            self.wear_failed.add((a["name"], a["letter"]))
-            self.equip_events.append((self.turn(), "fail", a["name"] + " | " + msgs[-80:]))
+            self.equip.wear_failed.add((a["name"], a["letter"]))
+            self.equip.events.append((self.turn(), "fail", a["name"] + " | " + msgs[-80:]))
             return
-        self.equip_events.append((self.turn(), "wear", a["name"]))
-        if slot in self.test_stripped:
-            self.scroll_stats["test_rewear"] = self.scroll_stats.get("test_rewear", 0) + 1
-            self.test_stripped.discard(slot)
+        self.equip.events.append((self.turn(), "wear", a["name"]))
+        if slot in self.equip.test_stripped:
+            self.scroll.stats["test_rewear"] = self.scroll.stats.get("test_rewear", 0) + 1
+            self.equip.test_stripped.discard(slot)
         # put the cloak back on (it stays in inventory; next equip_step re-wears it anyway)
 
     def take_off(self, a):
@@ -374,10 +380,10 @@ class EquipMixin:
             self.press(a["letter"])
         msgs = self.text_since(seq0)
         if "cursed" in msgs and "You can't" in msgs:
-            self.cursed_slots.add(a["slot"])
+            self.equip.cursed_slots.add(a["slot"])
             return False
         still = [x for x in self.armor_inventory() if x["letter"] == a["letter"] and x["worn"]]
         if still:
             return False
-        self.equip_events.append((self.turn(), "takeoff", a["name"]))
+        self.equip.events.append((self.turn(), "takeoff", a["name"]))
         return True
