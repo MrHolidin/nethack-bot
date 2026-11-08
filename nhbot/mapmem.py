@@ -1,13 +1,14 @@
 """Map memory per level: what lies under monsters, what we visited, searched, learned to avoid,
 where the shops are; terrain and passability grids for path finding."""
 import re
-from collections import deque
+from collections import Counter, deque
 
 import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FLOOR_GLYPH, FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH
+from nhbot.consts import (ALTAR_GLYPH, COLS, CORRIDOR_GLYPHS, DOWNSTAIR_GLYPH, FEATURE_GLYPH, FEATURE_HERE_RE, FLOOR_GLYPH,
+                          FOUNTAIN_GLYPH, NEIGH, ROWS, UPSTAIR_GLYPH)
 
 
 
@@ -122,6 +123,7 @@ class Level:
 class MapMixin:
     def map_init(self):
         self.levels = {}                 # level key (dungeon number, level) -> Level
+        self.map_stats = Counter()       # what messages taught the map (summary 'map_stats')
         self.cur_key = None              # the key of the level this tick is on
         self.prev_key = None             # ... of the level at the last tick (note_arrival)
         self.arrived_by_stairs = False   # this tick: a staircase brought us onto this level (note_arrival)
@@ -137,12 +139,25 @@ class MapMixin:
             lv.entered_xl = self.bl(nh.NLE_BL_XP)
         return lv
 
+    def engulfed(self):
+        """Swallowed: the engulfer is drawn on the 8 squares AROUND us (display.c swallowed()), the rest of the map
+        is blank."""
+        gg = self.obs["glyphs"]
+        y, x = self.pos()
+        ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
+        return int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5
+
     def update_memory(self):
         """First thing every tick: what the screen shows now into this level's memory; a shop greeted in the dark grows
-        as its floor shows (shop_regrow); the arrival on another level noted (note_arrival). The level."""
+        as its floor shows (shop_regrow); the arrival on another level noted (note_arrival). The level.
+        engulf_memory: not while engulfed -- the blank map (display.c swallowed: everything but the engulfer cleared)
+        wrote solid rock over every square remembered, the terrain layer too: a staircase under an item, a fountain,
+        what feature_here / a stair arrival had taught was gone for good (79276: the way down, under a large box)."""
         lv = self.level()
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
+        if self.opts.engulf_memory and self.engulfed():
+            known = np.zeros_like(known)
         lv.under[known] = g[known]
         feat = known & G.TERRAIN[g]
         lv.terrain[feat] = g[feat]
@@ -351,6 +366,24 @@ class MapMixin:
         """On a new level by a staircase we took: the other end of it is under us."""
         if self.last_stair_dir:
             lv.set_terrain(self.pos(), UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH)
+
+    def note_feature_here(self, text):
+        """feature_here: "There is a staircase down here." (invent.c look_here, said when something lies on the square
+        we step on -- first on the top line, or atop the "Things that are here" window; game.settle reads both) into the
+        terrain layer under us: an
+        item on a staircase hid it -- kinds read the item, and the level stayed "no way down" for thousands of turns
+        searching (79337, 79099, 79276: the true down staircase under an item we had stood on)."""
+        if not self.opts.feature_here:
+            return
+        lv = self.levels.get((self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)))
+        if lv is None:
+            return
+        for mm in FEATURE_HERE_RE.finditer(text):
+            g = FEATURE_GLYPH[mm.group(1)]
+            pos = self.pos()
+            if lv.terrain[pos] != g:
+                lv.terrain[pos] = g
+                self.map_stats["feature_here"] += 1
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""

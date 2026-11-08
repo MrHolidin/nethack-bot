@@ -58,6 +58,10 @@ DEFAULTS = {
                                #      peaceful (shoot_cells), not only RANGED_TARGETS -- and never at the Oracle
     "spore_elb": False,        # A/B: a gas spore next to us blocking the only way (unblock_step), too close to throw at:
                                #      Elbereth written and waited on until it drifts off (combat.spore_back_off)
+    "feature_here": False,     # A/B: "There is a staircase down here." (look_here, something on the square) into the
+                               #      terrain layer: a staircase under an item is a staircase (mapmem.note_feature_here)
+    "engulf_memory": False,    # A/B: the map memory is not written while engulfed (the blank screen wiped the level's
+                               #      memory, its terrain layer too) (mapmem.update_memory)
     "drink_prompt": False,     # A/B: 'q' on a fountain / sink answers "Drink from the fountain?" 'n' and goes on to the
                                #      potion question -- the heal / quaff_test steps typed the potion letter into it
                                #      (game.ask_drink)

@@ -190,11 +190,8 @@ class PolicyMixin:
         return False
 
     def step_engulfed(self, c):
-        """Engulfed: hit anything. The engulfer is drawn on the 8 squares AROUND us (display.c swallowed())."""
-        gg = self.obs["glyphs"]
-        y, x = c.y, c.x
-        ring = gg[max(0, y - 1):y + 2, max(0, x - 1):x + 2]
-        if int(((ring >= nh.GLYPH_SWALLOW_OFF) & (ring < nh.GLYPH_WARNING_OFF)).sum()) >= 5:
+        """Engulfed: hit anything."""
+        if self.engulfed():
             self.attack_engulfer()
             return True
         return False

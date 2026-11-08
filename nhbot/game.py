@@ -68,6 +68,9 @@ class GameMixin:
             if "Things that are here" in tty:
                 self.here_window = (self.turn(), self.pos(), " | ".join(
                     l.strip() for l in self.menu_lines(tty, "Things that are here")))
+            # mapmem: "There is a staircase down here." -- atop the window, or first on the top line, where the
+            # message observation holds only the last message of the line ("You see here a large box.")
+            self.note_feature_here(tty if "Things that are here" in tty else self.top_line())
             if "--More--" in flat or (self.obs["misc"][2] and not menu):
                 self.log_msg(msg if msg else self.top_line().replace("--More--", ""))
                 self.raw_step(13)
