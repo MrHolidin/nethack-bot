@@ -3,39 +3,17 @@ side here, named by what they mean. Each keeps the exact pattern of the module t
 noted, so the readings can be merged knowingly later."""
 import re
 
-# ---------------------------------------------------------------- a monster attacks us (mhitu.c)
-# MELEE_BY_NAME_RE (perception.msg_peace: a peaceful-looking monster attacked us): who it was -- group 1 / 2 the
-#   attacker, at the start of a sentence: "The <name>" or a proper name ("Asidonhopo hits!"); contact verbs ending
-#   in '!', or touches / engulfs / squeezes / charms / grabs you. Monster-vs-monster lines name their target
-#   without '!' and do not match.
-MELEE_BY_NAME_RE = re.compile(r"(?:^|[.!?]\s+)(The [^.!?]+?|[A-Z][\w'-]*(?: [\w'-]+)*?) (?:hits|bites|misses|just misses|stings|"
-                              r"kicks|butts|claws|scratches|lashes|tickles|stabs|pummels|whips|gores)!|"
-                              r"(?:^|[.!?]\s+)(The [^.!?]+?|[A-Z][\w'-]*(?: [\w'-]+)*?) (?:touches|engulfs|squeezes|charms|grabs) you")
-# MELEE_ON_US_RE (combat.msg_combat -> hallu_strike: something hit us in melee this turn): only "The <name> <verb>!",
-#   anywhere in the line (hallucinating, the name is random); thrusts / swings / grabs too, no proper names.
-#   Monster-vs-monster and missiles read differently ("The gnome hits the jackal.", "You are hit by a dart.").
-MELEE_ON_US_RE = re.compile(r"\bThe [^.!]+? (?:hits|bites|misses|just misses|stings|kicks|butts|claws|scratches|"
-                            r"thrusts|swings|grabs|lashes|tickles|stabs|pummels|whips|touches you|engulfs you|"
-                            r"squeezes you|gores|charms you)!")
-# UNSEEN_ATTACK_RE (combat.msg_combat -> blind_strike): "It <verb>" -- a monster we can't see attacked us; mhitu.c
-#   marks its square with an 'I' the same turn. No '!' needed, hugs too.
-UNSEEN_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches you|stings|kicks|butts|claws|scratches|"
-                              r"thrusts|swings|grabs|hugs|lashes|squeezes|engulfs|tickles|stabs|pummels|whips)\b")
-# ATTACKER_NAME_RE (threats.msg_threat: the track of that name attacked): the name of any monster attacking, melee or
-#   ranged (shoots, throws, zaps, breathes, casts, spits, gazes, ...); no '!' needed, so a monster-vs-monster line
-#   matches too (the tracker only follows names in view).
-ATTACKER_NAME_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|bites|stings|kicks|butts|touches|claws|thrusts|swings|"
-                              r"shoots|throws|zaps|breathes|casts|spits|gazes|engulfs|squeezes|lashes|tentacles|"
-                              r"just misses|strikes)\b")
-# FLEE_RE (threats.msg_threat, ranges: our to-hit +2 on a fleeing monster): monmove.c:306 monflee's message, printed
+# ---------------------------------------------------------------- a monster turns to flee
+# FLEE_RE (threats.msg_threat, helpless_bonus: our to-hit +2 on a fleeing monster): monmove.c:306 monflee's message, printed
 #   only as it starts fleeing (seen, not fleeing already)
 FLEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) turns to flee\.")
 
-# ---------------------------------------------------------------- attacked_us: one table, one parser
+# ---------------------------------------------------------------- attacks on us: one table, one parser
 # How the game tells that a monster attacks US, subject first ("The <name>", "It" unseen, "Something", a proper name
 # -- a shopkeeper, a priest). A monster-vs-monster line (mhitm.c) names its target after the verb and has no '!'
 # right after it: "The jackal bites the little dog.", "The gnome swings her axe at the jackal.", "The kobold throws
-# a dart at the newt!" -- those are not attacks on us. The four readings above disagreed on exactly that.
+# a dart at the newt!" -- those are not attacks on us. (Four regexes read this before and disagreed on exactly that:
+# A/B attacked_us.)
 ATTACK_ON_US_VERBS = (
     # melee -- mhitu.c:46-75 hitmsg, :92 missmu, :40-43 a seduction, :100-108 mswings (no "at <target>", which
     # mhitm.c:1566-1576 mswingsm adds), :980 a hug, :1818 an engulf, steal.c:413
@@ -55,7 +33,7 @@ ATTACK_ON_US_RE = re.compile(
 
 
 def attacks_on_us(m):
-    """attacked_us: the attacks on us a message line tells, [(who, kind)] -- who "The <name>", "It", "Something" or a
+    """The attacks on us a message line tells, [(who, kind)] -- who "The <name>", "It", "Something" or a
     proper name; kind "melee" / "ranged" (ATTACK_ON_US_VERBS)."""
     out = []
     for mm in ATTACK_ON_US_RE.finditer(m):

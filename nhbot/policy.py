@@ -37,7 +37,9 @@ STEPS = (
     "vault_guard",
     "vault_rob",         # vault_rob: the gold of a vault we stand in, then down through the floor (nhbot.vault)
     "blind",
-    "history",           # per-tick record of the fight state (summary 'hist')
+    "history",           # per-tick record of the fight state (summary 'hist'); a tick an earlier step acted in records
+                         # nothing, the hit made before is counted on the next (danger_tick keeps its pending entry).
+                         # A/B history_always (perceive + history first, every tick): -477 [-870, -77]
     "loot_here",         # loot_now: standing where our things fell -- picked up at once, fight or not
     "elbereth",
     "thieves",
@@ -64,16 +66,6 @@ STEPS = (
     "gold_here",
     "explore",
 )
-
-
-def step_order(opts):
-    """STEPS as the options order them. history_always: perceive and history out of the list -- tick runs them
-    first, every tick."""
-    order = list(STEPS)
-    if opts.history_always:
-        order.remove("perceive")             # history_always: both run every tick ahead of the list (tick)
-        order.remove("history")
-    return tuple(order)
 
 
 # step_housekeeping: (name, job(bot, tick) -> True if it acted), in order -- with no hostile in view
@@ -122,7 +114,7 @@ class Tick:
 
 class PolicyMixin:
     def policy_init(self):
-        self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in step_order(self.opts)]
+        self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in STEPS]
         self.last_step = None
         self.tick_no = 0
         self.tick_seq = 0                # msg_seq at the start of this tick
@@ -159,12 +151,6 @@ class PolicyMixin:
         y, x = self.pos()
         c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP),
                  maxhp=self.bl(nh.NLE_BL_HPMAX), hunger=self.bl(nh.NLE_BL_HUNGER))
-        if self.opts.history_always:
-            # history_always: perception and the fight record (danger_tick: our hits counted for win_prob, the
-            # damage prediction scored; summary 'hist') every tick, ahead of the steps that act -- in STEPS the
-            # record sat after pray / heal / blind / ..., and a tick one of those acted in recorded nothing
-            self.step_perceive(c)
-            self.step_history(c)
         for name, step in self.steps_by_name:
             if step(c):
                 self.last_step = name
@@ -432,9 +418,9 @@ class PolicyMixin:
 
     def step_eat_corpse(self, c):
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""
-        lv, y, x = c.lv, c.y, c.x
-        # merch_one: merch_risk only where the corpse lies (corpse_goals) -- not also at our own square
-        if c.hunger >= NOT_HUNGRY and self.kills and (self.opts.merch_one or not self.merch_risk(lv, (y, x))):
+        lv = c.lv
+        # merch_risk only where the corpse lies (corpse_goals) -- not also at our own square (merch_one)
+        if c.hunger >= NOT_HUNGRY and self.kills:
             goals = self.corpse_goals(lv)
             if goals:
                 return self.pursue("corpse", lv, goals, lambda g: self.eat_corpse_here())

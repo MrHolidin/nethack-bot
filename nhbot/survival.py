@@ -77,7 +77,7 @@ class SurvivalMixin:
         self.vault_bag_outs = 0        # vault_bag_out: gold taken out of the bag for the guard
         self.hunger_turns = Counter()  # turns spent per hunger state (status line)
         self.want_enhance = False
-        self.skills = None             # ranges: {skill name: level} from the #enhance menu (read_skills)
+        self.skills = None             # skill_bonus: {skill name: level} from the #enhance menu (read_skills)
         self.enhances = 0
         self.quaffs = 0
         self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
@@ -307,19 +307,19 @@ class SurvivalMixin:
         it = self.find_item(nh.POTION_CLASS, HEAL_POTIONS)
         if it:
             self.cur_act = "heal"
-            if self.ask("q", "drink"):
+            if self.ask_drink():
                 self.press(it[0])
                 self.quaffs += 1
                 return True
         return False
 
     def enhance_step(self):
-        if self.opts.ranges and self.skills is None:
-            self.read_skills()                       # ranges: the skill levels our to-hit / damage read
+        if self.opts.skill_bonus and self.skills is None:
+            self.read_skills()                       # skill_bonus: the skill levels our to-hit / damage read
         if not self.want_enhance:
             return False
         self.want_enhance = False
-        if self.opts.ranges:
+        if self.opts.skill_bonus:
             self.skills = None                       # read again next time, after the advance
         for _ in range(6):
             self.raw_step(229)                       # M-e: #enhance
@@ -337,7 +337,7 @@ class SurvivalMixin:
         return False                                 # takes no game time
 
     def read_skills(self):
-        """ranges: the skill levels from the #enhance menu (no game time): every page of its "Current skills:" (or
+        """skill_bonus: the skill levels from the #enhance menu (no game time): every page of its "Current skills:" (or
         "Pick a skill to advance:") list -- weapon.c:1250-1269 enhance_weapon_skill, " <name> [<level>]" -- into
         self.skills {name: skills.h level}. A restricted skill is not listed (and counts as Restricted)."""
         skills = {}
@@ -359,7 +359,7 @@ class SurvivalMixin:
         self.skills = skills
 
     def skill_level(self, name):
-        """ranges: the level of skill name (weapon.c P_NAME) -- None while not read; not listed: Restricted."""
+        """skill_bonus: the level of skill name (weapon.c P_NAME) -- None while not read; not listed: Restricted."""
         return None if self.skills is None else self.skills.get(name, 0)
 
     def vault_step(self, lv, hostiles):

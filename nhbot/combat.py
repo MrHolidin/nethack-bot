@@ -9,8 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, in_line, ray_squares
 from nhbot.danger import adj_level, dice_pmf
-from nhbot.messages import (KILL_RE, KILLED_RE, MELEE_ON_US_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE,
-                            UNSEEN_ATTACK_RE, attacks_on_us)
+from nhbot.messages import KILL_RE, KILLED_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE, attacks_on_us
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, MR_BITS, PM_BY_NAME, PM_INDEX, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
@@ -98,7 +97,7 @@ class CombatMixin:
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
         self.prey_cache = {}             # prey_win by state
-        self.prey_cache_tick = None      # prey_cache: the tick the cache is for
+        self.prey_cache_tick = None      # the tick the cache is for
 
     def throwables(self):
         if self.handless():
@@ -117,7 +116,7 @@ class CombatMixin:
 
     def ranged_target(self, lv):
         """A monster we never melee that a missile may kill (RANGED_TARGETS: floating eye, gas spore -- not closer
-        than spore_throw_min --, the jellies, brown / green mold, cockatrice, chickatrice; melee_policy: any of
+        than spore_throw_min --, the jellies, brown / green mold, cockatrice, chickatrice; shoot_avoided: any of
         shoot_cells) among avoid_cells, within 6 in a clear straight line -> (dir_key, dist, pos, step)."""
         if not self.avoid_cells:
             return None
@@ -130,8 +129,8 @@ class CombatMixin:
             if d == 0 or d > 6 or not in_line(dy, dx):
                 continue
             name = G.monster_name(g[ty, tx])
-            if self.opts.melee_policy:
-                if (ty, tx) not in self.shoot_cells:       # melee_policy's shoot
+            if self.opts.shoot_avoided:
+                if (ty, tx) not in self.shoot_cells:
                     continue
             elif name not in RANGED_TARGETS:
                 continue
@@ -145,8 +144,8 @@ class CombatMixin:
     def spore_throw_min(self):
         """The nearest a gas spore may be when we throw at it. Its explosion covers the 3x3 square round it
         (explode.c:163-171; mon.c corpse_chance explodes it on its own square), so from 2 we stand outside;
-        3 without ranges."""
-        return 2 if self.opts.ranges else 3
+        3 without spore_range."""
+        return 2 if self.opts.spore_range else 3
 
     def retrieve_goals(self, lv):
         """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
@@ -236,7 +235,7 @@ class CombatMixin:
         y, x = start
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
-        shoot = blocker in self.shoot_cells if self.opts.melee_policy else True     # melee_policy: not the Oracle
+        shoot = blocker in self.shoot_cells if self.opts.shoot_avoided else True    # shoot_avoided: not the Oracle
         if shoot and d <= 6 and in_line(dy, dx) \
                 and not (name == "gas spore" and d < self.spore_throw_min()):
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
@@ -267,7 +266,7 @@ class CombatMixin:
     def hunt_step(self, lv):
         """hunt_shooter: something hit us from range and nothing is next to us -> close in on the likeliest
         shooter: a visible hostile of the named kind, else one standing on a line with us within 8 squares
-        (monsters only fire when lined up, BOLT_LIM; ranges: within 7 -- mthrowu.c:1054-1055 m_lined_up: distmin <
+        (monsters only fire when lined up, BOLT_LIM; shooter_range: within 7 -- mthrowu.c:1054-1055 m_lined_up: distmin <
         BOLT_LIM = 8, hack.h:18). Pursue it for at most 25 turns, while HP >= 40%."""
         t = self.turn()
         y, x = self.pos()
@@ -279,7 +278,7 @@ class CombatMixin:
         if ev and t - ev[0] <= 2:
             self.shot_event = None
             vis = self.visible_hostiles(lv)
-            reach = BOLT_LIM - 1 if self.opts.ranges else 8   # ranges: m_lined_up wants distmin < BOLT_LIM
+            reach = BOLT_LIM - 1 if self.opts.shooter_range else 8   # shooter_range: m_lined_up: distmin < BOLT_LIM
             lined = [(p, n) for p, n in vis if dist(p) <= reach and in_line(p[0] - y, p[1] - x)]
             cands = lined
             if ev[1]:
@@ -433,20 +432,19 @@ class CombatMixin:
 
     def prey_win(self, name, pos):
         """P(we win a fight with this monster next to us), cached while what it depends on stays the
-        same (its name, our HP, max HP, AC, XL, the dungeon level, the weapon in hand; prey_cache: also its square,
-        our hits on it and asleep, for this tick only); the RNG state restored."""
+        same within this tick (its name, square, our hits on it, asleep, our HP, max HP, AC, XL, the dungeon level,
+        the weapon in hand); the RNG state restored. win_prob reads the monster's square -- our hits on the one there
+        (danger.our_hits) and whether our sleep ray put it down (asleep: P = 1) -- and much state the key leaves out
+        (Str, encumbrance, resistances, speed): the cache lives for one tick (bounded, never stale).
+        (A/B prey_cache -- before: no square / hits / asleep in the key, kept for the game: -287 [-662, +76],
+        median 7777 -> 7763; a correctness fix, accepted.)"""
         weapon = next((it.text for it in self.items() if it.wielded), None)
+        if self.prey_cache_tick != self.tick_no:
+            self.prey_cache, self.prey_cache_tick = {}, self.tick_no
+        lv = self.levels.get(self.cur_key)
         key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),
-               self.bl(nh.NLE_BL_DEPTH), weapon)
-        if self.opts.prey_cache:
-            # prey_cache: win_prob also reads the monster's square -- our hits on the one there (danger.our_hits)
-            # and whether our sleep ray put it down (asleep: P = 1) -- and much state the key above leaves out
-            # (Str, encumbrance, resistances, speed); the cache lives for one tick (bounded, never stale)
-            if self.prey_cache_tick != self.tick_no:
-                self.prey_cache, self.prey_cache_tick = {}, self.tick_no
-            lv = self.levels.get(self.cur_key)
-            key += (self.cur_key, pos, self.our_hits.get((self.cur_key, pos), 0),
-                    lv is not None and self.asleep(lv, pos))
+               self.bl(nh.NLE_BL_DEPTH), weapon, self.cur_key, pos, self.our_hits.get((self.cur_key, pos), 0),
+               lv is not None and self.asleep(lv, pos))
         if key not in self.prey_cache:
             state = self.win_rng.bit_generator.state
             self.prey_cache[key] = self.win_prob([(pos, name)])
@@ -637,14 +635,9 @@ class CombatMixin:
             self.last_shot_turn = self.turn()
             mm = SHOOTER_RE.search(m)
             self.shot_event = (self.turn(), mm.group(1) if mm else None)
-        if self.opts.attacked_us:
-            # attacked_us: the one parser of attacks on us (messages.attacks_on_us) -- "It ..." an unseen one, a named
-            # one in melee (hallucinating, the name is random)
-            melee = [who for who, kind in attacks_on_us(m) if kind == "melee"]
-            self.it_attacked |= "It" in melee
-            self.melee_on_us |= any(who.startswith("The ") for who in melee)
-        else:
-            if UNSEEN_ATTACK_RE.search(m):
-                self.it_attacked = True       # blind_strike: an unseen monster attacked us this turn
-            if MELEE_ON_US_RE.search(m):
-                self.melee_on_us = True       # hallu_strike: something attacked us in melee this turn
+        # the one parser of attacks on us (messages.attacks_on_us) -- "It ..." an unseen one (blind_strike), a named
+        # one in melee (hallu_strike: hallucinating, the name is random) (A/B attacked_us: -333 [-653, -55], median
+        # 7777 -> 7787, 29 games of 1000 changed)
+        melee = [who for who, kind in attacks_on_us(m) if kind == "melee"]
+        self.it_attacked |= "It" in melee
+        self.melee_on_us |= any(who.startswith("The ") for who in melee)

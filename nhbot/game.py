@@ -125,6 +125,24 @@ class GameMixin:
         self.settle()
         return False
 
+    def ask_drink(self):
+        """'q' up to "What do you want to drink?": True if that question came (ask). drink_prompt: on a fountain / sink
+        the game asks first "Drink from the fountain?" (potion.c:501, 510) -- answered 'n'; before, ask took that
+        question for the item prompt ("drink" in it) and typed the potion's letter there: no potion drunk and the
+        step done again every tick (455 quaffs in a game), a letter 'y' drank from the fountain (water moccasins,
+        a water demon)."""
+        if not self.opts.drink_prompt:
+            return self.ask("q", "drink")
+        self.press("q", expect_prompt=True)
+        if "drink from the" in self.message().lower() and self.obs["misc"][0]:
+            self.msg_audit["drink_from_declined"] += 1
+            self.press("n", expect_prompt=True)
+        self.asked = self.message().lower()
+        if "what do you want to drink" in self.asked and self.obs["misc"][0]:
+            return True
+        self.settle()
+        return False
+
     def call_type(self, letter, name):
         """#call the type of the inventory item letter: name (C, "the type of an object in inventory"). Its items
         then read "<appearance> called <name>". True if the name was given."""

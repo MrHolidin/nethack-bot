@@ -123,10 +123,9 @@ class PickupMixin:
     def take_reason(self, text, worn=None):
         """Why we'd take this floor item: "armor" (an upgrade), "missile", "weapon" (a wield candidate), "food",
         "carry" (worth carrying to sell / use); None: leave it. Never merchandise, known-cursed armor / weapons,
-        ammunition without a launcher, rocks / boulders / iron balls. slots: and only with a letter for it
-        (value.slot_ok)."""
+        ammunition without a launcher, rocks / boulders / iron balls. Only with a letter for it (value.slot_ok)."""
         reason = self.take_reason_kind(text, worn)
-        if reason is not None and self.opts.slots and not self.slot_ok(self.kind_of(text)[0], text, reason):
+        if reason is not None and not self.slot_ok(self.kind_of(text)[0], text, reason):
             return None
         return reason
 

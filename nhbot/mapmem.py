@@ -324,13 +324,12 @@ class MapMixin:
 
     def stairs_mask(self, lv, kind, k_mem=None):
         """The squares of the remembered staircases of kind (G.UPSTAIR / G.DOWNSTAIR) we may walk to and take:
-        k_mem (default: kinds) == kind -- stairs_refused: less the squares where the game said there is none
-        (Level.not_stairs, msg_map). Every step that walks to stairs and presses '<' / '>' takes its targets
-        from here."""
+        k_mem (default: kinds) == kind, less the squares where the game said there is none (Level.not_stairs,
+        msg_map). Every step that walks to stairs and presses '<' / '>' takes its targets from here.
+        (A/B stairs_refused -- one record, every walk to stairs: +94 [-141, +329], median 7777 -> 7794.)"""
         mask = (self.kinds(lv) if k_mem is None else k_mem) == kind
-        if self.opts.stairs_refused:
-            for p in lv.not_stairs:
-                mask[p] = False
+        for p in lv.not_stairs:
+            mask[p] = False
         return mask
 
     def stairs_kind_here(self, lv):
@@ -410,11 +409,10 @@ class MapMixin:
             # we remembered a staircase that isn't here (arriving next to stairs a monster stood on marks the
             # wrong square); the refusal costs no time, so pressing again looped to the step cap
             yy, xx = self.pos()
-            if self.opts.stairs_refused:
-                # stairs_refused: the one place a refusal is recorded -- whichever step pressed the key; every
-                # stairs target (stairs_mask, linked_stairs) leaves the square out from now on, also when the
-                # staircase is remembered in the terrain layer under an item
-                lv.not_stairs.add((yy, xx))
+            # the one place a refusal is recorded -- whichever step pressed the key; every stairs target
+            # (stairs_mask, linked_stairs) leaves the square out from now on, also when the staircase is remembered
+            # in the terrain layer under an item
+            lv.not_stairs.add((yy, xx))
             if G.KIND[int(lv.under[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):
                 lv.set_terrain((yy, xx), FLOOR_GLYPH)
             elif self.opts.stair_refuse and G.KIND[int(lv.terrain[yy, xx])] in (G.UPSTAIR, G.DOWNSTAIR):

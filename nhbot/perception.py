@@ -9,7 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
-from nhbot.messages import MELEE_BY_NAME_RE, attacks_on_us
+from nhbot.messages import attacks_on_us
 from nhbot.monsters import (ALWAYS_AVOID, M2_HOSTILE, M2_PEACEFUL, MR_BITS, MS_GUARDIAN, MS_LEADER, MS_NEMESIS,
                             NEVER_MELEE, NO_ACTIVE_ATTACK, PASSIVE_DMG, PASSIVE_KIND, PM_BY_NAME, RACE_MASKS, THIEVES)
 from nhbot.rays import our_protection
@@ -27,7 +27,7 @@ class PerceptionMixin:
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
         self._adjacent, self._adjacent_at = [], None     # adjacent_hostiles: the answer and (tick, steps, level) of it
         self.avoid_cells = []          # squares of never-melee monsters, walked round (adjacent_hostiles)
-        self.shoot_cells = set()       # melee_policy: the avoid_cells in view a missile may go at (melee_policy)
+        self.shoot_cells = set()       # shoot_avoided: the avoid_cells in view a missile may go at (not peaceful)
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn (msg_combat)
         self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
         self.blind_held = self.hallu_held = 0
@@ -128,11 +128,7 @@ class PerceptionMixin:
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
                and G.KIND[g[y + dy, x + dx]] == G.MONSTER]
-        if self.opts.attacked_us:
-            # attacked_us: the one parser of attacks on us (messages.attacks_on_us), melee ones
-            whos = [who for who, kind in attacks_on_us(m) if kind == "melee" and who != "Something"]
-        else:
-            whos = [mm.group(1) or mm.group(2) for mm in MELEE_BY_NAME_RE.finditer(m)]
+        whos = [who for who, kind in attacks_on_us(m) if kind == "melee" and who != "Something"]
         for who in whos:
             if who in ("You", "It") or who.startswith("You "):
                 continue
@@ -229,6 +225,8 @@ class PerceptionMixin:
                     if self.never_melee(name) and name in PM_BY_NAME \
                             and PM_BY_NAME[name].mmove == 0:
                         lv.stationary[(yy, xx)] = name
+        if self.opts.shoot_avoided and not pol:
+            self.shoot_cells = {p for p in self.avoid_cells if not self.peaceful_now(lv, p, look=False)}
         self.stationary_avoid(lv)
         for dy, dx in NEIGH:
             ny, nx = y + dy, x + dx
@@ -360,7 +358,7 @@ class PerceptionMixin:
 
     def melee_policy(self, lv, name, pos):
         """melee_policy: (fight, avoid, shoot) for the monster `name` at pos -- the one answer avoid_cells,
-        adjacent_hostiles, ranged_target and unblock_step read. fight: we may hit it -- anything not never_melee; a
+        adjacent_hostiles and unblock_step read (shoot: ranged_target / unblock_step under shoot_avoided). fight: we may hit it -- anything not never_melee; a
         never-melee one only on a desperate level at 90% of max HP or more (not the always-avoided ones), a gas spore
         above its explosion (spore_ok). avoid: a never-melee one we may not hit is walked round -- exactly then, so
         explore never walks into one the melee step refuses (before, a desperate level dropped it from avoid_cells at

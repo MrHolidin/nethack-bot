@@ -165,9 +165,10 @@ class GoalsMixin:
         the gate of the steps that consume them; gold not in a shop when we visit shops (gold_here), piles never
         on a shop square (housekeeping inspects them)."""
         ok = self.items_gate(lv)
-        # merch_one: gold where step_gold_here would take it -- not where merch_risk holds (a shopkeeper in view
-        # and no shop marked too), else explore walks to gold that step never picks up
-        out = {"gold": gold & ~(self.merch_mask(lv) if self.opts.merch_one else lv.shop) & ok}
+        # gold where step_gold_here would take it -- not where merch_risk holds (a shopkeeper in view and no shop
+        # marked too), else explore walks to gold that step never picks up (A/B merch_one: -252 [-482, -47], median
+        # 7777 unchanged, 15 games of 1000 changed)
+        out = {"gold": gold & ~self.merch_mask(lv) & ok}
         pile = np.zeros_like(gold)
         if ok:
             im = passable & ~lv.shop

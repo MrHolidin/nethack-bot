@@ -228,9 +228,7 @@ class ExploreMixin:
         else:
             return self.walk_to(lv, mask, grids=grids, max_cost=max_cost)[0] == "moved"
         if re.search(r"You can't go (?:down|up) here", self.message()):
-            if not self.opts.stairs_refused:          # stairs_refused: msg_map records it, for every step
-                lv.not_stairs.add(self.pos())
-            self.mines_trip_stats["not_stairs"] += 1
+            self.mines_trip_stats["not_stairs"] += 1     # msg_map recorded it (Level.not_stairs)
         return True
 
     def level_travel_step(self, lv, grids, key, act, stat, known_only=False, max_cost=10_000):

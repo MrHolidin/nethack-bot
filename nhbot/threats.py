@@ -19,13 +19,13 @@ gives it unlimited use of them):
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.messages import (ATTACKER_NAME_RE, FLEE_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE, attacker_kind,
+from nhbot.messages import (FLEE_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE, attacker_kind,
                             attacks_on_us)
 from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
 TRACK_FORGET = 10            # turns a track is kept unseen
-FLEE_TURNS = 10              # ranges: turns a monster counts as fleeing after "The X turns to flee." -- monmove.c:346
+FLEE_TURNS = 10              # helpless_bonus: turns a monster counts as fleeing after "The X turns to flee." -- monmove.c:346
                              # distfleeck's scare (Elbereth, a scroll of scare monster) lasts rnd(10) 6 times in 7
 WAND_KINDS = ("striking", "magic missile", "fire", "cold", "sleep", "lightning", "death")
 RAY_SEEN = (("sleep ray", "sleep"), ("bolt of fire", "fire"), ("bolt of cold", "cold"),
@@ -81,12 +81,8 @@ class ThreatMixin:
         if not self.mon_tracks:
             return
         t = self.turn()
-        if self.opts.attacked_us:
-            # attacked_us: only attacks on us (messages.attacks_on_us), melee or ranged -- not "The jackal bites the
-            # little dog."
-            names = [n for who, _ in attacks_on_us(m) if (n := attacker_kind(who)) is not None]
-        else:
-            names = ATTACKER_NAME_RE.findall(m)
+        # only attacks on us (messages.attacks_on_us), melee or ranged -- not "The jackal bites the little dog."
+        names = [n for who, _ in attacks_on_us(m) if (n := attacker_kind(who)) is not None]
         for name in names:
             tr = self.track_named(name)
             if tr is not None:
@@ -112,7 +108,7 @@ class ThreatMixin:
                 old = tr["missile"]
                 tr["missile"] = {"kind": kind, "counts": (old["counts"] if old else []) + [n],
                                  "poisoned": poisoned or bool(old and old["poisoned"])}
-        if self.opts.ranges:
+        if self.opts.helpless_bonus:
             for name in FLEE_RE.findall(m):
                 tr = self.track_named(name)
                 if tr is not None:
@@ -136,7 +132,7 @@ class ThreatMixin:
         return {"wands": sorted(tr["wands"]), "missile": tr["missile"], "breath": tr["breath"]}
 
     def fleeing(self, pos):
-        """ranges: the monster at pos turned to flee (FLEE_RE) at most FLEE_TURNS turns ago."""
+        """helpless_bonus: the monster at pos turned to flee (FLEE_RE) at most FLEE_TURNS turns ago."""
         t = self.turn()
         tr = next((r for r in self.mon_tracks if r["pos"] == pos and r["seen"] == t), None)
         return tr is not None and tr.get("fled") is not None and t - tr["fled"] <= FLEE_TURNS

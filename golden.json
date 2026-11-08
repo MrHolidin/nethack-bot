@@ -20,7 +20,7 @@
   "steps": 12983,
   "keys": 12983,
   "keyhash": "1ad3b4bc42c637ee",
-  "secs": 7.9
+  "secs": 8.6
  },
  "61001": {
   "score": 1838.0,
@@ -43,30 +43,30 @@
   "steps": 2907,
   "keys": 2907,
   "keyhash": "654a2f45ac33fb36",
-  "secs": 2.5
+  "secs": 2.4
  },
  "61002": {
-  "score": 78408.0,
-  "turns": 13659,
+  "score": 100659.0,
+  "turns": 17699,
   "max_depth": 22,
-  "xl": 11,
+  "xl": 12,
   "last_msgs": [
-   "The gremlin bites!  The gremlin hits!  The gremlin hits!",
-   "The gremlin hits!  The gremlin bites!  The gremlin hits!",
-   "The gremlin hits!  The gremlin bites!  The gremlin hits!",
-   "You kill the gremlin!  The gremlin hits!  The gremlin hits!",
-   "The gremlin bites!  The gremlin hits!  The gremlin hits!",
-   "The gremlin hits!  The gremlin bites!  The gremlin hits!",
-   "The gremlin hits!  The gremlin hits!  The gremlin bites!",
-   "The gremlin hits!  The gremlin hits!  The gremlin hits!",
+   "The gremlin hits!",
+   "You kill the gremlin!",
+   "You kill the gremlin!",
+   "You kill the gremlin!  The gremlin hits!  The gremlin misses!",
    "The gremlin bites!  The gremlin misses!  The gremlin hits!",
-   "The gremlin hits!  The gremlin bites!"
+   "The gremlin hits!  The gremlin bites!  The gremlin hits!",
+   "The gremlin hits!  The gremlin bites!  The gremlin hits!",
+   "You kill the gremlin!",
+   "You kill the gremlin!",
+   "You kill the gremlin!  The gremlin hits!"
   ],
   "truncated": false,
-  "steps": 17444,
-  "keys": 17444,
-  "keyhash": "2d49292b5654ad30",
-  "secs": 31.8
+  "steps": 24856,
+  "keys": 24856,
+  "keyhash": "622eb58ddc70d62d",
+  "secs": 90.7
  },
  "61003": {
   "score": 1724.0,
@@ -89,7 +89,7 @@
   "steps": 6026,
   "keys": 6026,
   "keyhash": "41944cebb1ae335c",
-  "secs": 3.9
+  "secs": 5.0
  },
  "61004": {
   "score": 1709.0,
@@ -112,51 +112,51 @@
   "steps": 5009,
   "keys": 5009,
   "keyhash": "71a0a67d3bc61a28",
-  "secs": 3.3
+  "secs": 3.8
  },
  "61005": {
-  "score": 36055.0,
-  "turns": 12624,
-  "max_depth": 14,
-  "xl": 10,
+  "score": 10077.0,
+  "turns": 6417,
+  "max_depth": 11,
+  "xl": 8,
   "last_msgs": [
-   "The wand misses the warhorse.  The warhorse kicks!",
-   "The warhorse bites!  The killer bee misses!",
-   "What do you want to zap? [A or ?*]",
-   "In what direction?",
-   "The wand misses the warhorse.  The wand hits the panther!",
-   "The hill orc zaps a wand of striking!  The wand hits you!",
-   "The warhorse kicks!  The warhorse just misses!  The dingo bites!",
+   "Something is written here in the dust.  You read: \"Elbereth\".",
+   "You see no objects here.",
+   "You see no objects here.",
+   "The blast of fire hits you!  Valkyrie, all your powers will be lost...",
+   "You stop searching.  The killer bee is killed by the blast of fire!",
+   "The blast of fire bounces!  The blast of fire hits you!",
+   "Your scroll labeled GARVEN DEH catches fire and burns!",
    "You die...  But wait...  Your medallion begins to glow!"
   ],
   "truncated": false,
-  "steps": 23553,
-  "keys": 23553,
-  "keyhash": "c74f48962251d38f",
-  "secs": 19.2
+  "steps": 13232,
+  "keys": 13232,
+  "keyhash": "8d29786827f41f98",
+  "secs": 13.0
  },
  "61006": {
-  "score": 102810.0,
-  "turns": 37309,
-  "max_depth": 23,
-  "xl": 12,
+  "score": 13599.0,
+  "turns": 11459,
+  "max_depth": 10,
+  "xl": 9,
   "last_msgs": [
-   "You finish your prayer.  You feel that Tyr is displeased.",
-   "You feel less confused now.",
-   "There are several objects here.",
-   "There are several objects here.",
-   "You hear a G note squeak in the distance.",
-   "A gush of water hits the large dog on the head!",
-   "You stop searching.",
-   "A mysterious force prevents the black unicorn from teleporting!",
-   "A mysterious force prevents the black unicorn from teleporting!",
-   "A mysterious force prevents the black unicorn from teleporting!"
+   "The gargoyle hits!  The gargoyle misses!  It hits!  It hits!",
+   "The fox bites!  The giant spider misses!",
+   "The fox bites!  The giant spider misses!",
+   "You destroy it!  The xan misses!  The gargoyle hits!",
+   "The gargoyle hits!  The gargoyle bites!  You hear a mumbled curse.",
+   "The fox misses!  The giant spider bites!",
+   "The fox misses!  The giant spider bites!",
+   "You attack thin air.",
+   "You attack thin air.",
+   "You miss the xan.  The xan pricks your right leg!  The gargoyle hits!"
   ],
   "truncated": false,
-  "steps": 128430,
-  "keys": 128430,
-  "keyhash": "4a18e032982d1a2b",
-  "secs": 60.0
+  "steps": 17229,
+  "keys": 17229,
+  "keyhash": "35cc3835fc0be33a",
+  "secs": 20.2
  },
  "61007": {
   "score": 8379.0,
@@ -179,30 +179,30 @@
   "steps": 11549,
   "keys": 11549,
   "keyhash": "95206293e4f62987",
-  "secs": 10.8
+  "secs": 12.1
  },
  "61008": {
-  "score": 28131.0,
-  "turns": 11524,
-  "max_depth": 17,
-  "xl": 10,
+  "score": 15986.0,
+  "turns": 9430,
+  "max_depth": 15,
+  "xl": 9,
   "last_msgs": [
-   "Your movements are slowed slightly because of your load.",
-   "What do you want to drop? [$a-zA-Z or ?*]",
-   "You drop a knife.  The soldier thrusts his short sword.",
-   "The soldier hits!",
-   "What do you want to drop? [$a-zA-Z or ?*]",
-   "You drop a helmet.  The soldier thrusts his short sword.",
-   "The soldier hits!",
-   "What do you want to drop? [$a-zA-FH-Z or ?*]",
-   "You drop a mummy wrapping.  The soldier thrusts his short sword.",
-   "The soldier hits!"
+   "The giant mummy turns to flee.",
+   "Something is written here in the dust.  You read: \"Elbereth\".",
+   "You see no objects here.",
+   "The troll wields a spetum!",
+   "The troll thrusts a spetum.  You are hit by a spetum!",
+   "The troll thrusts his spetum.  The troll hits!  The troll hits!",
+   "The troll bites!",
+   "The troll bites!",
+   "You hit the troll!  The troll thrusts his spetum.  The troll hits!",
+   "The troll hits!"
   ],
   "truncated": false,
-  "steps": 18654,
-  "keys": 18654,
-  "keyhash": "6df06d191dba80fc",
-  "secs": 15.2
+  "steps": 14471,
+  "keys": 14471,
+  "keyhash": "3b213a6b218a37ba",
+  "secs": 16.0
  },
  "61009": {
   "score": 47516.0,
@@ -225,30 +225,30 @@
   "steps": 19037,
   "keys": 19037,
   "keyhash": "d1aba6e909c163de",
-  "secs": 19.3
+  "secs": 23.3
  },
  "61010": {
-  "score": 28090.0,
-  "turns": 14187,
-  "max_depth": 19,
+  "score": 22372.0,
+  "turns": 12083,
+  "max_depth": 16,
   "xl": 10,
   "last_msgs": [
+   "What do you want to throw? [$agjnotz or ?*]",
    "In what direction?",
-   "The xorn hits!  The xorn hits!  The xorn hits!  The xorn bites!",
-   "What do you want to throw? [$atzQ or ?*]",
+   "The zruty misses!  The zruty hits!  The zruty bites!",
+   "What do you want to throw? [$agjnotz or ?*]",
    "In what direction?",
-   "What do you want to throw? [$atzQ or ?*]",
+   "What do you want to throw? [$agjnotz or ?*]",
    "In what direction?",
-   "The xorn hits!  The xorn hits!  The xorn hits!  The xorn bites!",
-   "What do you want to throw? [$atzQ or ?*]",
+   "What do you want to throw? [$agjnotz or ?*]",
    "In what direction?",
-   "The xorn hits!  The xorn hits!  The xorn hits!  The xorn bites!"
+   "The zruty hits!"
   ],
   "truncated": false,
-  "steps": 25969,
-  "keys": 25969,
-  "keyhash": "1d7052eb2d622c05",
-  "secs": 25.1
+  "steps": 21809,
+  "keys": 21809,
+  "keyhash": "0b3598ce8fb01207",
+  "secs": 31.1
  },
  "61011": {
   "score": 100.0,
@@ -294,7 +294,7 @@
   "steps": 3994,
   "keys": 3994,
   "keyhash": "61d1d7e19fce4e15",
-  "secs": 4.9
+  "secs": 5.5
  },
  "61013": {
   "score": 93022.0,
@@ -316,54 +316,54 @@
   "truncated": true,
   "steps": 200000,
   "keys": 200000,
-  "keyhash": "150919abfaddf2fa",
-  "secs": 41.3
+  "keyhash": "4e40b372dc57746c",
+  "secs": 208.2
  },
  "61014": {
-  "score": 33955.0,
-  "turns": 16015,
+  "score": 15330.0,
+  "turns": 7208,
   "max_depth": 12,
   "xl": 10,
   "last_msgs": [
-   "You hit the tengu!  The tengu bites!",
-   "You hit the tengu!  The gecko misses!  The tengu bites!",
-   "You hit the tengu!  The gecko misses!  The tengu bites!",
-   "You kill the tengu!  The ogre king wields a battle-axe!",
-   "You kill the tengu!  The ogre king wields a battle-axe!",
-   "You hit the leocrotta!  The large kobold drinks an emerald potion!",
-   "Suddenly you cannot see the large kobold.",
-   "The ogre king swings his battle-axe.  The ogre king hits!",
-   "The orc shaman picks up a scroll.  The leocrotta hits!",
-   "The leocrotta bites!  The leocrotta hits!"
+   "The 1st elven arrow hits the lizard.",
+   "The 2nd elven arrow misses the lizard.",
+   "The 2nd elven arrow misses the Elvenking.",
+   "The 2nd elven arrow misses the xan.  The 2nd elven arrow misses you.",
+   "The 3rd elven arrow hits the lizard!  The xan misses!",
+   "The vampire bat bites!  The vampire bat bites!  The xan misses!",
+   "The vampire bat bites!  The vampire bat bites!  The xan misses!",
+   "You hit the elf-lord!  The xan scratches your right boot!",
+   "The elf-lord thrusts his elven spear.  The elf-lord hits!",
+   "The elf-lord thrusts his elven spear.  The elf-lord hits!"
   ],
   "truncated": false,
-  "steps": 26794,
-  "keys": 26794,
-  "keyhash": "eae361863e030a08",
-  "secs": 25.6
+  "steps": 10118,
+  "keys": 10118,
+  "keyhash": "221ff74329223b6b",
+  "secs": 14.1
  },
  "61015": {
-  "score": 55300.0,
-  "turns": 31088,
+  "score": 42744.0,
+  "turns": 24766,
   "max_depth": 9,
   "xl": 9,
   "last_msgs": [
-   "You hit the warg!",
-   "You kill the warg!  The warg bites!  The warg bites!",
-   "You kill the warg!  The warg bites!  The warg bites!",
-   "You hit the warg.  The warg misses!  The warg misses!",
-   "You hit the warg.  The warg misses!  The warg misses!",
-   "You hit the warg.  The warg bites!  The warg bites!",
-   "You hit the warg.  The warg bites!  The warg bites!",
-   "You hit the warg!  The warg misses!  The warg bites!",
-   "You hit the warg!  The warg misses!  The warg bites!",
-   "You hit the warg!  The warg bites!  The warg bites!"
+   "The troll hits!  The troll just misses!  The troll bites!",
+   "The troll hits!  The troll just misses!  The troll bites!",
+   "You kill the soldier ant!",
+   "You kill the soldier ant!",
+   "You hit the troll!  The troll swings his scimitar.  The troll hits!",
+   "The troll hits!  The troll misses!",
+   "The troll hits!  The troll misses!",
+   "You hit the troll.",
+   "You hit the troll.",
+   "You miss the troll.  The troll swings his scimitar.  The troll hits!"
   ],
   "truncated": false,
-  "steps": 61588,
-  "keys": 61588,
-  "keyhash": "cc278c6dd93c61cb",
-  "secs": 48.5
+  "steps": 41265,
+  "keys": 41265,
+  "keyhash": "74ec1e937c7ac9de",
+  "secs": 54.3
  },
  "61016": {
   "score": 16958.0,
@@ -386,7 +386,7 @@
   "steps": 13041,
   "keys": 13041,
   "keyhash": "cb12ec1b0cfa9721",
-  "secs": 9.7
+  "secs": 10.1
  },
  "61017": {
   "score": 3237.0,
@@ -409,7 +409,7 @@
   "steps": 5991,
   "keys": 5991,
   "keyhash": "83bc99806c589792",
-  "secs": 10.6
+  "secs": 11.4
  },
  "61018": {
   "score": 21280.0,
@@ -432,7 +432,7 @@
   "steps": 12765,
   "keys": 12765,
   "keyhash": "357e5d78b22ebd60",
-  "secs": 12.0
+  "secs": 14.2
  },
  "61019": {
   "score": 69391.0,
@@ -455,7 +455,7 @@
   "steps": 29449,
   "keys": 29449,
   "keyhash": "9cefa906349d5adf",
-  "secs": 48.2
+  "secs": 48.9
  },
  "61020": {
   "score": 570.0,
@@ -501,7 +501,7 @@
   "steps": 8405,
   "keys": 8405,
   "keyhash": "0a5686d8ae1a74c1",
-  "secs": 7.5
+  "secs": 7.9
  },
  "61022": {
   "score": 65461.0,
@@ -524,7 +524,7 @@
   "steps": 26288,
   "keys": 26288,
   "keyhash": "d860f93db593fd88",
-  "secs": 24.8
+  "secs": 30.5
  },
  "61023": {
   "score": 412.0,
@@ -550,27 +550,27 @@
   "secs": 1.5
  },
  "61024": {
-  "score": 5305.0,
-  "turns": 5207,
-  "max_depth": 11,
-  "xl": 7,
+  "score": 20586.0,
+  "turns": 9379,
+  "max_depth": 13,
+  "xl": 10,
   "last_msgs": [
-   "There are several objects here.",
-   "You see here 6 rocks.",
-   "There are several objects here.",
-   "You see here a yellowish brown gem.",
-   "You descend the stairs.",
-   "You see here a red gem.",
-   "You see here a red gem.",
-   "You see here a red gem.",
-   "j - a red gem.",
-   "You fall into a pit!  You land on a set of sharp iron spikes!"
+   "The Olog-hai bites!",
+   "You hit the Olog-hai!",
+   "You hit the Olog-hai!",
+   "You hit the Olog-hai!  The Olog-hai hits!  The Olog-hai hits!",
+   "The Olog-hai bites!",
+   "The Olog-hai bites!",
+   "You hit the Olog-hai!  The Olog-hai hits!  The Olog-hai hits!",
+   "The Olog-hai bites!",
+   "The Olog-hai bites!",
+   "You miss the Olog-hai.  The Olog-hai hits!  The Olog-hai hits!"
   ],
   "truncated": false,
-  "steps": 9014,
-  "keys": 9014,
-  "keyhash": "dc3b3c5817d237fd",
-  "secs": 6.6
+  "steps": 16262,
+  "keys": 16262,
+  "keyhash": "4c09171fac91a4f9",
+  "secs": 24.6
  },
  "61025": {
   "score": 2251.0,
@@ -593,7 +593,7 @@
   "steps": 8214,
   "keys": 8214,
   "keyhash": "f585ffa2f6736582",
-  "secs": 5.0
+  "secs": 5.3
  },
  "61026": {
   "score": 1317.0,
@@ -616,7 +616,7 @@
   "steps": 3307,
   "keys": 3307,
   "keyhash": "41aead6438cfd44b",
-  "secs": 3.7
+  "secs": 3.6
  },
  "61027": {
   "score": 26468.0,
@@ -639,7 +639,7 @@
   "steps": 33256,
   "keys": 33256,
   "keyhash": "a9281fd7ae1b95f1",
-  "secs": 48.8
+  "secs": 65.4
  },
  "61028": {
   "score": 810.0,
@@ -662,7 +662,7 @@
   "steps": 2904,
   "keys": 2904,
   "keyhash": "6ed9dbbd5058fd6e",
-  "secs": 2.5
+  "secs": 2.6
  },
  "61029": {
   "score": 989.0,
@@ -685,52 +685,52 @@
   "steps": 3433,
   "keys": 3433,
   "keyhash": "d9f255afb9267716",
-  "secs": 2.8
+  "secs": 3.2
  },
  "61030": {
-  "score": 119884.0,
-  "turns": 17036,
-  "max_depth": 24,
-  "xl": 12,
-  "last_msgs": [
-   "You kill the vampire bat!",
-   "The seemingly dead vampire bat suddenly transforms and rises as a vampire!",
-   "The seemingly dead vampire bat suddenly transforms and rises as a vampire!",
-   "You faint from lack of food.  The vampire hits!  The vampire bites!",
-   "It hits!  The vampire hits!  The vampire bites!  It hits!",
-   "The vampire hits!  The vampire bites!  The vampire hits!",
-   "The vampire misses!  The vampire hits!  The vampire bites!",
-   "The vampire hits!  The vampire bites!  The vampire hits!",
-   "The vampire bites!  It hits!  The vampire hits!  The vampire bites!",
-   "It hits!"
-  ],
-  "truncated": false,
-  "steps": 29263,
-  "keys": 29263,
-  "keyhash": "678533bd0d8abb05",
-  "secs": 43.4
- },
- "61031": {
-  "score": 10555.0,
-  "turns": 8249,
-  "max_depth": 9,
+  "score": 10682.0,
+  "turns": 8421,
+  "max_depth": 10,
   "xl": 8,
   "last_msgs": [
-   "The soldier ant stings!  The soldier ant's sting was poisoned!",
-   "The poison doesn't seem to affect you.",
-   "Something is written here in the dust.  You read: \"Elbe)eth\".",
-   "You see here a potion of extra healing.",
-   "What do you want to write with? [- befhiklnqv-xABEJMRSZ or ?*]",
-   "Do you want to add to the current engraving? [ynq] (y)",
-   "You wipe out the message that was written in the dust here.",
-   "You write in the dust with your fingertip.",
-   "What do you want to write in the dust here?",
-   "The soldier ant bites!"
+   "You kill the dwarf!",
+   "The quasit just misses!  The quasit misses!  The quasit misses!",
+   "The quasit just misses!  The quasit misses!  The quasit misses!",
+   "You miss the quasit.  The quasit hits!  The quasit hits!",
+   "The quasit misses!",
+   "The quasit misses!",
+   "You hit the quasit!  The quasit reads a scroll labeled VELOX NEB!",
+   "The quasit misses!  The quasit hits!  The quasit bites!",
+   "The quasit misses!  The quasit hits!  The quasit bites!",
+   "You miss the quasit.  The quasit just misses!  The quasit hits!"
   ],
   "truncated": false,
-  "steps": 12985,
-  "keys": 12985,
-  "keyhash": "e16618389a75179e",
-  "secs": 11.8
+  "steps": 17755,
+  "keys": 17755,
+  "keyhash": "7686b62ba9a19d37",
+  "secs": 15.4
+ },
+ "61031": {
+  "score": 7220.0,
+  "turns": 6416,
+  "max_depth": 8,
+  "xl": 7,
+  "last_msgs": [
+   "The bolt of cold hits Kinsky!  Kinsky zaps a wand of magic missile!",
+   "The magic missile hits you!  The magic missile bounces!",
+   "The magic missile hits you!  The magic missile hits Kinsky.",
+   "What do you want to zap? [fnv or ?*]",
+   "In what direction?",
+   "The bolt of cold hits Kinsky!  The bolt of cold bounces!",
+   "What do you want to zap? [fnv or ?*]",
+   "Nothing happens.  Kinsky zaps a wand of magic missile!",
+   "The magic missile hits you!  Valkyrie, all your powers will be lost...",
+   "The magic missile bounces!  The magic missile hits you!"
+  ],
+  "truncated": false,
+  "steps": 9828,
+  "keys": 9828,
+  "keyhash": "e8268c57477adb73",
+  "secs": 10.2
  }
 }

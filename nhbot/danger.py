@@ -261,10 +261,10 @@ class DangerMixin:
         return (name if name in WEAPON_DICE else None), (ench or 0), (0, 0)
 
     def our_skill_bonus(self):
-        """ranges: (to-hit, damage) bonus of our skill with the weapon in hand (weapon.c weapon_hit_bonus /
+        """skill_bonus: (to-hit, damage) bonus of our skill with the weapon in hand (weapon.c weapon_hit_bonus /
         weapon_dam_bonus; weapondice.skill_hit_bonus) -- bare hands: bare handed combat, a Monk's or Samurai's
         martial arts; a wielded non-weapon: none (P_NONE). (0, 0) without the flag or while the levels are unread."""
-        if not self.opts.ranges or self.skills is None:
+        if not self.opts.skill_bonus or self.skills is None:
             return 0, 0
         it = next((i for i in self.items() if i.wielded), None)
         if it is None:
@@ -280,15 +280,16 @@ class DangerMixin:
 
     def our_hit_prob(self, name, pos=None):
         """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20).
-        ranges: + our weapon skill (our_skill_bonus); the monster at pos: +4 helpless -- our sleep ray put it down
-        (asleep: zap.c sleep_monst clears mcanmove) --, +2 fleeing (threats.fleeing) (uhitm.c:276-291)."""
+        skill_bonus: + our weapon skill (our_skill_bonus); helpless_bonus, the monster at pos: +4 helpless -- our
+        sleep ray put it down (asleep: zap.c sleep_monst clears mcanmove) --, +2 fleeing (threats.fleeing)
+        (uhitm.c:276-291)."""
         pm = PM_BY_NAME[name]
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
         abon = to_hit_abon(st, dx, xl)
         w, ench, (hit_die, _) = self.our_weapon()
         tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
-        if self.opts.ranges:
-            tmp += self.our_skill_bonus()[0]
+        tmp += self.our_skill_bonus()[0]
+        if self.opts.helpless_bonus:
             lv = self.levels.get(self.cur_key)
             if pos is not None and lv is not None:
                 tmp += 4 if self.asleep(lv, pos) else 0
@@ -302,7 +303,7 @@ class DangerMixin:
 
     def our_damage_pmf(self, name):
         """weapon.c dmgval -- the small / large die + enchantment (not below 0), then less the erosion (rusty,
-        corroded, ...: 1..3, not below 1) -- plus dbon (ranges: and the skill's bonus), at least 1 (uhitm.c hmon); plus
+        corroded, ...: 1..3, not below 1) -- plus dbon (skill_bonus: and the skill's bonus), at least 1 (uhitm.c hmon); plus
         an artifact's damage die."""
         pm = PM_BY_NAME[name]
         dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
@@ -311,7 +312,7 @@ class DangerMixin:
         eros = erosion(wielded.text) if w and wielded is not None else 0
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
-        sk = self.our_skill_bonus()[1]           # ranges: the skill's damage bonus, only on a base roll above 1
+        sk = self.our_skill_bonus()[1]           # skill_bonus: the skill's damage bonus, only on a base roll above 1
         out = np.zeros(max(2, d + max(ench, 0) + dbon + max(sk, 0) + 1))      # (uhitm.c:711, 769, 1111)
         for v in range(1, d + 1):
             dv = max(0, v + ench)

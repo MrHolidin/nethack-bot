@@ -71,7 +71,7 @@ class PotionTestMixin:
         self.cur_act = "quaff_test"
         self.quaff_tested.add(key)
         seq0 = self.msg_seq
-        if not self.ask("q", "drink"):
+        if not self.ask_drink():
             self.quaff_stats["no_prompt"] += 1
             return True
         self.press(it.letter)

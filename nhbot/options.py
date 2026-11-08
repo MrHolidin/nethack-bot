@@ -45,39 +45,27 @@ DEFAULTS = {
                                #      we throw too) (nhbot.policy)
     "pile_one": False,         # A/B: one pile mask (pickup.pile_mask) for explore's walk, the inspection where we stand and
                                #      the goal statistics -- food piles only while we carry less than MAX_FOOD (nhbot.pickup)
-    "history_always": False,   # A/B: perception and the fight record (danger_tick -- our hits counted for win_prob --,
-                               #      summary 'hist') every tick before the steps that act, not only in ticks no
-                               #      step before 'history' (pray, heal, blind, ...) acted in (nhbot.policy.tick)
-    "prey_cache": False,       # A/B: prey_win's cache keyed also on the monster's square, our hits on it and whether it
-                               #      is asleep (all read by win_prob), and kept for one tick only -- it grew without
-                               #      limit and went stale (nhbot.combat.prey_win)
     "statue_free": False,      # A/B: a statue is floor for planning (mapmem.kinds, nav.grids), no boulder (cost 15,
                                #      never walked in Sokoban): no statue stops a step (hack.c test_move)
-    "ranges": False,           # A/B: a gas spore is thrown at from 2 on (its explosion covers 3x3, explode.c); a
-                               #      shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM); our to-hit / damage
-                               #      count our weapon skill (#enhance read, weapon.c), +4 on one our sleep ray put
-                               #      down, +2 on one that turned to flee (uhitm.c) (nhbot.combat, danger, threats)
-    "stairs_refused": False,   # A/B: "You can't go up / down here" noted (Level.not_stairs) by msg_map whatever pressed
-                               #      the key, and every walk to stairs (explore's way down, mines_return, excal_go_up,
-                               #      level travel) leaves those squares out (mapmem.stairs_mask)
-    "merch_one": False,        # A/B: one merchandise rule (pickup.merch_risk) for an item's walk mask and the step
-                               #      that takes it: gold not walked to where step_gold_here won't pick it up (a
-                               #      shopkeeper in view, no shop marked); a corpse judged where it lies, not where we
-                               #      stand (nhbot.goals.goal_masks, policy.step_eat_corpse)
+    # ranges (all four below at once: -1194 [-2590, +247], 560 games changed) split:
+    "spore_range": False,      # A/B: a gas spore is thrown at from 2 on (its explosion covers 3x3, explode.c), not 3
+    "shooter_range": False,    # A/B: a shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM), not 8 (nhbot.combat)
+    "skill_bonus": False,      # A/B: our to-hit / damage count our weapon skill (#enhance read, weapon.c) (nhbot.danger)
+    "helpless_bonus": False,   # A/B: our to-hit +4 on one our sleep ray put down, +2 on one that turned to flee
+                               #      (uhitm.c:276-291; threats.fleeing) (nhbot.danger)
     "nymph_elb": False,        # A/B: on a confirmed Elbereth (read back) a nymph / monkey next to us is not hit (the
                                #      blow erases it, setmangry) -- we wait, nymph_wait_max turns at most; the
                                #      nymph's Elbereth is written by elbereth.elb_write (retries a misspelling)
                                #      (nhbot.thieves.nymph_step)
-    "attacked_us": False,      # A/B: one table / parser of the attacks on us (messages.attacks_on_us) for every reader
-                               #      -- the threat tracker (no longer "The jackal bites the little dog."), the
-                               #      peaceful-attacker marks, blind_strike / hallu_strike ("thrusts" / "swings" lines)
-    "melee_policy": False,     # A/B: one (fight, avoid, shoot) answer per monster (perception.melee_policy) for
-                               #      avoid_cells, adjacent_hostiles, ranged_target and unblock_step: on a desperate
-                               #      level a never-melee monster is walked round below 90% HP too (no walking into
-                               #      a jelly we won't hit); missiles at every avoided non-peaceful one alike
-    "slots": False,            # A/B: the 52 inventory letters count: a floor stack that won't merge takes the last
-                               #      free letter only if worth more than the stack we'd give up (value.slot_ok),
-                               #      and with all 52 taken the drop step drops that one (carry.carry_drop_step)
+    "melee_policy": False,     # A/B: one (fight, avoid) answer per monster (perception.melee_policy) for avoid_cells,
+                               #      adjacent_hostiles and unblock_step: on a desperate level a never-melee monster is
+                               #      walked round below 90% HP too (no walking into a jelly we won't hit). (With the
+                               #      shooting below in it: -2813 [-4546, -1050], 877 games changed -- split.)
+    "shoot_avoided": False,    # A/B: missiles (ranged_target, unblock_step) at every avoided monster that is not
+                               #      peaceful (shoot_cells), not only RANGED_TARGETS -- and never at the Oracle
+    "drink_prompt": False,     # A/B: 'q' on a fountain / sink answers "Drink from the fountain?" 'n' and goes on to the
+                               #      potion question -- the heal / quaff_test steps typed the potion letter into it
+                               #      (game.ask_drink)
     "fight_model": False,      # A/B: focus fire (several hostiles next to us) scored with danger's fight model --
                                #      adjusted monster level (makemon.c adj_lev), the weapon in hand whatever its
                                #      class, erosion, encumbrance, our speed, the hits danger_tick counted -- not
