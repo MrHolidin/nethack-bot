@@ -57,6 +57,9 @@ DEFAULTS = {
                                #      shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM); our to-hit / damage
                                #      count our weapon skill (#enhance read, weapon.c), +4 on one our sleep ray put
                                #      down, +2 on one that turned to flee (uhitm.c) (nhbot.combat, danger, threats)
+    "stairs_refused": False,   # A/B: "You can't go up / down here" noted (Level.not_stairs) by msg_map whatever pressed
+                               #      the key, and every walk to stairs (explore's way down, mines_return, excal_go_up,
+                               #      level travel) leaves those squares out (mapmem.stairs_mask)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

@@ -56,7 +56,7 @@ class ExploreMixin:
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
         for p in self.goal_closed_set("gold", lv.key):
             gold[p] = False
-        downstairs = k_mem == G.DOWNSTAIR
+        downstairs = self.stairs_mask(lv, G.DOWNSTAIR, k_mem)
         on_level = self.turn() - lv.entered_turn
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)
@@ -334,7 +334,8 @@ class ExploreMixin:
         else:
             return self.walk_to(lv, mask, grids=grids)[0] == "moved"
         if re.search(r"You can't go (?:down|up) here", self.message()):
-            lv.not_stairs.add(self.pos())
+            if not self.opts.stairs_refused:          # stairs_refused: msg_map records it, for every step
+                lv.not_stairs.add(self.pos())
             self.mines_trip_stats["not_stairs"] += 1
         return True
 
@@ -351,7 +352,7 @@ class ExploreMixin:
         elsewhere = self.linked_stairs(lv, {p: k for p, k in lv.stairs_to.items() if k != nxt}, kind)
         if not up_way:
             elsewhere |= self.mines_stairs(lv)
-        mask = k_mem == kind
+        mask = self.stairs_mask(lv, kind, k_mem)
         for p in there:
             mask[p] = True
         for p in (elsewhere - there) | lv.not_stairs:
@@ -403,7 +404,7 @@ class ExploreMixin:
         branch staircase we arrive on gets the Mines mark (avoid_down), and mines_done keeps us out."""
         self.cur_act = "minesup"
         start = self.pos()
-        up = grids[0] == G.UPSTAIR
+        up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
         if up[start]:
             if lv.key[1] == 1:
                 self.pending_mines_mark = True      # next tick, on the branch level: mark its Mines staircase

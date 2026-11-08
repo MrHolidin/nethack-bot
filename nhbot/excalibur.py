@@ -82,8 +82,7 @@ class ExcaliburMixin:
         """No fountain here, but one is remembered a few levels up: walk back up to it."""
         if not self.excal_up_wanted(lv):
             return False
-        k_mem = self.grids(lv)[0]
-        up = k_mem == G.UPSTAIR
+        up = self.stairs_mask(lv, G.UPSTAIR, self.grids(lv)[0])
         if not up.any():
             return False
         y, x = self.pos()
