@@ -16,7 +16,7 @@ import nle.nethack as nh
 
 from nhbot import glyphs as G
 from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_GLYPH, NO_TOOLS, OBJ_INFO,
-                         TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, singular)
+                         TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, one_of)
 from nhbot.combat import THROWABLE
 from nhbot.equipment import GLOVES, parse_armor
 from nhbot.items import CURSED_RE, base_name
@@ -55,15 +55,16 @@ for _g in range(nh.MAX_GLYPH):
                                                           or bool(_wc and _wc[1] >= _wc[0]))
 
 
-def floor_kind(text):
+def floor_kind(text, fixed=False):
     """Floor / menu text -> (object class or None, type name): identified name for weapons and food, else the
-    bare name."""
+    bare name -- in the singular (fixed, name_parse: by items.singular_name -- "knives" was "knif", no weapon;
+    "cloves of garlic" no food)."""
     _, _, name = base_name(text)
-    one = " ".join(singular(w) for w in name.split(" "))
+    one = one_of(name, fixed)
     if re.search(r"\bgold pieces?\b", name):
         return nh.COIN_CLASS, "gold piece"
     if re.search(r"\bcorpses?$", name):
-        return nh.FOOD_CLASS, re.sub(r"s$", "", name)
+        return nh.FOOD_CLASS, one if fixed else re.sub(r"s$", "", name)
     if name in FOOD_NAMES or one in FOOD_NAMES:
         return nh.FOOD_CLASS, name if name in FOOD_NAMES else one
     a = parse_armor(text)                   # before the class words: "ring mail" is armor, not a ring
@@ -99,6 +100,10 @@ class PickupMixin:
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
 
+    def kind_of(self, text):
+        """floor_kind, names made singular by items.singular_name with name_parse."""
+        return floor_kind(text, self.opts.name_parse)
+
     # ------------------------------------------------------------------ merchandise
     def merch_risk(self, lv, pos):
         """Could what lies at pos be merchandise? On a shop square; a shopkeeper in view counts only while no
@@ -119,7 +124,7 @@ class PickupMixin:
         ammunition without a launcher, rocks / boulders / iron balls. slots: and only with a letter for it
         (value.slot_ok)."""
         reason = self.take_reason_kind(text, worn)
-        if reason is not None and self.opts.slots and not self.slot_ok(floor_kind(text)[0], text, reason):
+        if reason is not None and self.opts.slots and not self.slot_ok(self.kind_of(text)[0], text, reason):
             return None
         return reason
 
@@ -128,7 +133,7 @@ class PickupMixin:
         if "for sale" in text or base_name(text)[2] in self.never_take:
             return None
         food_n = self._take_food if self._take_food is not None else self.food_count()
-        ocls, typ = floor_kind(text)
+        ocls, typ = self.kind_of(text)
         cursed = bool(CURSED_RE.search(text))
         reason = None
         if ocls == nh.FOOD_CLASS:
@@ -207,7 +212,7 @@ class PickupMixin:
     # ------------------------------------------------------------------ what to take
     def food_needed(self, it):
         """Safe food is kept like what we need, while we carry no more than MAX_FOOD pieces."""
-        return it.ocls == nh.FOOD_CLASS and floor_kind(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
+        return it.ocls == nh.FOOD_CLASS and self.kind_of(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
 
     def food_count(self):
         return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
@@ -250,7 +255,7 @@ class PickupMixin:
         def want(t):
             if "for sale" in t or CURSED_RE.search(t):
                 return False
-            ocls, typ = floor_kind(t)
+            ocls, typ = self.kind_of(t)
             return (ocls == nh.WEAPON_CLASS and typ in MISSILE_TYPES) or (ocls == nh.GEM_CLASS and typ in THROW_STONE_TYPES)
         if not self.merch_risk(self.level(), self.pos()):
             self.take_here(want, "ammo")
@@ -322,7 +327,7 @@ class PickupMixin:
         if self.lift_last is None or self.turn() - self.lift_last[1] > LIFT_UNDO_TURNS:
             self.lift_last = None
             return it
-        lifted = next((x for x in inv if floor_kind(x.text)[1] == self.lift_last[0]), None)
+        lifted = next((x for x in inv if self.kind_of(x.text)[1] == self.lift_last[0]), None)
         if lifted is None or lifted.letter == it.letter:
             return it
         if self.value_per_weight(it, same(it)) >= self.value_per_weight(lifted, same(lifted)):
@@ -347,12 +352,12 @@ class PickupMixin:
         name = mm.group(1)
         tags = self.for_sale.get((self.cur_key, self.pos()), {})     # the price tag want may look for
         texts = [name] + ["%s (for sale, %d zorkmids)" % (t, pr) for t, pr in tags.items() if t in name or name in t]
-        ocls = floor_kind(name)[0]
+        ocls = self.kind_of(name)[0]
         # worth_taking: worth more per weight than what the drop step sheds for it -- not only "carry" picks pass
         # it (armor to wear, food, weapons don't), and one that fails would be the first thing dropped again
         ok = any(want(t) for t in texts) and ocls is not None and self.worth_taking(ocls, name)
         if ok:
-            self.lift_last = (floor_kind(name)[1], self.turn())
+            self.lift_last = (self.kind_of(name)[1], self.turn())
         k = "lift_heavy_" + ("yes" if ok else "no")
         self.carry_stats[k] = self.carry_stats.get(k, 0) + 1
         return ok

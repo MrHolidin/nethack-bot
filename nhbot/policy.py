@@ -18,7 +18,7 @@ from nhbot.consts import FAINTING, FLOOR_GLYPH, HUNGRY, NOT_HUNGRY, WEAK, ray_sq
 from nhbot.mapmem import Level
 from nhbot.monsters import M2_STALK, PASSIVE_MOLDS, PM_BY_NAME
 from nhbot.items import CURSED_RE
-from nhbot.pickup import MISSILE_TYPES, floor_kind
+from nhbot.pickup import MISSILE_TYPES
 from nhbot.survival import HORN_FIXES, HORN_SICK
 
 
@@ -405,7 +405,7 @@ class PolicyMixin:
         # the pile window lists what "Things that are here" leaves out
         txt = (sh[2] if sh else "") + (" | " + hw[2] if hw and sh and hw[:2] == sh[:2] else "")
         if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws and not c.lv.shop[y, x] \
-                and any(floor_kind(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
+                and any(self.kind_of(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
                         for t in re.split(r" \| |You see here |\.$", txt) if t.strip()):
             self.seen_here = None
             self.take_ammo()

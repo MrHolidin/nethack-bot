@@ -19,8 +19,8 @@ from collections import Counter
 
 import nle.nethack as nh
 
-from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, describe, singular
-from nhbot.items import base_name, parse_item
+from nhbot.carry import RANDOM_CLASSES, WEAPON_NAME_OF, one_of
+from nhbot.items import base_name, parse_item, unid_gem_look
 from nhbot.pricemem import _cls_of, _unit_prices, appearance, candidates, likelihood
 
 VALUE_MAX = 1_000_000.0
@@ -44,12 +44,13 @@ MERGE_WEAPONS = {"arrow", "elven arrow", "orcish arrow", "silver arrow", "ya", "
                  "worm tooth", "crysknife"}
 
 
-def stack_key(text):
+def stack_key(text, fixed=False):
     """What must agree for two stacks to merge, as far as the text shows (invent.c mergable: the type, BUC and its
-    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular."""
+    knowledge, enchantment, erosion, name): the text without count, article and state suffixes, singular (fixed --
+    name_parse: by items.singular_name)."""
     t = re.sub(r"\s*\(.*?\)", "", text).strip()
     t = re.sub(r"^(?:a|an|the|some|\d+)\s+", "", t)
-    return " ".join(singular(w) for w in t.split(" "))
+    return one_of(t, fixed)
 
 
 def is_water(ocls, text):
@@ -79,7 +80,7 @@ class ValueMixin:
         self._known_inv = inv
         for it in self.items():
             if appearance(it.text) is None and (it.ocls in RANDOM_CLASSES or it.ocls in (nh.ARMOR_CLASS, nh.TOOL_CLASS)):
-                key = describe(it.ocls, it.text)["key"]
+                key = self.describe_item(it.ocls, it.text)["key"]
                 if key in TYPE_PROB and key not in self.known_types:
                     self.known_types.add(key)
                     self.type_version += 1
@@ -135,7 +136,7 @@ class ValueMixin:
         _, ench, t = base_name(text)
         if ocls == nh.WAND_CLASS and CANCELLED_RE.search(text):
             return 0.0
-        if ocls == nh.GEM_CLASS and UNID_GEM_RE.match(t):
+        if ocls == nh.GEM_CLASS and self.unid_gem(t):
             return UNID_GEM_OFFER
         if ocls == nh.POTION_CLASS and re.match(r"^clear potions?$", t):
             return 0.0 if not re.search(r"\b(blessed|cursed)\b", text) or "uncursed" in text else 100 / div
@@ -148,7 +149,7 @@ class ValueMixin:
             for n, p in post.items():
                 tot += p * sum(pk * gp for gp, pk in _unit_prices(n, _cls_of(n, key)))
             return tot / div * UNID_SHK
-        d = describe(ocls, text)
+        d = self.describe_item(ocls, text)
         if d["cost"] is None:
             return 0.0
         gp = d["cost"]
@@ -158,9 +159,14 @@ class ValueMixin:
             gp = 0
         return gp / div * (UNID_SHK if d["unid"] else 1.0)
 
+    def unid_gem(self, name):
+        """A gem's bare name is an unidentified look: UNID_GEM_RE; name_parse: any gem / glass / gray stone description
+        before "gem" / "stone" ("yellowish brown gem" failed the pattern: valued 0, dropped first)."""
+        return unid_gem_look(name) is not None if self.opts.name_parse else UNID_GEM_RE.match(name) is not None
+
     def is_unknown(self, ocls, text):
         """More than one type is still possible for it."""
-        if ocls == nh.GEM_CLASS and UNID_GEM_RE.match(base_name(text)[2]):
+        if ocls == nh.GEM_CLASS and self.unid_gem(base_name(text)[2]):
             return True
         post = self.type_posterior(text)
         return post is not None and len(post) > 1
@@ -184,7 +190,7 @@ class ValueMixin:
         return out
 
     def value_per_weight(self, it, same=1):
-        return self.est_value(it, same) / describe(it.ocls, it.text)["wt"]
+        return self.est_value(it, same) / self.describe_item(it.ocls, it.text)["wt"]
 
     # ------------------------------------------------------------ the same comparison for picking up
     def weight_capacity(self):
@@ -197,7 +203,7 @@ class ValueMixin:
             if it.ocls == nh.COIN_CLASS:
                 wt += (base_name(it.text)[0] + 50) // 100           # invent.c: 100 coins weigh 1
             else:
-                d = describe(it.ocls, it.text)
+                d = self.describe_item(it.ocls, it.text)
                 wt += d["wt"] * d["qty"]
         return wt
 
@@ -211,13 +217,14 @@ class ValueMixin:
         text agrees with one of ours (stack_key; hidden differences -- an unknown BUC -- can still keep them apart)."""
         if ocls == nh.WEAPON_CLASS:
             name = base_name(text)[2]
-            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(" ".join(singular(w) for w in name.split(" ")), name))
+            name = WEAPON_NAME_OF.get(name, WEAPON_NAME_OF.get(one_of(name, self.opts.name_parse), name))
             if name not in MERGE_WEAPONS:
                 return False
         elif ocls not in MERGE_CLASSES and not (ocls == nh.TOOL_CLASS and "candle" in text):
             return False
-        k = stack_key(text)
-        return any(it.ocls == ocls and stack_key(it.text) == k for it in self.items())
+        fixed = self.opts.name_parse
+        k = stack_key(text, fixed)
+        return any(it.ocls == ocls and stack_key(it.text, fixed) == k for it in self.items())
 
     def stack_value(self, it, same=1):
         """est_value of the whole stack (a letter is freed only by all of it)."""
@@ -260,7 +267,7 @@ class ValueMixin:
         """Take a floor stack if it fits without Burdened, or if it is worth more per weight than
         the cheapest things (off the body) we would drop to make room for it -- the order carry_drop_step drops
         in, so we never pick up what the drop step would put straight back down."""
-        d = describe(ocls, text)
+        d = self.describe_item(ocls, text)
         wt = d["wt"] * d["qty"]
         free = self.weight_capacity() - self.inventory_weight()
         if wt <= free:
@@ -276,7 +283,7 @@ class ValueMixin:
         for v, it in drop:
             if v >= vpw:
                 return False
-            dd = describe(it.ocls, it.text)
+            dd = self.describe_item(it.ocls, it.text)
             need -= dd["wt"] * dd["qty"]
             if need <= 0:
                 return True

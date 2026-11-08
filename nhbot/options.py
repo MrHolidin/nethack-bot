@@ -115,6 +115,12 @@ DEFAULTS = {
                                #      hack.c test_move, cant_squeeze_thru) costs Dijkstra SQUEEZE_COST more -- walked
                                #      round when a way round exists; the only way, it is still tried and the refusal
                                #      sheds (squeeze_step) or digs as before (nhbot.nav.dijkstra)
+    "name_parse": False,       # A/B: item names made singular by one resolver (items.singular_name: objnam.c
+                               #      makeplural inverted over the object / monster names -- "knives" was "knif",
+                               #      "cloves of garlic" no food); a corpse weighs its monster's cwt, an unidentified
+                               #      gem its type's weight (1, was 10) and any gem look counts as unidentified
+                               #      ("yellowish brown gem" was worth 0); a stack's food counts one piece's nutrition
+                               #      (carry.describe, pickup.floor_kind, value.stack_key / unid_gem, survival)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
