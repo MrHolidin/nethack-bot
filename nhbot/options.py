@@ -89,6 +89,8 @@ DEFAULTS = {
                                #      dragon scale mail 0, not the 1 every suit got (nhbot.equipment.wear_gain)
     "excal_sword": False,      # A/B: any one long sword of ours is dipped for Excalibur -- cursed or named too (fountain.c
                                #      dipfountain asks neither, and blesses it); not an artifact (nhbot.excalibur.long_sword)
+    "level_time": False,       # A/B: explore's descend_after and the mines_after hatch count turns spent ON the level
+                               #      (Level.turns_here), not since the first arrival (nhbot.explore.explore)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
