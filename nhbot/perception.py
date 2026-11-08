@@ -10,35 +10,9 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
 from nhbot.messages import MELEE_BY_NAME_RE, attacks_on_us
-from nhbot.monattacks import ATTACKS
-from nhbot.monsters import (ALWAYS_AVOID, M2_DWARF, M2_ELF, M2_GNOME, M2_HOSTILE, M2_HUMAN, M2_ORC, M2_PEACEFUL,
-                            MR_COLD, MR_DISINT, MR_ELEC, MR_FIRE, MR_POISON, MR_SLEEP, MS_GUARDIAN, MS_LEADER,
-                            MS_NEMESIS, NEVER_MELEE, PASSIVE_DMG, PM_BY_NAME, THIEVES)
+from nhbot.monsters import (ALWAYS_AVOID, M2_HOSTILE, M2_PEACEFUL, MR_BITS, MS_GUARDIAN, MS_LEADER, MS_NEMESIS,
+                            NEVER_MELEE, NO_ACTIVE_ATTACK, PASSIVE_DMG, PASSIVE_KIND, PM_BY_NAME, RACE_MASKS, THIEVES)
 from nhbot.rays import our_protection
-
-# no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
-# (gas spore), the Oracle, a long worm's tail. Most of them never move (mmove 0); the floating eye (speed 1), gas
-# spore and acid blob (speed 3) do, slowly.
-# Not the shrieker: no attack, but next to us it shrieks every move (mon.c m_respond): wakes the level, and
-# one shriek in 10 creates a monster (1 in 13 of those a purple worm).
-NO_ACTIVE_ATTACK = {nh.permonst(i).mname for i in range(nh.NUMMONS)
-                    if all(a[0] in ("NONE", "BOOM") for a in ATTACKS[i])} - {"shrieker"}
-
-# passive_immune: the monsters whose only attack is a passive cold / fire one -- uhitm.c passive(): with the
-# resistance it does no damage (shieldeff, "You feel a mild chill" / "You're not affected"), nothing else
-# (brown mold, blue jelly: cold; red mold: fire)
-PASSIVE_ELEMENT = {"COLD": "cold", "FIRE": "fire"}
-PASSIVE_KIND = {nh.permonst(i).mname: PASSIVE_ELEMENT[ATTACKS[i][0][1]] for i in range(nh.NUMMONS)
-                if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i]) and ATTACKS[i][0][1] in PASSIVE_ELEMENT}
-# monst.h MR_* bits of mconveys: the resistances eating the corpse may give (eat.c cpostfx: one of them at random)
-CONVEYS = ((MR_FIRE, "fire"), (MR_COLD, "cold"), (MR_SLEEP, "sleep"), (MR_DISINT, "disint"), (MR_ELEC, "shock"),
-           (MR_POISON, "poison"))
-
-# role.c races[]: (lovemask, hatemask)
-RACE_MASKS = {"human": (0, M2_GNOME | M2_ORC), "elf": (M2_ELF, M2_ORC), "elven": (M2_ELF, M2_ORC),
-              "dwarf": (M2_DWARF | M2_GNOME, M2_ORC), "dwarven": (M2_DWARF | M2_GNOME, M2_ORC),
-              "gnome": (M2_DWARF | M2_GNOME, M2_HUMAN), "gnomish": (M2_DWARF | M2_GNOME, M2_HUMAN),
-              "orc": (0, M2_HUMAN | M2_ELF | M2_DWARF), "orcish": (0, M2_HUMAN | M2_ELF | M2_DWARF)}
 
 
 class PerceptionMixin:
@@ -373,7 +347,7 @@ class PerceptionMixin:
         (combat.prey_mask) and hit next to us (adjacent_hostiles), though it never attacks."""
         if not self.passive_immune(name):
             return False
-        conveys = {r for bit, r in CONVEYS if PM_BY_NAME[name].mconveys & bit}
+        conveys = {r for r, bit in MR_BITS.items() if PM_BY_NAME[name].mconveys & bit}     # eat.c cpostfx
         return bool(conveys - self.our_resists())
 
     def never_melee(self, name):

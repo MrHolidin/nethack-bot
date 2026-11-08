@@ -25,6 +25,7 @@ from nhbot.options import Options
 from nhbot.perception import PerceptionMixin
 from nhbot.pickup import PickupMixin
 from nhbot.policy import PolicyMixin
+from nhbot.poly import PolyMixin
 from nhbot.pricemem import PriceMemoryMixin, appearance
 from nhbot.scrolls import ScrollMixin
 from nhbot.shop import ShopMixin
@@ -56,7 +57,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
-          SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, LockToolMixin):
+          SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, LockToolMixin, PolyMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,

@@ -34,11 +34,18 @@ M2_LIKES_OBJS = 0x10000000 | 0x20000000 | 0x40000000 | 0x80000000
 
 MS_LEADER, MS_NEMESIS, MS_GUARDIAN = 31, 32, 33     # monflag.h msound: the quest's leader, nemesis, guardians
 
-# monst.h mresists / mconveys bits
+# monst.h mresists / mconveys bits, by the resistance's name (as our_resists names it)
 MR_FIRE, MR_COLD, MR_SLEEP, MR_DISINT, MR_ELEC, MR_POISON = 0x01, 0x02, 0x04, 0x08, 0x10, 0x20
+MR_BITS = {"fire": MR_FIRE, "cold": MR_COLD, "sleep": MR_SLEEP, "disint": MR_DISINT, "shock": MR_ELEC,
+           "poison": MR_POISON}
 
+# our race (the ^X line's word) -> its M2 flag, and role.c races[]: (lovemask, hatemask)
 RACE_FLAG = {"human": M2_HUMAN, "elf": M2_ELF, "elven": M2_ELF, "dwarf": M2_DWARF, "dwarven": M2_DWARF,
              "gnome": M2_GNOME, "gnomish": M2_GNOME, "orc": M2_ORC, "orcish": M2_ORC}
+RACE_MASKS = {"human": (0, M2_GNOME | M2_ORC), "elf": (M2_ELF, M2_ORC), "elven": (M2_ELF, M2_ORC),
+              "dwarf": (M2_DWARF | M2_GNOME, M2_ORC), "dwarven": (M2_DWARF | M2_GNOME, M2_ORC),
+              "gnome": (M2_DWARF | M2_GNOME, M2_HUMAN), "gnomish": (M2_DWARF | M2_GNOME, M2_HUMAN),
+              "orc": (0, M2_HUMAN | M2_ELF | M2_DWARF), "orcish": (0, M2_HUMAN | M2_ELF | M2_DWARF)}
 
 NEVER_EAT = {"cockatrice", "chickatrice", "Medusa", "green slime", "little dog", "dog", "large dog",
              "kitten", "housecat", "large cat", "Death", "Pestilence", "Famine"}
@@ -63,6 +70,21 @@ CARRIERS = {nh.permonst(i).mname for i in range(nh.NUMMONS)
 # A shrieker has no attack at all: hitting it is free.
 PASSIVE_DMG = {nh.permonst(i).mname for i in range(nh.NUMMONS)
                if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i])}
+
+# no active attack: only passive ones (molds, jellies, floating eye, acid blob), an explosion when killed
+# (gas spore), the Oracle, a long worm's tail. Most of them never move (mmove 0); the floating eye (speed 1), gas
+# spore and acid blob (speed 3) do, slowly.
+# Not the shrieker: no attack, but next to us it shrieks every move (mon.c m_respond): wakes the level, and
+# one shriek in 10 creates a monster (1 in 13 of those a purple worm).
+NO_ACTIVE_ATTACK = {nh.permonst(i).mname for i in range(nh.NUMMONS)
+                    if all(a[0] in ("NONE", "BOOM") for a in ATTACKS[i])} - {"shrieker"}
+
+# passive_immune: the monsters whose only attack is a passive cold / fire one -- uhitm.c passive(): with the
+# resistance it does no damage (shieldeff, "You feel a mild chill" / "You're not affected"), nothing else
+# (brown mold, blue jelly: cold; red mold: fire)
+PASSIVE_ELEMENT = {"COLD": "cold", "FIRE": "fire"}
+PASSIVE_KIND = {nh.permonst(i).mname: PASSIVE_ELEMENT[ATTACKS[i][0][1]] for i in range(nh.NUMMONS)
+                if ATTACKS[i] and all(a[0] == "NONE" for a in ATTACKS[i]) and ATTACKS[i][0][1] in PASSIVE_ELEMENT}
 
 
 THIEVES = ("water nymph", "wood nymph", "mountain nymph", "monkey")
