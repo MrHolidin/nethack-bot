@@ -242,7 +242,7 @@ class PerceptionMixin:
                     if not self.melee_policy(lv, name, (ny, nx))[0]:
                         continue
                 elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
-                                                  and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
+                                                  and not self.hp_below(self.opts.desperate_melee_hp)) \
                         and not self.spore_ok(name):
                     continue
                 if self.is_actively_dangerous(lv, (ny, nx)) or self.passive_prey(name):
@@ -371,7 +371,7 @@ class PerceptionMixin:
         if not self.never_melee(name):
             return True, False, False
         fight = (lv.desperate and name not in self.always_avoid()
-                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) or self.spore_ok(name)
+                 and not self.hp_below(self.opts.desperate_melee_hp)) or self.spore_ok(name)
         if fight:
             return True, False, False
         return False, True, not self.peaceful_now(lv, pos, look=False)

@@ -44,7 +44,6 @@ RESULTS = (
 NO_MESSAGE = frozenset({"opening", "locking", "probing", "undead turning", "nothing", "secret door detection"})
 WORN_OUT_RE = re.compile(r"too worn out to engrave|turns to dust")
 WAND_OF_RE = re.compile(r"wand of ([a-z ]+?)(?: \(| called| named|$)")
-TEST_HP = 0.6                    # HP fraction at least, to spend turns on a test
 
 
 class WandIdMixin:
@@ -83,7 +82,7 @@ class WandIdMixin:
         if it is None or not self.elb_can_write(lv) or lv.shop[self.pos()] \
                 or (lv.key, self.pos()) in self.wandid_refused \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU \
-                or self.bl(nh.NLE_BL_HP) < TEST_HP * self.bl(nh.NLE_BL_HPMAX):
+                or self.hp_below(self.opts.wandid_hp):
             return False
         self.cur_act = "wandid"
         if not self.read_engraving():

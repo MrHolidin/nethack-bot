@@ -271,8 +271,7 @@ class CombatMixin:
         BOLT_LIM = 8, hack.h:18). Pursue it for at most 25 turns, while HP >= 40%."""
         t = self.turn()
         y, x = self.pos()
-        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp < maxhp * 0.4:
+        if self.hp_below(self.opts.hunt_hp):
             self.hunt = None
             return False
         ev = self.shot_event

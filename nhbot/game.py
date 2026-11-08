@@ -208,6 +208,10 @@ class GameMixin:
     def bl(self, idx):
         return int(self.last_bl[idx])
 
+    def hp_below(self, frac):
+        """HP below this fraction of max HP (the HP thresholds in options)."""
+        return self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * frac
+
     def turn(self):
         return self.bl(nh.NLE_BL_TIME)
 

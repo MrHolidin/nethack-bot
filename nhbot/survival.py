@@ -302,8 +302,7 @@ class SurvivalMixin:
         return True
 
     def heal_step(self, hostiles):
-        hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp * 3 >= maxhp or self.can_pray():
+        if not self.hp_below(self.opts.heal_hp) or self.can_pray():
             return False
         it = self.find_item(nh.POTION_CLASS, HEAL_POTIONS)
         if it:

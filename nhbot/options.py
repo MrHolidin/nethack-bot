@@ -121,8 +121,19 @@ DEFAULTS = {
                                #      corpses, no tins), what carry.needed keeps; no lamp to rub thrown, no water sold
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
+    # ---- HP thresholds (fractions of max HP; Bot.hp_below)
+    "rest_frac": 0.5,          # rest (search 20) below this with nothing in view; rest on our Elbereth below it too
+    "elb_hp": 0.5,             # write Elbereth below this
+    "elb_exit": 0.85,          # leave Elbereth at this
+    "elb_early": 0.6,          # ... or at this with nothing in view
+    "heal_hp": 1 / 3,          # quaff a known healing potion below this (when no prayer is safe)
+    "hunt_hp": 0.4,            # hunt a shooter only from this on
+    "desperate_melee_hp": 0.9, # on a desperate level, melee a kind we never melee (not always_avoid) from this on
+    "vault_dig_hp": 0.6,       # dig to a vault only from this on
+    "descend_rest_hp": 0.95,   # rest on the down staircase below this before descending
+    "wandid_hp": 0.6,          # engrave-test a wand only from this on
+    "excal_hp": 0.7,           # Excalibur trip / dip only from this on
     # ---- parameters
-    "rest_frac": 0.5,          # rest (search 20) below this HP fraction with nothing in view
     "pray_gap": 1000,          # turns since the last prayer before praying for HP
     "hunger_gap": 500,         # ... before praying when Weak
     "faint_wait": 200,         # turns Fainting before the emergency prayer
@@ -131,13 +142,10 @@ DEFAULTS = {
                                # (Level.avoid_down, from a bounce), walk to it and go in -- Excalibur first at the
                                # fountains we know (explore.mines_trip_step)
     "mines_after": 3000,       # a closed Mines staircase opens after this many turns on its level anyway
-    "elb_hp": 0.5,             # write Elbereth below this HP fraction
-    "elb_exit": 0.85,          # leave Elbereth at this HP fraction
     "elb_max": 400,            # turns at most on one Elbereth
     "nymph_hold": 4,           # wait for a thief within this distance
     "nymph_wait_max": 8,       # turns at most waiting for it
     "excal_xl": 5,
-    "excal_hp": 0.7,
     "excal_cost": 200,         # max path cost to a fountain on this level
     "excal_cost_up": 150,      # max path cost to the up staircase on the way to one
     "excal_up": 4,             # levels at most to walk back up

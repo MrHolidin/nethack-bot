@@ -293,7 +293,7 @@ class VaultMixin:
         means = self.dig_means()
         if means is None or lv.key in self.dig_refused:
             return False
-        if self.bl(nh.NLE_BL_HUNGER) >= WEAK or self.bl(nh.NLE_BL_HP) * 10 < self.bl(nh.NLE_BL_HPMAX) * 6:
+        if self.bl(nh.NLE_BL_HUNGER) >= WEAK or self.hp_below(self.opts.vault_dig_hp):
             return False
         inner = self.vault_locate(lv)
         if inner is None:
