@@ -124,6 +124,7 @@ class MapMixin:
     def map_init(self):
         self.levels = {}                 # level key (dungeon number, level) -> Level
         self.map_stats = Counter()       # what messages taught the map (summary 'map_stats')
+        self.shop_flood_memo = {}        # shop_regrow: (level, door, came) -> (floor mask, flood)
         self.cur_key = None              # the key of the level this tick is on
         self.prev_key = None             # ... of the level at the last tick (note_arrival)
         self.arrived_by_stairs = False   # this tick: a staircase brought us onto this level (note_arrival)
@@ -245,10 +246,11 @@ class MapMixin:
             lv.shop[c] = True
         lv.shop_anchors.append([door, came, False])
 
-    def shop_flood(self, lv, door, came):
+    def shop_flood(self, lv, door, came, inside_ok=None):
         """The shop's squares behind its door as far as the map knows them: room floor from the door, not the side
-        we came from."""
-        inside_ok = self.shop_floor(lv)
+        we came from. inside_ok: shop_floor(lv), when the caller has it."""
+        if inside_ok is None:
+            inside_ok = self.shop_floor(lv)
         seen = set()
         q = deque()
         y, x = door
@@ -283,7 +285,16 @@ class MapMixin:
         for a in lv.shop_anchors:
             if a[2]:
                 continue
-            room = self.shop_flood(lv, a[0], a[1])
+            # the flood depends only on the floor mask and the anchor: while the map shows the same floor, last
+            # tick's answer (a shop never finished re-flooded its outside every tick: 1.7 ms a tick)
+            ok = self.shop_floor(lv)
+            key = (lv.key, a[0], a[1])
+            memo = self.shop_flood_memo.get(key)
+            if memo is not None and np.array_equal(memo[0], ok):
+                room = memo[1]
+            else:
+                room = self.shop_flood(lv, a[0], a[1], ok)
+                self.shop_flood_memo[key] = (ok, room)
             for c in room:
                 lv.shop[c] = True
             k = self.kinds(lv) if k is None else k
