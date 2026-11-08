@@ -82,6 +82,10 @@ class ExcaliburMixin:
         self.excal.skip.add(lv.key)                # can't reach it: don't keep coming back
         return False
 
+    def excal_give_up(self, key):
+        """The fountain on level key can't be reached: never gone back to for Excalibur (excal_fountain_level)."""
+        self.excal.skip.add(key)
+
     def excal_fountain_level(self):
         """The main-dungeon level, nearest in depth, with a fountain we could make Excalibur at (not a
         shop's, not on a level we gave up reaching it on), while Excalibur can be made at all (lawful, XL

@@ -69,6 +69,10 @@ class ScrollMixin:
         """Game summary entries."""
         return {"enchant": dict(self.scroll.enchant_stats, log=self.scroll.enchant_log), "scrolls": dict(self.scroll.stats)}
 
+    def scroll_stat(self, k):
+        """Count k in the summary 'scrolls' (test strips for a read, good scrolls kept from selling)."""
+        self.scroll.stats[k] = self.scroll.stats.get(k, 0) + 1
+
     def scroll_is_good(self, s):
         """Identified as one of GOOD_TYPES, or every type value.type_posterior leaves (known types out, oc_prob prior,
         shop prices, deductions) is one of them -- not pricemem's uniform price-only one.

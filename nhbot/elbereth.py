@@ -113,6 +113,10 @@ class ElberethMixin:
             lv.elbereth.discard(self.pos())
         return ok
 
+    def elb_rest(self):
+        """Counted: a rest on an Elbereth confirmed just now (policy.step_rest_on_elbereth)."""
+        self.elb.stats["rest_confirmed"] += 1
+
     def elb_wanted(self, lv, hostiles):
         """Write Elbereth now: a hostile next to us or within 3 squares, and either two swarmers among them or
         we are hurt -- below elb_hp of max HP -- and we can write here and nothing in view ignores it (elb_blocked).

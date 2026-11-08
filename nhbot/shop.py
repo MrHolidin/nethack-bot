@@ -228,10 +228,10 @@ class ShopMixin:
         keep_100: likewise a potion of the 100 group."""
         c, s = self.shop.selling_item
         if c == nh.SCROLL_CLASS and self.scroll_is_good(s):
-            self.scroll.stats["kept_good"] = self.scroll.stats.get("kept_good", 0) + 1
+            self.scroll_stat("kept_good")
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
         if c == nh.POTION_CLASS and self.potion_100(s):
-            self.carry.stats["kept_100"] = self.carry.stats.get("kept_100", 0) + 1
+            self.carry_stat("kept_100")
             return True                    # the offer just showed it is of the 100 group
         return False
 
@@ -261,11 +261,11 @@ class ShopMixin:
             self.shop.selling = False
             got = self.bl(nh.NLE_BL_GOLD) - gold0
             if got > 0:
-                self.carry.stats["sold"] += 1
-                self.carry.stats["gold"] += got
+                self.carry_stat("sold")
+                self.carry_stat("gold", got)
             else:                                    # not bought: it is still ours, take it back
                 self.shop.sell_tried.add((lv.key, s))
-                self.carry.stats["kept_back"] += 1
+                self.carry_stat("kept_back")
                 self.pickup_matching((re.sub(r"^(a|an|the|\d+)\s+", "", re.sub(r"\s*\(.*?\)", "", s)).strip(),),
                                      own=True)
             return True

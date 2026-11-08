@@ -84,6 +84,10 @@ class ValueMixin:
     def value_init(self):
         self.value = ValueState()
 
+    def value_types_changed(self):
+        """Something type_posterior reads changed (a price reading, a wand engrave-tested): its memo is stale."""
+        self.value.type_version += 1
+
     def note_known_types(self):
         inv = self.inventory()
         if inv == self.value.known_inv:

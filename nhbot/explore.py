@@ -146,7 +146,7 @@ class ExploreMixin:
                 return True
             if self.rest_before_descent(lv):
                 return True
-            self.mines.return_descents += self.mines.return_on
+            self.mines_descent()
             self.take_stairs(">")
             return True
         return self.walk_to(lv, downstairs, chase="downstairs", grids=grids)[0] == "moved"
@@ -236,7 +236,7 @@ class ExploreMixin:
         else:
             return self.walk_to(lv, mask, grids=grids, max_cost=max_cost)[0] == "moved"
         if re.search(r"You can't go (?:down|up) here", self.message()):
-            self.mines.trip_stats["not_stairs"] += 1     # msg_map recorded it (Level.not_stairs)
+            self.mines_trip_stat("not_stairs")           # msg_map recorded it (Level.not_stairs)
         return True
 
     def level_travel_step(self, lv, grids, key, act, stat, known_only=False, max_cost=10_000):
@@ -264,7 +264,7 @@ class ExploreMixin:
             return False
         self.cur_act = act
         if mask[self.pos()]:
-            self.mines.trip_stats[stat + ("_up" if up_way else "_down")] += 1
+            self.mines_trip_stat(stat + ("_up" if up_way else "_down"))
         return self.stairs_step(lv, grids, mask, "<" if up_way else ">", max_cost=max_cost)
 
     def magic_map_step(self, lv):

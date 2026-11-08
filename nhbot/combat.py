@@ -9,6 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, in_line, ray_squares
 from nhbot.danger import adj_level, dice_pmf
+from nhbot.goals import GOALS
 from nhbot.messages import KILL_RE, KILLED_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE, attacks_on_us
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, MR_BITS, PM_BY_NAME, PM_INDEX, RANGED_TARGETS, permonst_of
@@ -152,6 +153,32 @@ class CombatMixin:
                 return DELTA2KEY[(sy, sx)], d, (ty, tx), (sy, sx)
         return None
 
+    def retrieve_note(self, ray):
+        """A throw of ours (actions.throw): the squares of ray it may land on, walked to later (retrieve_goals)."""
+        self.combat.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
+        self.goal_event("retrieve", "created")
+
+    def retrieve_forget(self, goal):
+        """goal_forget: the throws whose ray holds square goal are done with; how many went."""
+        n = len(self.combat.retrieve)
+        self.combat.retrieve = [r for r in self.combat.retrieve if goal not in r[1]]
+        return n - len(self.combat.retrieve)
+
+    def kills_expire(self, ttl):
+        """Forget our kills older than ttl turns (their corpses are not fresh); how many went."""
+        t = self.turn()
+        n = len(self.combat.kills)
+        self.combat.kills = [k for k in self.combat.kills if t - k[0] < ttl]
+        return n - len(self.combat.kills)
+
+    def kills_forget(self, key, pos, name=None):
+        """Forget our kills on square pos of level key (only those of name, if given): the corpse is eaten, carried,
+        offered or given up; how many went."""
+        n = len(self.combat.kills)
+        self.combat.kills = [k for k in self.combat.kills
+                             if k[2] != pos or k[3] != key or (name is not None and k[1] != name)]
+        return n - len(self.combat.kills)
+
     def retrieve_goals(self, lv):
         """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
         t = self.turn()
@@ -251,7 +278,7 @@ class CombatMixin:
             if ex:
                 ray = ray_squares(y, x, sy, sx)
                 self.cur_act = "unblock"
-                self.acts.last_attack_target = blocker
+                self.aim_at(blocker)
                 self.combat.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
@@ -405,7 +432,7 @@ class CombatMixin:
             if kind in RAY_WANDS:          # statistics only: the ray coming back is in the P(win) of the zap
                 self.ray_risk_note(lv, (dy, dx), d, kind, letter, True)
             self.cur_act = "fight"
-            self.acts.last_attack_target = pos
+            self.aim_at(pos)
             if len(self.combat.wand_pwin_log) < 30:
                 self.combat.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2), None,
                                            f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
@@ -642,5 +669,4 @@ class CombatMixin:
         # one in melee (hallu_strike: hallucinating, the name is random) (A/B attacked_us: -333 [-653, -55], median
         # 7777 -> 7787, 29 games of 1000 changed)
         melee = [who for who, kind in attacks_on_us(m) if kind == "melee"]
-        self.perc.it_attacked |= "It" in melee
-        self.perc.melee_on_us |= any(who.startswith("The ") for who in melee)
+        self.melee_on_us_note(melee)

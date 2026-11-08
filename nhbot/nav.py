@@ -68,6 +68,7 @@ class NavState:
         self.grids_key, self.grids = None, None      # grids: the cache and its key
         self.last_move_target = None     # the square our last step went for (msg_map reads what it said)
         self.peaceful_waits = 0          # turns waited for a peaceful monster in our way
+        self.peaceful_wait_by = Counter()   # ... by species
         self.shop_kicks_avoided = 0
         self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us (msg_map)
         self.trap_stats = Counter()
@@ -225,7 +226,7 @@ class NavMixin:
             # counts)
             lv.fail[ty, tx] += 1
             self.nav.peaceful_waits += 1
-            self.perc.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
+            self.nav.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
             self.press("s")
             return
         seq0 = self.msg_seq
@@ -254,6 +255,20 @@ class NavMixin:
             if lv.fail[ty, tx] >= 6:
                 lv.blocked[ty, tx] = True
 
+    def not_stepping(self):
+        """Our action is not a step (an attack): what the game says next is not about a square we went for."""
+        self.nav.last_move_target = None
+
+    def trap_caught(self, kind):
+        """msg_map: a bear trap / pit / web holds us here (counted once per catch)."""
+        if self.nav.trapped is None:
+            self.nav.trap_stats[kind] += 1
+        self.nav.trapped = (kind, self.cur_key, self.pos())
+
+    def trap_freed(self):
+        """msg_map: out of the trap that held us."""
+        self.nav.trapped = None
+
     def trap_held(self, lv):
         """Still held by the trap the messages told of (failed steps that took a turn then are not counted)? Forgotten
         once we are elsewhere."""
@@ -263,6 +278,10 @@ class NavMixin:
             self.nav.trapped = None
             return False
         return True
+
+    def mines_kick_stat(self, k):
+        """Count a Minetown door-kick event the messages told of (the watch warned us, arrested us)."""
+        self.nav.mines_kick_stats[k] += 1
 
     def kick(self, key):
         seq0 = self.msg_seq

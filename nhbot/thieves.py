@@ -22,6 +22,7 @@ class ThievesState:
         self.stolen_pending = False
         self.loot_sq = None
         self.loot_key = None
+        self.stolen_names = set()      # bare names of what thieves (or a polymorph) took from us: loot takes them back
         self.nymph_kills = 0
         self.loot_pickups = 0
         self.nymph_waits = 0
@@ -54,10 +55,11 @@ class ThievesMixin:
         """Stats only: a change of the gold we carry since the last tick, by the messages that came with it --
         a leprechaun's touch ("Your purse feels lighter."), a foocubus, a vault guard, a shop, a fountain."""
         g = int(self.bl(nh.NLE_BL_GOLD))
+        bag_moved = self.gold_bag_moved()
         if self.thief.gold_prev is not None and g != self.thief.gold_prev:
             d = g - self.thief.gold_prev
             m = self.text_since(self.thief.gold_seq)
-            if self.bag.moved:
+            if bag_moved:
                 self.thief.gold_flow["bag_in" if d < 0 else "bag_out"] += abs(d)      # gold_bag: ours all the same
             elif d > 0:
                 self.thief.gold_flow["got_sold" if "You sold" in m else "got_other"] += d
@@ -72,12 +74,11 @@ class ThievesMixin:
         xl = int(self.bl(nh.NLE_BL_XP))
         self.thief.gold_xl[xl] = max(self.thief.gold_xl.get(xl, 0), g)
         self.thief.gold_prev, self.thief.gold_seq = g, self.msg_seq
-        self.bag.moved = False
 
     # ================================================================== nymphs
     def msg_thieves(self, m):
         for what in STOLE_RE.findall(m):                    # "She stole a +0 orcish helm." / "It steals ...!"
-            self.pick.stolen_names.add(base_name(what)[2])
+            self.thief.stolen_names.add(base_name(what)[2])
         stole = (re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m) and \
             (any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m)
         if stole or "It stole" in m or "It steals" in m or "She charms you" in m:
@@ -123,7 +124,7 @@ class ThievesMixin:
                 continue
             if self.peaceful_now(lv, pos, far=True):
                 continue
-            self.acts.last_attack_target = pos
+            self.aim_at(pos)
             self.cur_act = "fight"
             tw = self.throwables()
             if tw:
@@ -189,6 +190,15 @@ class ThievesMixin:
                             best = (d, (ny, nx))
         return best[1] if best else None
 
+    def poly_unnoticed(self):
+        """The game refused to let us wear / wield as in a form we failed to notice: polymorphed until "You return to
+        ... form"."""
+        self.thief.polyd = True
+
+    def poly_prayed(self):
+        """Counted: a prayer to get out of a handless form (policy)."""
+        self.thief.poly_stats["prayed"] += 1
+
     def poly_track(self):
         """poly_recover, every tick: what left us when we turned into something (polyself.c break_armor /
         drop_weapon: worn armor and the weapon fall where we stood -- were_drop) is named like stolen loot, so
@@ -196,7 +206,7 @@ class ThievesMixin:
         names = {base_name(it.text)[2] for it in self.items()}
         if self.thief.poly_new:
             lost = self.thief.poly_inv - names
-            self.pick.stolen_names |= lost
+            self.thief.stolen_names |= lost
             self.wield_forget(lost)
             self.thief.poly_stats["turned"] += 1
             self.thief.poly_stats["lost_items"] += len(lost)
@@ -207,6 +217,10 @@ class ThievesMixin:
         if self.thief.loot_sq is None or self.thief.loot_key != lv.key:
             return False
         return self.pursue("loot", lv, [self.thief.loot_sq], self.loot_consume)
+
+    def loot_forget(self):
+        """goal_forget: the loot square is done with."""
+        self.thief.loot_sq = None
 
     def loot_consume(self, goal):
         self.pickup_all()

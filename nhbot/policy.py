@@ -143,7 +143,7 @@ class PolicyMixin:
         lv = self.update_memory()
         self.cur_key = lv.key
         self.pol.last_step = None
-        self.goals.chasing = None
+        self.goal_tick_start()
         self.pol.tick_no += 1
         self.nutrition_tick()                    # survival.py: hunger
         self.pol.tick_seq = self.msg_seq
@@ -214,7 +214,7 @@ class PolicyMixin:
                 self.pol.faint_since is not None and t - self.pol.faint_since > self.opts.faint_wait), weak=True):
             self.pray(); return True
         if self.thief.polyd and self.handless() and self.can_pray():
-            self.thief.poly_stats["prayed"] += 1
+            self.poly_prayed()
             self.pray(); return True           # pray.c: a handless form is major trouble, fixed by rehumanize()
             #                                    (A/B poly_recover +1066 [+675, +1502])
         if self.surv.lycanthropy and self.can_pray() and \
@@ -367,7 +367,7 @@ class PolicyMixin:
         if (c.y, c.x) not in c.lv.elbereth or c.hp >= c.maxhp * self.opts.rest_frac \
                 or self.visible_hostiles(c.lv) or not self.elb_confirm(c.lv):
             return False
-        self.elb.stats["rest_confirmed"] += 1
+        self.elb_rest()
         self.cur_act = "rest"
         self.search_turns(20)
         return True
@@ -380,7 +380,7 @@ class PolicyMixin:
             if th:
                 key, d, tpos, (sy, sx) = rt
                 ray = ray_squares(c.y, c.x, sy, sx)
-                self.acts.last_attack_target = tpos
+                self.aim_at(tpos)
                 self.throw(th[0][0], key, ray)
                 return True
         return False

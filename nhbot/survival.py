@@ -239,11 +239,8 @@ class SurvivalMixin:
 
     def corpse_goals(self, lv):
         """Fresh corpses of our kills here that we would eat, within max_dist, nearest (straight line) first."""
-        t = self.turn()
         kind = GOALS["corpse"]
-        n = len(self.combat.kills)
-        self.combat.kills = [k for k in self.combat.kills if t - k[0] < kind.ttl]
-        self.goal_event("corpse", "expired", n - len(self.combat.kills))
+        self.goal_event("corpse", "expired", self.kills_expire(kind.ttl))
         cands = []
         for kt, name, pos, key in self.combat.kills:
             if key != lv.key or not self.corpse_ok(name):

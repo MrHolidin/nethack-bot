@@ -15,6 +15,10 @@ class DiggingMixin:
     def digging_init(self):
         self.digging = DiggingState()
 
+    def dig_refused_here(self, lv):
+        """The floor of lv would not be dug ("too hard to dig in", "cannot reach the floor"): never tried again."""
+        self.digging.refused.add(lv.key)
+
     def dig_means(self):
         """How we can dig down: ("wand", item) a wand of digging with charges left, ("pick", item) a pick-axe,
         ("mattock", item) a dwarvish mattock -- none known cursed (a cursed digger applied stays welded), no

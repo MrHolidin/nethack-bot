@@ -203,7 +203,7 @@ class VaultMixin:
 
     def dig_note(self, lv, msgs):
         if "too hard to" in msgs or "cannot reach the" in msgs:
-            self.digging.refused.add(lv.key)
+            self.dig_refused_here(lv)
             self.vault.stats["refused"] += 1
         if "You dig a hole through" in msgs or "fall through" in msgs:
             self.vault.stats["dug_out"] += 1

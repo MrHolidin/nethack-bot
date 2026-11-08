@@ -131,9 +131,9 @@ class SacrificeMixin:
             if any(name + " corpse" in it.text for it in self.items()):
                 self.sac.carry = (kt, name)
                 self.sac.stats["picked"] += 1
-                self.combat.kills = [k for k in self.combat.kills if k[2] != pos or k[3] != lv.key]
+                self.kills_forget(lv.key, pos)
             else:
-                self.combat.kills = [k for k in self.combat.kills if k[2] != pos or k[3] != lv.key]   # can't lift it
+                self.kills_forget(lv.key, pos)                       # can't lift it
                 self.sac.stats["not_lifted"] += 1
             return True
         tm = np.zeros_like(passable)
@@ -188,7 +188,7 @@ class SacrificeMixin:
             self.press(it.letter)
         said = self.text_since(seq0)
         self.sac.carry = None
-        self.combat.kills = [k for k in self.combat.kills if not (k[1] == name and k[3] == lv.key and k[2] == self.pos())]
+        self.kills_forget(lv.key, self.pos(), name)
         self.sac.stats["offered"] += 1
         for phrase, what in SAC_RESULTS:
             if phrase in said:

@@ -68,7 +68,7 @@ class MinesMixin:
                 if self.level_travel_step(lv, grids, fk, "excal", "excal_travel"):
                     return True
                 self.mines.trip_stats["excal_no_way"] += 1
-                self.excal.skip.add(fk)
+                self.excal_give_up(fk)
                 return False
             hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
             if hp >= maxhp * self.opts.excal_hp or self.visible_hostiles(lv):
@@ -94,6 +94,10 @@ class MinesMixin:
         self.mines.trip_stats["unreachable"] += 1
         self.mines.trip_retry = self.turn() + MINES_TRIP_RETRY
         return False
+
+    def mines_trip_stat(self, k):
+        """Count k in the summary 'mines_trip' (what the ticks of the trip to the Mines and back did)."""
+        self.mines.trip_stats[k] += 1
 
     def mines_stairs(self, lv):
         """The down staircases of this level we know lead into the Mines -- marked on a bounce
@@ -163,6 +167,10 @@ class MinesMixin:
         if not self.mines.return_on:
             self.mines.return_on = True
             self.mines.return_log.append((self.turn(), list(lv.key), why, self.bl(nh.NLE_BL_DEPTH)))
+
+    def mines_descent(self):
+        """We take a down staircase: counted while climbing out of the Mines (the up/down loop)."""
+        self.mines.return_descents += self.mines.return_on
 
     def mines_return_step(self, lv, grids):
         """mines_return: climb back to the main dungeon -- walk to this level's up staircase and take it; the

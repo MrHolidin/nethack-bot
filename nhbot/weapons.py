@@ -61,6 +61,10 @@ class WeaponsMixin:
             self.weapons.swap_welded += 1             # a cursed one: stuck with it until uncursed (weapon_upgrade can't)
             self.weapons.swapped_for = None
 
+    def swap_lost(self):
+        """The dagger swapped in is gone (broke forcing a lock): nothing to swap back from."""
+        self.weapons.swapped_for = None
+
     def swap_back(self, job=None):
         """Back to the main weapon after a swap_in (for job, or any). True if it used the turn."""
         if self.weapons.swapped_for is None or (job is not None and self.weapons.swapped_for != job):
@@ -132,7 +136,7 @@ class WeaponsMixin:
         seq0 = self.msg_seq
         self.wield(l)
         if "Don't be ridiculous" in self.text_since(seq0):
-            self.thief.polyd = True                # a form we failed to notice; retry after "You return to ... form"
+            self.poly_unnoticed()                  # retried after "You return to ... form"
             return True
         self.weapons.wield_tried = tried | {(l, s)}
         self.weapons.rewields += 1

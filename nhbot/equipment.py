@@ -321,7 +321,7 @@ class EquipMixin:
         self.cur_act = "test_strip"
         if self.take_off(a):
             self.equip.test_stripped.add(a["slot"])
-            self.scroll.stats["test_strip"] = self.scroll.stats.get("test_strip", 0) + 1
+            self.scroll_stat("test_strip")
         else:
             self.equip.test_strip_refused.add(a["letter"])     # it would not come off: don't try every tick
         return True
@@ -356,7 +356,7 @@ class EquipMixin:
         seq0 = self.msg_seq
         if not self.ask("W", "what do you want to wear"):
             if "even bother" in self.asked:
-                self.thief.polyd = True             # a form we failed to notice; cleared by "You return to ... form"
+                self.poly_unnoticed()
             return
         self.press(a["letter"])
         msgs = self.text_since(seq0)
@@ -369,9 +369,13 @@ class EquipMixin:
             return
         self.equip.events.append((self.turn(), "wear", a["name"]))
         if slot in self.equip.test_stripped:
-            self.scroll.stats["test_rewear"] = self.scroll.stats.get("test_rewear", 0) + 1
+            self.scroll_stat("test_rewear")
             self.equip.test_stripped.discard(slot)
         # put the cloak back on (it stays in inventory; next equip_step re-wears it anyway)
+
+    def equip_event(self, kind, what):
+        """Log an event (a pickup) beside the wear / fail / takeoff ones of the equipment summary."""
+        self.equip.events.append((self.turn(), kind, what))
 
     def take_off(self, a):
         """Take off a worn item. False if cursed / failed."""

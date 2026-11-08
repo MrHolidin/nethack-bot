@@ -29,6 +29,11 @@ class GoldBagMixin:
         """Game summary entries."""
         return {"gold_bag": dict(self.bag.stats, in_bag=self.bag.gold)}
 
+    def gold_bag_moved(self):
+        """Did gold move between us and the bag since the last call (gold_flow_tick, every tick)? The note is used up."""
+        moved, self.bag.moved = self.bag.moved, False
+        return moved
+
     def gold_bag(self):
         """The bag our gold goes in: carried, not a bag of tricks, not known cursed (a cursed bag of holding
         loses what is in it, pickup.c boh_loss) -- a bag of holding first. None: no such bag. (A/B goldbag_v1

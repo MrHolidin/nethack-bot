@@ -2,18 +2,19 @@
 staircase we took leads, what we threw and where to pick it up, what a zap told, where we dropped something), so
 the steps above never press these command keys themselves."""
 from nhbot.consts import DELTA2KEY
-from nhbot.goals import GOALS
 from nhbot.items import base_name
 
 
 class ActionsState:
-    """State of our last actions: attack target, staircase, throws and zaps (ActionsMixin)."""
+    """State of our last actions: attack target, staircase, drop, throws and zaps (ActionsMixin)."""
     def __init__(self):
         self.last_attack_target = None   # the square we last attacked (melee, missile, wand): kills are noted there
         self.attack_step = -1            # steps before the 'F' of our last melee attack (focus: message logged again)
+        self.attack_turn = -1            # turn of our last melee attack (danger: the monster we hit first may not act)
         self.took_stairs = False         # the last action was a staircase (mapmem.note_arrival reads it)
         self.last_stair_dir = None       # '<' / '>' of the staircase we took this tick
         self.stair_from = None           # (level key, square) of the staircase we last took
+        self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
         self.throws = 0
         self.zaps = 0
         self.own_zap_turn = -99          # a bouncing ray of ours is not an enemy shooter
@@ -32,9 +33,9 @@ class ActionsMixin:
             return
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
         self.acts.last_attack_target = target
-        self.danger.attack_turn = self.turn()           # danger: the monster we hit first may not act
+        self.acts.attack_turn = self.turn()             # danger: the monster we hit first may not act
         self.acts.attack_step = self.steps              # after 'F' NLE still shows the last message: logged again then
-        self.nav.last_move_target = None
+        self.not_stepping()
         self.press("F")
         self.press(key)
 
@@ -44,6 +45,10 @@ class ActionsMixin:
         self.press("F")
         self.press("h")
 
+    def aim_at(self, pos):
+        """A missile / wand of ours is about to go for the monster on pos: a kill there is ours (msg_combat)."""
+        self.acts.last_attack_target = pos
+
     def take_stairs(self, key):
         """Up ('<') or down ('>') the staircase we stand on. Where it led is noted next tick (mapmem.note_arrival:
         Level.stairs_to, the staircase under us on arrival)."""
@@ -51,6 +56,11 @@ class ActionsMixin:
         self.acts.stair_from = (self.cur_key, self.pos())
         self.acts.took_stairs = True
         self.press(key)
+
+    def stairs_noted(self):
+        """mapmem.note_arrival has read where the staircase of the last action led: that bookkeeping is used up."""
+        self.acts.last_stair_dir = None
+        self.acts.took_stairs = False
 
     def search_turns(self, n):
         """Rest / search n turns: the count, then 's' ("20s"); the game stops early when something shows up."""
@@ -71,8 +81,7 @@ class ActionsMixin:
             self.settle()
         self.acts.throws += 1
         self.elb_scuffed()                       # a throw scuffs the engraving under us
-        self.combat.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
-        self.goal_event("retrieve", "created")
+        self.retrieve_note(ray)
 
     def zap(self, letter, key):
         """Zap the wand letter in direction key; its charges (charges.py) and whom a sleep ray hit (combat.py) noted.
@@ -123,7 +132,7 @@ class ActionsMixin:
     def drop_units(self, letter, n=None):
         """Drop n of a stack (all if None); remember the square."""
         item = next((it for it in self.items() if it.letter == letter), None)
-        self.carry.last_drop_qty = n or (base_name(item.text)[0] if item else 1)
+        self.acts.last_drop_qty = n or (base_name(item.text)[0] if item else 1)
         self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
         seq0 = self.msg_seq
         if not self.ask("d", "drop"):
@@ -133,4 +142,4 @@ class ActionsMixin:
                 self.raw_step(ord(c))
         self.press(letter)
         if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
-            self.carry.cant_drop.add(item.key)      # "For some reason, you cannot drop the stone!"
+            self.drop_refused(item)                 # "For some reason, you cannot drop the stone!"

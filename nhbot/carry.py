@@ -177,7 +177,6 @@ class CarryState:
         self.squeeze_pending = None  # (level key, square) a diagonal squeeze refused for our weight (squeeze_step)
         self.squeeze_stats = Counter()
         self.stats = {"picked": 0, "dropped": [0, 0, 0, 0, 0], "sold": 0, "gold": 0, "kept_back": 0}
-        self.last_drop_qty = None        # units in the last drop (pricemem reads it for a sell offer)
 
 
 class CarryMixin:
@@ -186,6 +185,14 @@ class CarryMixin:
 
     def carry_classes(self):
         return CARRY_CLASSES + MORE_CLASSES + (nh.WEAPON_CLASS, nh.SPBOOK_CLASS, nh.GEM_CLASS)
+
+    def carry_stat(self, k, n=1):
+        """Count n for k in the summary 'carry' (what was picked up, lifted, sold or kept back)."""
+        self.carry.stats[k] = self.carry.stats.get(k, 0) + n
+
+    def drop_refused(self, it):
+        """The game would not let it drop (a cursed loadstone): never tried again."""
+        self.carry.cant_drop.add(it.key)
 
     # ------------------------------------------------------------ never Burdened
     def squeeze_msg(self, m, lv):

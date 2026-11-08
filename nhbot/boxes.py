@@ -70,6 +70,10 @@ class BoxMixin:
                 m[p] = False
         return m
 
+    def box_chased(self):
+        """goal_chase: this tick's step goes toward a box (box_goal_mask pauses the boxes if a hostile shows up)."""
+        self.box.chase_turn = self.turn()
+
     def box_goal_mask(self, lv, passable):
         """goals.goal_masks, kind "box": the boxes to walk to now. Only with no hostile in view (the gate of
         box_step); and when one shows up while we were on our way to a box, the level's boxes stop being
@@ -191,7 +195,7 @@ class BoxMixin:
             self.box.stats["forced"] += 1
         elif "broke" in said:
             self.box.stats["dagger_broke"] += 1
-            self.weapons.swapped_for = None              # the dagger is gone: nothing to swap back from
+            self.swap_lost()
         return True
 
     def box_kick_step(self, lv):

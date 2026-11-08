@@ -25,7 +25,6 @@ class PerceptionState:
         self.peaceful_hits = Counter() # species: attacks on us by a monster we took for peaceful
         self.peace_turned = 0          # looks that found a kind created peaceful hostile
         self.empty_looks = 0           # looks whose description came back empty
-        self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
         self.adjacent, self.adjacent_at = [], None       # adjacent_hostiles: the answer and (tick, steps, level) of it
         self.avoid_cells = []          # squares of never-melee monsters, walked round (adjacent_hostiles)
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn (msg_combat)
@@ -360,6 +359,11 @@ class PerceptionMixin:
         g = int(self.obs["glyphs"][pos])
         m = nh.glyph_to_mon(g)
         return nh.permonst(m).mlevel if 0 <= m < nh.NUMMONS else 0
+
+    def melee_on_us_note(self, melee):
+        """msg_combat: who hit us in melee this message -- "It" (blind_strike) or "The ..." (hallu_strike) evidence."""
+        self.perc.it_attacked |= "It" in melee
+        self.perc.melee_on_us |= any(who.startswith("The ") for who in melee)
 
     def blind_attackers(self, lv, hostiles):
         """blind_strike: while blind, an adjacent 'I' is only a target if it attacked us. mhitu.c marks the square

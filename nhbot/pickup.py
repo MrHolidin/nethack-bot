@@ -97,7 +97,6 @@ LIFT_UNDO_TURNS = 30     # lift_heavy: turns after a pick-up into Burdened its d
 class PickupState:
     """State of picking things up (PickupMixin)."""
     def __init__(self):
-        self.stolen_names = set()      # bare names of what thieves took from us (loot takes these back)
         self.stats = Counter()         # why things were taken / refused
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
@@ -227,10 +226,10 @@ class PickupMixin:
         for r in reasons:
             if r:
                 self.pick.stats[r] += 1
-                self.carry.stats["picked"] += r in ("carry", "missile", "weapon")
+                self.carry_stat("picked", r in ("carry", "missile", "weapon"))
                 self.pick.food_picked += r == "food"
         self.take_here(lambda t: self.take_reason(t, worn) is not None, "pile")
-        self.equip.events.append((self.turn(), "pickup", ",".join(n for n, r in zip(names, reasons) if r)))
+        self.equip_event("pickup", ",".join(n for n, r in zip(names, reasons) if r))
         return True
 
     def pickup_all(self):
@@ -241,7 +240,7 @@ class PickupMixin:
         def want(t):
             if "for sale" in t:
                 return False
-            if base_name(t)[2] in self.pick.stolen_names:
+            if base_name(t)[2] in self.thief.stolen_names:
                 self.pick.stats["loot_stolen"] += 1
                 return True
             return self.take_reason(t) is not None
@@ -258,6 +257,10 @@ class PickupMixin:
         """Ammo / retrieve: our missiles (and the stones we throw) here."""
         if not self.merch_risk(self.level(), self.pos()):
             self.take_here(self.ammo_want, "ammo")
+
+    def never_take_again(self, name):
+        """Items of bare name are dropped to make room (sokoban.soko_make_room): never taken again."""
+        self.pick.never_take.add(name)
 
     def take_here(self, want, site):
         """Pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it
@@ -350,8 +353,7 @@ class PickupMixin:
             return it
         if self.value_per_weight(it, same(it)) >= self.value_per_weight(lifted, same(lifted)):
             self.pick.lift_last = None
-            k = "lift_heavy_undone"
-            self.carry.stats[k] = self.carry.stats.get(k, 0) + 1
+            self.carry_stat("lift_heavy_undone")
             return lifted
         return it
 
@@ -376,8 +378,7 @@ class PickupMixin:
         ok = any(want(t) for t in texts) and ocls is not None and self.worth_taking(ocls, name)
         if ok:
             self.pick.lift_last = (floor_kind(name)[1], self.turn())
-        k = "lift_heavy_" + ("yes" if ok else "no")
-        self.carry.stats[k] = self.carry.stats.get(k, 0) + 1
+        self.carry_stat("lift_heavy_" + ("yes" if ok else "no"))
         return ok
 
     def pickup_matching(self, words, no_sale=False, own=False):

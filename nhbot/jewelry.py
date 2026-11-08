@@ -310,7 +310,7 @@ class JewelryMixin:
             self.cur_act = "buy"
             self.pickup(lambda t: "for sale" in t and PRICE_RE.search(t) is not None
                         and affordable(t, int(PRICE_RE.search(t).group(1))), "buy")
-            self.prices.for_sale.pop((lv.key, here), None)
+            self.price_tags_taken(lv.key, here)
             self.jewel.stats["picked_up"] += 1
             return True
         if goals.any() and self.walk_to(lv, goals, act="buy")[0] == "moved":

@@ -370,8 +370,7 @@ class MapMixin:
                 lv.stairs_to[self.pos()] = self.prev_key
             self.note_stair_arrival(lv)
             self.prev_key = lv.key
-        self.acts.last_stair_dir = None
-        self.acts.took_stairs = False
+        self.stairs_noted()
         return arrived_by_stairs
 
     def note_stair_arrival(self, lv):
@@ -404,22 +403,20 @@ class MapMixin:
             lv.town_heard = True                              # the watch warned us -- Minetown (A/B minetown_watch:
                                                               # never fired without dig_through, accepted)
         if "under arrest" in m:
-            self.nav.mines_kick_stats["arrest"] += 1
+            self.mines_kick_stat("arrest")
         if "stop damaging that door" in m and lv and self.nav.last_move_target:
             lv.watch_warned.add(self.nav.last_move_target)      # the next kick it sees means arrest
             self.no_entry_mark(lv, self.nav.last_move_target)
-            self.nav.mines_kick_stats["warned"] += 1
+            self.mines_kick_stat("warned")
         if "diagonally into an intact doorway" in m and lv and self.nav.last_move_target:
             lv.door_seen[self.nav.last_move_target] = lv.no_diag[self.nav.last_move_target] = True
         if "diagonally out of an intact doorway" in m and lv:
             lv.door_seen[self.pos()] = lv.no_diag[self.pos()] = True
         for kind, caught, freed in TRAP_MSGS:
             if any(c in m for c in caught) and self.cur_key:
-                if self.nav.trapped is None:
-                    self.nav.trap_stats[kind] += 1
-                self.nav.trapped = (kind, self.cur_key, self.pos())
+                self.trap_caught(kind)
             elif any(f in m for f in freed):
-                self.nav.trapped = None
+                self.trap_freed()
         if "This door is locked" in m and self.nav.last_move_target and lv:
             lv.locked.add(self.nav.last_move_target)
         if self.squeeze_msg(m, lv):                           # carry.py: a diagonal squeeze refused for our weight

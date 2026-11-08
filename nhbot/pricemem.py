@@ -229,7 +229,7 @@ class PriceMemoryMixin:
         if rid not in bucket:
             bucket[rid] = r
             self.prices.stats[kind] += 1
-            self.value.type_version += 1           # value.type_posterior reads the price readings
+            self.value_types_changed()             # value.type_posterior reads the price readings
 
     def price_note_text(self, text):
         """Any text with price tags (look_here lines, 'You see here ...' messages)."""
@@ -243,6 +243,10 @@ class PriceMemoryMixin:
                 self._record(item, "buy", price, ("buy", lk, self.pos(), item, price))
                 self.prices.for_sale.setdefault((lk, self.pos()), {})[item] = price
 
+    def price_tags_taken(self, key, pos):
+        """We bought what lay for sale on square pos of level key: its price tags are gone."""
+        self.prices.for_sale.pop((key, pos), None)
+
     def price_note_offer(self, msg):
         if "offers only" in msg:
             return                                   # shopkeeper short of cash: no information
@@ -252,7 +256,7 @@ class PriceMemoryMixin:
         offer, item = int(m.group(1)), m.group(2).strip()
         shk = msg.split(" offers ")[0].split(".")[-1].strip()
         # "for your scrolls labeled X": the offer is for the whole stack, whose size the message omits
-        qty = self.carry.last_drop_qty if re.search(r"\b(potions|scrolls|rings|wands|amulets|spellbooks|pairs)\b", item) else 1
+        qty = self.acts.last_drop_qty if re.search(r"\b(potions|scrolls|rings|wands|amulets|spellbooks|pairs)\b", item) else 1
         self._record(item, "sell", offer, ("sell", shk, item, offer, qty), qty)
 
     def price_posterior(self, key):

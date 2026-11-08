@@ -161,7 +161,6 @@ class DangerState:
         self.pending = None                      # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
-        self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
         self.mean = defaultdict(lambda: [0, 0.0, 0.0])           # bin -> [n, sum predicted, sum actual]
         self.p = defaultdict(lambda: [0, 0.0, 0])                # bin -> [n, sum predicted, deaths]
 
@@ -361,7 +360,7 @@ class DangerMixin:
         self.danger.pending = None
         if pend is not None:
             pt, php, parts = pend
-            target = self.acts.last_attack_target if self.danger.attack_turn == pt else None
+            target = self.acts.last_attack_target if self.acts.attack_turn == pt else None
             if t == pt + 1 and hp <= php:
                 mean, pd = self.danger_combine(parts, target, php)
                 self.danger_score((pt, php, mean, pd), php - hp, died=False)
@@ -380,7 +379,7 @@ class DangerMixin:
     def danger_summary(self):
         if self.done and not self.truncated and self.danger.pending is not None:
             pt, php, parts = self.danger.pending
-            target = self.acts.last_attack_target if self.danger.attack_turn == pt else None
+            target = self.acts.last_attack_target if self.acts.attack_turn == pt else None
             mean, pd = self.danger_combine(parts, target, php)
             self.danger_score((pt, php, mean, pd), php, died=True)
             self.danger.pending = None

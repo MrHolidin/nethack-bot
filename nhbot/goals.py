@@ -72,10 +72,14 @@ class GoalsMixin:
         if n:
             self.goals.stats[kind][event] += n
 
+    def goal_tick_start(self):
+        """A new tick: nothing walked toward yet (goal_chase)."""
+        self.goals.chasing = None
+
     def goal_chase(self, kind):
         self.goals.chasing = kind
         if kind == "box":
-            self.box.chase_turn = self.turn()
+            self.box_chased()
 
     # ------------------------------------------------------------------ explore tier
     def goal_raw(self, kind, lv):
@@ -150,15 +154,11 @@ class GoalsMixin:
     def goal_forget(self, kind, lv, goal):
         """Remove an own-tier goal at goal from its list; returns how many entries went."""
         if kind == "retrieve":
-            n = len(self.combat.retrieve)
-            self.combat.retrieve = [r for r in self.combat.retrieve if goal not in r[1]]
-            return n - len(self.combat.retrieve)
+            return self.retrieve_forget(goal)
         if kind == "corpse":
-            n = len(self.combat.kills)
-            self.combat.kills = [k for k in self.combat.kills if k[2] != goal or k[3] != lv.key]
-            return n - len(self.combat.kills)
+            return self.kills_forget(lv.key, goal)
         if kind == "loot":
-            self.thief.loot_sq = None
+            self.loot_forget()
             return 1
         raise ValueError(kind)
 

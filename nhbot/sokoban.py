@@ -798,7 +798,7 @@ class SokobanMixin:
         looks = self.carried_by_look()
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         it = min(inv, key=lambda it: self.est_value(it, same(it)))
-        self.pick.never_take.add(base_name(it.text)[2])
+        self.never_take_again(base_name(it.text)[2])
         self.soko_stats["room_dropped"] += 1
         self.drop_units(it.letter)
         return True
