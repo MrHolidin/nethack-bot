@@ -60,6 +60,10 @@ DEFAULTS = {
     "stairs_refused": False,   # A/B: "You can't go up / down here" noted (Level.not_stairs) by msg_map whatever pressed
                                #      the key, and every walk to stairs (explore's way down, mines_return, excal_go_up,
                                #      level travel) leaves those squares out (mapmem.stairs_mask)
+    "merch_one": False,        # A/B: one merchandise rule (pickup.merch_risk) for an item's walk mask and the step
+                               #      that takes it: gold not walked to where step_gold_here won't pick it up (a
+                               #      shopkeeper in view, no shop marked); a corpse judged where it lies, not where we
+                               #      stand (nhbot.goals.goal_masks, policy.step_eat_corpse)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

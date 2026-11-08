@@ -430,7 +430,8 @@ class PolicyMixin:
     def step_eat_corpse(self, c):
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""
         lv, y, x = c.lv, c.y, c.x
-        if c.hunger >= NOT_HUNGRY and self.kills and not self.merch_risk(lv, (y, x)):
+        # merch_one: merch_risk only where the corpse lies (corpse_goals) -- not also at our own square
+        if c.hunger >= NOT_HUNGRY and self.kills and (self.opts.merch_one or not self.merch_risk(lv, (y, x))):
             goals = self.corpse_goals(lv)
             if goals:
                 return self.pursue("corpse", lv, goals, lambda g: self.eat_corpse_here())

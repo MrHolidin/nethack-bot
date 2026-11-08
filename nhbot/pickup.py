@@ -105,6 +105,13 @@ class PickupMixin:
         shop on this level is marked (the marked squares are the better answer)."""
         return bool(lv.shop[pos]) or (self.shopkeeper_in_view() and not lv.shop.any())
 
+    def merch_mask(self, lv):
+        """merch_risk of every square at once (merch_one: the walk mask of an item goal, so it agrees with the
+        step that takes the item there)."""
+        if self.shopkeeper_in_view() and not lv.shop.any():
+            return np.ones_like(lv.shop, dtype=bool)
+        return lv.shop.astype(bool)
+
     # ------------------------------------------------------------------ one rule what to take
     def take_reason(self, text, worn=None):
         """Why we'd take this floor item: "armor" (an upgrade), "missile", "weapon" (a wield candidate), "food",
