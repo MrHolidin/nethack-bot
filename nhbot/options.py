@@ -53,6 +53,10 @@ DEFAULTS = {
                                #      limit and went stale (nhbot.combat.prey_win)
     "statue_free": False,      # A/B: a statue is floor for planning (mapmem.kinds, nav.grids), no boulder (cost 15,
                                #      never walked in Sokoban): no statue stops a step (hack.c test_move)
+    "ranges": False,           # A/B: a gas spore is thrown at from 2 on (its explosion covers 3x3, explode.c); a
+                               #      shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM); our to-hit / damage
+                               #      count our weapon skill (#enhance read, weapon.c), +4 on one our sleep ray put
+                               #      down, +2 on one that turned to flee (uhitm.c) (nhbot.combat, danger, threats)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

@@ -19,11 +19,13 @@ gives it unlimited use of them):
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.messages import ATTACKER_NAME_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE
+from nhbot.messages import ATTACKER_NAME_RE, FLEE_RE, MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE
 from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
 TRACK_FORGET = 10            # turns a track is kept unseen
+FLEE_TURNS = 10              # ranges: turns a monster counts as fleeing after "The X turns to flee." -- monmove.c:346
+                             # distfleeck's scare (Elbereth, a scroll of scare monster) lasts rnd(10) 6 times in 7
 WAND_KINDS = ("striking", "magic missile", "fire", "cold", "sleep", "lightning", "death")
 RAY_SEEN = (("sleep ray", "sleep"), ("bolt of fire", "fire"), ("bolt of cold", "cold"),
             ("bolt of lightning", "lightning"), ("magic missile", "magic missile"), ("death ray", "death"),
@@ -103,6 +105,11 @@ class ThreatMixin:
                 old = tr["missile"]
                 tr["missile"] = {"kind": kind, "counts": (old["counts"] if old else []) + [n],
                                  "poisoned": poisoned or bool(old and old["poisoned"])}
+        if self.opts.ranges:
+            for name in FLEE_RE.findall(m):
+                tr = self.track_named(name)
+                if tr is not None:
+                    tr["fled"] = t
         for name in MON_BREATHES_RE.findall(m):
             tr = self.track_named(name)
             if tr is not None:
@@ -120,6 +127,12 @@ class ThreatMixin:
         if tr is None or not (tr["wands"] or tr["missile"] or tr["breath"]):
             return None
         return {"wands": sorted(tr["wands"]), "missile": tr["missile"], "breath": tr["breath"]}
+
+    def fleeing(self, pos):
+        """ranges: the monster at pos turned to flee (FLEE_RE) at most FLEE_TURNS turns ago."""
+        t = self.turn()
+        tr = next((r for r in self.mon_tracks if r["pos"] == pos and r["seen"] == t), None)
+        return tr is not None and tr.get("fled") is not None and t - tr["fled"] <= FLEE_TURNS
 
     def active_threat(self, pos):
         """The monster at pos is coming for us (module docstring)."""

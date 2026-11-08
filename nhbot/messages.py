@@ -27,6 +27,9 @@ UNSEEN_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|misses|just misses|touches yo
 ATTACKER_NAME_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|bites|stings|kicks|butts|touches|claws|thrusts|swings|"
                               r"shoots|throws|zaps|breathes|casts|spits|gazes|engulfs|squeezes|lashes|tentacles|"
                               r"just misses|strikes)\b")
+# FLEE_RE (threats.msg_threat, ranges: our to-hit +2 on a fleeing monster): monmove.c:306 monflee's message, printed
+#   only as it starts fleeing (seen, not fleeing already)
+FLEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) turns to flee\.")
 
 # ---------------------------------------------------------------- shot at from a distance
 # SHOT_AT_RE (combat.msg_combat -> last_shot_turn, hunt_shooter): somebody attacked us from a distance (mthrowu.c

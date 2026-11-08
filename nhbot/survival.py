@@ -9,9 +9,11 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.carry import HEAL_POTIONS
 from nhbot.consts import DELTA2KEY, FAINTING, HUNGRY, NOT_HUNGRY, SATIATED, WEAK
+from nhbot.game import PAGE_RE
 from nhbot.goals import GOALS
 from nhbot.items import base_name
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
+from nhbot.weapondice import SKILL_LEVEL
 
 
 # apply.c use_unicorn_horn: what an uncursed / blessed horn can fix (deafness left alone: harmless to us), and a
@@ -19,6 +21,9 @@ from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE
 HORN_SICK = nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
 HORN_FIXES = HORN_SICK | nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU
 HORN_HARM = HORN_FIXES | nh.BL_MASK_DEAF
+# a line of the #enhance menu: "   long sword         [Basic]", "a -   dagger   [Unskilled]" (weapon.c:1262)
+SKILL_LINE_RE = re.compile(r"^ *(?:[a-zA-Z] - )?[ *#]*([a-z][a-z' -]*?[a-z]) +\[(" + "|".join(SKILL_LEVEL) + r")\]",
+                           re.M)
 ATTR_LOSS_RE = re.compile(r"You feel (?:weak|stupid|foolish|clumsy|fragile|repulsive)!")
 
 # eat.c newuhs: the status line by u.uhunger
@@ -58,6 +63,7 @@ class SurvivalMixin:
         self.vault_bag_outs = 0        # vault_bag_out: gold taken out of the bag for the guard
         self.hunger_turns = Counter()  # turns spent per hunger state (status line)
         self.want_enhance = False
+        self.skills = None             # ranges: {skill name: level} from the #enhance menu (read_skills)
         self.enhances = 0
         self.quaffs = 0
         self.nutrition = 900           # estimated u.uhunger (start 900): see nutrition_tick
@@ -269,9 +275,13 @@ class SurvivalMixin:
         return False
 
     def enhance_step(self):
+        if self.opts.ranges and self.skills is None:
+            self.read_skills()                       # ranges: the skill levels our to-hit / damage read
         if not self.want_enhance:
             return False
         self.want_enhance = False
+        if self.opts.ranges:
+            self.skills = None                       # read again next time, after the advance
         for _ in range(6):
             self.raw_step(229)                       # M-e: #enhance
             tty = self.tty_text()
@@ -286,6 +296,32 @@ class SurvivalMixin:
             self.settle()
             self.enhances += 1
         return False                                 # takes no game time
+
+    def read_skills(self):
+        """ranges: the skill levels from the #enhance menu (no game time): every page of its "Current skills:" (or
+        "Pick a skill to advance:") list -- weapon.c:1250-1269 enhance_weapon_skill, " <name> [<level>]" -- into
+        self.skills {name: skills.h level}. A restricted skill is not listed (and counts as Restricted)."""
+        skills = {}
+        self.raw_step(229)                           # M-e: #enhance
+        for _ in range(6):
+            tty = self.tty_text()
+            # a short menu is drawn over the map from its header's column (game.menu_lines); pages after the
+            # first have no header and fill the screen
+            header = next((h for h in ("Current skills:", "Pick a skill to advance:") if h in tty), None)
+            lines = self.menu_lines(tty, header) if header else tty.split("\n")
+            for m in SKILL_LINE_RE.finditer("\n".join(lines)):
+                skills[m.group(1)] = SKILL_LEVEL[m.group(2)]
+            page = PAGE_RE.search(tty)
+            if not (page and int(page.group(1)) < int(page.group(2))):
+                break
+            self.raw_step(ord(">"))
+        self.raw_step(27)
+        self.settle()
+        self.skills = skills
+
+    def skill_level(self, name):
+        """ranges: the level of skill name (weapon.c P_NAME) -- None while not read; not listed: Restricted."""
+        return None if self.skills is None else self.skills.get(name, 0)
 
     def vault_step(self, lv, hostiles):
         """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""

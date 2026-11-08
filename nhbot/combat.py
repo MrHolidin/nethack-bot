@@ -38,6 +38,7 @@ BEAM_WANDS = ("striking",)                                            # no bounc
 SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
 SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
 MR_BIT = {"sleep": MR_SLEEP, "fire": MR_FIRE, "cold": MR_COLD, "lightning": MR_ELEC}    # mresists of each ray
+BOLT_LIM = 8               # hack.h:18: monsters fire / zap at us only from closer than this (mthrowu.c m_lined_up)
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
 PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
 
@@ -127,7 +128,7 @@ class CombatMixin:
 
     def ranged_target(self, lv):
         """A monster we never melee that a missile may kill (RANGED_TARGETS: floating eye, gas spore -- not closer
-        than 3 --, the jellies, brown / green mold, cockatrice, chickatrice) among avoid_cells, within 6 in a clear
+        than spore_throw_min --, the jellies, brown / green mold, cockatrice, chickatrice) among avoid_cells, within 6 in a clear
         straight line -> (dir_key, dist, pos, step)."""
         if not self.avoid_cells:
             return None
@@ -142,12 +143,18 @@ class CombatMixin:
             name = G.monster_name(g[ty, tx])
             if name not in RANGED_TARGETS:
                 continue
-            if name == "gas spore" and d < 3:
+            if name == "gas spore" and d < self.spore_throw_min():
                 continue
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             if line_clear(k_mem, g, y, x, sy, sx, d):
                 return DELTA2KEY[(sy, sx)], d, (ty, tx), (sy, sx)
         return None
+
+    def spore_throw_min(self):
+        """The nearest a gas spore may be when we throw at it. Its explosion covers the 3x3 square round it
+        (explode.c:163-171; mon.c corpse_chance explodes it on its own square), so from 2 we stand outside;
+        3 without ranges."""
+        return 2 if self.opts.ranges else 3
 
     def retrieve_goals(self, lv):
         """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
@@ -229,7 +236,7 @@ class CombatMixin:
         y, x = start
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
-        if d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) and not (name == "gas spore" and d < 3):
+        if d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) and not (name == "gas spore" and d < self.spore_throw_min()):
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             clear = line_clear(k_mem, self.obs["glyphs"], y, x, sy, sx, d)
             ex = self.expendables() if clear else []
@@ -257,7 +264,8 @@ class CombatMixin:
     def hunt_step(self, lv):
         """hunt_shooter: something hit us from range and nothing is next to us -> close in on the likeliest
         shooter: a visible hostile of the named kind, else one standing on a line with us within 8 squares
-        (monsters only fire when lined up, BOLT_LIM). Pursue it for at most 25 turns, while HP >= 40%."""
+        (monsters only fire when lined up, BOLT_LIM; ranges: within 7 -- mthrowu.c:1054-1055 m_lined_up: distmin <
+        BOLT_LIM = 8, hack.h:18). Pursue it for at most 25 turns, while HP >= 40%."""
         t = self.turn()
         y, x = self.pos()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
@@ -269,7 +277,8 @@ class CombatMixin:
         if ev and t - ev[0] <= 2:
             self.shot_event = None
             vis = self.visible_hostiles(lv)
-            lined = [(p, n) for p, n in vis if dist(p) <= 8 and (p[0] == y or p[1] == x or abs(p[0] - y) == abs(p[1] - x))]
+            reach = BOLT_LIM - 1 if self.opts.ranges else 8   # ranges: m_lined_up wants distmin < BOLT_LIM
+            lined = [(p, n) for p, n in vis if dist(p) <= reach and (p[0] == y or p[1] == x or abs(p[0] - y) == abs(p[1] - x))]
             cands = lined
             if ev[1]:
                 cands = [c for c in lined if c[1] == ev[1]] or [c for c in vis if c[1] == ev[1]] or lined
