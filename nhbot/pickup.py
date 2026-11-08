@@ -19,7 +19,7 @@ from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_
                          TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, one_of)
 from nhbot.combat import THROWABLE
 from nhbot.equipment import GLOVES, parse_armor
-from nhbot.items import CURSED_RE, base_name
+from nhbot.items import CURSED_RE, base_name, parse_item
 from nhbot.tins import MAX_TINS
 from nhbot.wishing import LAMP_NAMES
 
@@ -129,14 +129,24 @@ class PickupMixin:
         return reason
 
     def take_reason_kind(self, text, worn=None):
-        """take_reason before the letter count."""
+        """take_reason before the letter count. keep_rule: food, missiles, wield candidates and diggers only within
+        what value.keep_plan keeps of our pack with this stack added (food by pieces, no corpses; MISSILE_KEEP
+        missile pieces; one wield candidate and one Excalibur long sword; one digger -- "digger", a dwarvish mattock,
+        worth less than its weight, was never taken)."""
         if "for sale" in text or base_name(text)[2] in self.never_take:
             return None
         food_n = self._take_food if self._take_food is not None else self.food_count()
         ocls, typ = self.kind_of(text)
         cursed = bool(CURSED_RE.search(text))
+        keep = self.opts.keep_rule
+        kept = self.keep_reason(parse_item("?", ocls, text)) if keep and ocls is not None else None
         reason = None
-        if ocls == nh.FOOD_CLASS:
+        if keep and kept == "digger" and not cursed:
+            reason = "digger"
+        elif ocls == nh.FOOD_CLASS and keep and typ != "tin":
+            if kept == "food" and "partly eaten" not in text:
+                reason = "food"
+        elif ocls == nh.FOOD_CLASS:
             if typ in SAFE_FOOD_SET and "partly eaten" not in text and food_n < MAX_FOOD:
                 reason = "food"
             elif typ == "tin" and self.tins_carried() < MAX_TINS:
@@ -151,9 +161,9 @@ class PickupMixin:
                 reason = "carry"
         elif ocls == nh.WEAPON_CLASS and not cursed and typ not in AMMO_TYPES:
             if typ in MISSILE_TYPES:
-                reason = "missile"
+                reason = "missile" if not keep or kept == "missile" else None
             elif typ in WIELD_TYPES:
-                reason = "weapon"
+                reason = "weapon" if not keep or kept in ("wield", "excalibur") else None
             else:
                 wc = OBJ_INFO.get((nh.WEAPON_CLASS, typ))
                 if wc and wc[1] >= wc[0]:
@@ -168,7 +178,7 @@ class PickupMixin:
         elif ocls in (nh.SPBOOK_CLASS, nh.GEM_CLASS):
             if ocls == nh.SPBOOK_CLASS or not (typ == "gray stone" or typ in THROW_STONE_TYPES):
                 reason = "carry"
-        if reason == "carry" and not self.worth_taking(ocls, text):
+        if reason in ("carry", "digger") and not self.worth_taking(ocls, text):
             return None
         return reason
 
@@ -215,6 +225,9 @@ class PickupMixin:
         return it.ocls == nh.FOOD_CLASS and self.kind_of(it.text)[1] in SAFE_FOOD_SET and self.food_count() <= MAX_FOOD
 
     def food_count(self):
+        """Food lines in the pack; keep_rule: pieces of the food we eat from it (value.keep_food_pieces)."""
+        if self.opts.keep_rule:
+            return self.keep_food_pieces()
         return sum(1 for _, ocls, _ in self.inventory() if ocls == nh.FOOD_CLASS)
 
     # ------------------------------------------------------------------ the paths

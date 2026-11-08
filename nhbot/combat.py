@@ -24,6 +24,7 @@ THROWABLE = ("dagger", "dart", "knife", "shuriken", "javelin", "spear")
 
 
 THROW_STONES = ("flint stone", "rock")
+CONTAINER_WORDS = ("bag", "sack", "box", "chest")    # keep_rule: never thrown (expendables) -- its contents go too
 
 
 # =====================================================================================
@@ -179,10 +180,18 @@ class CombatMixin:
 
     def expendables(self):
         """Inventory items worth less than a way through: missiles first, then gems/rocks, spare weapons,
-        unworn armor, ordinary tools."""
+        unworn armor, ordinary tools. keep_rule: missiles first, then what value.keep_reason doesn't keep (no lamp
+        to rub, no wield candidate, no digger) and no container, the least worth (est_gold) first."""
         if self.handless():
             return []
         out = [(0, l, s) for l, s in self.throwables()]          # missiles, the alternate weapon included
+        if self.opts.keep_rule:
+            seen = {l for _, l, _ in out}
+            rest = [(self.est_gold(it.ocls, it.text), it.letter, it.text) for it in self.items()
+                    if it.letter not in seen and not it.on_body and not it.alternate and not it.cursed
+                    and it.ocls in (nh.GEM_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS, nh.TOOL_CLASS)
+                    and not any(w in it.text for w in CONTAINER_WORDS) and self.keep_reason(it) is None]
+            return [(l, s) for _, l, s in out] + [(l, s) for _, l, s in sorted(rest, key=lambda c: c[0])]
         for it in self.items():
             if it.on_body or it.alternate or it.cursed:
                 continue

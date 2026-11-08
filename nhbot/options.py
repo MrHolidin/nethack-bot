@@ -121,6 +121,11 @@ DEFAULTS = {
                                #      gem its type's weight (1, was 10) and any gem look counts as unidentified
                                #      ("yellowish brown gem" was worth 0); a stack's food counts one piece's nutrition
                                #      (carry.describe, pickup.floor_kind, value.stack_key / unid_gem, survival)
+    "keep_rule": False,        # A/B: one rule what we keep (value.keep_reason / keep_plan) for est_value, selling,
+                               #      throwing (expendables) and taking: worn, the alternate weapon, water, one digger
+                               #      (taken now: "digger"), the best wield candidate (+ a long sword for Excalibur),
+                               #      MISSILE_KEEP missile pieces (no crysknife), MAX_FOOD pieces of food we eat (no
+                               #      corpses, no tins), what carry.needed keeps; no lamp to rub thrown, no water sold
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

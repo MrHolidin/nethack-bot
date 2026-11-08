@@ -355,7 +355,8 @@ class CarryMixin:
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes()
                 and (self.shop_buys(stype, it) and not self.offer_zero(it) if facts else buys is ALL or it.ocls in buys)
-                and not self.needed(it) and (lv.key, it.text) not in self.sell_tried
+                and (self.keep_reason(it) is None if self.opts.keep_rule else not self.needed(it))
+                and (lv.key, it.text) not in self.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and "unpaid" not in it.text]
 
     def item_types(self, it):
