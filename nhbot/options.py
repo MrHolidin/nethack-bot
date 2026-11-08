@@ -56,6 +56,8 @@ DEFAULTS = {
                                #      shooting below in it: -2813 [-4546, -1050], 877 games changed -- split.)
     "shoot_avoided": False,    # A/B: missiles (ranged_target, unblock_step) at every avoided monster that is not
                                #      peaceful (shoot_cells), not only RANGED_TARGETS -- and never at the Oracle
+    "spore_elb": False,        # A/B: a gas spore next to us blocking the only way (unblock_step), too close to throw at:
+                               #      Elbereth written and waited on until it drifts off (combat.spore_back_off)
     "drink_prompt": False,     # A/B: 'q' on a fountain / sink answers "Drink from the fountain?" 'n' and goes on to the
                                #      potion question -- the heal / quaff_test steps typed the potion letter into it
                                #      (game.ask_drink)

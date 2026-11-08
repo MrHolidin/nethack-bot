@@ -27,6 +27,7 @@ SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns 
 SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
 BOLT_LIM = 8               # hack.h:18: monsters fire / zap at us only from closer than this (mthrowu.c m_lined_up)
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
+SPORE_WAITS = 100          # spore_elb: turns at most a level waiting on Elbereth for a gas spore to drift off
 PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
 
 
@@ -91,6 +92,7 @@ class CombatMixin:
         self.hunts = self.hunt_steps = 0
         self.hunt_offline_steps = 0
         self.unblocks = self.unblock_throws = self.unblock_melee = 0
+        self.spore_waits = Counter()     # spore_elb: level key -> turns spent getting a gas spore off us
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
         self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)
@@ -165,6 +167,26 @@ class CombatMixin:
                     out.append(p)
         return out
 
+    def spore_back_off(self, lv):
+        """spore_elb: a gas spore blocks the way, closer than we may throw at (its explosion covers the 3x3 square
+        round it, explode.c) -- and it floats up to us and stays: below its explosion's 4d6 (spore_ok) we waited
+        next to it for good (79897: 20000 turns, starved). On an Elbereth it respects it is scared off
+        (monmove.c:341-346 distfleeck: monflee) -- write one (read back) and wait there; from spore_throw_min on
+        unblock_step throws at it. SPORE_WAITS turns at most a level. True if it used the turn."""
+        if self.spore_waits[lv.key] >= SPORE_WAITS:
+            return False
+        self.cur_act = "unblock"
+        if self.pos() in lv.elbereth and self.elb_confirm(lv):
+            self.spore_waits[lv.key] += 1
+            self.press("s")
+            return True
+        if not self.elb_can_write(lv) or not self.engrave_elbereth():
+            self.spore_waits[lv.key] = SPORE_WAITS      # no Elbereth here: give it up on this level
+            return False
+        self.spore_waits[lv.key] += 1
+        self.elb_confirm(lv)
+        return True
+
     def expendables(self):
         """Inventory items worth less than a way through: missiles first, then gems/rocks, spare weapons,
         unworn armor, ordinary tools. keep_rule: missiles first, then what value.keep_reason doesn't keep (no lamp
@@ -235,6 +257,8 @@ class CombatMixin:
         y, x = start
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
+        if self.opts.spore_elb and name == "gas spore" and d < self.spore_throw_min():
+            return self.spore_back_off(lv)
         shoot = blocker in self.shoot_cells if self.opts.shoot_avoided else True    # shoot_avoided: not the Oracle
         if shoot and d <= 6 and in_line(dy, dx) \
                 and not (name == "gas spore" and d < self.spore_throw_min()):
