@@ -7,11 +7,14 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
+from nhbot.items import base_name
 from nhbot.materials import rusts
 
 JUNK_CLASSES = (nh.GEM_CLASS, nh.ROCK_CLASS, nh.WEAPON_CLASS, nh.TOOL_CLASS, nh.ARMOR_CLASS)   # water spoils little
 CONTAINERS = ("bag", "sack", "box", "chest", "lamp", "candle")
 FOUNTAIN_DIP_DEPTH = 20     # dips for a wish on dungeon levels above this only
+# artilist.h: the long-sword artifacts besides Excalibur (a long sword named so is one: oname makes it the artifact)
+LONG_SWORD_ARTIFACT_RE = re.compile(r"\bnamed (?:Frost Brand|Fire Brand|Demonbane|Giantslayer|Vorpal Blade|Sunsword)\b")
 DEMON_WIN = 0.7      # dip for a wish only while P(we beat a water demon) is above this
 
 
@@ -27,9 +30,16 @@ class ExcaliburMixin:
         self.demon_win = (None, 0.0)     # (state key, P(we beat a water demon))
 
     def long_sword(self):
+        """(letter, text) of a long sword of ours to dip for Excalibur, or None. excal_sword: fountain.c:371-373
+        dipfountain asks only for one long sword (quantity 1) that is no artifact -- a cursed one or one we named is
+        fine (it comes out blessed: bless(obj)); without the flag no cursed or named one."""
         for it in self.items():
-            if it.ocls == nh.WEAPON_CLASS and re.search(r"\blong sword\b", it.text) and "named" not in it.text \
-                    and "Excalibur" not in it.text and not it.cursed:
+            if it.ocls != nh.WEAPON_CLASS or not re.search(r"\blong sword\b", it.text) or "Excalibur" in it.text:
+                continue
+            if self.opts.excal_sword:
+                if base_name(it.text)[0] == 1 and not LONG_SWORD_ARTIFACT_RE.search(it.text):
+                    return it.letter, it.text
+            elif "named" not in it.text and not it.cursed:
                 return it.letter, it.text
         return None
 

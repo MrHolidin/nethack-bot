@@ -87,6 +87,8 @@ DEFAULTS = {
                                #      regeneration, sleep, stun, stoning, brain-eating (nhbot.danger.win_prob)
     "dragon_mc": False,        # A/B: the MC of a worn piece from objects.c a_can (equipment.MC_CAN): dragon scales and
                                #      dragon scale mail 0, not the 1 every suit got (nhbot.equipment.wear_gain)
+    "excal_sword": False,      # A/B: any one long sword of ours is dipped for Excalibur -- cursed or named too (fountain.c
+                               #      dipfountain asks neither, and blesses it); not an artifact (nhbot.excalibur.long_sword)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
