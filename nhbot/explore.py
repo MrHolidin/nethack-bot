@@ -325,27 +325,28 @@ class ExploreMixin:
                     out.add(q)
         return out - lv.not_stairs
 
-    def stairs_step(self, lv, grids, mask, key):
-        """To a staircase of mask and take it (down: go_down, with its pet wait and rest). The game
-        saying there is none here: the square is noted (Level.not_stairs) -- no turn passed. True if it acted."""
+    def stairs_step(self, lv, grids, mask, key, max_cost=10_000):
+        """To a staircase of mask and take it (down: go_down, with its pet wait and rest; up: within max_cost). The
+        game saying there is none here: the square is noted (Level.not_stairs) -- no turn passed. True if it acted."""
         if key == ">":
             if not self.go_down(lv, grids, mask):
                 return False
         elif mask[self.pos()]:
             self.take_stairs("<")
         else:
-            return self.walk_to(lv, mask, grids=grids)[0] == "moved"
+            return self.walk_to(lv, mask, grids=grids, max_cost=max_cost)[0] == "moved"
         if re.search(r"You can't go (?:down|up) here", self.message()):
             if not self.opts.stairs_refused:          # stairs_refused: msg_map records it, for every step
                 lv.not_stairs.add(self.pos())
             self.mines_trip_stats["not_stairs"] += 1
         return True
 
-    def level_travel_step(self, lv, grids, key, act, stat):
+    def level_travel_step(self, lv, grids, key, act, stat, known_only=False, max_cost=10_000):
         """One step toward main-dungeon level `key` from this one by the stairs we know: to an up staircase and
         up it, or down a down staircase -- never one we know leads elsewhere than the next main level (Sokoban's
         up staircase, the Mines'; Level.stairs_to, avoid_down, placed by linked_stairs); one we know leads there
-        counts even if the map shows a boulder on it. False: no way known."""
+        counts even if the map shows a boulder on it. known_only: while one is known to lead there, only that one
+        (an up staircase not taken yet may be Sokoban's). Up: walked to within max_cost. False: no way known."""
         k_mem = grids[0]
         up_way = key[1] < lv.key[1]
         nxt = (0, lv.key[1] - 1 if up_way else lv.key[1] + 1)
@@ -355,6 +356,8 @@ class ExploreMixin:
         if not up_way:
             elsewhere |= self.mines_stairs(lv)
         mask = self.stairs_mask(lv, kind, k_mem)
+        if known_only and there - lv.not_stairs:
+            mask[:] = False
         for p in there:
             mask[p] = True
         for p in (elsewhere - there) | lv.not_stairs:
@@ -364,7 +367,7 @@ class ExploreMixin:
         self.cur_act = act
         if mask[self.pos()]:
             self.mines_trip_stats[stat + ("_up" if up_way else "_down")] += 1
-        return self.stairs_step(lv, grids, mask, "<" if up_way else ">")
+        return self.stairs_step(lv, grids, mask, "<" if up_way else ">", max_cost=max_cost)
 
     def mines_tick(self, lv):
         """Every tick, before the steps: the branch level's Mines staircase marked (avoid_down) where mines_return or a

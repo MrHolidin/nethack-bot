@@ -61,6 +61,10 @@ class ExcaliburMixin:
             self.fountain_levels.add(lv.key)
         if not self.excal_eligible():
             return False
+        if self.opts.excal_travel:
+            # excal_travel: the fountains we may use (fountains: no shop's, none in the Mines, none on a level given
+            # up -- before, a level given up was walked at again every tick)
+            fmask = self.fountains(lv)
         if not fmask.any():
             return self.excal_go_up(lv)
         if lv.shop.any() and fmask[lv.shop].any():
@@ -89,7 +93,18 @@ class ExcaliburMixin:
         return min(keys, key=lambda k: abs(k[1] - dl)) if keys else None
 
     def excal_go_up(self, lv):
-        """No fountain here, but one is remembered a few levels up: walk back up to it."""
+        """No fountain here, but one is remembered a few levels up: walk back up to it. excal_travel: toward the
+        nearest such level by level_travel_step (no staircase known to lead elsewhere -- Sokoban's --, only the one
+        known to lead up there while one is), each staircase taken a trip."""
+        if self.opts.excal_travel:
+            target = self.excal_up_target(lv)
+            if target is None:
+                return False
+            if not self.level_travel_step(lv, self.grids(lv), target, "excal", "excal_travel", known_only=True,
+                                          max_cost=self.opts.excal_cost_up):
+                return False
+            self.excal_trips += self.took_stairs
+            return True
         if not self.excal_up_wanted(lv):
             return False
         up = self.stairs_mask(lv, G.UPSTAIR, self.grids(lv)[0])
@@ -102,6 +117,16 @@ class ExcaliburMixin:
             self.take_stairs("<")
             return True
         return self.walk_to(lv, up, max_cost=self.opts.excal_cost_up, act="excal")[0] == "moved"
+
+    def excal_up_target(self, lv):
+        """excal_travel: the nearest main-dungeon level at most excal_up above this one with a fountain we may use
+        (fountains), while trips are left; None."""
+        if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
+            return None
+        dl = lv.key[1]
+        keys = [k for k, l in self.levels.items()
+                if k[0] == 0 and dl - self.opts.excal_up <= k[1] < dl and self.fountains(l).any()]
+        return max(keys, key=lambda k: k[1]) if keys else None
 
     def excal_up_wanted(self, lv):
         """A fountain is remembered a few levels up (not skipped, not all in shops) and trips are left."""
