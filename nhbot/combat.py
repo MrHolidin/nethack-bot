@@ -141,7 +141,10 @@ class CombatMixin:
             if d == 0 or d > 6 or not (dy == 0 or dx == 0 or abs(dy) == abs(dx)):
                 continue
             name = G.monster_name(g[ty, tx])
-            if name not in RANGED_TARGETS:
+            if self.opts.melee_policy:
+                if (ty, tx) not in self.shoot_cells:       # melee_policy's shoot
+                    continue
+            elif name not in RANGED_TARGETS:
                 continue
             if name == "gas spore" and d < self.spore_throw_min():
                 continue
@@ -236,7 +239,9 @@ class CombatMixin:
         y, x = start
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
-        if d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) and not (name == "gas spore" and d < self.spore_throw_min()):
+        shoot = blocker in self.shoot_cells if self.opts.melee_policy else True     # melee_policy: not the Oracle
+        if shoot and d <= 6 and (dy == 0 or dx == 0 or abs(dy) == abs(dx)) \
+                and not (name == "gas spore" and d < self.spore_throw_min()):
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             clear = line_clear(k_mem, self.obs["glyphs"], y, x, sy, sx, d)
             ex = self.expendables() if clear else []
@@ -247,7 +252,8 @@ class CombatMixin:
                 self.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
-            if d == 1 and name == "floating eye" and lv.desperate:
+            if d == 1 and name == "floating eye" and lv.desperate and not self.opts.melee_policy:
+                # (melee_policy: its fight rule decides -- an eye we may hit is not in avoid_cells, never a blocker)
                 self.unblock_melee += 1
                 self.attack(blocker)
                 return True

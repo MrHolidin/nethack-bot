@@ -71,6 +71,10 @@ DEFAULTS = {
     "attacked_us": False,      # A/B: one table / parser of the attacks on us (messages.attacks_on_us) for every reader
                                #      -- the threat tracker (no longer "The jackal bites the little dog."), the
                                #      peaceful-attacker marks, blind_strike / hallu_strike ("thrusts" / "swings" lines)
+    "melee_policy": False,     # A/B: one (fight, avoid, shoot) answer per monster (perception.melee_policy) for
+                               #      avoid_cells, adjacent_hostiles, ranged_target and unblock_step: on a desperate
+                               #      level a never-melee monster is walked round below 90% HP too (no walking into
+                               #      a jelly we won't hit); missiles at every avoided non-peaceful one alike
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

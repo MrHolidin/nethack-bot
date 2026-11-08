@@ -53,6 +53,7 @@ class PerceptionMixin:
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
         self._adjacent, self._adjacent_at = [], None     # adjacent_hostiles: the answer and (tick, steps, level) of it
         self.avoid_cells = []          # squares of never-melee monsters, walked round (adjacent_hostiles)
+        self.shoot_cells = set()       # melee_policy: the avoid_cells in view a missile may go at (melee_policy)
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn (msg_combat)
         self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
         self.blind_held = self.hallu_held = 0
@@ -212,8 +213,11 @@ class PerceptionMixin:
             if not here and not blind and max(abs(pos[0] - y), abs(pos[1] - x)) <= 1:
                 del lv.stationary[pos]
                 continue
-            if not here and pos not in self.avoid_cells and self.never_melee(name) \
-                    and not (lv.desperate and name not in self.always_avoid()):
+            if self.opts.melee_policy:
+                avoid = self.melee_policy(lv, name, pos)[1]
+            else:
+                avoid = self.never_melee(name) and not (lv.desperate and name not in self.always_avoid())
+            if not here and pos not in self.avoid_cells and avoid:
                 self.avoid_cells.append(pos)
 
     def adjacent_hostiles(self, lv):
@@ -232,12 +236,20 @@ class PerceptionMixin:
         g = self.obs["glyphs"]
         out = []
         self.avoid_cells = []
+        self.shoot_cells = set()
+        pol = self.opts.melee_policy
         for yy in range(max(0, y - 7), min(ROWS, y + 8)):
             for xx in range(max(0, x - 7), min(COLS, x + 8)):
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(g[yy, xx])
-                    if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
+                    if pol:
+                        _, avoid, shoot = self.melee_policy(lv, name, (yy, xx))
+                        if avoid:
+                            self.avoid_cells.append((yy, xx))
+                        if shoot:
+                            self.shoot_cells.add((yy, xx))
+                    elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()) \
                             and not self.spore_ok(name):
                         self.avoid_cells.append((yy, xx))
                     if self.never_melee(name) and name in PM_BY_NAME \
@@ -252,8 +264,11 @@ class PerceptionMixin:
             k = G.KIND[gg]
             if k == G.MONSTER:
                 name = G.monster_name(gg)
-                if self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
-                                                and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
+                if pol:
+                    if not self.melee_policy(lv, name, (ny, nx))[0]:
+                        continue
+                elif self.never_melee(name) and not (lv.desperate and name not in self.always_avoid()
+                                                  and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) \
                         and not self.spore_ok(name):
                     continue
                 if self.is_actively_dangerous(lv, (ny, nx)) or self.passive_prey(name):
@@ -368,6 +383,24 @@ class PerceptionMixin:
         if self.passive_immune(name):
             return False
         return name in NEVER_MELEE or name in PASSIVE_DMG
+
+    def melee_policy(self, lv, name, pos):
+        """melee_policy: (fight, avoid, shoot) for the monster `name` at pos -- the one answer avoid_cells,
+        adjacent_hostiles, ranged_target and unblock_step read. fight: we may hit it -- anything not never_melee; a
+        never-melee one only on a desperate level at 90% of max HP or more (not the always-avoided ones), a gas spore
+        above its explosion (spore_ok). avoid: a never-melee one we may not hit is walked round -- exactly then, so
+        explore never walks into one the melee step refuses (before, a desperate level dropped it from avoid_cells at
+        any HP). shoot: an avoided one that is not peaceful (the Oracle) -- a missile at it is safe (its harm is
+        passive, uhitm.c passive() follows a melee hit only; an acid blob may corrode the missile, dothrow.c:1727
+        passive_obj), for the blocker throws and for unblocking alike (before,
+        throw_at_blocker never threw at a yellow / red mold or an acid blob, unblock_step did -- and at the Oracle)."""
+        if not self.never_melee(name):
+            return True, False, False
+        fight = (lv.desperate and name not in self.always_avoid()
+                 and self.bl(nh.NLE_BL_HP) * 10 >= self.bl(nh.NLE_BL_HPMAX) * 9) or self.spore_ok(name)
+        if fight:
+            return True, False, False
+        return False, True, not self.peaceful_now(lv, pos, look=False)
 
     def spore_ok(self, name):
         # gas spore explosion is 4d6 (max 24): meleeing it is safe above that
