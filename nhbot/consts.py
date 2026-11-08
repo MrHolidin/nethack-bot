@@ -30,6 +30,10 @@ SATIATED, NOT_HUNGRY, HUNGRY, WEAK, FAINTING = 0, 1, 2, 3, 4
 # water, a fountain and the Planes of Air / Water; on an altar the attempt angers its god and writes nothing, and a
 # finger only smudges a grave -- stairs, ladders, a throne and a sink take an engraving.
 NO_ENGRAVE_CMAP = {23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 34, 39, 40, 41}
+# engrave_more: only what doengrave really refuses (engrave.c:521-533: lava, pool / water, fountain, the Planes of
+# Air / Water -- S_air, S_cloud, S_water) or wastes (engrave.c:574-583: an altar angers its god, a finger only smudges
+# a grave); stairs, ladders, a throne and a sink are written on (and onscary, monmove.c:175, has no terrain test)
+ENGRAVE_REFUSED_CMAP = {27, 28, 31, 32, 34, 39, 40, 41}
 
 # cmap glyphs (display.h / drawing.c S_ indices)
 STONE_GLYPH = nh.GLYPH_CMAP_OFF + 0

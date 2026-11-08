@@ -18,7 +18,7 @@ from nhbot import glyphs as G
 from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_GLYPH, NO_TOOLS, OBJ_INFO,
                          TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, singular)
 from nhbot.combat import THROWABLE
-from nhbot.equipment import parse_armor
+from nhbot.equipment import GLOVES, parse_armor
 from nhbot.items import CURSED_RE, base_name
 from nhbot.tins import MAX_TINS
 from nhbot.wishing import LAMP_NAMES
@@ -44,6 +44,7 @@ SAFE_FOOD_SET = set(SAFE_FOOD)
 CLASS_WORDS = {"potion": nh.POTION_CLASS, "scroll": nh.SCROLL_CLASS, "ring": nh.RING_CLASS, "wand": nh.WAND_CLASS,
                "amulet": nh.AMULET_CLASS, "spellbook": nh.SPBOOK_CLASS}
 CLASS_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s?\b")
+PETRIFYING_CORPSE_RE = re.compile(r"\b(?:cockatrice|chickatrice) corpses?\b")   # mondata.h:192 touch_petrifies
 STOLE_RE = re.compile(r"\b(?:stole|steals) (.+?)[.!](?:\s|$)")
 WANTED_WEAPON_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)   # a remembered weapon worth the walk
 for _g in range(nh.MAX_GLYPH):
@@ -262,7 +263,16 @@ class PickupMixin:
     # ------------------------------------------------------------------ the menu
     def pickup(self, want, site):
         """',' and select what want(text) accepts in the 'Pick up what?' menu (a lone item is picked up
-        without a menu). Returns "menu", or "lone" when there was no menu."""
+        without a menu). Returns "menu", or "lone" when there was no menu; safe_pickup: "none" when it pressed
+        nothing (a lone item want rejects)."""
+        if self.opts.safe_pickup:
+            want = self.touch_safe(want)
+            here = self.look_here()            # ':' costs no game time
+            if len(here) == 1 and not want(here[0]):
+                # pickup.c:869 query_objlist AUTOSELECT_SINGLE: one object here is taken without a menu, whatever
+                # it is -- a cockatrice corpse killed us so
+                self.pickup_stats["lone_refused"] += 1
+                return "none"
         seq0 = self.msg_seq
         self.lift_want = want                  # lift_heavy: a lone item lifted into Burdened, if want takes it
         self.press(",", expect_prompt=True)
@@ -282,6 +292,13 @@ class PickupMixin:
         self.settle()
         self.lift_want = None
         return "menu"
+
+    def touch_safe(self, want):
+        """want, but never a cockatrice / chickatrice corpse while we wear no gloves: pickup.c:1513
+        pickup_object -> fatal_corpse_mistake (pickup.c:258): touching it bare-handed stones us."""
+        if GLOVES in self.worn_by_slot():
+            return want
+        return lambda t: not PETRIFYING_CORPSE_RE.search(t) and want(t)
 
     def lift_undo(self, it, inv, same):
         """lift_heavy: it, the next thing the drop step would shed, while we are Burdened after letting a pick-up

@@ -24,6 +24,27 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "desperate_time": False,   # A/B: step_progress's stall (500: obstacles forgotten, 1500: desperate) and its 2500-turn
+                               #      rule count turns spent ON the level (Level.turns_here), not since the first
+                               #      arrival -- a level re-entered went desperate at once (nhbot.policy)
+    "safe_pickup": False,      # A/B: ',' only after a ':' look (no game time): a lone item (taken without a menu,
+                               #      pickup.c AUTOSELECT_SINGLE) only if want accepts it; never a cockatrice /
+                               #      chickatrice corpse without gloves (nhbot.pickup)
+    "mines_mask": False,       # A/B: the closed Mines staircase explore keeps away from is mines_stairs (linked
+                               #      arrival marks, stairs taken, two_down), not only the avoid_down marks (nhbot.explore)
+    "goal_here": False,        # A/B: explore's targets leave out our own square -- a goal there whose step declined
+                               #      (an altar with a hostile in view) no longer ends exploring (nhbot.explore)
+    "door_stale": False,       # A/B: a door in Level.locked is kicked only while the map shows it closed (else
+                               #      forgotten: opened / broken since); door messages ("The door opens.", "This door
+                               #      is locked.", "The door resists!") are no failed step (nhbot.nav.move)
+    "heal_first": False,       # A/B: the heal step (a healing potion below 1/3 HP) before unihorn / stunned / blind:
+                               #      a non-cursed healing potion cures blindness too (nhbot.policy step order)
+    "engrave_more": False,     # A/B: Elbereth (and the engrave tests) also on stairs, ladders, a throne, a sink --
+                               #      engrave.c doengrave refuses none of them (nhbot.elbereth)
+    "dmg_model": False,        # A/B: danger's melee model corrected (mhitu.c / attrib.c / uhitm.c): rust / corrode /
+                               #      disenchant / slime / gold-stealing hits do damage, negative AC takes rnd(-AC)
+                               #      off each hit, poison's extra damage 24 in 240, a gelatinous cube's passive
+                               #      d(1, 4) on misses too, cold zeroed only when we resist it (nhbot.danger)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

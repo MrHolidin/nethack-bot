@@ -61,8 +61,11 @@ class ExploreMixin:
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)
         hatch = self.turn() - self.mines_done_turn if self.mines_done else on_level
-        if lv.avoid_down and hatch < self.opts.mines_after and self.mines_blocked():
-            for p in lv.avoid_down:
+        # mines_mask: the closed Mines staircase as mines_stairs places it -- an avoid_down mark is the square we
+        # arrived on, often beside the staircase (linked_stairs), and the stairs taken / two_down count too
+        closed = (self.mines_stairs(lv) if lv.key[0] == 0 else set()) if self.opts.mines_mask else lv.avoid_down
+        if closed and hatch < self.opts.mines_after and self.mines_blocked():
+            for p in closed:
                 downstairs[p] = False
         if self.mines_return_on and lv.key[0] == 2:
             # climbing out of the Mines: no way down is a way on -- a level whose up staircase is unknown is explored
@@ -99,6 +102,11 @@ class ExploreMixin:
         targets = frontier.copy()
         for m in goals.values():
             targets |= m
+        if self.opts.goal_here:
+            # goal_here: a goal on our own square was the consuming step's to take this tick (housekeeping, gold_here,
+            # melee); it declined (the altar with a hostile in view) -- walk on to the others instead of "here" ending
+            # exploring (frontier never covers our square: visited) -- as the descent hold above leaves it out
+            targets[y, x] = False
         if targets.any():
             status, _ = self.walk_to(lv, targets, grids=grids,
                                      chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))

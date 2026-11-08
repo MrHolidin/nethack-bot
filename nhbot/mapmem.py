@@ -95,7 +95,9 @@ class Level:
         self.turns_here = 0
         self.progress_count = 0
         self.last_progress = 0
-        self.last_reset = 0        # turn the learned obstacles were last forgotten (step_progress)
+        self.progress_here = 0     # turns_here at the last progress (desperate_time: step_progress counts turns here)
+        self.last_reset = 0        # turn (desperate_time: turns_here) the learned obstacles were last forgotten
+                                   # (step_progress)
         self.entered_turn = None
         self.entered_xl = None     # experience level at the first arrival (stats)
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
@@ -166,6 +168,7 @@ class MapMixin:
         if pc > lv.progress_count:
             lv.progress_count = pc
             lv.last_progress = self.turn()
+            lv.progress_here = lv.turns_here
         if lv.shop_anchors:
             self.shop_regrow(lv)
         self.arrived_by_stairs = self.note_arrival(lv)

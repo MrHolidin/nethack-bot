@@ -10,7 +10,7 @@ import nle.nethack as nh
 
 from nhbot import elb_rules as ELB
 from nhbot import glyphs as G
-from nhbot.consts import NO_ENGRAVE_CMAP
+from nhbot.consts import ENGRAVE_REFUSED_CMAP, NO_ENGRAVE_CMAP
 from nhbot.messages import ELB_WIPED_RE
 from nhbot.monsters import (ELB_IGNORE_NAMES, M1_NOHANDS, PM_BY_NAME, PM_INDICES, S_ANGEL, S_HUMAN, SWARMERS,
                             VALK_RANKS)
@@ -77,7 +77,8 @@ class ElberethMixin:
         counts: an item lying on an altar hides it, and Elbereth "written" on an altar angers its god
         (engrave.c altar_wrath) and writes nothing."""
         g = int(self.terrain_glyphs(lv)[self.pos()])
-        if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in NO_ENGRAVE_CMAP:
+        if nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in (ENGRAVE_REFUSED_CMAP if self.opts.engrave_more
+                                                           else NO_ENGRAVE_CMAP):
             return False
         return not self.handless()
 
@@ -105,7 +106,7 @@ class ElberethMixin:
         not levitating / blind / stunned / confused."""
         if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
             return False
-        if self.kinds(lv)[self.pos()] in (G.UPSTAIR, G.DOWNSTAIR):
+        if self.kinds(lv)[self.pos()] in (G.UPSTAIR, G.DOWNSTAIR) and not self.opts.engrave_more:
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & nh.BL_MASK_HALLU:

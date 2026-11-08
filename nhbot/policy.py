@@ -64,6 +64,17 @@ STEPS = (
 )
 
 
+def step_order(opts):
+    """STEPS as the options order them. heal_first: heal right after perceive -- before unihorn, stunned and blind,
+    which wait (or apply the horn) while a known healing potion would mend the HP -- and blindness too
+    (potion.c:993-1010 peffects: healup's cureblind -- healing when not cursed, extra / full healing always)."""
+    order = list(STEPS)
+    if opts.heal_first:
+        order.remove("heal")
+        order.insert(order.index("perceive") + 1, "heal")
+    return tuple(order)
+
+
 # step_housekeeping: (name, job(bot, tick) -> True if it acted), in order -- with no hostile in view
 HOUSEKEEPING = (
     ("pay", lambda b, c: b.pay_step()),
@@ -110,7 +121,7 @@ class Tick:
 
 class PolicyMixin:
     def policy_init(self):
-        self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in STEPS]
+        self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in step_order(self.opts)]
         self.last_step = None
         self.tick_no = 0
         self.tick_seq = 0                # msg_seq at the start of this tick
@@ -163,14 +174,21 @@ class PolicyMixin:
             self.loop_steps = self.steps
             self.raw_step(27); self.press("s")
             return True
-        stall = t - max(lv.last_progress, lv.entered_turn)
-        if stall > 500 and t - lv.last_reset > 500:
+        if self.opts.desperate_time:
+            # desperate_time: the level's own clock, turns spent on it (Level.turns_here) -- counted from the first
+            # arrival, a level re-entered had been "stalled" for the whole time away: desperate at once, its
+            # learned obstacles wiped
+            clock, since, age = lv.turns_here, lv.progress_here, lv.turns_here
+        else:
+            clock, since, age = t, max(lv.last_progress, lv.entered_turn), t - lv.entered_turn
+        stall = clock - since
+        if stall > 500 and clock - lv.last_reset > 500:
             # forget learned obstacles: they are often transient (monsters, misreads)
             lv.fail[:] = 0
             lv.blocked[:] = False
-            lv.last_reset = t
+            lv.last_reset = clock
             self.resets += 1
-        if not lv.desperate and (stall > 1500 or (t - lv.entered_turn > 2500 and
+        if not lv.desperate and (stall > 1500 or (age > 2500 and
                                                  not (self.kinds(lv) == G.DOWNSTAIR).any())):
             lv.desperate = True
             self.desperations += 1
