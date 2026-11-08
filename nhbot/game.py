@@ -169,7 +169,7 @@ class GameMixin:
         m = msg.lower()
         if "offers" in m and "sell" in m:
             self.price_note_offer(msg + " " + self.top_line())       # every offer is a price reading
-        if self.selling and ("sell it" in m or "sell them" in m):
+        if self.shop.selling and ("sell it" in m or "sell them" in m):
             self.raw_step(ord("n" if self.keep_after_offer() else "y"))
             return
         if "really attack" in m:

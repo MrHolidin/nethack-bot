@@ -58,13 +58,14 @@ ZOO_WELCOME = "Welcome to David's treasure zoo!"
 ARRIVED_RE = re.compile(r"trap door|fall through|\bhole\b|teleport|wrenching|You materialize")   # this tick
 
 
-class ShopMixin:
-    def shop_init(self):
+class ShopState:
+    """State of shop visits: browsing, paying, selling, the digger stash (ShopMixin)."""
+    def __init__(self):
         self.shopping = None
-        self.shop_browsed = set()        # (level key, square) of shop squares we stood on to read the tags
+        self.browsed = set()             # (level key, square) of shop squares we stood on to read the tags
         self.browse_stats = {"steps": 0, "looks": 0}
-        self.shops_seen = 0
-        self.shops_done = set()          # level keys whose shop visit is over
+        self.seen = 0                    # shop entrances we were welcomed at (summary 'shops')
+        self.done = set()                # level keys whose shop visit is over
         self.need_pay = False            # a shopkeeper asked us to pay (step_housekeeping: pay_step)
         self.selling = False
         self.sell_tried = set()          # (shop level key, item text) the shopkeeper would not take
@@ -72,6 +73,11 @@ class ShopMixin:
         self.stash_pending = None        # (level key, door) -- a shopkeeper asked us to leave the digger outside
         self.dig_stash = None            # dict(key, pos, turn): where we left it
         self.stash_stats = {"asked": 0, "stashed": 0, "retrieved": 0, "lost": 0}
+
+
+class ShopMixin:
+    def shop_init(self):
+        self.shop = ShopState()
 
     def shop_welcome(self, m):
         """A shopkeeper's greeting in m (the regex match, its group 1 the shop type), or None. zoo_not_shop: the
@@ -86,18 +92,18 @@ class ShopMixin:
         if not mm:
             return
         stype = mm.group(1)
-        if self.shopping is None:
+        if self.shop.shopping is None:
             self.sell_greeted(lv, stype)
 
     def shop_active(self, lv):
-        s = self.shopping
+        s = self.shop.shopping
         return s is not None and s["key"] == lv.key and self.turn() < s["until"]
 
     def pay_step(self):
         """The shopkeeper wants paying (need_pay, msg_shop): pay. True if it acted."""
-        if not self.need_pay:
+        if not self.shop.need_pay:
             return False
-        self.need_pay = False
+        self.shop.need_pay = False
         self.pay()
         return True
 
@@ -116,19 +122,19 @@ class ShopMixin:
 
     def shop_step(self, lv):
         """Returns True if it used the turn (or did a free action worth re-ticking)."""
-        if self.shopping is None:
+        if self.shop.shopping is None:
             return False
         if not self.shop_active(lv):
-            self.shops_done.add(self.shopping["key"])
-            self.shopping = None
+            self.shop.done.add(self.shop.shopping["key"])
+            self.shop.shopping = None
             return False
         if self.sell_step(lv):
             return True
-        if self.shopping is not None and self.shop_buy_step(lv):
+        if self.shop.shopping is not None and self.shop_buy_step(lv):
             return True
-        if self.shopping is not None:
-            self.shops_done.add(self.shopping["key"])
-            self.shopping = None
+        if self.shop.shopping is not None:
+            self.shop.done.add(self.shop.shopping["key"])
+            self.shop.shopping = None
         return False
 
     def browse_step(self, lv, glyph_mask, act):
@@ -136,16 +142,16 @@ class ShopMixin:
         ('You see here ... (for sale, N zorkmids)' when we step there, ':' on a pile). True if it acted."""
         here = self.pos()
         todo = lv.shop & glyph_mask[lv.under]
-        for k, p in self.shop_browsed | set(self.for_sale):
+        for k, p in self.shop.browsed | set(self.for_sale):
             if k == lv.key:
                 todo[p] = False
         if todo[here]:
-            self.shop_browsed.add((lv.key, here))
+            self.shop.browsed.add((lv.key, here))
             self.look_here()                       # a pile: the tags show in the 'Things that are here' window
-            self.browse_stats["looks"] += 1
+            self.shop.browse_stats["looks"] += 1
             return True
         if todo.any() and self.walk_to(lv, todo, act=act)[0] == "moved":
-            self.browse_stats["steps"] += 1
+            self.shop.browse_stats["steps"] += 1
             return True
         return False
 
@@ -159,12 +165,12 @@ class ShopMixin:
             # shop entrance: mark the shop from the door -- after falling in through a trap door we are
             # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())
-            self.shops_seen += 1
+            self.shop.seen += 1
             self.shop_greeted(lv, m)
         if LEAVE_RE.search(m):
             self.stash_request()
         if "Please pay before leaving" in m or "you owe" in m.lower() and "zorkmid" in m:
-            self.need_pay = True
+            self.shop.need_pay = True
 
     # ------------------------------------------------------------ selling
     def sellables(self, lv, stype):
@@ -172,7 +178,7 @@ class ShopMixin:
                 if it.ocls in self.carry_classes()
                 and self.shop_buys(stype, it) and not self.offer_zero(it)
                 and not self.needed(it)
-                and (lv.key, it.text) not in self.sell_tried
+                and (lv.key, it.text) not in self.shop.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and not it.unpaid]
 
     def item_types(self, it):
@@ -220,7 +226,7 @@ class ShopMixin:
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it;
         keep_100: likewise a potion of the 100 group."""
-        c, s = self.selling_item
+        c, s = self.shop.selling_item
         if c == nh.SCROLL_CLASS and self.scroll_is_good(s):
             self.scroll_stats["kept_good"] = self.scroll_stats.get("kept_good", 0) + 1
             return True                    # the offer just showed it is enchant armor/weapon or remove curse
@@ -230,12 +236,12 @@ class ShopMixin:
         return False
 
     def sell_greeted(self, lv, stype):
-        if lv.key in self.shops_done or not (self.sellables(lv, stype) or self.buy_wanted(stype)):
+        if lv.key in self.shop.done or not (self.sellables(lv, stype) or self.buy_wanted(stype)):
             return
-        self.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
+        self.shop.shopping = {"key": lv.key, "until": self.turn() + 150, "kind": "sell", "stype": stype}
 
     def sell_step(self, lv):
-        stype = self.shopping.get("stype")
+        stype = self.shop.shopping.get("stype")
         items = self.sellables(lv, stype)
         if not items:
             return False                             # shop_step: buying, or the end of the visit
@@ -249,16 +255,16 @@ class ShopMixin:
         if lv.shop[y, x] and not near[y, x]:
             l, c, s = items[0]
             gold0 = self.bl(nh.NLE_BL_GOLD)
-            self.selling_item = (c, s)
-            self.selling = True
+            self.shop.selling_item = (c, s)
+            self.shop.selling = True
             self.drop_units(l)
-            self.selling = False
+            self.shop.selling = False
             got = self.bl(nh.NLE_BL_GOLD) - gold0
             if got > 0:
                 self.carry_stats["sold"] += 1
                 self.carry_stats["gold"] += got
             else:                                    # not bought: it is still ours, take it back
-                self.sell_tried.add((lv.key, s))
+                self.shop.sell_tried.add((lv.key, s))
                 self.carry_stats["kept_back"] += 1
                 self.pickup_matching((re.sub(r"^(a|an|the|\d+)\s+", "", re.sub(r"\s*\(.*?\)", "", s)).strip(),),
                                      own=True)
@@ -266,13 +272,13 @@ class ShopMixin:
         targets = lv.shop & ~near
         targets[y, x] = False
         if not targets.any():
-            self.shops_done.add(lv.key)
-            self.shopping = None
+            self.shop.done.add(lv.key)
+            self.shop.shopping = None
             return False
         if self.walk_to(lv, targets)[0] == "moved":
             return True
-        self.shops_done.add(lv.key)          # can't get further in: the visit is over
-        self.shopping = None
+        self.shop.done.add(lv.key)          # can't get further in: the visit is over
+        self.shop.shopping = None
         return False
 
     # ------------------------------------------------------------ the digger left outside
@@ -285,18 +291,18 @@ class ShopMixin:
         door, outside the shop."""
         if self.cur_key is None:
             return
-        self.stash_stats["asked"] += 1
-        sh = self.shopping                          # the keeper greets and blocks in the same breath
+        self.shop.stash_stats["asked"] += 1
+        sh = self.shop.shopping                          # the keeper greets and blocks in the same breath
         if sh is None or sh["key"] != self.cur_key:
-            self.stash_stats["skipped"] = self.stash_stats.get("skipped", 0) + 1
+            self.shop.stash_stats["skipped"] = self.shop.stash_stats.get("skipped", 0) + 1
             return                                   # the greeting found nothing to do in there
-        self.stash_pending = (self.cur_key, self.pos())
+        self.shop.stash_pending = (self.cur_key, self.pos())
 
     def stash_step(self, lv):
-        sp = self.stash_pending
+        sp = self.shop.stash_pending
         if sp is not None:
             if sp[0] != lv.key or not self.digger_letters():
-                self.stash_pending = None
+                self.shop.stash_pending = None
                 return False
             door = sp[1]
             k = self.kinds(lv)
@@ -310,34 +316,34 @@ class ShopMixin:
                 self.cur_act = "stash"
                 self.drop_units(self.digger_letters()[0])
                 if not self.digger_letters():
-                    self.stash_stats["stashed"] += 1
-                    self.dig_stash = {"key": lv.key, "pos": here, "turn": self.turn()}
-                    self.stash_pending = None
+                    self.shop.stash_stats["stashed"] += 1
+                    self.shop.dig_stash = {"key": lv.key, "pos": here, "turn": self.turn()}
+                    self.shop.stash_pending = None
                 return True
             if self.walk_to(lv, ok, act="stash")[0] == "moved":
                 return True
-            self.stash_pending = None
+            self.shop.stash_pending = None
             return False
-        st = self.dig_stash
+        st = self.shop.dig_stash
         if st is None:
             return False
         if st["key"] != lv.key:
-            self.dig_stash = None
-            self.stash_stats["lost"] += 1            # left the level without it
+            self.shop.dig_stash = None
+            self.shop.stash_stats["lost"] += 1            # left the level without it
             return False
         if self.shop_active(lv) or lv.shop[self.pos()]:
             return False                             # the visit (on since the greeting) is not over
         if self.pos() == st["pos"]:
             self.cur_act = "stash"
             self.pickup_matching(DIGGER_WORDS, own=True)
-            self.dig_stash = None
-            self.stash_stats["retrieved"] += 1
+            self.shop.dig_stash = None
+            self.shop.stash_stats["retrieved"] += 1
             return True
         m = np.zeros(lv.under.shape, dtype=bool)
         m[st["pos"]] = True
         if self.walk_to(lv, m)[0] == "moved":
             self.cur_act = "stash"
             return True
-        self.dig_stash = None
-        self.stash_stats["lost"] += 1
+        self.shop.dig_stash = None
+        self.shop.stash_stats["lost"] += 1
         return False

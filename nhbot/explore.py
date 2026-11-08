@@ -36,7 +36,7 @@ class ExploreMixin:
                 unknown[max(0, -dy):ROWS + min(0, -dy), max(0, -dx):COLS + min(0, -dx)]
         frontier = passable & dil & (lv.visited == 0)
         lv.explored = not frontier.any()
-        if self.mines_return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
+        if self.mines.return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
         if self.mines_trip_step(lv, grids):
             return
@@ -50,7 +50,7 @@ class ExploreMixin:
         on_level = lv.turns_here
         # the mines_after hatch counts from our first arrival here -- or, after mines_return, from the return
         # (the branch level was first entered long before, which re-opened the Mines at once)
-        hatch = self.turn() - self.mines_done_turn if self.mines_done else on_level
+        hatch = self.turn() - self.mines.done_turn if self.mines.done else on_level
         # the closed Mines staircase as mines_stairs places it -- an avoid_down mark is the square we arrived on,
         # often beside the staircase (linked_stairs), and the stairs taken / two_down count too
         # (A/B mines_mask: -43 [-100, +6], 6 games of 1000 changed)
@@ -58,13 +58,13 @@ class ExploreMixin:
         if closed and hatch < self.opts.mines_after and self.mines_blocked():
             for p in closed:
                 downstairs[p] = False
-        if self.mines_return_on and lv.key[0] == 2:
+        if self.mines.return_on and lv.key[0] == 2:
             # climbing out of the Mines: no way down is a way on -- a level whose up staircase is unknown is explored
             # for it (descend_after, counted from the first visit, used to send us down at once and back up: a loop)
             downstairs[:] = False
         want_down = downstairs.any() and self.should_descend(lv, frontier, on_level)
         if want_down and lv.key[0] == 2 and lv.key[1] >= 4 \
-                and not self.minetown_seen and not self.is_minetown(lv):
+                and not self.mines.minetown_seen and not self.is_minetown(lv):
             # mines level 4 done and no Minetown on 3 or 4: it won't come further down
             self.mines_return_start(lv, "no_town")
             if self.mines_return_step(lv, grids):
@@ -122,7 +122,7 @@ class ExploreMixin:
             return
         # the Mines' cave levels (mkmap) have no secret doors or corridors -- no way on found: leave the Mines
         # instead of searching -- but a Minetown of rooms and corridors is searched (minetown_rooms)
-        if lv.key[0] == 2 and not self.mines_return_on and not self.minetown_rooms(lv):
+        if lv.key[0] == 2 and not self.mines.return_on and not self.minetown_rooms(lv):
             self.mines_return_start(lv, "no_way")
             if self.mines_return_step(lv, grids):
                 return
@@ -140,7 +140,7 @@ class ExploreMixin:
                 return True
             if self.rest_before_descent(lv):
                 return True
-            self.mines_return_descents += self.mines_return_on
+            self.mines.return_descents += self.mines.return_on
             self.take_stairs(">")
             return True
         return self.walk_to(lv, downstairs, chase="downstairs", grids=grids)[0] == "moved"
@@ -230,7 +230,7 @@ class ExploreMixin:
         else:
             return self.walk_to(lv, mask, grids=grids, max_cost=max_cost)[0] == "moved"
         if re.search(r"You can't go (?:down|up) here", self.message()):
-            self.mines_trip_stats["not_stairs"] += 1     # msg_map recorded it (Level.not_stairs)
+            self.mines.trip_stats["not_stairs"] += 1     # msg_map recorded it (Level.not_stairs)
         return True
 
     def level_travel_step(self, lv, grids, key, act, stat, known_only=False, max_cost=10_000):
@@ -258,7 +258,7 @@ class ExploreMixin:
             return False
         self.cur_act = act
         if mask[self.pos()]:
-            self.mines_trip_stats[stat + ("_up" if up_way else "_down")] += 1
+            self.mines.trip_stats[stat + ("_up" if up_way else "_down")] += 1
         return self.stairs_step(lv, grids, mask, "<" if up_way else ">", max_cost=max_cost)
 
     def magic_map_step(self, lv):

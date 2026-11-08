@@ -327,7 +327,7 @@ class SurvivalMixin:
         """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
         if self.vault_drop:
             bag = self.gold_bag()
-            if bag is not None and self.bag_gold > 0:
+            if bag is not None and self.bag.gold > 0:
                 self.vault_bag_outs += 1          # he wants the gold in our bag too (vault.c hidden_gold): out first
                 #                                   (A/B vault_bag_out +316 [+84, +574]: 9 of 10 guard deaths gone)
                 return self.bag_take_out(bag)

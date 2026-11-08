@@ -15,25 +15,31 @@ MINES_TRIP_RETRY = 500      # the Mines staircase out of reach -- try again this
                             # step_progress may have forgotten the obstacles in the way)
 
 
+class MinesState:
+    """State of the Mines trip / return (MinesMixin)."""
+    def __init__(self):
+        self.return_descents = 0         # descents while climbing out of the Mines (the up/down loop)
+        self.trip_stats = Counter()        # ticks of the trip to the Mines by what they did
+        self.two_down_levels = set()       # branch levels whose Mines staircase we inferred (two_down_mines)
+        self.trip_retry = 0                # no trip to the Mines before this turn (the staircase was out of reach)
+        self.pending_mines_mark = False  # next tick: mark the Mines staircase we stand by (mines_tick)
+        self.bounced = set()             # Mines levels we went straight back up from (mines_tick)
+        self.return_on = False           # mines_return: climbing out of the Mines
+        self.done = False                # ... and out: the Mines are finished
+        self.done_turn = 0
+        self.minetown_seen = False
+        self.return_log = []             # (turn, level key, why, depth) per mines_return
+
+
 class MinesMixin:
     def mines_init(self):
-        self.mines_return_descents = 0   # descents while climbing out of the Mines (the up/down loop)
-        self.mines_trip_stats = Counter()  # ticks of the trip to the Mines by what they did
-        self.two_down_levels = set()       # branch levels whose Mines staircase we inferred (two_down_mines)
-        self.mines_trip_retry = 0          # no trip to the Mines before this turn (the staircase was out of reach)
-        self.pending_mines_mark = False  # next tick: mark the Mines staircase we stand by (mines_tick)
-        self.mines_bounced = set()       # Mines levels we went straight back up from (mines_tick)
-        self.mines_return_on = False     # mines_return: climbing out of the Mines
-        self.mines_done = False          # ... and out: the Mines are finished
-        self.mines_done_turn = 0
-        self.minetown_seen = False
-        self.mines_return_log = []       # (turn, level key, why, depth) per mines_return
+        self.mines = MinesState()
 
     def mines_blocked(self):
         """The Mines staircase is closed: below XL mines_xl (mines_xl_open), while Excalibur can still be made
         at a fountain we know (excal_fountain_level), and once mines_return brought us back (the Mines are
         finished). A/B mines_xl 5 vs the Mines always open: +1041 [+135, +2013], then +2636 [+1582, +3695]."""
-        if self.mines_done:
+        if self.mines.done:
             return True                       # mines_return brought us back: the Mines are finished
         return not self.mines_xl_open() or self.excal_fountain_level() is not None
 
@@ -50,8 +56,8 @@ class MinesMixin:
         then to the branch level and down its Mines staircase. A level we know no way to (an up staircase never
         seen: we fell past it): its fountain is given up (excal_skip), the Mines tried again MINES_TRIP_RETRY
         turns later. True if it used the turn."""
-        if lv.key[0] != 0 or self.mines_done or not self.mines_xl_open() \
-                or self.turn() < self.mines_trip_retry:
+        if lv.key[0] != 0 or self.mines.done or not self.mines_xl_open() \
+                or self.turn() < self.mines.trip_retry:
             return False
         branch = next((k for k, l in self.levels.items() if k[0] == 0 and self.mines_stairs(l)), None)
         if branch is None:
@@ -61,21 +67,21 @@ class MinesMixin:
             if fk != lv.key:
                 if self.level_travel_step(lv, grids, fk, "excal", "excal_travel"):
                     return True
-                self.mines_trip_stats["excal_no_way"] += 1
-                self.excal_skip.add(fk)
+                self.mines.trip_stats["excal_no_way"] += 1
+                self.excal.skip.add(fk)
                 return False
             hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
             if hp >= maxhp * self.opts.excal_hp or self.visible_hostiles(lv):
                 return False
             self.cur_act = "rest"                # excal_step dips from excal_hp of max HP on
-            self.mines_trip_stats["excal_rest"] += 1
+            self.mines.trip_stats["excal_rest"] += 1
             self.search_turns(20)
             return True
         if lv.key != branch:
             if self.level_travel_step(lv, grids, branch, "mines", "travel"):
                 return True
-            self.mines_trip_stats["no_way"] += 1
-            self.mines_trip_retry = self.turn() + MINES_TRIP_RETRY
+            self.mines.trip_stats["no_way"] += 1
+            self.mines.trip_retry = self.turn() + MINES_TRIP_RETRY
             return False
         down = np.zeros_like(grids[0], dtype=bool)
         for p in self.mines_stairs(lv):
@@ -83,10 +89,10 @@ class MinesMixin:
         on = bool(down[self.pos()])
         if self.stairs_step(lv, grids, down, ">"):
             self.cur_act = "mines"
-            self.mines_trip_stats["enter" if on else "to_stairs"] += 1
+            self.mines.trip_stats["enter" if on else "to_stairs"] += 1
             return True
-        self.mines_trip_stats["unreachable"] += 1
-        self.mines_trip_retry = self.turn() + MINES_TRIP_RETRY
+        self.mines.trip_stats["unreachable"] += 1
+        self.mines.trip_retry = self.turn() + MINES_TRIP_RETRY
         return False
 
     def mines_stairs(self, lv):
@@ -118,9 +124,9 @@ class MinesMixin:
                                   G.DOWNSTAIR) & downs
         if len(main) != 1:
             return set()
-        if lv.key not in self.two_down_levels:
-            self.two_down_levels.add(lv.key)
-            self.mines_trip_stats["two_down"] += 1
+        if lv.key not in self.mines.two_down_levels:
+            self.mines.two_down_levels.add(lv.key)
+            self.mines.trip_stats["two_down"] += 1
         return downs - main
 
     def mines_tick(self, lv):
@@ -128,14 +134,14 @@ class MinesMixin:
         bounce brought us back up; on a Mines level reached by a staircase while the Mines are closed (mines_blocked)
         -- straight back up (once a level); Minetown seen (or passed: mines_return); out of the Mines after
         mines_return -- the Mines are done. True if it took the stairs."""
-        if self.pending_mines_mark:
-            self.pending_mines_mark = False
+        if self.mines.pending_mines_mark:
+            self.mines.pending_mines_mark = False
             if lv.key[0] == 0:
                 lv.avoid_down.add(self.pos())
-        if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines_bounced \
+        if self.mines_blocked() and lv.key[0] == 2 and lv.key not in self.mines.bounced \
                 and self.arrived_by_stairs:
-            self.mines_bounced.add(lv.key)
-            self.pending_mines_mark = True
+            self.mines.bounced.add(lv.key)
+            self.mines.pending_mines_mark = True
             self.take_stairs("<")
             return True
         if lv.key[0] == 2:
@@ -144,19 +150,19 @@ class MinesMixin:
                 lv.town_heard = True                  # its watch / priest / shopkeeper in view (minetown_folk,
                                                       # accepted before its A/B was in)
             if self.is_minetown(lv) or folk:
-                self.minetown_seen = True
-            if not self.minetown_seen and lv.key[1] >= 5:
+                self.mines.minetown_seen = True
+            if not self.mines.minetown_seen and lv.key[1] >= 5:
                 self.mines_return_start(lv, "no_town")    # Minetown is Mines level 3 or 4: we passed it
-        elif self.mines_return_on:
-            self.mines_return_on = False
-            self.mines_done = True
-            self.mines_done_turn = self.turn()
+        elif self.mines.return_on:
+            self.mines.return_on = False
+            self.mines.done = True
+            self.mines.done_turn = self.turn()
         return False
 
     def mines_return_start(self, lv, why):
-        if not self.mines_return_on:
-            self.mines_return_on = True
-            self.mines_return_log.append((self.turn(), list(lv.key), why, self.bl(nh.NLE_BL_DEPTH)))
+        if not self.mines.return_on:
+            self.mines.return_on = True
+            self.mines.return_log.append((self.turn(), list(lv.key), why, self.bl(nh.NLE_BL_DEPTH)))
 
     def mines_return_step(self, lv, grids):
         """mines_return: climb back to the main dungeon -- walk to this level's up staircase and take it; the
@@ -166,7 +172,7 @@ class MinesMixin:
         up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
         if up[start]:
             if lv.key[1] == 1:
-                self.pending_mines_mark = True      # next tick, on the branch level: mark its Mines staircase
+                self.mines.pending_mines_mark = True      # next tick, on the branch level: mark its Mines staircase
             self.take_stairs("<")
             return True
         return up.any() and self.walk_to(lv, up, grids=grids)[0] == "moved"

@@ -12,19 +12,29 @@ BAG_WORDS = ("bag", "sack")
 BAG_RANK = ("holding", "oilskin", "sack")      # the bag used: the first of these we carry, else a plain "bag"
 
 
+class GoldBagState:
+    """State of the gold kept in a bag (GoldBagMixin)."""
+    def __init__(self):
+        self.gold = 0                 # gold we put in the bag and did not take out
+        self.bad = set()              # item keys of bags that are not containers (a bag of tricks: no menu)
+        self.stats = Counter()
+        self.moved = False            # gold moved between us and the bag since the last tick (gold_flow_tick)
+
+
 class GoldBagMixin:
     def goldbag_init(self):
-        self.bag_gold = 0             # gold we put in the bag and did not take out
-        self.bag_bad = set()          # item keys of bags that are not containers (a bag of tricks: no menu)
-        self.bag_stats = Counter()
-        self.bag_moved = False        # gold moved between us and the bag since the last tick (gold_flow_tick)
+        self.bag = GoldBagState()
+
+    def goldbag_summary(self):
+        """Game summary entries."""
+        return {"gold_bag": dict(self.bag.stats, in_bag=self.bag.gold)}
 
     def gold_bag(self):
         """The bag our gold goes in: carried, not a bag of tricks, not known cursed (a cursed bag of holding
         loses what is in it, pickup.c boh_loss) -- a bag of holding first. None: no such bag. (A/B goldbag_v1
         +1076.)"""
         bags = [it for it in self.items() if it.ocls == nh.TOOL_CLASS and any(w in it.text for w in BAG_WORDS)
-                and "tricks" not in it.text and not it.cursed and it.key not in self.bag_bad]
+                and "tricks" not in it.text and not it.cursed and it.key not in self.bag.bad]
         rank = lambda it: next((i for i, w in enumerate(BAG_RANK) if w in it.text), len(BAG_RANK))
         return min(bags, key=rank) if bags else None
 
@@ -35,7 +45,7 @@ class GoldBagMixin:
         if bag is None:
             return False
         in_shop = bool(lv.shop[self.pos()])
-        if in_shop and self.bag_gold > 0:
+        if in_shop and self.bag.gold > 0:
             return self.bag_take_out(bag)
         if not in_shop and int(self.bl(nh.NLE_BL_GOLD)) > 0 and self.lep_visible() \
                 and not any(n != "leprechaun" for _, n in hostiles):
@@ -47,9 +57,9 @@ class GoldBagMixin:
         the bag with our gold in it -- the gold taken out first (coins are never what that step drops). True if
         it used the turn."""
         bag = self.gold_bag()
-        if bag is None or bag.letter != it.letter or self.bag_gold <= 0:
+        if bag is None or bag.letter != it.letter or self.bag.gold <= 0:
             return False
-        self.bag_stats["unload_before_drop"] += 1
+        self.bag.stats["unload_before_drop"] += 1
         return self.bag_take_out(bag)
 
     def bag_open(self, bag):
@@ -62,8 +72,8 @@ class GoldBagMixin:
         if "Do what with" in self.tty_text():
             return True
         self.settle()
-        self.bag_bad.add(bag.key)
-        self.bag_stats["not_a_container"] += 1
+        self.bag.bad.add(bag.key)
+        self.bag.stats["not_a_container"] += 1
         return False
 
     def bag_choose(self, key):
@@ -81,10 +91,10 @@ class GoldBagMixin:
             self.raw_step(ord("$"))
         self.settle()
         put = g0 - int(self.bl(nh.NLE_BL_GOLD))
-        self.bag_gold += max(0, put)
-        self.bag_moved = True
-        self.bag_stats["put_in" if put > 0 else "put_in_failed"] += 1
-        self.bag_stats["put_in_gold"] += max(0, put)
+        self.bag.gold += max(0, put)
+        self.bag.moved = True
+        self.bag.stats["put_in" if put > 0 else "put_in_failed"] += 1
+        self.bag.stats["put_in_gold"] += max(0, put)
         return True
 
     def bag_take_out(self, bag):
@@ -105,8 +115,8 @@ class GoldBagMixin:
             self.raw_step(13)
         self.settle()
         got = int(self.bl(nh.NLE_BL_GOLD)) - g0
-        self.bag_gold = 0                                 # all of it out (nothing came: none in it, as we know)
-        self.bag_moved = True
-        self.bag_stats["take_out" if got > 0 else "take_out_failed"] += 1
-        self.bag_stats["take_out_gold"] += max(0, got)
+        self.bag.gold = 0                                 # all of it out (nothing came: none in it, as we know)
+        self.bag.moved = True
+        self.bag.stats["take_out" if got > 0 else "take_out_failed"] += 1
+        self.bag.stats["take_out_gold"] += max(0, got)
         return True

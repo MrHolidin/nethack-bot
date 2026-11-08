@@ -33,33 +33,43 @@ DIG_TRIES = 4                  # tries at one square before the tunnel is given 
 VAULT_RETRY = 100              # turns before a tunnel whose start we could not reach is planned again
 
 
+class VaultState:
+    """State of finding, robbing and leaving gold vaults (VaultMixin)."""
+    def __init__(self):
+        self.since = None              # (level key, turn) we were first seen in this vault
+        self.seen = None               # (level key, its 4 squares): the vault we were last in -- the guard's way in
+                                       # opens its wall (vault.c fake corridor), so it is known by its squares then
+        self.stats = Counter()
+        self.portal = None             # level key of a vault where we found a magic portal (the Fort Ludios one,
+                                       # mkmaze.c): no more gold picked there -- a step onto it takes us to the fort
+        self.heard = set()             # vault_find: level keys whose vault we heard
+        self.done = set()              # vault_find: level keys whose vault we reached or gave up
+        self.plan = None               # vault_find: {key, inner, start, path (squares to dig, in order), wand}
+        self.out = None                # vault_exit: (level key, square) where the tunnel into the vault we are in begins
+        self.shut = {}                 # vault_clear: level key -> the squares (floor, wall) of a vault we are leaving
+        self.tries = Counter()         # vault_find: tries at digging each square of the plan
+        self.loc_at = {}               # vault_find: level key -> (lv.under bytes hash, located interior or None)
+        self.wait = {}                 # vault_find: level key -> turn before which no tunnel is planned again
+
+
 class VaultMixin:
     def vault_init(self):
-        self.vault_since = None        # (level key, turn) we were first seen in this vault
-        self.vault_seen = None         # (level key, its 4 squares): the vault we were last in -- the guard's way in
-                                       # opens its wall (vault.c fake corridor), so it is known by its squares then
-        self.vault_stats = Counter()
-        self.vault_portal = None       # level key of a vault where we found a magic portal (the Fort Ludios one,
-                                       # mkmaze.c): no more gold picked there -- a step onto it takes us to the fort
-        self.vault_heard = set()       # vault_find: level keys whose vault we heard
-        self.vault_done = set()        # vault_find: level keys whose vault we reached or gave up
-        self.vault_plan = None         # vault_find: {key, inner, start, path (squares to dig, in order), wand}
-        self.vault_out = None          # vault_exit: (level key, square) where the tunnel into the vault we are in begins
-        self.vault_shut = {}           # vault_clear: level key -> the squares (floor, wall) of a vault we are leaving
-        self.vault_tries = Counter()   # vault_find: tries at digging each square of the plan
-        self.vault_loc_at = {}         # vault_find: level key -> (lv.under bytes hash, located interior or None)
-        self.vault_wait = {}           # vault_find: level key -> turn before which no tunnel is planned again
+        self.vault = VaultState()
+
+    def vault_summary(self):
+        """Game summary entries."""
+        return {"vault_rob": dict(self.vault.stats)}
 
     # ------------------------------------------------------------------ in a vault
     def vault_box(self):
         """The 4 floor squares of the 2x2 room we stand in, closed all round by wall (no door): a vault -- or
         those of the vault we were seen in on this level, while we stand in it. None if not."""
         y, x = self.pos()
-        if self.vault_seen is not None and self.vault_seen[0] == self.cur_key and (y, x) in self.vault_seen[1]:
-            return self.vault_seen[1]
+        if self.vault.seen is not None and self.vault.seen[0] == self.cur_key and (y, x) in self.vault.seen[1]:
+            return self.vault.seen[1]
         inner = self.vault_closed()
         if inner is not None:
-            self.vault_seen = (self.cur_key, inner)
+            self.vault.seen = (self.cur_key, inner)
         return inner
 
     @staticmethod
@@ -91,7 +101,7 @@ class VaultMixin:
         """settle: the vault guard's "Hello stranger, who are you?" -- our real name (lawful: lying costs alignment);
         vault_rob, about to dig out: "Croesus" -- the guard leaves (vault.c invault)."""
         name = "Croesus" if self.vault_rob_ready() else "Agent"
-        self.vault_stats["croesus"] += name == "Croesus"
+        self.vault.stats["croesus"] += name == "Croesus"
         for c in name:
             self.raw_step(ord(c))
         self.raw_step(13)
@@ -105,36 +115,36 @@ class VaultMixin:
         if box is None and self.vault_leaving(lv):
             return self.vault_walk_out(lv)
         if box is None:
-            self.vault_since = None
-            return self.vault_plan is None and self.dig_job is None and self.dig_unwield()
-        if self.vault_plan is not None and self.vault_plan["key"] == lv.key:
-            self.vault_done.add(lv.key)               # vault_find: the tunnel is through
-            self.vault_out = (lv.key, self.vault_plan["start"])
-            self.vault_plan = None
-            self.vault_stats["tunnel_in"] += 1
+            self.vault.since = None
+            return self.vault.plan is None and self.dig_job is None and self.dig_unwield()
+        if self.vault.plan is not None and self.vault.plan["key"] == lv.key:
+            self.vault.done.add(lv.key)               # vault_find: the tunnel is through
+            self.vault.out = (lv.key, self.vault.plan["start"])
+            self.vault.plan = None
+            self.vault.stats["tunnel_in"] += 1
         if hostiles and any(n != "guard" for _, n in hostiles) or lv.key in self.dig_refused:
             return False
         means = self.dig_means()
         if means is None:
             return False                              # the guard protocol (survival.vault_step): drop, follow
-        if self.vault_since is None or self.vault_since[0] != lv.key:
-            self.vault_since = (lv.key, self.turn())
-            self.vault_stats["entered"] += 1
+        if self.vault.since is None or self.vault.since[0] != lv.key:
+            self.vault.since = (lv.key, self.turn())
+            self.vault.stats["entered"] += 1
         here = self.pos()
         gold = [p for p in box if G.KIND[self.obs["glyphs"][p]] == G.GOLD or (p == here and G.KIND[lv.under[p]] == G.GOLD)]
-        if gold and self.turn() - self.vault_since[1] < VAULT_GRAB_TURNS and self.vault_portal != lv.key:
+        if gold and self.turn() - self.vault.since[1] < VAULT_GRAB_TURNS and self.vault.portal != lv.key:
             self.cur_act = "vault_rob"
             if here in gold:
                 g0 = int(self.bl(nh.NLE_BL_GOLD))
                 self.pickup_matching(("gold piece",), own=True)
                 lv.under[here] = FLOOR_GLYPH
-                self.vault_stats["gold"] += int(self.bl(nh.NLE_BL_GOLD)) - g0
+                self.vault.stats["gold"] += int(self.bl(nh.NLE_BL_GOLD)) - g0
                 return True
             p = gold[0]                               # every square of the 2x2 is next to us
             self.press(DELTA2KEY[(p[0] - here[0], p[1] - here[1])])
             return True
-        if self.vault_out is not None and self.vault_out[0] == lv.key:
-            self.vault_shut[lv.key] = self.vault_walls(box)
+        if self.vault.out is not None and self.vault.out[0] == lv.key:
+            self.vault.shut[lv.key] = self.vault_walls(box)
             if self.vault_walk_out(lv):
                 return True
         return self.dig_down(lv, means)
@@ -142,32 +152,32 @@ class VaultMixin:
     def vault_leaving(self, lv):
         """On the wall of the vault we are leaving -- in its dug opening, still in the vault for the game (in_rooms
         counts a door with the room: the guard's count goes on)."""
-        return self.vault_out is not None and self.vault_out[0] == lv.key \
-            and self.pos() in self.vault_shut.get(lv.key, ())
+        return self.vault.out is not None and self.vault.out[0] == lv.key \
+            and self.pos() in self.vault.shut.get(lv.key, ())
 
     def vault_walk_out(self, lv):
         """vault_exit: a step back along our tunnel. True if it used the turn; False if the way is shut (down
         after all)."""
         mask = np.zeros(lv.under.shape, dtype=bool)
-        mask[self.vault_out[1]] = True
+        mask[self.vault.out[1]] = True
         if self.walk_to(lv, mask, act="vault_exit")[0] == "moved":
-            self.vault_stats["walk_out"] += 1         # vault_exit: out by our own tunnel, not down a hole
+            self.vault.stats["walk_out"] += 1         # vault_exit: out by our own tunnel, not down a hole
             return True
-        self.vault_out = None
+        self.vault.out = None
         return False
 
     def dig_down(self, lv, means):
         kind, it = means
         self.cur_act = "vault_dig"
         if kind == "wand":
-            self.vault_stats["zap"] += 1
+            self.vault.stats["zap"] += 1
             seq0 = self.msg_seq
             self.zap(it.letter, ">")
             self.dig_note(lv, self.text_since(seq0))
             return True
         if self.dig_wield(lv, means):
             return True
-        self.vault_stats["apply"] += 1
+        self.vault.stats["apply"] += 1
         return self.dig_apply(lv, it, ">")
 
     def dig_apply(self, lv, it, key):
@@ -179,24 +189,24 @@ class VaultMixin:
         if key == ">":
             self.dig_note(lv, msgs)
         elif "too hard to" in msgs:                   # undiggable walls / rock (W_NONDIGGABLE): no tunnel here
-            self.vault_done.add(lv.key)
-            self.vault_plan = None
-            self.vault_stats["tunnel_refused"] += 1
+            self.vault.done.add(lv.key)
+            self.vault.plan = None
+            self.vault.stats["tunnel_refused"] += 1
         return True
 
     def msg_vault(self, m):
-        if "You find a magic portal" in m and self.vault_since is not None:
-            self.vault_portal = self.cur_key
-            self.vault_stats["portal"] += 1
+        if "You find a magic portal" in m and self.vault.since is not None:
+            self.vault.portal = self.cur_key
+            self.vault.stats["portal"] += 1
         if any(s in m for s in VAULT_SOUNDS):
-            self.vault_heard.add(self.cur_key)
+            self.vault.heard.add(self.cur_key)
 
     def dig_note(self, lv, msgs):
         if "too hard to" in msgs or "cannot reach the" in msgs:
             self.dig_refused.add(lv.key)
-            self.vault_stats["refused"] += 1
+            self.vault.stats["refused"] += 1
         if "You dig a hole through" in msgs or "fall through" in msgs:
-            self.vault_stats["dug_out"] += 1
+            self.vault.stats["dug_out"] += 1
 
     # ------------------------------------------------------------------ vault_find: to a vault on our map
     def vault_locate(self, lv):
@@ -204,7 +214,7 @@ class VaultMixin:
         2x2 of gold none of whose 12 neighbours we know as floor or door (gold detection: the vault lies in rock).
         None. Cached per map state."""
         h = hash(lv.under.tobytes())
-        got = self.vault_loc_at.get(lv.key)
+        got = self.vault.loc_at.get(lv.key)
         if got is not None and got[0] == h:
             return got[1]
         k = G.KIND[lv.under]
@@ -221,7 +231,7 @@ class VaultMixin:
                     break
             if found:
                 break
-        self.vault_loc_at[lv.key] = (h, found)
+        self.vault.loc_at[lv.key] = (h, found)
         return found
 
     def vault_tunnel(self, lv, inner, wand):
@@ -288,7 +298,7 @@ class VaultMixin:
     def vault_find_step(self, lv, hostiles_in_view):
         """Nothing in view: read a detection scroll where we heard a vault; dig to a vault our map shows. True if it
         used the turn. (A/B vault_find -34 [-708, +601], taken with vault_exit.)"""
-        if hostiles_in_view or lv.key in self.vault_done or lv.key[0] != 0:
+        if hostiles_in_view or lv.key in self.vault.done or lv.key[0] != 0:
             return False
         means = self.dig_means()
         if means is None or lv.key in self.dig_refused:
@@ -298,24 +308,24 @@ class VaultMixin:
         inner = self.vault_locate(lv)
         if inner is None:
             return self.vault_detect(lv)
-        if self.turn() < self.vault_wait.get(lv.key, 0):
+        if self.turn() < self.vault.wait.get(lv.key, 0):
             return False
-        plan = self.vault_plan
+        plan = self.vault.plan
         if plan is None or plan["key"] != lv.key or plan["wand"] != (means[0] == "wand"):
             got = self.vault_tunnel(lv, inner, means[0] == "wand")
             if got is None:                           # no start near enough yet: again once more is explored
-                self.vault_wait[lv.key] = self.turn() + VAULT_RETRY
-                self.vault_stats["no_tunnel"] += 1
+                self.vault.wait[lv.key] = self.turn() + VAULT_RETRY
+                self.vault.stats["no_tunnel"] += 1
                 return False
-            plan = self.vault_plan = {"key": lv.key, "inner": inner, "start": got[0], "path": got[1],
+            plan = self.vault.plan = {"key": lv.key, "inner": inner, "start": got[0], "path": got[1],
                                       "wand": means[0] == "wand"}
-            self.vault_seen = (lv.key, inner)         # its wall will have our opening: known by its squares
-            self.vault_stats["planned"] += 1
+            self.vault.seen = (lv.key, inner)         # its wall will have our opening: known by its squares
+            self.vault.stats["planned"] += 1
         return self.vault_tunnel_step(lv, plan, means)
 
     def vault_detect(self, lv):
         """A vault heard here and not on our map: read a scroll of gold detection / magic mapping we know."""
-        if lv.key not in self.vault_heard or int(self.last_bl[nh.NLE_BL_CONDITION]) & (
+        if lv.key not in self.vault.heard or int(self.last_bl[nh.NLE_BL_CONDITION]) & (
                 nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU):
             return False
         for name in FIND_SCROLLS:
@@ -323,8 +333,8 @@ class VaultMixin:
                       None)
             if it is not None:
                 self.cur_act = "vault_detect"
-                self.vault_stats["read_" + name.split()[-1]] += 1
-                self.vault_heard.discard(lv.key)      # one scroll per hearing
+                self.vault.stats["read_" + name.split()[-1]] += 1
+                self.vault.heard.discard(lv.key)      # one scroll per hearing
                 return self.read_scroll(lv, it.letter)
         return False
 
@@ -341,28 +351,28 @@ class VaultMixin:
                 self.cur_act = "vault_tunnel"
                 self.press(DELTA2KEY[d])              # dug: step in
                 return True
-            self.vault_tries[(lv.key, nxt)] += 1
-            if self.vault_tries[(lv.key, nxt)] > DIG_TRIES:
-                self.vault_done.add(lv.key)           # it won't give way: given up
-                self.vault_plan = None
-                self.vault_stats["stuck"] += 1
+            self.vault.tries[(lv.key, nxt)] += 1
+            if self.vault.tries[(lv.key, nxt)] > DIG_TRIES:
+                self.vault.done.add(lv.key)           # it won't give way: given up
+                self.vault.plan = None
+                self.vault.stats["stuck"] += 1
                 return self.dig_unwield()
             self.cur_act = "vault_tunnel"
             kind, it = means
             if kind == "wand":
-                self.vault_stats["tunnel_zap"] += 1
+                self.vault.stats["tunnel_zap"] += 1
                 self.zap(it.letter, DELTA2KEY[d])
                 return True
             if self.dig_wield(lv, means):
                 return True
-            self.vault_stats["tunnel_apply"] += 1
+            self.vault.stats["tunnel_apply"] += 1
             return self.dig_apply(lv, it, DELTA2KEY[d])
         mask = np.zeros(lv.under.shape, dtype=bool)
         mask[plan["start"]] = True
         st = self.walk_to(lv, mask, act="vault_tunnel")[0]
         if st == "moved":
             return True
-        self.vault_plan = None                        # the start can't be reached yet: again once more is explored
-        self.vault_wait[lv.key] = self.turn() + VAULT_RETRY
-        self.vault_stats["unreachable"] += 1
+        self.vault.plan = None                        # the start can't be reached yet: again once more is explored
+        self.vault.wait[lv.key] = self.turn() + VAULT_RETRY
+        self.vault.stats["unreachable"] += 1
         return False

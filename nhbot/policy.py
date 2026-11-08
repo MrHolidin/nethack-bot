@@ -323,7 +323,7 @@ class PolicyMixin:
         return self.pursue("loot", c.lv, [self.loot_sq], self.loot_consume)
 
     def step_weapon(self, c):
-        if self.rub_back is not None:            # a lamp wielded to rub it: the weapon back once a threat shows
+        if self.wish.rub_back is not None:            # a lamp wielded to rub it: the weapon back once a threat shows
             return bool(c.hostiles or self.visible_hostiles(c.lv)) and self.rub_rewield()
         if self.tin_glib():
             return False                         # tins: slippery fingers, whatever we wield now slips too

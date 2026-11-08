@@ -17,16 +17,27 @@ LONG_SWORD_ARTIFACT_RE = re.compile(r"\bnamed (?:Frost Brand|Fire Brand|Demonban
 DEMON_WIN = 0.7      # dip for a wish only while P(we beat a water demon) is above this
 
 
-class ExcaliburMixin:
-    def excal_init(self):
+class ExcaliburState:
+    """State of making Excalibur at a fountain (ExcaliburMixin)."""
+    def __init__(self):
         self.excalibur = False
-        self.excal_turn = None
+        self.turn = None
         self.dips = 0
         self.dip_events = []
         self.fountain_levels = set()
-        self.excal_trips = 0
-        self.excal_skip = set()
+        self.trips = 0
+        self.skip = set()
         self.demon_win = (None, 0.0)     # (state key, P(we beat a water demon))
+
+
+class ExcaliburMixin:
+    def excal_init(self):
+        self.excal = ExcaliburState()
+
+    def excal_summary(self):
+        """Game summary entries."""
+        return {"excalibur": self.excal.turn, "dips": self.excal.dips, "excal_trips": self.excal.trips,
+                "dip_events": self.excal.dip_events, "fountain_levels": len(self.excal.fountain_levels)}
 
     def long_sword(self):
         """(letter, text) of a long sword of ours to dip for Excalibur, or None. fountain.c:371-373 dipfountain
@@ -41,7 +52,7 @@ class ExcaliburMixin:
         return None
 
     def excal_eligible(self):
-        if self.excalibur:
+        if self.excal.excalibur:
             return False
         if int(self.last_bl[nh.NLE_BL_ALIGN]) != 1:
             return False
@@ -55,7 +66,7 @@ class ExcaliburMixin:
     def excal_step(self, lv):
         fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
         if fmask.any():
-            self.fountain_levels.add(lv.key)
+            self.excal.fountain_levels.add(lv.key)
         if not self.excal_eligible():
             return False
         # the fountains we may use (fountains: no shop's, none in the Mines -- Minetown's watch --, none on a level
@@ -68,14 +79,14 @@ class ExcaliburMixin:
             return self.dip(lv)
         if self.walk_to(lv, fmask, max_cost=self.opts.excal_cost, act="excal", also=fmask)[0] == "moved":
             return True
-        self.excal_skip.add(lv.key)                # can't reach it: don't keep coming back
+        self.excal.skip.add(lv.key)                # can't reach it: don't keep coming back
         return False
 
     def excal_fountain_level(self):
         """The main-dungeon level, nearest in depth, with a fountain we could make Excalibur at (not a
         shop's, not on a level we gave up reaching it on), while Excalibur can be made at all (lawful, XL
         excal_xl, an unnamed long sword; not the HP: we rest for that). None: no such level."""
-        if self.excalibur or int(self.last_bl[nh.NLE_BL_ALIGN]) != 1 or self.bl(nh.NLE_BL_XP) < self.opts.excal_xl \
+        if self.excal.excalibur or int(self.last_bl[nh.NLE_BL_ALIGN]) != 1 or self.bl(nh.NLE_BL_XP) < self.opts.excal_xl \
                 or self.long_sword() is None:
             return None
         dl = self.bl(nh.NLE_BL_DEPTH)
@@ -93,13 +104,13 @@ class ExcaliburMixin:
         if not self.level_travel_step(lv, self.grids(lv), target, "excal", "excal_travel", known_only=True,
                                       max_cost=self.opts.excal_cost_up):
             return False
-        self.excal_trips += self.took_stairs
+        self.excal.trips += self.took_stairs
         return True
 
     def excal_up_target(self, lv):
         """The nearest main-dungeon level at most excal_up above this one with a fountain we may use
         (fountains), while trips are left; None."""
-        if lv.key[0] != 0 or self.excal_trips >= self.opts.excal_trips:
+        if lv.key[0] != 0 or self.excal.trips >= self.opts.excal_trips:
             return None
         dl = lv.key[1]
         keys = [k for k, l in self.levels.items()
@@ -117,13 +128,13 @@ class ExcaliburMixin:
         y, x = self.pos()
         if "Excalibur" in recent or "hand reaches up" in recent or \
                 any("Excalibur" in s for _, _, s in self.inventory()):
-            self.excalibur = True
-            self.excal_turn = self.turn()
+            self.excal.excalibur = True
+            self.excal.turn = self.turn()
             lv.set_terrain((y, x), FLOOR_GLYPH)
-            self.dip_events.append((self.turn(), "excalibur"))
+            self.excal.dip_events.append((self.turn(), "excalibur"))
         elif self.fountain_gone(recent):
             lv.set_terrain((y, x), FLOOR_GLYPH)
-            self.dip_events.append((self.turn(), "dried"))
+            self.excal.dip_events.append((self.turn(), "dried"))
         return True
 
     @staticmethod
@@ -146,12 +157,12 @@ class ExcaliburMixin:
             if "nothing to dip" in m or "anything to dip" in m or "into" in m:
                 lv.set_terrain(self.pos(), FLOOR_GLYPH)       # no fountain here any more
             return None
-        self.dips += 1
+        self.excal.dips += 1
         recent = self.text_since(seq0)
         if "water demon" in recent:              # fountain.c dipfountain case 21, either reason to dip
-            self.dip_events.append((self.turn(), "wish" if "grants you a wish" in recent else "demon"))
+            self.excal.dip_events.append((self.turn(), "wish" if "grants you a wish" in recent else "demon"))
         if "glows for a moment" in recent:       # cases 17..20: the dipped item was cursed and is not now
-            self.dip_events.append((self.turn(), "uncursed"))
+            self.excal.dip_events.append((self.turn(), "uncursed"))
         return recent
 
     def demon_win_prob(self):
@@ -160,15 +171,15 @@ class ExcaliburMixin:
         weapon = next((it.text for it in self.items() if it.wielded), None)
         key = (self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC),
                weapon)
-        if self.demon_win[0] != key:
-            self.demon_win = (key, self.win_prob([(None, "water demon")]))
-        return self.demon_win[1]
+        if self.excal.demon_win[0] != key:
+            self.excal.demon_win = (key, self.win_prob([(None, "water demon")]))
+        return self.excal.demon_win[1]
 
     def fountains(self, lv):
         """Fountains of this level we may use: not a shop's, not in the Mines (Minetown's watch), not on a
         level we gave up reaching them on."""
         fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
-        if lv.key[0] == 2 or lv.key in self.excal_skip:
+        if lv.key[0] == 2 or lv.key in self.excal.skip:
             return fmask & False
         return fmask & ~lv.shop if lv.shop.any() else fmask
 
@@ -182,11 +193,11 @@ class ExcaliburMixin:
                 return False
             if self.fountain_gone(recent):
                 lv.set_terrain((y, x), FLOOR_GLYPH)
-                self.dip_events.append((self.turn(), "dried"))
+                self.excal.dip_events.append((self.turn(), "dried"))
             return True
         if self.walk_to(lv, fmask, max_cost=self.opts.excal_cost, act=act, also=fmask)[0] == "moved":
             return True
-        self.excal_skip.add(lv.key)
+        self.excal.skip.add(lv.key)
         return False
 
     # ------------------------------------------------------------------ why we dip
@@ -202,7 +213,7 @@ class ExcaliburMixin:
         if self.excal_step(lv):
             return True
         lawful = int(self.last_bl[nh.NLE_BL_ALIGN]) == 1
-        if lawful and not self.excalibur:
+        if lawful and not self.excal.excalibur:
             return False
         fmask = self.fountains(lv)
         if not fmask.any():

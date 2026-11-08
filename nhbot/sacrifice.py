@@ -33,11 +33,21 @@ SAC_RESULTS = (("consumed in a burst of flame", "accepted"), ("hopeful feeling",
                ("You feel guilty", "guilty"), ("infamous offense", "cannibal"))
 
 
+class SacrificeState:
+    """State of sacrificing corpses at an altar (SacrificeMixin)."""
+    def __init__(self):
+        self.carry = None                # (kill turn, name): the corpse we carry to the altar
+        self.stats = Counter()
+        self.gift_here = None            # (level key, square) a gift appeared on: pick it up
+
+
 class SacrificeMixin:
     def sacrifice_init(self):
-        self.sac_carry = None            # (kill turn, name): the corpse we carry to the altar
-        self.sac_stats = Counter()
-        self.sac_gift_here = None        # (level key, square) a gift appeared on: pick it up
+        self.sac = SacrificeState()
+
+    def sacrifice_summary(self):
+        """Game summary entries."""
+        return {"sacrifice": dict(self.sac.stats)}
 
     def msg_sacrifice(self, m, lv):
         """An altar's alignment; what an offering did."""
@@ -49,7 +59,7 @@ class SacrificeMixin:
 
     def sac_carrying(self, it):
         """The corpse we carry to the altar (the weight step keeps it)."""
-        return self.sac_carry is not None and it.ocls == nh.FOOD_CLASS and self.sac_carry[1] + " corpse" in it.text
+        return self.sac.carry is not None and it.ocls == nh.FOOD_CLASS and self.sac.carry[1] + " corpse" in it.text
 
     def sac_ok(self, name):
         """A corpse we may offer: known, not our race, not a unicorn."""
@@ -70,10 +80,10 @@ class SacrificeMixin:
         if not self.opts.sacrifice or int(self.last_bl[nh.NLE_BL_ALIGN]) != 0 or hostiles:
             return False
         here = self.pos()
-        if self.sac_gift_here == (lv.key, here):
-            self.sac_gift_here = None
+        if self.sac.gift_here == (lv.key, here):
+            self.sac.gift_here = None
             self.pickup_matching(["Mjollnir", "named", "war hammer"], own=True)
-            self.sac_stats["gift_picked"] += 1
+            self.sac.stats["gift_picked"] += 1
             return True
         if self.sac_learn_altar(lv):
             return True
@@ -85,11 +95,11 @@ class SacrificeMixin:
         amask = np.zeros_like(passable)
         for p in altars:
             amask[p] = True
-        if self.sac_carry is not None:
-            kt, name = self.sac_carry
+        if self.sac.carry is not None:
+            kt, name = self.sac.carry
             if t - kt >= SAC_AGE or not any(name + " corpse" in it.text for it in self.items()):
-                self.sac_carry = None            # too old now (or gone): it is only weight
-                self.sac_stats["carry_late"] += 1
+                self.sac.carry = None            # too old now (or gone): it is only weight
+                self.sac.stats["carry_late"] += 1
                 return False
             if amask[here]:
                 return self.offer(lv, name, carried=True)
@@ -119,12 +129,12 @@ class SacrificeMixin:
                 return self.offer(lv, name, carried=False)
             self.pickup_matching([name + " corpse"], own=True)
             if any(name + " corpse" in it.text for it in self.items()):
-                self.sac_carry = (kt, name)
-                self.sac_stats["picked"] += 1
+                self.sac.carry = (kt, name)
+                self.sac.stats["picked"] += 1
                 self.kills = [k for k in self.kills if k[2] != pos or k[3] != lv.key]
             else:
                 self.kills = [k for k in self.kills if k[2] != pos or k[3] != lv.key]   # can't lift it
-                self.sac_stats["not_lifted"] += 1
+                self.sac.stats["not_lifted"] += 1
             return True
         tm = np.zeros_like(passable)
         tm[pos] = True
@@ -147,7 +157,7 @@ class SacrificeMixin:
                 lv.altar_align[here] = mm.group(1)
             if here not in lv.altar_align:
                 lv.altar_align[here] = "?"
-            self.sac_stats["altar_looked"] += 1
+            self.sac.stats["altar_looked"] += 1
             return False                          # a look takes no time
         mask = np.zeros_like(alt)
         for p in unknown:
@@ -172,17 +182,17 @@ class SacrificeMixin:
             it = next((i for i in self.items() if name + " corpse" in i.text), None)
             if it is None or "sacrifice" not in self.message().lower():
                 self.settle()
-                self.sac_carry = None
-                self.sac_stats["offer_failed"] += 1
+                self.sac.carry = None
+                self.sac.stats["offer_failed"] += 1
                 return True
             self.press(it.letter)
         said = self.text_since(seq0)
-        self.sac_carry = None
+        self.sac.carry = None
         self.kills = [k for k in self.kills if not (k[1] == name and k[3] == lv.key and k[2] == self.pos())]
-        self.sac_stats["offered"] += 1
+        self.sac.stats["offered"] += 1
         for phrase, what in SAC_RESULTS:
             if phrase in said:
-                self.sac_stats[what] += 1
+                self.sac.stats[what] += 1
                 if what == "gift":
-                    self.sac_gift_here = (lv.key, self.pos())
+                    self.sac.gift_here = (lv.key, self.pos())
         return True

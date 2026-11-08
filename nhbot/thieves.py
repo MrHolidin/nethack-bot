@@ -51,7 +51,7 @@ class ThievesMixin:
         if self._gold_prev is not None and g != self._gold_prev:
             d = g - self._gold_prev
             m = self.text_since(self._gold_seq)
-            if self.bag_moved:
+            if self.bag.moved:
                 self.gold_flow["bag_in" if d < 0 else "bag_out"] += abs(d)      # gold_bag: ours all the same
             elif d > 0:
                 self.gold_flow["got_sold" if "You sold" in m else "got_other"] += d
@@ -66,7 +66,7 @@ class ThievesMixin:
         xl = int(self.bl(nh.NLE_BL_XP))
         self._gold_xl[xl] = max(self._gold_xl.get(xl, 0), g)
         self._gold_prev, self._gold_seq = g, self.msg_seq
-        self.bag_moved = False
+        self.bag.moved = False
 
     # ================================================================== nymphs
     def msg_thieves(self, m):

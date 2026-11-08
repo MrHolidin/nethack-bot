@@ -38,15 +38,25 @@ KICK_FROM = (G.FLOOR, G.TRAP, G.DOWNSTAIR, G.UPSTAIR, G.OBJECT, G.GOLD, G.CORPSE
 NO_ACT = nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU | nh.BL_MASK_LEV
 
 
+class BoxState:
+    """State of opening boxes and chests (BoxMixin)."""
+    def __init__(self):
+        self.stats = Counter()
+        self.tries = Counter()           # (level key, square) -> actions spent on that box
+        self.forces = Counter()          # (level key, square) -> #force attempts on that box
+        self.fails = Counter()           # (level key, square) -> loot attempts that got neither contents nor a lock
+        self.kick = None                 # (level key, box square): kicking it open from next to it
+        self.paused = {}                 # (level key, square) -> turn: not a goal until then (box_pause)
+        self.chase_turn = -1             # last turn we walked toward a box
+
+
 class BoxMixin:
     def box_init(self):
-        self.box_stats = Counter()
-        self.box_tries = Counter()       # (level key, square) -> actions spent on that box
-        self.box_forces = Counter()      # (level key, square) -> #force attempts on that box
-        self.box_fails = Counter()       # (level key, square) -> loot attempts that got neither contents nor a lock
-        self.box_kick = None             # (level key, box square): kicking it open from next to it
-        self.box_paused = {}             # (level key, square) -> turn: not a goal until then (box_pause)
-        self.box_chase_turn = -1         # last turn we walked toward a box
+        self.box = BoxState()
+
+    def box_summary(self):
+        """Game summary entries (welded: weapons.swap_in put a cursed dagger in our hands)."""
+        return {"boxes": dict(self.box.stats, welded=self.swap_welded)}
 
     # ------------------------------------------------------------------ goal
     def box_targets(self, lv):
@@ -55,7 +65,7 @@ class BoxMixin:
         for p in self.goal_closed_set("box", lv.key):
             m[p] = False
         t = self.turn()
-        for (key, p), until in self.box_paused.items():
+        for (key, p), until in self.box.paused.items():
             if key == lv.key and t < until:
                 m[p] = False
         return m
@@ -69,24 +79,24 @@ class BoxMixin:
         if not box.any():
             return box
         if self.visible_hostiles(lv):
-            if self.turn() - self.box_chase_turn <= 2:
+            if self.turn() - self.box.chase_turn <= 2:
                 until = self.turn() + BOX_PAUSE
                 for p in zip(*np.nonzero(box)):
-                    self.box_paused[(lv.key, (int(p[0]), int(p[1])))] = until
-                self.box_stats["paused"] += 1
+                    self.box.paused[(lv.key, (int(p[0]), int(p[1])))] = until
+                self.box.stats["paused"] += 1
             return np.zeros_like(box)
         return box & passable
 
     def box_done(self, lv, pos, why):
-        self.box_stats[why] += 1
-        self.box_kick = None
+        self.box.stats[why] += 1
+        self.box.kick = None
         self.goal_done("box", lv, pos)
 
     # ------------------------------------------------------------------ step
     def box_step(self, lv):
         """Housekeeping (no hostile in view): open the box under us, or go on kicking one open. True if it
         used the turn."""
-        if self.box_kick is not None:
+        if self.box.kick is not None:
             return self.box_kick_step(lv)
         pos = self.pos()
         if not self.box_targets(lv)[pos]:
@@ -94,8 +104,8 @@ class BoxMixin:
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & NO_ACT or self.handless():
             return False
         key = (lv.key, pos)
-        self.box_tries[key] += 1
-        if self.box_tries[key] > BOX_TRIES:
+        self.box.tries[key] += 1
+        if self.box.tries[key] > BOX_TRIES:
             self.box_done(lv, pos, "gave_up")
             return self.swap_back("box")
         self.cur_act = "box"
@@ -104,24 +114,24 @@ class BoxMixin:
             self.box_done(lv, pos, r)
             return True
         if r == "failed":
-            self.box_fails[key] += 1
-            if self.box_fails[key] < FAILED_TRIES:
+            self.box.fails[key] += 1
+            if self.box.fails[key] < FAILED_TRIES:
                 return True                      # something came between (a trap went off, --More--): again
         if r != "locked":
             self.box_done(lv, pos, "no_box" if r == "none" else "failed")
             return True
         if self.swapped_for is None and self.lock_box_step(key):
             return True                          # lock_tools: unlocked with the tool, nothing broken
-        if self.swapped_for == "box" and self.box_forces[key] < FORCE_TRIES:
+        if self.swapped_for == "box" and self.box.forces[key] < FORCE_TRIES:
             return self.box_force(key)
-        opener = self.dagger_alternate() if self.swapped_for is None and self.box_forces[key] < FORCE_TRIES else None
+        opener = self.dagger_alternate() if self.swapped_for is None and self.box.forces[key] < FORCE_TRIES else None
         if opener is not None:
             self.swap_in("box", opener)
             return True
         if self.swap_back("box"):
             return True
-        self.box_kick = (lv.key, pos)
-        self.box_stats["kick_start"] += 1
+        self.box.kick = (lv.key, pos)
+        self.box.stats["kick_start"] += 1
         return self.box_kick_step(lv)
 
     def box_loot(self):
@@ -156,13 +166,13 @@ class BoxMixin:
         self.settle()
         said = self.text_since(seq0)
         if "trigger a trap" in said or "set it off" in said:
-            self.box_stats["trap"] += 1
+            self.box.stats["trap"] += 1
         if re.search(r"\blocked\b", said):
             return "locked"                      # not "There is an unlocked chest here" (lock_tools opened it)
         if "is empty" in said:
             return "empty"
         if took is not None:
-            self.box_stats["taken"] += took
+            self.box.stats["taken"] += took
             return "opened"
         if "here to loot" in said:
             return "none"
@@ -170,7 +180,7 @@ class BoxMixin:
 
     def box_force(self, key):
         """#force the lock with the dagger in hand (an occupation: the game runs it until done or interrupted)."""
-        self.box_forces[key] += 1
+        self.box.forces[key] += 1
         seq0 = self.msg_seq
         self.press("#", expect_prompt=True)
         for c in "force":
@@ -182,19 +192,19 @@ class BoxMixin:
             self.settle()
         said = self.text_since(seq0)
         if "succeed in forcing" in said:
-            self.box_stats["forced"] += 1
+            self.box.stats["forced"] += 1
         elif "broke" in said:
-            self.box_stats["dagger_broke"] += 1
+            self.box.stats["dagger_broke"] += 1
             self.swapped_for = None              # the dagger is gone: nothing to swap back from
         return True
 
     def box_kick_step(self, lv):
         """Kick the box open from a square next to it (step off it first). True if it used the turn."""
-        key, box = self.box_kick
+        key, box = self.box.kick
         if key != lv.key:
-            self.box_kick = None                 # left the level: the goal stays there
+            self.box.kick = None                 # left the level: the goal stays there
             return False
-        if self.box_tries[(key, box)] > BOX_TRIES + KICK_TRIES:
+        if self.box.tries[(key, box)] > BOX_TRIES + KICK_TRIES:
             self.box_done(lv, box, "gave_up")
             return False
         y, x = self.pos()
@@ -213,21 +223,21 @@ class BoxMixin:
             self.box_done(lv, box, "no_room_to_kick")
             return False
         if max(abs(box[0] - y), abs(box[1] - x)) != 1:
-            self.box_kick = None                 # moved away: the goal walks us back, the lock decides again
+            self.box.kick = None                 # moved away: the goal walks us back, the lock decides again
             return False
         if live[box] in (G.MONSTER, G.PET, G.INVIS):
             self.cur_act = "box"
             self.press("s")                      # something on the box: don't kick it
             return True
-        self.box_tries[(key, box)] += 1
-        self.box_stats["kicks"] += 1
+        self.box.tries[(key, box)] += 1
+        self.box.stats["kicks"] += 1
         self.cur_act = "box"
         seq0 = self.msg_seq
         self.kick(DELTA2KEY[(box[0] - y, box[1] - x)])
         said = self.text_since(seq0)
         if "trigger a trap" in said or "set it off" in said:
-            self.box_stats["trap"] += 1
+            self.box.stats["trap"] += 1
         if "break open the lock" in said:
-            self.box_stats["kicked_open"] += 1
-            self.box_kick = None                 # the goal walks us back onto it to loot
+            self.box.stats["kicked_open"] += 1
+            self.box.kick = None                 # the goal walks us back onto it to loot
         return True

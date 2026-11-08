@@ -69,7 +69,7 @@ class GoalsMixin:
     def goal_chase(self, kind):
         self.chasing = kind
         if kind == "box":
-            self.box_chase_turn = self.turn()
+            self.box.chase_turn = self.turn()
 
     # ------------------------------------------------------------------ explore tier
     def goal_raw(self, kind, lv):

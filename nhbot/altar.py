@@ -29,16 +29,26 @@ PROTECTION_TRIES = 6         # donations at most on one level (one that didn't p
 PROTECTION_BUYS = 1          # protection bought at most this many times (A/B buy_protection +40 [-155, +258])
 
 
-class AltarMixin:
-    def altar_init(self):
-        self.altar_known = set()         # buc_key of items whose status we learned (or saw)
-        self.altar_dropped = None        # (level key, square, {buc_key}) lying on an altar, to pick back up
-        self.altar_stats = Counter()
+class AltarState:
+    """State of altar BUC testing and temple protection (AltarMixin)."""
+    def __init__(self):
+        self.known = set()               # buc_key of items whose status we learned (or saw)
+        self.dropped = None              # (level key, square, {buc_key}) lying on an altar, to pick back up
+        self.stats = Counter()
         self.prot_bought = 0             # AC the temple priests' protection gave us
         self.prot_stats = Counter()
         self.temple_levels = set()       # levels where we entered a temple ("Pilgrim, you enter a sacred place!")
         self.prot_tries = Counter()      # level key -> donations there
-        self._temple_seq = 0
+        self.temple_seq = 0
+
+
+class AltarMixin:
+    def altar_init(self):
+        self.altar = AltarState()
+
+    def altar_summary(self):
+        """Game summary entries."""
+        return {"altar": dict(self.altar.stats), "protection": dict(self.altar.prot_stats, ac=self.altar.prot_bought)}
 
     def protection_step(self, lv):
         """Buy protection from a temple priest (priest.c priest_talk): a donation of 400 * XL (below 600 * XL)
@@ -46,21 +56,21 @@ class AltarMixin:
         PROTECTION_MAX -- PROTECTION_BUYS times at most; gold in our bag is taken out for it. Only on a level where we entered his temple (out of it he takes a chat for an insult and
         turns hostile), with the gold for it, nothing threatening us (the caller checks): to a square next to him,
         #chat, offer. True if it used the turn."""
-        new = self.msgs_since(self._temple_seq) if self._temple_seq else []
-        self._temple_seq = self.msg_seq
+        new = self.msgs_since(self.altar.temple_seq) if self.altar.temple_seq else []
+        self.altar.temple_seq = self.msg_seq
         if any("enter a sacred place" in m for m in new):
-            self.temple_levels.add(lv.key)
-        if lv.key not in self.temple_levels or self.prot_bought >= PROTECTION_MAX \
-                or self.prot_stats["bought"] >= PROTECTION_BUYS \
-                or self.prot_tries[lv.key] >= PROTECTION_TRIES \
+            self.altar.temple_levels.add(lv.key)
+        if lv.key not in self.altar.temple_levels or self.altar.prot_bought >= PROTECTION_MAX \
+                or self.altar.prot_stats["bought"] >= PROTECTION_BUYS \
+                or self.altar.prot_tries[lv.key] >= PROTECTION_TRIES \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_HALLU | nh.BL_MASK_CONF
                                                              | nh.BL_MASK_STUN):
             return False
         offer = 400 * int(self.bl(nh.NLE_BL_XP))
         gold = int(self.bl(nh.NLE_BL_GOLD))
         bag = self.gold_bag()
-        if gold < offer and bag is not None and gold + self.bag_gold >= offer:
-            self.prot_stats["bag_out"] += 1
+        if gold < offer and bag is not None and gold + self.bag.gold >= offer:
+            self.altar.prot_stats["bag_out"] += 1
             return self.bag_take_out(bag)             # the gold we keep in the bag (nhbot.goldbag) counts too
         if gold < offer:
             return False
@@ -73,8 +83,8 @@ class AltarMixin:
         p = min(priests, key=lambda q: max(abs(q[0] - y), abs(q[1] - x)))
         if max(abs(p[0] - y), abs(p[1] - x)) == 1:
             if not self.peaceful_now(lv, p):
-                self.prot_tries[lv.key] = PROTECTION_TRIES     # angered: leave him be
-                self.prot_stats["hostile"] += 1
+                self.altar.prot_tries[lv.key] = PROTECTION_TRIES     # angered: leave him be
+                self.altar.prot_stats["hostile"] += 1
                 return False
             return self.donate(lv, p, offer)
         mask = np.zeros_like(lv.under, dtype=bool)
@@ -88,8 +98,8 @@ class AltarMixin:
         """#chat toward the priest at p, offer `offer` gold (typed into the 'How much will you offer?' line --
         the generic prompt handling would escape it, an offer of 0: "Thou shalt regret thine action!")."""
         self.cur_act = "protection"
-        self.prot_tries[lv.key] += 1
-        self.prot_stats["donate"] += 1
+        self.altar.prot_tries[lv.key] += 1
+        self.altar.prot_stats["donate"] += 1
         ac0 = int(self.bl(nh.NLE_BL_AC))
         seq = self.msg_seq
         y, x = self.pos()
@@ -108,26 +118,26 @@ class AltarMixin:
                 for c in str(offer):
                     self.raw_step(ord(c))
                 self.raw_step(13)
-                self.prot_stats["offered"] += 1
+                self.altar.prot_stats["offered"] += 1
             break
         self.settle()
         said = self.text_since(seq)
         if "rewarded for thy devotion" in said:
             gain = max(1, ac0 - int(self.bl(nh.NLE_BL_AC)))
-            self.prot_bought += gain
-            self.prot_stats["bought"] += 1
-            self.prot_stats["ac"] += gain
+            self.altar.prot_bought += gain
+            self.altar.prot_stats["bought"] += 1
+            self.altar.prot_stats["ac"] += gain
         elif "selfless generosity" in said or "pious individual" in said or "Cheapskate" in said:
-            self.prot_stats["no_protection"] += 1
+            self.altar.prot_stats["no_protection"] += 1
         else:
-            self.prot_stats["other"] += 1
-            self.prot_tries[lv.key] = PROTECTION_TRIES          # not what we expected: no more here
+            self.altar.prot_stats["other"] += 1
+            self.altar.prot_tries[lv.key] = PROTECTION_TRIES          # not what we expected: no more here
         return True
 
     def altar_untested(self):
         return [it for it in self.items()
                 if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.cant_drop
-                and not BUC_RE.search(it.text) and buc_key(it.text) not in self.altar_known
+                and not BUC_RE.search(it.text) and buc_key(it.text) not in self.altar.known
                 and not it.unpaid]
 
     def altar_mask(self, lv):
@@ -135,7 +145,7 @@ class AltarMixin:
         alt = self.terrain_glyphs(lv) == ALTAR_GLYPH
         if not alt.any():
             return alt & False
-        dropped = self.altar_dropped
+        dropped = self.altar.dropped
         if dropped is not None and dropped[0] == lv.key:
             out = alt & False
             out[dropped[1]] = True
@@ -149,7 +159,7 @@ class AltarMixin:
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_BLIND | nh.BL_MASK_LEV | nh.BL_MASK_HALLU):
             return False
         here = (lv.key, self.pos())
-        if self.altar_dropped is not None and self.altar_dropped[:2] == here:
+        if self.altar.dropped is not None and self.altar.dropped[:2] == here:
             return self.altar_pick_back()
         untested = self.altar_untested()
         if untested:
@@ -159,18 +169,18 @@ class AltarMixin:
             self.drop_units(it.letter)
             m = self.text_since(seq0)
             res = "cursed" if "black flash" in m else "blessed" if "amber flash" in m else "uncursed"
-            self.altar_stats[res] += 1
-            self.altar_known.add(buc_key(it.text))
-            if self.altar_dropped is None or self.altar_dropped[:2] != here:
-                self.altar_dropped = (lv.key, self.pos(), set())
-            self.altar_dropped[2].add(buc_key(it.text))
+            self.altar.stats[res] += 1
+            self.altar.known.add(buc_key(it.text))
+            if self.altar.dropped is None or self.altar.dropped[:2] != here:
+                self.altar.dropped = (lv.key, self.pos(), set())
+            self.altar.dropped[2].add(buc_key(it.text))
             return True
         return False
 
     def altar_pick_back(self):
-        keys = self.altar_dropped[2]
-        self.altar_dropped = None
+        keys = self.altar.dropped[2]
+        self.altar.dropped = None
         self.cur_act = "altar"
         self.pickup(lambda t: "for sale" not in t and buc_key(t) in keys, "altar")
-        self.altar_stats["picked_back"] += 1
+        self.altar.stats["picked_back"] += 1
         return True
