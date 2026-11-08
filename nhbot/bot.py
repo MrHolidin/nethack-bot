@@ -13,6 +13,7 @@ from nhbot.elbereth import ElberethMixin
 from nhbot.equipment import EquipMixin
 from nhbot.excalibur import ExcaliburMixin
 from nhbot.explore import ExploreMixin
+from nhbot.mines import MinesMixin
 from nhbot.focus import FocusMixin
 from nhbot.game import GameMixin, GameOver
 from nhbot.charges import WandChargeMixin
@@ -54,7 +55,7 @@ SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
 
 class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
-          ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, ExcaliburMixin, ShopMixin, EquipMixin,
+          ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, MinesMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, LockToolMixin, PolyMixin):
@@ -100,6 +101,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         self.perception_init()
         self.survival_init()
         self.explore_init()
+        self.mines_init()
         self.hidden_init()
         self.combat_init()
         self.excal_init()
