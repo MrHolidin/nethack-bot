@@ -64,6 +64,10 @@ DEFAULTS = {
                                #      that takes it: gold not walked to where step_gold_here won't pick it up (a
                                #      shopkeeper in view, no shop marked); a corpse judged where it lies, not where we
                                #      stand (nhbot.goals.goal_masks, policy.step_eat_corpse)
+    "nymph_elb": False,        # A/B: on a confirmed Elbereth (read back) a nymph / monkey next to us is not hit (the
+                               #      blow erases it, setmangry) -- we wait, nymph_wait_max turns at most; the
+                               #      nymph's Elbereth is written by elbereth.elb_write (retries a misspelling)
+                               #      (nhbot.thieves.nymph_step)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
