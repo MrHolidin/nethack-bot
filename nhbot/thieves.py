@@ -9,10 +9,10 @@ import numpy as np
 
 from nhbot import glyphs as G
 from nhbot.consts import COLS, ROWS, in_line, ray_squares
+from nhbot.events import Kill, Stolen, Theft
 from nhbot.monsters import THIEVES
 from nhbot.items import base_name
 from nhbot.nav import line_clear
-from nhbot.pickup import STOLE_RE
 
 
 class ThievesState:
@@ -76,17 +76,19 @@ class ThievesMixin:
         self.thief.gold_prev, self.thief.gold_seq = g, self.msg_seq
 
     # ================================================================== nymphs
-    def msg_thieves(self, m):
-        for what in STOLE_RE.findall(m):                    # "She stole a +0 orcish helm." / "It steals ...!"
-            self.thief.stolen_names.add(base_name(what)[2])
-        stole = (re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m) and \
-            (any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m)
-        if stole or "It stole" in m or "It steals" in m or "She charms you" in m:
+    def msg_thieves(self, msg):
+        """Thefts and what they took, a thief we killed (its square: loot), our polymorph."""
+        m = msg.text
+        for e in msg.all(Stolen):
+            self.thief.stolen_names.add(base_name(e.what)[2])
+        if msg.all(Theft):
             if self.turn() != self.thief.theft_turn:
                 self.thief.theft_turn = self.turn()
                 self.thief.thefts += 1
             self.thief.stolen_pending = True
-        if self.combat.killed and any(t in self.combat.killed for t in THIEVES) and self.acts.last_attack_target:
+        kills = msg.all(Kill)
+        killed = kills[0].name if kills else None            # the kill msg_combat counts
+        if killed and any(t in killed for t in THIEVES) and self.acts.last_attack_target:
             self.thief.nymph_kills += 1
             if self.thief.stolen_pending:
                 self.goal_event("loot", "abandoned", self.thief.loot_sq is not None)    # replaced by a newer one

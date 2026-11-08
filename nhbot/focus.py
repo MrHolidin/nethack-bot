@@ -7,7 +7,6 @@ Scored by focus_parts from danger.py's model where it matched the true game stat
 fixes where it did not (scratchpad zi/fight_calib.py): spells, negative AC, unarmed weapon users, our weapon skill,
 HP left and kill time after the hits we counted, an unseen attacker by the HP it took.
 """
-import re
 from collections import deque
 
 import numpy as np
@@ -16,12 +15,9 @@ import nle.nethack as nh
 from nhbot.danger import adj_level
 from nhbot.fightmodel import (BASIC, WEAPON_SKILL, hits_to_kill, hp_prior, remaining_hp, skill_bonus,
                               typical_monster, unseen_level)
-from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
+from nhbot.events import Kill, MonMelee, OurBlow, SkillAdvanced
 from nhbot.monsters import PM_BY_NAME
 
-SKILL_RE = re.compile(r"You are now (?:more|most) skilled in ([a-z -]+)\.")      # weapon.c:1138 skill_advance
-UNSEEN_ATTACK_RE = re.compile(r"\bIt (?:hits|bites|stings|butts|touches you|kicks|misses|just misses)\b")
-SEEN_ATTACK_RE = re.compile(r"\bThe [a-zA-Z' -]+? (?:hits|bites|stings|butts|touches you|kicks|misses|just misses)\b")
 START_WEAPONS = {"Valkyrie": {"long sword", "dagger"}}   # u_init.c Valkyrie[]; weapon.c skill_init: those at Basic
 UNSEEN_WINDOW = 20        # turns of unseen attacks an 'I' is scored from
 HIT_MEMORY = 30           # turns our hits on a square are remembered
@@ -42,18 +38,16 @@ class FocusMixin:
     def focus_init(self):
         self.focus = FocusState()
 
-    def focus_note(self, m):
+    def focus_note(self, msg):
         """Our reading of a message: our hits on the square we attacked (a kill forgets them), our weapon skill's
-        advances, an unseen attacker's attacks and the HP they cost us. The message logged at the step of our
-        attack's 'F' is the one shown before, logged again (NLE keeps it on the line while asking the direction):
-        skipped -- counted as a hit it was one more, and a kill in it forgot the new target's hits."""
-        if self.steps == self.acts.attack_step + 1:
-            return
+        advances, an unseen attacker's attacks (an "It" melee line and no "The ..." one) and the HP they cost us.
+        game.on_message leaves out the message logged at the step of our attack's 'F' (the one before, shown again)
+        -- counted as a hit it was one more, and a kill in it forgot the new target's hits."""
         hp = self.bl(nh.NLE_BL_HP)
-        sk = SKILL_RE.search(m)
-        if sk:
-            self.focus.skill[sk.group(1)] = self.focus.skill.get(sk.group(1), 0) + 1
-        if UNSEEN_ATTACK_RE.search(m) and not SEEN_ATTACK_RE.search(m):
+        for adv in msg.all(SkillAdvanced)[:1]:           # one advance read per message
+            self.focus.skill[adv.skill] = self.focus.skill.get(adv.skill, 0) + 1
+        melee = msg.all(MonMelee)
+        if any(e.who == "It" for e in melee) and not any(e.who != "It" for e in melee):
             self.focus.unseen.append((self.turn(), max(0, self.focus.hp - hp) if self.focus.hp is not None else 0))
         while self.focus.unseen and self.turn() - self.focus.unseen[0][0] >= UNSEEN_WINDOW:
             self.focus.unseen.popleft()
@@ -62,9 +56,9 @@ class FocusMixin:
         if pos is None or self.cur_key is None:
             return
         key = (self.cur_key, pos)
-        if KILL_WORD_RE.search(m):
+        if msg.all(Kill):
             self.focus.hits.pop(key, None)
-        elif OUR_HIT_RE.search(m):
+        elif any(e.verb != "miss" for e in msg.all(OurBlow)):
             g = int(self.obs["glyphs"][pos])
             if nh.glyph_is_monster(g):
                 idx = nh.glyph_to_mon(g)

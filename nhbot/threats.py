@@ -19,15 +19,12 @@ gives it unlimited use of them):
 import numpy as np
 
 from nhbot import glyphs as G
-from nhbot.messages import MON_BREATHES_RE, MON_SHOOTS_RE, MON_ZAPS_RE, attacker_kind, attacks_on_us
+from nhbot.events import Attacked, MonBreath, MonVolley, MonZap, RaySeen
 from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
 TRACK_FORGET = 10            # turns a track is kept unseen
 WAND_KINDS = ("striking", "magic missile", "fire", "cold", "sleep", "lightning", "death")
-RAY_SEEN = (("sleep ray", "sleep"), ("bolt of fire", "fire"), ("bolt of cold", "cold"),
-            ("bolt of lightning", "lightning"), ("magic missile", "magic missile"), ("death ray", "death"),
-            ("The wand hits you", "striking"), ("The wand misses you", "striking"), ("Boing!", "striking"))
 
 
 def singular(what):
@@ -78,41 +75,40 @@ class ThreatMixin:
                                "wands": set(), "missile": None, "breath": False})
         self.threats.mon_tracks = tracks
 
-    def msg_threat(self, m):
+    def msg_threat(self, msg):
         """A message naming a monster attacking us: the nearest track of that name in view attacked; its ranged
         attacks noted (module docstring)."""
         if not self.threats.mon_tracks:
             return
         t = self.turn()
-        # only attacks on us (messages.attacks_on_us), melee or ranged -- not "The jackal bites the little dog."
-        names = [n for who, _ in attacks_on_us(m) if (n := attacker_kind(who)) is not None]
+        # only attacks on us (events.Attacked), melee or ranged -- not "The jackal bites the little dog."
+        names = [e.monster for e in msg.all(Attacked) if e.monster is not None]
         for name in names:
             tr = self.track_named(name)
             if tr is not None:
                 tr["attacked"] = t
-        for name, wand in MON_ZAPS_RE.findall(m):
-            tr = self.track_named(name)
+        for zap in msg.all(MonZap):
+            tr = self.track_named(zap.name)
             if tr is not None:
-                kind = wand[len("wand of "):] if wand.startswith("wand of ") else None
+                kind = zap.wand[len("wand of "):] if zap.wand.startswith("wand of ") else None
                 if kind in WAND_KINDS:
                     tr["wands"].add(kind)
                 self.threats.zapper = (t, tr) if kind is None else None
         if self.threats.zapper is not None and t - self.threats.zapper[0] <= 1:            # its effect: this turn or the next
-            kind = next((k for phrase, k in RAY_SEEN if phrase in m), None)
-            if kind is not None:
-                self.threats.zapper[1]["wands"].add(kind)
+            for ray in msg.all(RaySeen):
+                self.threats.zapper[1]["wands"].add(ray.kind)
                 self.threats.zapper = None
-        for name, count, what in MON_SHOOTS_RE.findall(m):
-            tr = self.track_named(name)
+        for vol in msg.all(MonVolley):
+            tr = self.track_named(vol.name)
             if tr is not None:
-                n = int(count) if count.isdigit() else 1
-                poisoned = what.startswith("poisoned ")
-                kind = singular(what[len("poisoned "):] if poisoned else what)
+                n = int(vol.count) if vol.count.isdigit() else 1
+                poisoned = vol.missile.startswith("poisoned ")
+                kind = singular(vol.missile[len("poisoned "):] if poisoned else vol.missile)
                 old = tr["missile"]
                 tr["missile"] = {"kind": kind, "counts": (old["counts"] if old else []) + [n],
                                  "poisoned": poisoned or bool(old and old["poisoned"])}
-        for name in MON_BREATHES_RE.findall(m):
-            tr = self.track_named(name)
+        for br in msg.all(MonBreath):
+            tr = self.track_named(br.name)
             if tr is not None:
                 tr["breath"] = True
 

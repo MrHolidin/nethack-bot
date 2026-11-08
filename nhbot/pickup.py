@@ -47,7 +47,6 @@ CLASS_WORDS = {"potion": nh.POTION_CLASS, "scroll": nh.SCROLL_CLASS, "ring": nh.
                "amulet": nh.AMULET_CLASS, "spellbook": nh.SPBOOK_CLASS}
 CLASS_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s?\b")
 PETRIFYING_CORPSE_RE = re.compile(r"\b(?:cockatrice|chickatrice) corpses?\b")   # mondata.h:192 touch_petrifies
-STOLE_RE = re.compile(r"\b(?:stole|steals) (.+?)[.!](?:\s|$)")
 WANTED_WEAPON_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)   # a remembered weapon worth the walk
 for _g in range(nh.MAX_GLYPH):
     if WEAPON_GLYPH[_g]:

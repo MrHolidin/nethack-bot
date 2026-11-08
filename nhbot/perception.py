@@ -9,7 +9,7 @@ import nle.nethack as nh
 from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, NEIGH, ROWS
 from nhbot.monalign import ALIGN
-from nhbot.messages import attacks_on_us
+from nhbot.events import Attacked
 from nhbot.monsters import (ALWAYS_AVOID, M2_HOSTILE, M2_PEACEFUL, MR_BITS, MS_GUARDIAN, MS_LEADER, MS_NEMESIS,
                             NEVER_MELEE, NO_ACTIVE_ATTACK, PASSIVE_DMG, PASSIVE_KIND, PM_BY_NAME, RACE_MASKS, THIEVES)
 from nhbot.rays import our_protection
@@ -123,7 +123,7 @@ class PerceptionMixin:
             return peaceful
         return cls > 0
 
-    def msg_peace(self, m, lv):
+    def msg_peace(self, msg, lv):
         """A monster we take for peaceful attacked us: count it (by kind), and every one of that kind next to
         us is hostile from now on."""
         if lv is None or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
@@ -132,7 +132,7 @@ class PerceptionMixin:
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
                and G.KIND[g[y + dy, x + dx]] == G.MONSTER]
-        whos = [who for who, kind in attacks_on_us(m) if kind == "melee" and who != "Something"]
+        whos = [e.who for e in msg.all(Attacked) if e.how == "melee" and e.who != "Something"]
         for who in whos:
             if who in ("You", "It") or who.startswith("You "):
                 continue

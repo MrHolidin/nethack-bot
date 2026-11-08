@@ -13,9 +13,9 @@ can be added later.
 | `bot.py` | `Bot`: construction, the game loop (`run`), the summary |
 | `policy.py` | the decision order: `tick()` runs the steps in `STEPS`, the first one that acts ends the tick; `HOUSEKEEPING`: the jobs of the housekeeping step, in order |
 | `options.py` | every option and its default; unknown names raise |
-| `game.py` | keys, prompts, `--More--`, the message log (`on_message`), status line, inventory text |
+| `game.py` | keys, prompts, `--More--`, the message log (`log_msg`: new or repeat; `on_message`: the domains' handlers in order), status line, inventory text |
 | `actions.py` | the primitive actions, each doing its own bookkeeping: attack, take_stairs, search_turns, throw, zap, engrave, drop_units |
-| `messages.py` | message patterns read by several domains (attacks on us, shots, our blows and kills), side by side |
+| `events.py` | the message event layer: each message parsed once into typed events (our blows and kills, attacks on us, monsters' missiles / wands / breath, items destroyed, thefts); `Message.repeat`: a message NLE shows again |
 | `mapmem.py` | per-level map memory, terrain / passability grids, shop marking, where the stairs we took lead |
 | `nav.py` | Dijkstra, single steps, door kicks, walking toward a square |
 | `perception.py` | hostile / peaceful monsters, threat gates, line targets |

@@ -34,6 +34,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
+from nhbot.events import ItemDestroyed, MonMelee, MonWeapon
 from nhbot.fightmodel import (FIRE_PILLAR, LIGHTNING, PACK_CLASSES, RAY_DESTROY, RESIST_OF, SPELL_DESTROY, ac_reduce,
                               cast_chance, cast_profile, hp_prior, melee_destroy_events, pack_destroy, spell_picks,
                               uncancelled)
@@ -60,16 +61,7 @@ MISSILE_DIE = {"arrow": 6, "elven arrow": 7, "orcish arrow": 5, "silver arrow": 
                "rock": 3, "flint stone": 6, "boulder": 20}        # objects.c, small monsters' die
 BREATH_KIND = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning", "SLEE": "sleep", "MAGM": "magic missile",
                "DISN": "death", "ACID": "fire", "DRST": "fire", "RBRE": "fire"}
-WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
-# a seen monster's melee hit or miss (mhitu.c hitmsg default "%s hits!", missmu); a weapon attack with a weapon in hand
-# says "swings" / "thrusts" first (mhitu.c:767-772, 100-106 mswings, a seen monster) -- without it, none
-MON_MELEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|just misses)!")
-# zap.c:4797-4805 destroy_strings, 4920-4922 destroy_one_item "%s %s %s!" -- one of our stacks lost one or more units
-DESTROY_RE = re.compile(r"\b(?:Your|One of your|Some of your|Both of your|All of your) (.+?) (freezes? and shatters?|"
-                        r"boils? and explodes?|ignites? and explodes?|catch(?:es)? fire and burns?|"
-                        r"turns to dust and vanishes|breaks apart and explodes)!")
-DESTROY_VERB_CLASS = {"free": nh.POTION_CLASS, "boil": nh.POTION_CLASS, "igni": nh.POTION_CLASS,
-                      "turn": nh.RING_CLASS, "brea": nh.WAND_CLASS}       # "catch": a scroll or a spellbook
+BARE_MELEE_VERBS = ("hits", "misses", "just misses")    # danger_weapons_msg: "The X hits!" with no weapon swung
 CLASS_NAME = {nh.POTION_CLASS: "potion", nh.SCROLL_CLASS: "scroll", nh.SPBOOK_CLASS: "spellbook",
               nh.WAND_CLASS: "wand", nh.RING_CLASS: "ring"}
 RAY_OF_AD = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning"}     # a breath that is a ray destroy_item follows
@@ -187,21 +179,25 @@ class DangerMixin:
     def danger_init(self):
         self.danger = DangerState()
 
-    def danger_msg(self, m):
-        if self.steps != self.acts.attack_step + 1:      # not the message 'F' logs again
-            for name, verb in DESTROY_RE.findall(m):
-                if "glob" in name:
-                    continue                             # a glob of green slime (food) boiling
-                cls = DESTROY_VERB_CLASS.get(verb[:4], nh.SPBOOK_CLASS if "spellbook" in name else nh.SCROLL_CLASS)
-                self.danger.items_window[cls] += 1
-                self.danger.items["all_stacks"][CLASS_NAME[cls]] += 1
-        for mon, weapon in WIELD_RE.findall(m):
-            w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon
+    def danger_items_msg(self, msg):
+        """Item-loss statistics: our stacks destroyed (events.ItemDestroyed; a glob of green slime, food, left out)."""
+        for e in msg.all(ItemDestroyed):
+            if e.cls == nh.FOOD_CLASS:
+                continue
+            self.danger.items_window[e.cls] += 1
+            self.danger.items["all_stacks"][CLASS_NAME[e.cls]] += 1
+
+    def danger_weapons_msg(self, msg):
+        """The weapon a monster swung (events.MonWeapon), and the monsters we saw hit / miss us with no weapon
+        swung: a seen one's weapon attack says "swings" / "thrusts" first (mhitu.c:767-772, 100-106 mswings) --
+        "The X hits!" without it, none (events.MonMelee with '!')."""
+        for e in msg.all(MonWeapon):
+            w = re.sub(r"s$", "", e.weapon) if e.weapon not in WEAPON_DICE else e.weapon
             if w in WEAPON_DICE:
-                self.danger.mon_weapon[mon] = w
-        for mon in MON_MELEE_RE.findall(m):
-            if mon not in self.danger.mon_weapon:
-                self.danger.mon_unarmed.add(mon)
+                self.danger.mon_weapon[e.name] = w
+        for e in msg.all(MonMelee):
+            if e.bang and e.who != "It" and e.verb in BARE_MELEE_VERBS and e.who[4:] not in self.danger.mon_weapon:
+                self.danger.mon_unarmed.add(e.who[4:])
 
     def hit_prob(self, level, i, bonus=0):
         """P(10 + AC_VALUE(ac) + level (+ bonus: 4 while we are helpless, mhitu.c multi < 0) > rnd(20 + i))."""
@@ -470,9 +466,9 @@ class DangerMixin:
     def items_tick(self, t, adjacent=(), final=False):
         """(Statistics only) Score the item loss predicted for the last turn (monster_item_loss of the
         hostiles next to us; on Elbereth one that respects it doesn't melee us unless we attacked, the one we
-        attacked may have died first -- as danger_combine) against our stacks destroyed since (danger_msg,
-        DESTROY_RE); predict the next turn's for the adjacent (pos, name) danger.pending was just made for. final: the
-        game ended -- score what is pending."""
+        attacked may have died first -- as danger_combine) against our stacks destroyed since (danger_items_msg,
+        events.ItemDestroyed); predict the next turn's for the adjacent (pos, name) danger.pending was just made for.
+        final: the game ended -- score what is pending."""
         d = self.danger
         pend, d.items_pending = d.items_pending, None
         if pend is not None and (final or t == pend[0] + 1):

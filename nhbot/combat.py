@@ -10,7 +10,7 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, DELTA2KEY, DIRS, NEIGH, ROWS, in_line, ray_squares
 from nhbot.danger import adj_level, cdf_draw, dice_pmf
 from nhbot.goals import GOALS
-from nhbot.messages import KILL_RE, KILLED_RE, SHOOTER_RE, SHOT_AT_RE, TRAP_SHOT_RE, attacks_on_us
+from nhbot.events import Attacked, Kill, ShotAt
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import CARRIERS, MR_BITS, PM_BY_NAME, PM_INDEX, RANGED_TARGETS, permonst_of
 from nhbot.nav import line_clear
@@ -93,7 +93,6 @@ class CombatState:
         self.kill_by = Counter()       # our kills, by kind
         self.kill_count = 0
         self.kills = []                # (turn, name, square, level key) of our kills (fresh corpses)
-        self.killed = None             # msg_combat: what the message being handled says we killed
         self.retrieve = []             # (level key, ray squares, until turn) of our throws (retrieve_goals)
         self.last_shot_turn = -99      # something shot at us (msg_combat)
         self.shot_event = None         # (turn, shooter name or None) for hunt_shooter
@@ -646,31 +645,30 @@ class CombatMixin:
         if len(self.combat.ray_risk_log) < 40:
             self.combat.ray_risk_log.append((self.turn(), ev, kind, d, round(p, 3), harm["verdict"]))
 
-    def msg_combat(self, m):
-        """Our hits and kills, being shot at, being attacked by something unseen."""
-        self.focus_note(m)
-        mk = KILLED_RE.search(m)
-        if mk or KILL_RE.search(m):                    # KILLED_RE matches only what KILL_RE does
+    def msg_combat(self, msg):
+        """Our kills, being shot at, being attacked by something unseen."""
+        kills = msg.all(Kill)
+        name = kills[0].name if kills else None          # one kill counted per message
+        if kills:
             self.combat.kill_count += 1
-        if mk:
-            self.combat.kill_by[mk.group(1)] += 1
-        self.combat.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
-        if mk and self.acts.last_attack_target:
+        if name:
+            self.combat.kill_by[name] += 1
+        if name and self.acts.last_attack_target:
             lvk = self.levels.get(self.cur_key)
             if lvk is not None:
                 lvk.stationary.pop(self.acts.last_attack_target, None)   # killed it (a missile at a mold)
-            if lvk is not None and mk.group(1) in CARRIERS:
+            if lvk is not None and name in CARRIERS:
                 lvk.kill_piles.add(self.acts.last_attack_target)    # what it carried lies under its corpse (pickup.py)
             old_corpse = lvk is not None and G.KIND[lvk.under[self.acts.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
-                self.combat.kills.append((self.turn(), mk.group(1), self.acts.last_attack_target, self.cur_key))
+                self.combat.kills.append((self.turn(), name, self.acts.last_attack_target, self.cur_key))
                 self.goal_event("corpse", "created")
-        if SHOT_AT_RE.search(m) and not TRAP_SHOT_RE.search(m) and self.turn() - self.acts.own_zap_turn > 1:
-            self.combat.last_shot_turn = self.turn()
-            mm = SHOOTER_RE.search(m)
-            self.combat.shot_event = (self.turn(), mm.group(1) if mm else None)
-        # the one parser of attacks on us (messages.attacks_on_us) -- "It ..." an unseen one (blind_strike), a named
-        # one in melee (hallu_strike: hallucinating, the name is random) (A/B attacked_us: -333 [-653, -55], median
-        # 7777 -> 7787, 29 games of 1000 changed)
-        melee = [who for who, kind in attacks_on_us(m) if kind == "melee"]
+        for shot in msg.all(ShotAt):
+            if self.turn() - self.acts.own_zap_turn > 1:
+                self.combat.last_shot_turn = self.turn()
+                self.combat.shot_event = (self.turn(), shot.shooter)
+        # the one parser of attacks on us (events.Attacked) -- "It ..." an unseen one (blind_strike), a named one in
+        # melee (hallu_strike: hallucinating, the name is random) (A/B attacked_us: -333 [-653, -55], median 7777 ->
+        # 7787, 29 games of 1000 changed)
+        melee = [e.who for e in msg.all(Attacked) if e.how == "melee"]
         self.melee_on_us_note(melee)

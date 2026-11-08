@@ -5,6 +5,7 @@ from collections import Counter, deque
 import nle.nethack as nh
 
 from nhbot.consts import DELTA2KEY
+from nhbot.events import RESHOW_KEYS, Message
 from nhbot.items import parse_item
 
 
@@ -21,6 +22,7 @@ class GameOver(Exception):
 class GameMixin:
     def game_init(self):
         self.steps = 0                   # keys sent so far
+        self.last_key = None             # the key sent last (log_msg: a message NLE shows again after it)
         self.reward = 0.0
         self.done = False
         self.truncated = False
@@ -42,6 +44,7 @@ class GameMixin:
             raise ValueError(f"key {code!r} not in action set")
         self.obs, r, term, trunc, info = self.env.step(self.key2act[code])
         self.steps += 1
+        self.last_key = code
         self.reward += r
         self.done = term or trunc
         if not self.done:
@@ -202,9 +205,13 @@ class GameMixin:
             self.raw_step(27)
 
     def log_msg(self, m):
+        """Log a message and hand it to the domains (on_message) -- the one place that tells a new message from one
+        shown again: the same text at the same step is dropped; after a key the game reads before clearing the
+        message window (events.RESHOW_KEYS) the same text is a repeat -- logged and handed on, marked."""
         m = m.strip()
         if m and m == self._last_logged and self.steps == self._last_logged_step:
             return
+        repeat = m == self._last_logged and self.last_key in RESHOW_KEYS
         self._last_logged, self._last_logged_step = m, self.steps
         if m:
             self.messages.append((self.turn(), m))
@@ -213,7 +220,7 @@ class GameMixin:
                 self.all_msgs.append((self.turn(), m))
             if len(self.messages) > 60:
                 self.messages.popleft()
-            self.on_message(m)
+            self.on_message(Message(m, repeat))
 
     def tty_text(self):
         return "\n".join(bytes(r).decode("latin1") for r in self.obs["tty_chars"])
@@ -324,22 +331,31 @@ class GameMixin:
         self.settle()
         return desc
 
-    def on_message(self, m):
-        """Every logged message. Each domain reads what concerns it."""
+    def on_message(self, msg):
+        """Every logged message, parsed once (events.Message), to each domain in this order: the raw-text readers get
+        the text, the others read its events."""
+        m = msg.text
         lv = self.levels.get(self.cur_key) if self.cur_key else None
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
+        # the message logged at the step after attack()'s 'F' (the one before, shown again: events.RESHOW_KEYS) is not
+        # read by focus and the destroyed-item count
+        after_attack_f = self.steps == self.acts.attack_step + 1
         self.msg_survival(m)
         self.msg_enchant(m)
-        self.msg_combat(m)
-        self.danger_msg(m)
-        self.msg_peace(m, lv)
+        if not after_attack_f:
+            self.focus_note(msg)
+        self.msg_combat(msg)
+        if not after_attack_f:
+            self.danger_items_msg(msg)
+        self.danger_weapons_msg(msg)
+        self.msg_peace(msg, lv)
         self.msg_map(m, lv)
         self.msg_shop(m, lv)
-        self.msg_thieves(m)
+        self.msg_thieves(msg)
         self.msg_sacrifice(m, lv)
-        self.msg_threat(m)
+        self.msg_threat(msg)
         self.msg_vault(m)
-        self.msg_elbereth(m, lv)
+        self.msg_elbereth(msg, lv)
         if "You die" in m or "You starve" in m:
             self.death_msgs = [mm for _, mm in list(self.messages)[-8:]]

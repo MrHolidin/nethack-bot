@@ -10,8 +10,10 @@ import nle.nethack as nh
 
 from nhbot import elb_rules as ELB
 from nhbot.consts import NO_ENGRAVE_CMAP
-from nhbot.messages import ELB_WIPED_RE
+from nhbot.events import Kill, OurBlow
 from nhbot.monsters import PM_INDICES, SWARMERS
+
+ELB_WIPE_VERBS = ("hit", "miss", "smite")     # msg_elbereth: our blows read as scuffing it (with a kill)
 
 
 class ElberethState:
@@ -91,12 +93,16 @@ class ElberethMixin:
             return False                         # hallucinating: Elbereth won't come out right (engrave_elbereth)
         return not cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_STUN | nh.BL_MASK_CONF)
 
-    def msg_elbereth(self, m, lv):
+    def msg_elbereth(self, msg, lv):
         """The Elbereth under us gone or scuffed -- mon.c setmangry deletes it when we attack one that respects it
-        ("The engraving beneath you fades"), a melee blow wipes letters (uhitm.c u_wipe_engr(3)): off lv.elbereth till
-        read back (elb_confirm). Before, lv.elbereth kept it for good and the wand gate, the nymph rule and the danger
-        model trusted it (A/B elb_stale +609 [-317, +1545], 215 of 1000 games changed -- accepted)."""
-        if lv is not None and ELB_WIPED_RE.search(m):
+        ("The engraving beneath you fades"), a melee blow of ours, landed or not, or a kill wipes letters (uhitm.c
+        u_wipe_engr(3); read: hit / miss / smite / a kill): off lv.elbereth till read back (elb_confirm). Before,
+        lv.elbereth kept it for good and the wand gate, the nymph rule and the danger model trusted it (A/B elb_stale
+        +609 [-317, +1545], 215 of 1000 games changed -- accepted)."""
+        if lv is None:
+            return
+        if msg.all(Kill) or any(e.verb in ELB_WIPE_VERBS for e in msg.all(OurBlow)) \
+                or "The engraving beneath you fades" in msg.text:
             self.elb_scuffed(lv)
 
     def elb_scuffed(self, lv=None):
