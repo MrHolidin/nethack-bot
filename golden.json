@@ -1,26 +1,26 @@
 {
  "61000": {
-  "score": 4921.0,
-  "turns": 6172,
-  "max_depth": 7,
-  "xl": 7,
+  "score": 7338.0,
+  "turns": 6739,
+  "max_depth": 8,
+  "xl": 8,
   "last_msgs": [
-   "Click!  The black unicorn triggers a rolling boulder trap.",
-   "It's solid stone.",
-   "It's solid stone.",
-   "The black unicorn butts!  The black unicorn kicks!",
-   "The black unicorn butts!  The black unicorn kicks!",
-   "What do you want to write with? [- aefjknouBJSX or ?*]",
-   "You write in the dust with your fingertip.",
-   "What do you want to write in the dust here?",
-   "The black unicorn butts!  The black unicorn kicks!",
-   "The black unicorn butts!"
+   "The elven broadsword welds itself to the Grey-elf's hand!",
+   "The Grey-elf swings her elven broadsword.  The Grey-elf hits!",
+   "You hit the Grey-elf!  The Grey-elf swings her elven broadsword.",
+   "The Grey-elf hits!",
+   "The Grey-elf hits!",
+   "You kill the Grey-elf!  The Grey-elf swings his elven broadsword.",
+   "The Grey-elf misses!",
+   "You hit the Grey-elf!",
+   "You hit the Grey-elf!  The Grey-elf swings his elven broadsword.",
+   "The Grey-elf hits!"
   ],
   "truncated": false,
-  "steps": 10355,
-  "keys": 10355,
-  "keyhash": "73fc7e528c00caf8",
-  "secs": 12.3
+  "steps": 12255,
+  "keys": 12255,
+  "keyhash": "e2ef2704f555f279",
+  "secs": 10.9
  },
  "61001": {
   "score": 1776.0,
@@ -43,7 +43,7 @@
   "steps": 6072,
   "keys": 6072,
   "keyhash": "020fbcc5b3e11faf",
-  "secs": 6.8
+  "secs": 4.2
  },
  "61002": {
   "score": 71888.0,
@@ -66,30 +66,30 @@
   "steps": 66007,
   "keys": 66007,
   "keyhash": "08ed53f7d674f844",
-  "secs": 130.1
+  "secs": 135.4
  },
  "61003": {
-  "score": 2966.0,
-  "turns": 6810,
+  "score": 3238.0,
+  "turns": 7089,
   "max_depth": 9,
-  "xl": 6,
+  "xl": 7,
   "last_msgs": [
-   "You miss it.  It touches you!  You're covered in frost!",
+   "You're on fire!  The fire ant bites!  The fire ant bites!",
+   "You're on fire!  It touches you!  You're covered in frost!",
    "The frost doesn't seem cold!  Something casts a spell at you!",
-   "You suddenly feel weaker!",
-   "You suddenly feel weaker!",
-   "You miss it.  It touches you!  You're covered in frost!",
-   "The frost doesn't seem cold!",
-   "The frost doesn't seem cold!",
-   "You miss it.  It touches you!  You're covered in frost!",
-   "The frost doesn't seem cold!  Something casts a spell at you!",
-   "You suddenly feel weaker!"
+   "Your skin itches.  The fire ant bites!  The fire ant bites!",
+   "You're on fire!  The fire ant bites!  The fire ant bites!",
+   "You're on fire!",
+   "You're on fire!",
+   "You miss the fire ant.  The fire ant bites!  The fire ant bites!",
+   "You're on fire!  The fire ant bites!  The fire ant bites!",
+   "You're on fire!  The fire ant bites!"
   ],
   "truncated": false,
-  "steps": 8558,
-  "keys": 8558,
-  "keyhash": "101948d142a79b11",
-  "secs": 8.4
+  "steps": 9139,
+  "keys": 9139,
+  "keyhash": "6e4bf5caad3f3bb2",
+  "secs": 8.5
  },
  "61004": {
   "score": 1411.0,
@@ -112,30 +112,30 @@
   "steps": 3690,
   "keys": 3690,
   "keyhash": "498cfb2c1993ca18",
-  "secs": 5.5
+  "secs": 4.9
  },
  "61005": {
-  "score": 42197.0,
-  "turns": 11497,
-  "max_depth": 14,
-  "xl": 10,
+  "score": 43242.0,
+  "turns": 11447,
+  "max_depth": 13,
+  "xl": 11,
   "last_msgs": [
-   "You miss the zruty.  The gremlin misses!  The gremlin hits!",
-   "The gremlin bites!  The gremlin hits!",
-   "The gremlin bites!  The gremlin hits!",
-   "You hit the zruty!  The gremlin misses!  The gremlin hits!",
-   "The gremlin bites!  The gremlin misses!  The zruty hits!",
-   "The zruty hits!  The zruty bites!",
-   "What do you want to drink? [ox or ?*]",
-   "You feel better.  The gremlin hits!  The gremlin misses!",
-   "The gremlin bites!  The gremlin hits!  The zruty hits!",
-   "The zruty hits!"
+   "Your movements are slowed slightly because of your load.",
+   "What do you want to drop? [$a-zA-GIK-Z or ?*]",
+   "You drop an orcish helm.  Your movements are now unencumbered.",
+   "Things that are here:",
+   "The winged gargoyle hits!  The winged gargoyle misses!",
+   "The winged gargoyle bites!",
+   "The winged gargoyle bites!",
+   "You hit the winged gargoyle!  The winged gargoyle hits!",
+   "The winged gargoyle hits!  The winged gargoyle bites!",
+   "The winged gargoyle hits!  The winged gargoyle hits!"
   ],
   "truncated": false,
-  "steps": 22798,
-  "keys": 22798,
-  "keyhash": "44f758603f168311",
-  "secs": 47.9
+  "steps": 24253,
+  "keys": 24253,
+  "keyhash": "cdc72d36c6bb99c3",
+  "secs": 34.7
  },
  "61006": {
   "score": 2517.0,
@@ -158,7 +158,7 @@
   "steps": 7457,
   "keys": 7457,
   "keyhash": "0850a2a683b21b6f",
-  "secs": 7.0
+  "secs": 6.7
  },
  "61007": {
   "score": 4372.0,
@@ -185,26 +185,26 @@
  },
  "61008": {
   "score": 1004.0,
-  "turns": 2953,
+  "turns": 2952,
   "max_depth": 4,
   "xl": 5,
   "last_msgs": [
-   "The water demon hits!  The water demon bites!",
-   "You hit the water demon.  The water demon hits!  The water demon hits!",
-   "The water demon bites!  The water demon hits!  The water demon hits!",
-   "The water demon bites!  The water demon hits!  The water demon hits!",
-   "The water demon bites!  The water demon hits!  The water demon hits!",
-   "The water demon bites!",
-   "The water demon bites!",
-   "You miss the water demon.  The water demon hits!",
-   "The water demon hits!  The water demon bites!  The water demon hits!",
-   "The water demon hits!"
+   "The crossbow bolt hits the acid blob.  The water demon hits!",
+   "The water demon hits!  The water demon bites!  The succubus hits!",
+   "The succubus hits!  A water demon appears in a cloud of smoke!",
+   "It hits!  It hits!  It bites!  The water demon hits!",
+   "The water demon hits!  The water demon just misses!",
+   "The water demon hits!  The water demon just misses!",
+   "You hit it.  The water demon drinks a purple-red potion!",
+   "The water demon is suddenly moving faster.  The water demon hits!",
+   "The water demon hits!  The water demon bites!  The succubus misses!",
+   "The succubus misses!  It hits!  It hits!"
   ],
   "truncated": false,
-  "steps": 2866,
-  "keys": 2866,
-  "keyhash": "06e2b2104932dd55",
-  "secs": 3.4
+  "steps": 2872,
+  "keys": 2872,
+  "keyhash": "fb8546817eeafce8",
+  "secs": 4.2
  },
  "61009": {
   "score": 91102.0,
@@ -227,7 +227,7 @@
   "steps": 51165,
   "keys": 51165,
   "keyhash": "dae9a8edce0c24d0",
-  "secs": 106.8
+  "secs": 201.0
  },
  "61010": {
   "score": 329.0,
@@ -250,7 +250,7 @@
   "steps": 1096,
   "keys": 1096,
   "keyhash": "9ba1051aff83c813",
-  "secs": 1.4
+  "secs": 3.7
  },
  "61011": {
   "score": 512.0,
@@ -273,7 +273,7 @@
   "steps": 1548,
   "keys": 1548,
   "keyhash": "72f92e8f51448c4a",
-  "secs": 1.5
+  "secs": 4.4
  },
  "61012": {
   "score": 47593.0,
@@ -296,7 +296,7 @@
   "steps": 19766,
   "keys": 19766,
   "keyhash": "a8da8d4b670a2cba",
-  "secs": 46.5
+  "secs": 96.0
  },
  "61013": {
   "score": 26918.0,
@@ -319,7 +319,7 @@
   "steps": 31073,
   "keys": 31073,
   "keyhash": "cf2f8b352104a591",
-  "secs": 52.4
+  "secs": 106.4
  },
  "61014": {
   "score": 3552.0,
@@ -342,7 +342,7 @@
   "steps": 3986,
   "keys": 3986,
   "keyhash": "5bb4e0c3293c9f8d",
-  "secs": 5.7
+  "secs": 11.7
  },
  "61015": {
   "score": 3769.0,
@@ -365,30 +365,30 @@
   "steps": 8346,
   "keys": 8346,
   "keyhash": "3db4dc872c5d70a0",
-  "secs": 7.4
+  "secs": 17.2
  },
  "61016": {
-  "score": 44146.0,
-  "turns": 17972,
-  "max_depth": 15,
-  "xl": 11,
+  "score": 65730.0,
+  "turns": 21290,
+  "max_depth": 16,
+  "xl": 10,
   "last_msgs": [
-   "You hit the orange dragon!  The orange dragon bites!",
-   "The orange dragon hits!  The orange dragon hits!",
-   "The orange dragon hits!  The orange dragon hits!",
-   "You hit the orange dragon!  The orange dragon bites!",
-   "The orange dragon hits!  The orange dragon hits!",
-   "The orange dragon hits!  The orange dragon hits!",
-   "You hit the orange dragon!",
-   "You hit the orange dragon!",
-   "You hit the orange dragon!  The orange dragon bites!",
-   "The orange dragon hits!  The orange dragon hits!"
+   "The gnome lord hits!",
+   "The gnome lord hits!",
+   "You hit the gnome lord!  The gnome lord hits!",
+   "You hit the gnome lord!  The gnome lord hits!",
+   "You kill the gnome lord!",
+   "You kill the gnome lord!",
+   "You stop searching.  The ettin hits!  The ettin hits!",
+   "You stop searching.  The ettin hits!  The ettin hits!",
+   "You hit the ettin!  The ettin hits!  The ettin hits!",
+   "The ettin mummy hits!"
   ],
   "truncated": false,
-  "steps": 34011,
-  "keys": 34011,
-  "keyhash": "73325e45df2bb24d",
-  "secs": 32.8
+  "steps": 39427,
+  "keys": 39427,
+  "keyhash": "611416360ae62eb5",
+  "secs": 94.3
  },
  "61017": {
   "score": 6872.0,
@@ -411,7 +411,7 @@
   "steps": 7099,
   "keys": 7099,
   "keyhash": "26cb37be76e341fb",
-  "secs": 7.1
+  "secs": 19.5
  },
  "61018": {
   "score": 503.0,
@@ -434,7 +434,7 @@
   "steps": 7077,
   "keys": 7077,
   "keyhash": "21db3e1ec773c013",
-  "secs": 3.6
+  "secs": 10.5
  },
  "61019": {
   "score": 596.0,
@@ -457,7 +457,7 @@
   "steps": 2000,
   "keys": 2000,
   "keyhash": "7a67b77e600f0e67",
-  "secs": 2.0
+  "secs": 4.3
  },
  "61020": {
   "score": 6967.0,
@@ -480,7 +480,7 @@
   "steps": 8650,
   "keys": 8650,
   "keyhash": "575838ba90b245f9",
-  "secs": 8.2
+  "secs": 17.7
  },
  "61021": {
   "score": 1552.0,
@@ -503,7 +503,7 @@
   "steps": 5672,
   "keys": 5672,
   "keyhash": "db6b8347d26d82e5",
-  "secs": 5.3
+  "secs": 13.0
  },
  "61022": {
   "score": 2805.0,
@@ -526,30 +526,30 @@
   "steps": 6822,
   "keys": 6822,
   "keyhash": "3b4e737034eeaf7a",
-  "secs": 6.0
+  "secs": 13.9
  },
  "61023": {
-  "score": 9580.0,
-  "turns": 6635,
-  "max_depth": 12,
+  "score": 8674.0,
+  "turns": 6146,
+  "max_depth": 11,
   "xl": 8,
   "last_msgs": [
-   "There is a dwarf corpse here; eat it? [ynq] (n)",
-   "This dwarf corpse tastes okay.  You finish eating the dwarf corpse.",
-   "U - a pair of iron shoes.  V - a dwarvish cloak.  P - a white gem.",
-   "U - a pair of iron shoes.  V - a dwarvish cloak.  P - a white gem.",
-   "You stop searching.",
-   "You stop searching.",
-   "You hit the giant spider!  The giant spider bites!",
-   "The giant spider's bite was poisoned!  The giant spider bites!",
-   "The giant spider's bite was poisoned!",
-   "Valkyrie, your life force is running out."
+   "You hit the orc mummy!",
+   "You destroy the orc mummy!",
+   "You destroy the orc mummy!",
+   "You hit the leocrotta.",
+   "You hit the leocrotta.",
+   "You hit the leocrotta.  The leocrotta hits!  The leocrotta bites!",
+   "The leocrotta hits!",
+   "The leocrotta hits!",
+   "You kill the leocrotta!  The soldier ant misses!",
+   "The soldier ant stings!"
   ],
   "truncated": false,
-  "steps": 10876,
-  "keys": 10876,
-  "keyhash": "6208dae210efe612",
-  "secs": 10.6
+  "steps": 9581,
+  "keys": 9581,
+  "keyhash": "1364fabdb62bad3f",
+  "secs": 26.8
  },
  "61024": {
   "score": 26787.0,
@@ -572,30 +572,30 @@
   "steps": 13900,
   "keys": 13900,
   "keyhash": "d10d3beeebe7723f",
-  "secs": 15.6
+  "secs": 45.5
  },
  "61025": {
-  "score": 6428.0,
-  "turns": 4763,
+  "score": 6116.0,
+  "turns": 4762,
   "max_depth": 7,
   "xl": 8,
   "last_msgs": [
+   "In what direction?",
+   "The wand misses the water moccasin.  The water moccasin bites!",
    "The water moccasin bites!  The water moccasin bites!",
-   "The water moccasin's bite was poisoned!  The water moccasin misses!",
+   "The water moccasin bites!  The water moccasin's bite was poisoned!",
+   "The water moccasin misses!",
    "What do you want to zap? [jnoMV or ?*]",
    "In what direction?",
    "The wand hits the water moccasin!  The water moccasin bites!",
-   "The water moccasin bites!  The water moccasin bites!",
-   "What do you want to zap? [jnoMV or ?*]",
-   "In what direction?",
-   "The wand hits the water moccasin!  You kill the water moccasin!",
-   "The water moccasin bites!"
+   "The water moccasin bites!  The water moccasin's bite was poisoned!",
+   "You feel weaker!  The water moccasin bites!  The water moccasin bites!"
   ],
   "truncated": false,
-  "steps": 6655,
-  "keys": 6655,
-  "keyhash": "69e142102043e30e",
-  "secs": 6.6
+  "steps": 6653,
+  "keys": 6653,
+  "keyhash": "d12ab5331c2d115d",
+  "secs": 22.6
  },
  "61026": {
   "score": 6719.0,
@@ -618,7 +618,7 @@
   "steps": 8784,
   "keys": 8784,
   "keyhash": "b0a8a2cbd4669f97",
-  "secs": 9.1
+  "secs": 29.7
  },
  "61027": {
   "score": 7392.0,
@@ -641,7 +641,7 @@
   "steps": 8909,
   "keys": 8909,
   "keyhash": "5eb9008a8e8208f4",
-  "secs": 11.3
+  "secs": 38.0
  },
  "61028": {
   "score": 75817.0,
@@ -664,7 +664,7 @@
   "steps": 23026,
   "keys": 23026,
   "keyhash": "0f544dc15bc88820",
-  "secs": 36.8
+  "secs": 113.2
  },
  "61029": {
   "score": 1541.0,
@@ -687,30 +687,30 @@
   "steps": 3630,
   "keys": 3630,
   "keyhash": "9b84bc42d151e370",
-  "secs": 3.9
+  "secs": 11.9
  },
  "61030": {
-  "score": 32733.0,
-  "turns": 11399,
-  "max_depth": 16,
-  "xl": 10,
+  "score": 130546.0,
+  "turns": 17106,
+  "max_depth": 24,
+  "xl": 12,
   "last_msgs": [
-   "You have no free hand to write with!",
-   "You kill the killer bee!",
-   "You kill the killer bee!",
-   "You kill the killer bee!",
-   "You see here a killer bee corpse.",
-   "You see here a killer bee corpse.",
-   "You hit the queen bee!  The queen bee stings!  The queen bee stings!",
-   "The queen bee's sting was poisoned!",
-   "The queen bee's sting was poisoned!",
-   "You hit the queen bee!  The queen bee stings!  The queen bee stings!"
+   "The gremlin hits!  The gremlin misses!  The gremlin just misses!",
+   "The gremlin bites!  The gremlin hits!  The gremlin misses!",
+   "The gremlin misses!  The gremlin misses!  The gremlin misses!",
+   "The gremlin misses!  The gremlin misses!  The gremlin misses!",
+   "You kill the gremlin!",
+   "You kill the gremlin!",
+   "You kill the gremlin!  The gremlin hits!  The gremlin hits!",
+   "The gremlin misses!  The gremlin misses!  The gremlin hits!",
+   "The gremlin hits!  The gremlin misses!  The gremlin misses!",
+   "The gremlin misses!  The gremlin hits!  The gremlin bites!"
   ],
   "truncated": false,
-  "steps": 20405,
-  "keys": 20405,
-  "keyhash": "725d0c7756932948",
-  "secs": 26.9
+  "steps": 30407,
+  "keys": 30407,
+  "keyhash": "265a349dc1ee164f",
+  "secs": 156.3
  },
  "61031": {
   "score": 1962.0,
@@ -733,6 +733,6 @@
   "steps": 5766,
   "keys": 5766,
   "keyhash": "c26f5a3e17bce18e",
-  "secs": 5.1
+  "secs": 16.4
  }
 }

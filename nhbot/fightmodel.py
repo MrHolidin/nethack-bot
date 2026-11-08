@@ -126,8 +126,8 @@ def cast_profile(ad, ml, n, d, us):
       DEATH_TOUCH 378-396 kills unless magic resistance when rn2(ml) > 12; GEYSER 535-543 d(8, 6); FIRE_PILLAR
       544-559 d(8, 6) unless we resist fire; LIGHTNING 560-578 d(8, 6) unless reflection / shock resistance. The rest
       (stun, weaken, destroy armor, curse, summon, aggravate, paralyse, blind, confuse, haste, invisible) do no HP
-      damage here. us["blast"] (elem_dmg): {FIRE_PILLAR / LIGHTNING: the damage pmf of what that spell's
-      destroy_item calls do to our pack (pack_destroy)} -- added to the spell's, resisted or not (but for a
+      damage here. us["blast"] (an AD_CLRC caster's): {FIRE_PILLAR / LIGHTNING: the damage pmf of what that
+      spell's destroy_item calls do to our pack (pack_destroy)} -- added to the spell's, resisted or not (but for a
       reflected lightning bolt, 563-569)."""
     res = us["resists"]
     magic = "magic" in res
@@ -164,7 +164,7 @@ def cast_profile(ad, ml, n, d, us):
         else:
             q = none
         if blast is not None and ad == "CLRC" and s in blast and (s != LIGHTNING or "reflection" not in res):
-            q = np.convolve(q, blast[s])                    # 555-557, 574-575: our pack burns / is zapped (elem_dmg)
+            q = np.convolve(q, blast[s])                    # 555-557, 574-575: our pack burns / is zapped
             if len(q) > len(pmf):
                 pmf = np.concatenate([pmf, np.zeros(len(q) - len(pmf))])
         pmf[:len(q)] += p * q

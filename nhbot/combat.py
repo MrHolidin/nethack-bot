@@ -567,8 +567,7 @@ class CombatMixin:
         our_dmg = dice_pmf(RAY_DICE[kind][0], 6) if kind in RAY_DICE and not resisted else None
 
         p_charged = (self.wand_p_charged(it) if it is not None else 0.0) * self.our_state()["aim"]   # astray: wasted
-        pack = self.pack_profile()
-        blast = self.ray_blasts().get(kind) if self.opts.elem_dmg else None     # pack_destroy's table
+        blast = self.ray_blasts().get(kind)              # what it destroys in our pack (pack_destroy's table)
 
         def opening(rng, alive_at, apply):
             got = {"dmg": 0, "sleep": 0, "blind": False}
@@ -582,10 +581,7 @@ class CombatMixin:
                     if reflect:
                         return (True, True)
                     got["blind"] |= kind == "lightning"       # zap.c flashburn, resisted or not
-                    if self.opts.elem_dmg:
-                        got["dmg"] += cdf_draw(rng, blast) if blast is not None else 0
-                    else:
-                        got["dmg"] += self.pack_blast(kind, pack, prot, rng)
+                    got["dmg"] += cdf_draw(rng, blast) if blast is not None else 0
                     if maybe_death and not resisted:
                         got["dmg"] += 10 ** 4                 # judged as death (ray_risk does the same)
                     elif kind == "sleep" and not resisted:
