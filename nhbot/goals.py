@@ -80,6 +80,8 @@ class GoalsMixin:
             return self.box_targets(lv)
         if kind == "gold":
             m = G.KIND[lv.under] == G.GOLD
+        elif self.opts.pile_one:
+            return self.pile_mask(lv)
         else:
             m = G.ARMOR_GLYPH[lv.under] | G.FOOD_GLYPH[lv.under]
             m |= self.carry_targets(lv)
@@ -169,8 +171,11 @@ class GoalsMixin:
         pile = np.zeros_like(gold)
         if ok:
             im = passable & ~lv.shop
-            pile |= self.armor_targets(lv, G) & im
-            pile |= self.carry_targets(lv) & im
+            if self.opts.pile_one:
+                pile |= self.pile_mask(lv) & im
+            else:
+                pile |= self.armor_targets(lv, G) & im
+                pile |= self.carry_targets(lv) & im
         out["pile"] = pile
         out["altar"] = self.altar_mask(lv) & passable if ok else np.zeros_like(gold)
         # boxes: opened by housekeeping, so only with no hostile in view (its gate; boxes.box_goal_mask)

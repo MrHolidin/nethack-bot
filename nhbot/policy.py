@@ -399,14 +399,16 @@ class PolicyMixin:
 
     # ------------------------------------------------------------------ items and food
     def step_ammo_here(self, c):
-        """Missiles lying where we stand (our own thrown ones)."""
+        """Missiles lying where we stand (our own thrown ones). ammo_one: what take_ammo takes (pickup.ammo_want:
+        the stones we throw too, weapons class only) -- not a looser test of its own."""
         sh = self.seen_here
         y, x = c.y, c.x
         hw = self.here_window
         # the pile window lists what "Things that are here" leaves out
         txt = (sh[2] if sh else "") + (" | " + hw[2] if hw and sh and hw[:2] == sh[:2] else "")
         if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws and not c.lv.shop[y, x] \
-                and any(self.kind_of(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
+                and any((self.ammo_want(t) if self.opts.ammo_one else
+                         self.kind_of(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t))
                         for t in re.split(r" \| |You see here |\.$", txt) if t.strip()):
             self.seen_here = None
             self.take_ammo()

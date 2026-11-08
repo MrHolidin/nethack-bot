@@ -208,6 +208,19 @@ class PickupMixin:
             mask[p] = False
         return mask
 
+    def pile_mask(self, lv):
+        """pile_one: the piles worth a look -- the one mask explore walks to, housekeeping inspects (pile_to_inspect)
+        and the goal statistics count (goals.goal_raw): '[' piles, '%' food while we carry less than MAX_FOOD
+        pieces, what carry goes for, the corpses on what our kills carried; not in a shop, not looked at yet."""
+        mask = G.ARMOR_GLYPH[lv.under] | (CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH)[lv.under]
+        if self.food_count() < MAX_FOOD:
+            mask |= G.FOOD_GLYPH[lv.under]
+        for p in self.corpse_piles(lv):
+            mask[p] = True
+        for p in self.goal_closed_set("pile", lv.key):
+            mask[p] = False
+        return mask & ~lv.shop
+
     def corpse_piles(self, lv):
         """Squares of our kills (Level.kill_piles) where a corpse lies on top -- what the monster carried is
         under it, unseen. (A/B kill_site, with resuming an interrupted meal: +800 [-528, +2171], median
@@ -216,7 +229,10 @@ class PickupMixin:
 
     def pile_to_inspect(self, lv, y, x):
         """An armor / food / carried-class pile under us (or a corpse on what a kill carried) that we have not
-        looked at, outside a shop."""
+        looked at, outside a shop (pile_one: pile_mask -- food only while we carry less than MAX_FOOD, as explore
+        walks to it)."""
+        if self.opts.pile_one:
+            return bool(self.pile_mask(lv)[y, x])
         return bool((G.ARMOR_GLYPH[lv.under[y, x]] or G.FOOD_GLYPH[lv.under[y, x]]
                      or self.carry_glyph(lv.under[y, x]) or (y, x) in self.corpse_piles(lv))
                     and (y, x) not in self.goal_closed_set("pile", lv.key) and not lv.shop[y, x])
@@ -265,15 +281,17 @@ class PickupMixin:
             return self.take_reason(t) is not None
         self.take_here(want, "loot")
 
+    def ammo_want(self, t):
+        """A missile of ours to pick up: a missile weapon or a stone we throw, not for sale, not cursed."""
+        if "for sale" in t or CURSED_RE.search(t):
+            return False
+        ocls, typ = self.kind_of(t)
+        return (ocls == nh.WEAPON_CLASS and typ in MISSILE_TYPES) or (ocls == nh.GEM_CLASS and typ in THROW_STONE_TYPES)
+
     def take_ammo(self):
         """Ammo / retrieve: our missiles (and the stones we throw) here."""
-        def want(t):
-            if "for sale" in t or CURSED_RE.search(t):
-                return False
-            ocls, typ = self.kind_of(t)
-            return (ocls == nh.WEAPON_CLASS and typ in MISSILE_TYPES) or (ocls == nh.GEM_CLASS and typ in THROW_STONE_TYPES)
         if not self.merch_risk(self.level(), self.pos()):
-            self.take_here(want, "ammo")
+            self.take_here(self.ammo_want, "ammo")
 
     def take_here(self, want, site):
         """Pick up what want(text) accepts; a lone item comes without a menu whatever it is: put it

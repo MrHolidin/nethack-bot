@@ -38,6 +38,13 @@ DEFAULTS = {
     "dmg_cube": False,         # A/B: a gelatinous cube's passive paralysis d(1, 4), and on our misses too (uhitm.c
                                #      passive) (nhbot.danger monster_paralysis / the fight simulator)
     "dmg_cold": False,         # A/B: a cold hit zeroed only when we resist cold (our_resists), not always
+    "posterior_one": False,    # A/B: scroll_is_good / unknown_readable read value.type_posterior (known types left out,
+                               #      oc_prob prior, deductions) like every other item decision, not pricemem's uniform
+                               #      price-only posterior (nhbot.scrolls)
+    "ammo_one": False,         # A/B: step_ammo_here stops for what take_ammo takes (pickup.ammo_want: the flint / rocks
+                               #      we throw too) (nhbot.policy)
+    "pile_one": False,         # A/B: one pile mask (pickup.pile_mask) for explore's walk, the inspection where we stand and
+                               #      the goal statistics -- food piles only while we carry less than MAX_FOOD (nhbot.pickup)
     "history_always": False,   # A/B: perception and the fight record (danger_tick -- our hits counted for win_prob --,
                                #      summary 'hist') every tick before the steps that act, not only in ticks no
                                #      step before 'history' (pray, heal, blind, ...) acted in (nhbot.policy.tick)
