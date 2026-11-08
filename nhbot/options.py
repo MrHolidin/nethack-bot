@@ -24,6 +24,12 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "keep_rule": False,        # A/B: one rule what we keep (value.keep_reason / keep_plan) for est_value, selling,
+                               #      throwing (expendables) and taking: worn, the alternate weapon, water, one digger
+                               #      (taken now: "digger"), the best wield candidate (+ a long sword for Excalibur),
+                               #      MISSILE_KEEP missile pieces (no crysknife), MAX_FOOD pieces of food we eat (no
+                               #      corpses, no tins), what carry.needed keeps; no lamp to rub thrown, no water sold
+                               #      (re-run on new seeds / base after rejection: -731 [-2505, +1053])
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
