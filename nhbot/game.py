@@ -335,12 +335,16 @@ class GameMixin:
         """Every logged message, parsed once (events.Message), to each domain in this order: the raw-text readers get
         the text, the others read its events."""
         m = msg.text
+        if msg.repeat:
+            self.msg_audit["repeat"] += 1
+            if self.opts.msg_dedup:
+                return                   # msg_dedup: shown again, said once -- logged, read by no handler
         lv = self.levels.get(self.cur_key) if self.cur_key else None
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
-        # the message logged at the step after attack()'s 'F' (the one before, shown again: events.RESHOW_KEYS) is not
-        # read by focus and the destroyed-item count
-        after_attack_f = self.steps == self.acts.attack_step + 1
+        # without msg_dedup: the message logged at the step after attack()'s 'F' (the one before, shown again:
+        # events.RESHOW_KEYS) is not read by focus and the destroyed-item count
+        after_attack_f = not self.opts.msg_dedup and self.steps == self.acts.attack_step + 1
         self.msg_survival(m)
         self.msg_enchant(m)
         if not after_attack_f:
