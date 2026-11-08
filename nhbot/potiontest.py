@@ -37,7 +37,7 @@ class PotionTestMixin:
 
     def potion_to_test(self):
         for it in self.items():
-            if it.ocls != nh.POTION_CLASS or "unpaid" in it.text:
+            if it.ocls != nh.POTION_CLASS or it.unpaid:
                 continue
             key = appearance(it.text)
             if key is None or key in self.quaff_tested:

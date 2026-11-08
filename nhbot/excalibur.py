@@ -296,7 +296,7 @@ class ExcaliburMixin:
         container or light, no long sword; what water won't rust first (a rusting one makes half the dips do
         nothing else), then gems and stones."""
         cands = [it for it in self.items() if it.ocls in JUNK_CLASSES and not it.on_body and not it.alternate
-                 and not it.quivered and "unpaid" not in it.text and not self.needed(it)
+                 and not it.quivered and not it.unpaid and not self.needed(it)
                  and not any(w in it.text for w in CONTAINERS) and not re.search(r"\blong sword\b", it.text)]
         return min(cands, key=lambda it: (rusts(it.text), JUNK_CLASSES.index(it.ocls)), default=None)
 

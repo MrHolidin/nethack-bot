@@ -128,7 +128,7 @@ class AltarMixin:
         return [it for it in self.items()
                 if it.ocls != nh.COIN_CLASS and not it.on_body and it.key not in self.cant_drop
                 and not BUC_RE.search(it.text) and buc_key(it.text) not in self.altar_known
-                and "unpaid" not in it.text]
+                and not it.unpaid]
 
     def altar_mask(self, lv):
         """Altar squares to walk to: something to test, or our things lying on one."""

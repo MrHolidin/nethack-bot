@@ -95,7 +95,7 @@ class JewelryMixin:
     def unknown_jewelry(self):
         """Amulets and rings worth a scroll of identify: an unknown look, or a ring of a charged type we would
         wear whose charge we don't know."""
-        return [it for it in self.items() if "unpaid" not in it.text and to_identify(it.ocls, it.text)]
+        return [it for it in self.items() if not it.unpaid and to_identify(it.ocls, it.text)]
 
     def is_identify(self, text):
         if IDENTIFY_RE.search(text):
@@ -106,7 +106,7 @@ class JewelryMixin:
         return bool(post) and set(post) == {"identify"}
 
     def identify_scrolls(self):
-        return [it for it in self.items() if it.ocls == nh.SCROLL_CLASS and "unpaid" not in it.text
+        return [it for it in self.items() if it.ocls == nh.SCROLL_CLASS and not it.unpaid
                 and self.is_identify(it.text)]
 
     def identify_wanted(self):
@@ -140,7 +140,7 @@ class JewelryMixin:
         for ocls, slots in ((nh.AMULET_CLASS, 1), (nh.RING_CLASS, 2)):
             on = [it for it in items if it.ocls == ocls and (it.worn or it.ring_on)]
             cands = [(wear_rank(it), it) for it in items
-                     if it.ocls == ocls and not it.on_body and not it.cursed and "unpaid" not in it.text
+                     if it.ocls == ocls and not it.on_body and not it.cursed and not it.unpaid
                      and wear_rank(it) is not None and it.letter not in self.jewelry_refused
                      and not is_regen(it)]                                  # regen_step's ring
             if not cands:
@@ -175,7 +175,7 @@ class JewelryMixin:
             self.jewelry_stats["regen_off"] += 1
             return self.jewelry_remove(on[0])
         if not full and not on and sum(it.ring_on for it in rings) < 2:
-            off = [it for it in regen if not it.cursed and "unpaid" not in it.text]
+            off = [it for it in regen if not it.cursed and not it.unpaid]
             if off:
                 self.jewelry_stats["regen_on"] += 1
                 return self.jewelry_put_on(off[0])
@@ -232,7 +232,7 @@ class JewelryMixin:
         that are not identify or good by price, unknown potions, unknown wands. One group only: the game
         identifies the picks in inventory order up to its limit, so a lower group picked too could take the
         place of a higher one."""
-        mine = [it for it in self.items() if "unpaid" not in it.text and appearance(it.text) is not None]
+        mine = [it for it in self.items() if not it.unpaid and appearance(it.text) is not None]
         groups = [self.unknown_jewelry(),
                   [it for it in mine if it.ocls == nh.SCROLL_CLASS and not self.scroll_is_good(it.text)
                    and not self.is_identify(it.text)],
@@ -271,7 +271,7 @@ class JewelryMixin:
     def shop_buy_step(self, lv):
         """On a shop visit (shop.shop_step, after selling): pay for what we picked up, else go for an identify
         scroll for sale, else read the tags of the scrolls not looked at yet. True if it acted."""
-        unpaid = [it for it in self.items() if "unpaid" in it.text]
+        unpaid = [it for it in self.items() if it.unpaid]
         if unpaid:
             self.cur_act = "buy"
             if self.pay_fails >= 3:                # can't pay: put it back

@@ -154,18 +154,23 @@ class SurvivalMixin:
         xl = INTRINSIC_FAST_XL.get(self.role or "")
         return xl is not None and self.bl(nh.NLE_BL_XP) >= xl
 
+    def eat_prompt(self):
+        """'e', declining the food lying here ("There is a jackal corpse here; eat it?", eat.c floorfood): True if
+        the inventory prompt "What do you want to eat?" is open."""
+        self.press("e", expect_prompt=True)
+        for _ in range(3):
+            m = self.message().lower()
+            if self.obs["misc"][0] and "eat" in m and "here" in m:
+                self.press("n", expect_prompt=True)
+                continue
+            break
+        return "what do you want to eat" in self.message().lower()
+
     def eat_from_inventory(self):
         for letter, ocls, s in self.inventory():
             if ocls != nh.FOOD_CLASS or not self.edible_now(s):
                 continue
-            self.press("e", expect_prompt=True)
-            for _ in range(3):
-                m = self.message().lower()
-                if self.obs["misc"][0] and "eat" in m and "here" in m:
-                    self.press("n", expect_prompt=True)
-                    continue
-                break
-            if "what do you want to eat" in self.message().lower():
+            if self.eat_prompt():
                 self.press(letter)
                 table = FOOD_NUTRITION_FIXED if self.opts.food_facts else FOOD_NUTRITION
                 name = base_name(s)[2]

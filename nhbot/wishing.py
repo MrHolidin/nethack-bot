@@ -52,7 +52,7 @@ class WishMixin:
     # ------------------------------------------------------------------ lamps
     def lamp_to_rub(self):
         return next((it for it in self.items() if self.is_lamp(it) and it.letter not in self.lamp_done
-                     and not it.cursed and "unpaid" not in it.text), None)
+                     and not it.cursed and not it.unpaid), None)
 
     def lamp_step(self):
         """Nothing threatening us (the caller checks): rub the next lamp, or wield the weapon back when done.

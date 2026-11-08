@@ -132,14 +132,7 @@ class TinMixin:
         letter = self.tin_letters()[0]
         self.cur_act = "tin"
         seq0 = self.msg_seq
-        self.press("e", expect_prompt=True)
-        for _ in range(3):
-            m = self.message().lower()
-            if self.obs["misc"][0] and "here" in m and "eat" in m:
-                self.press("n", expect_prompt=True)      # something on the floor here: not that
-                continue
-            break
-        if "what do you want to eat" not in self.message().lower():
+        if not self.eat_prompt():
             self.settle()
             return True
         self.press(letter, expect_prompt=True)

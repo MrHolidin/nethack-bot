@@ -54,6 +54,11 @@ class Item:
         return self.wield is not None
 
     @property
+    def unpaid(self):
+        """Picked up in a shop and not paid for yet (objnam.c doname_base: " (unpaid, N zorkmids)")."""
+        return "unpaid" in self.text
+
+    @property
     def on_body(self):
         """Can't be dropped / thrown / sold without taking it off or unwielding it first."""
         return self.wield is not None or self.worn or self.ring_on

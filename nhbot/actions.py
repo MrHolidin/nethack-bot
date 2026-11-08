@@ -1,10 +1,9 @@
 """The primitive game actions. Each one sends its keys and does its own bookkeeping (what we attacked, where a
 staircase we took leads, what we threw and where to pick it up, what a zap told, where we dropped something), so
 the steps above never press these command keys themselves."""
-import re
-
 from nhbot.consts import DELTA2KEY
 from nhbot.goals import GOALS
+from nhbot.items import base_name
 
 
 class ActionsMixin:
@@ -116,9 +115,7 @@ class ActionsMixin:
     def drop_units(self, letter, n=None):
         """Drop n of a stack (all if None); remember the square."""
         item = next((it for it in self.items() if it.letter == letter), None)
-        s = item.text if item else ""
-        m = re.match(r"^(\d+) ", s)
-        self.last_drop_qty = n or (int(m.group(1)) if m else 1)
+        self.last_drop_qty = n or (base_name(item.text)[0] if item else 1)
         self.goal_close("pile", self.level().key, self.pos())      # never come back for what we dropped
         seq0 = self.msg_seq
         if not self.ask("d", "drop"):

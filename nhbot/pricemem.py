@@ -196,14 +196,13 @@ class PriceMemoryMixin:
         self.for_sale = {}           # (level key, square) -> {floor text: price} from the tags read there
 
     def _record(self, text, kind, price, rid, qty=None):
+        """One price reading of the item named text; qty: the stack size a sell offer leaves out of its text
+        (shk.c:3253 "for your <xname>"), else the count the text starts with."""
         key = appearance(text)
         if key is None:
             return
-        m = re.match(r"^(\d+) ", text.strip())
-        if m:
-            qty = int(m.group(1))
-        elif qty is None:
-            qty = 1
+        if qty is None:
+            qty = base_name(text)[0]
         r = (kind, price, qty, self.bl(nh.NLE_BL_CHA), self.sucker())
         bucket = self.price_reads.setdefault(key, {})
         if rid not in bucket:
