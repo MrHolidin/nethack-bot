@@ -32,7 +32,7 @@ from nhbot.items import base_name, erosion
 from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_REGEN, PM_BY_NAME, PM_INDEX, PM_INDICES
-from nhbot.weapondice import WEAPON_DICE, WEAPON_SKILL, skill_dmg_bonus, skill_hit_bonus, str_dbon, to_hit_abon
+from nhbot.weapondice import WEAPON_DICE, str_dbon, to_hit_abon
 from nhbot.rays import RAY_RESIST, zap_hit_prob
 
 MELEE = {"CLAW", "BITE", "KICK", "BUTT", "TUCH", "STNG", "HUGS", "WEAP", "TENT"}
@@ -244,40 +244,15 @@ class DangerMixin:
         name = WEAPON_NAME_OF.get(name, name)
         return (name if name in WEAPON_DICE else None), (ench or 0), (0, 0)
 
-    def our_skill_bonus(self):
-        """skill_bonus: (to-hit, damage) bonus of our skill with the weapon in hand (weapon.c weapon_hit_bonus /
-        weapon_dam_bonus; weapondice.skill_hit_bonus) -- bare hands: bare handed combat, a Monk's or Samurai's
-        martial arts; a wielded non-weapon: none (P_NONE). (0, 0) without the flag or while the levels are unread."""
-        if not self.opts.skill_bonus or self.skills is None:
-            return 0, 0
-        it = next((i for i in self.items() if i.wielded), None)
-        if it is None:
-            martial = self.role in ("Monk", "Samurai")            # skills.h:82 martial_bonus
-            lvl = self.skill_level("martial arts" if martial else "bare handed combat")
-            return skill_hit_bonus(lvl, True, martial), skill_dmg_bonus(lvl, True, martial)
-        name = base_name(it.text)[2]
-        skill = WEAPON_SKILL.get("long sword" if "Excalibur" in it.text else WEAPON_NAME_OF.get(name, name))
-        if skill is None:
-            return 0, 0
-        lvl = self.skill_level(skill)
-        return skill_hit_bonus(lvl), skill_dmg_bonus(lvl)
-
-    def our_hit_prob(self, name, pos=None):
-        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20).
-        skill_bonus: + our weapon skill (our_skill_bonus); helpless_bonus, the monster at pos: +4 helpless -- our
-        sleep ray put it down (asleep: zap.c sleep_monst clears mcanmove) --, +2 fleeing (threats.fleeing)
-        (uhitm.c:276-291)."""
+    def our_hit_prob(self, name):
+        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20)."""
         pm = PM_BY_NAME[name]
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
         abon = to_hit_abon(st, dx, xl)
         w, ench, (hit_die, _) = self.our_weapon()
         tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
-        tmp += self.our_skill_bonus()[0]
-        if self.opts.helpless_bonus:
-            lv = self.levels.get(self.cur_key)
-            if pos is not None and lv is not None:
-                tmp += 4 if self.asleep(lv, pos) else 0
-                tmp += 2 if self.fleeing(pos) else 0
+        # (A/B skill_bonus -- our to-hit and damage counted our weapon skill: -577 [-1832, +703], median 7134)
+        # (A/B helpless_bonus -- to-hit +4 on monsters we slept, +2 on fleeing ones: -1049 [-1988, -67], median 7561)
         cap = self.bl(nh.NLE_BL_CAP)
         if cap:
             tmp -= cap * 2 - 1                    # encumbrance: near_capacity()
@@ -287,8 +262,7 @@ class DangerMixin:
 
     def our_damage_pmf(self, name):
         """weapon.c dmgval -- the small / large die + enchantment (not below 0), then less the erosion (rusty,
-        corroded, ...: 1..3, not below 1) -- plus dbon (skill_bonus: and the skill's bonus), at least 1 (uhitm.c hmon); plus
-        an artifact's damage die."""
+        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die."""
         pm = PM_BY_NAME[name]
         dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
         w, ench, (_, dmg_die) = self.our_weapon()
@@ -296,16 +270,15 @@ class DangerMixin:
         eros = erosion(wielded.text) if w and wielded is not None else 0
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
-        sk = self.our_skill_bonus()[1]           # skill_bonus: the skill's damage bonus, only on a base roll above 1
-        out = np.zeros(max(2, d + max(ench, 0) + dbon + max(sk, 0) + 1))      # (uhitm.c:711, 769, 1111)
+        out = np.zeros(max(2, d + max(ench, 0) + dbon + 1))
         for v in range(1, d + 1):
             dv = max(0, v + ench)
             if dv > 0:
                 dv = max(1, dv - eros)
-            out[max(1, dv + dbon + (sk if dv > 1 else 0))] += base[v]
+            out[max(1, dv + dbon)] += base[v]
         return conv(out, dice_pmf(1, dmg_die)) if dmg_die else out
 
-    def our_kill_prob(self, name, hits, pos=None):
+    def our_kill_prob(self, name, hits):
         """P(this attack kills it): it took `hits` hits of ours already and lives; its HP d(level, 8)."""
         pm = PM_BY_NAME.get(name)
         if pm is None:
@@ -322,11 +295,11 @@ class DangerMixin:
         if alive <= 0:
             return 1.0                                      # it should be dead by now: a tougher one
         dies = sum(hp[h] * (cdf(dk, h) - cdf(dk1, h)) for h in range(len(hp)) if hp[h])
-        return self.our_hit_prob(name, pos) * dies / alive
+        return self.our_hit_prob(name) * dies / alive
 
     def danger_parts(self, pos, name):
         pmf, inst = self.monster_round(name)
-        pk = self.our_kill_prob(name, self.our_hits.get((self.cur_key, pos), 0), pos) if name in PM_BY_NAME else 0.0
+        pk = self.our_kill_prob(name, self.our_hits.get((self.cur_key, pos), 0)) if name in PM_BY_NAME else 0.0
         lv = self.levels.get(self.cur_key)
         scared = lv is not None and self.pos() in lv.elbereth and self.respects(pos, name)
         return pos, pmf, inst, pk, scared
@@ -416,7 +389,7 @@ class DangerMixin:
                 continue
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
-            mons.append(FightMon(max(lev, 0), self.our_hit_prob(name, pos), self.our_damage_pmf(name), rnd_pmf, inst,
+            mons.append(FightMon(max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
                                  self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove,
                                  name, self.monster_taint(name), self.monster_turn_pmf(name, 4),
                                  bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),

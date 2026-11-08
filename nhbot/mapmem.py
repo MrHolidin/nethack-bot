@@ -151,13 +151,14 @@ class MapMixin:
     def update_memory(self):
         """First thing every tick: what the screen shows now into this level's memory; a shop greeted in the dark grows
         as its floor shows (shop_regrow); the arrival on another level noted (note_arrival). The level.
-        engulf_memory: not while engulfed -- the blank map (display.c swallowed: everything but the engulfer cleared)
-        wrote solid rock over every square remembered, the terrain layer too: a staircase under an item, a fountain,
-        what feature_here / a stair arrival had taught was gone for good (79276: the way down, under a large box)."""
+        Not while engulfed -- the blank map (display.c swallowed: everything but the engulfer cleared) wrote solid
+        rock over every square remembered, the terrain layer too: a staircase under an item, a fountain, what
+        note_feature_here / a stair arrival had taught was gone for good (79276: the way down, under a large box).
+        (A/B engulf_memory: -312 [-696, +73], median 7567 -> 7674, 57 of 1000 changed)"""
         lv = self.level()
         g = self.obs["glyphs"]
         known = ~G.TRANSIENT[g]
-        if self.opts.engulf_memory and self.engulfed():
+        if self.engulfed():
             known = np.zeros_like(known)
         lv.under[known] = g[known]
         feat = known & G.TERRAIN[g]
@@ -199,8 +200,6 @@ class MapMixin:
         k = G.KIND[lv.under]
         tk = G.KIND[lv.terrain]
         hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
-        if self.opts.look_under:
-            hidden |= G.STATUE_GLYPH[lv.under] & G.IS_TERRAIN[tk]     # look_under: a statue hides it too
         if hidden.any():
             # nothing lies on a closed door: an item there means it was opened or broken since we saw it
             tk = np.where(tk == G.DOOR_CLOSED, G.DOOR_OPEN, tk)
@@ -381,13 +380,11 @@ class MapMixin:
             lv.set_terrain(self.pos(), UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH)
 
     def note_feature_here(self, text):
-        """feature_here: "There is a staircase down here." (invent.c look_here, said when something lies on the square
-        we step on -- first on the top line, or atop the "Things that are here" window; game.settle reads both) into the
-        terrain layer under us: an
-        item on a staircase hid it -- kinds read the item, and the level stayed "no way down" for thousands of turns
-        searching (79337, 79099, 79276: the true down staircase under an item we had stood on)."""
-        if not (self.opts.feature_here or self.opts.look_under):
-            return
+        """"There is a staircase down here." (invent.c look_here, said when something lies on the square we step on --
+        first on the top line, or atop the "Things that are here" window; game.settle reads both) into the terrain
+        layer under us: an item on a staircase hid it -- kinds read the item, and the level stayed "no way down" for
+        thousands of turns searching (79337, 79099, 79276: the true down staircase under an item we had stood on).
+        (A/B feature_here: -731 [-1485, +23], median 7567 -> 7772, 168 of 1000 changed)"""
         lv = self.levels.get((self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)))
         if lv is None:
             return
@@ -396,7 +393,7 @@ class MapMixin:
             pos = self.pos()
             if lv.terrain[pos] != g:
                 lv.terrain[pos] = g
-                self.map_stats["feature_here"] += 1
+                self.map_stats["feature_noted"] += 1
 
     def msg_map(self, m, lv):
         """What a message tells about the map: locked doors, squares we can't enter, stairs that aren't."""

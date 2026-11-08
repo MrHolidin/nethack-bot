@@ -24,29 +24,6 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    "spore_range": False,      # A/B: a gas spore is thrown at from 2 on (its explosion covers 3x3, explode.c), not 3
-    "shooter_range": False,    # A/B: a shooter hunted within 7 (m_lined_up: distmin < BOLT_LIM), not 8 (nhbot.combat)
-    "skill_bonus": False,      # A/B: our to-hit / damage count our weapon skill (#enhance read, weapon.c) (nhbot.danger)
-    "helpless_bonus": False,   # A/B: our to-hit +4 on one our sleep ray put down, +2 on one that turned to flee
-                               #      (uhitm.c:276-291; threats.fleeing) (nhbot.danger)
-    "melee_policy": False,     # A/B: one (fight, avoid) answer per monster (perception.melee_policy) for avoid_cells,
-                               #      adjacent_hostiles and unblock_step: on a desperate level a never-melee monster is
-                               #      walked round below 90% HP too (no walking into a jelly we won't hit). (With the
-                               #      shooting below in it: -2813 [-4546, -1050], 877 games changed -- split.)
-    "shoot_avoided": False,    # A/B: missiles (ranged_target, unblock_step) at every avoided monster that is not
-                               #      peaceful (shoot_cells), not only RANGED_TARGETS -- and never at the Oracle
-    "spore_elb": False,        # A/B: a gas spore next to us blocking the only way (unblock_step), too close to throw at:
-                               #      Elbereth written and waited on until it drifts off (combat.spore_back_off)
-    "feature_here": False,     # A/B: "There is a staircase down here." (look_here, something on the square) into the
-                               #      terrain layer: a staircase under an item is a staircase (mapmem.note_feature_here)
-    "engulf_memory": False,    # A/B: the map memory is not written while engulfed (the blank screen wiped the level's
-                               #      memory, its terrain layer too) (mapmem.update_memory)
-    "look_under": False,       # A/B: no way down known, nothing left to explore: stand once on every item / statue square
-                               #      before searching -- the staircase may be under it (explore.look_under_step; reads
-                               #      "There is a staircase down here." as feature_here does; a statue hides terrain)
-    "drink_prompt": False,     # A/B: 'q' on a fountain / sink answers "Drink from the fountain?" 'n' and goes on to the
-                               #      potion question -- the heal / quaff_test steps typed the potion letter into it
-                               #      (game.ask_drink)
     # split from shop_facts (-1104 [-2164, -79], median 7726 -> 7696, 314 of 1000 changed; both parts at once):
     "shop_buys_facts": False,  # A/B: what a shop buys from shknam.c saleable (quality apparel: wands, leather gloves,
                                #      elven cloaks only; lighting: candles, lamps, potions of oil; the health food

@@ -3,11 +3,6 @@ side here, named by what they mean. Each keeps the exact pattern of the module t
 noted, so the readings can be merged knowingly later."""
 import re
 
-# ---------------------------------------------------------------- a monster turns to flee
-# FLEE_RE (threats.msg_threat, helpless_bonus: our to-hit +2 on a fleeing monster): monmove.c:306 monflee's message, printed
-#   only as it starts fleeing (seen, not fleeing already)
-FLEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) turns to flee\.")
-
 # ---------------------------------------------------------------- attacks on us: one table, one parser
 # How the game tells that a monster attacks US, subject first ("The <name>", "It" unseen, "Something", a proper name
 # -- a shopkeeper, a priest). A monster-vs-monster line (mhitm.c) names its target after the verb and has no '!'

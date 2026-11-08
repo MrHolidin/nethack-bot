@@ -46,7 +46,7 @@ UPSTAIR_GLYPH = nh.GLYPH_CMAP_OFF + 23
 DOWNSTAIR_GLYPH = nh.GLYPH_CMAP_OFF + 24
 ALTAR_GLYPH = nh.GLYPH_CMAP_OFF + 27
 FOUNTAIN_GLYPH = nh.GLYPH_CMAP_OFF + 31
-# feature_here: invent.c look_here "There is <dfeature> here." (dfeature_at: defsyms' explanations) -> its cmap glyph
+# mapmem.note_feature_here: invent.c look_here "There is <dfeature> here." (dfeature_at: defsyms' explanations) -> its cmap glyph
 FEATURE_HERE_RE = re.compile(r"There is an? (staircase down|staircase up|ladder down|ladder up|fountain|sink|"
                              r"opulent throne|grave|altar)\b[^.]* here\.")
 FEATURE_GLYPH = {"staircase up": nh.GLYPH_CMAP_OFF + 23, "staircase down": nh.GLYPH_CMAP_OFF + 24,

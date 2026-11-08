@@ -129,13 +129,11 @@ class GameMixin:
         return False
 
     def ask_drink(self):
-        """'q' up to "What do you want to drink?": True if that question came (ask). drink_prompt: on a fountain / sink
-        the game asks first "Drink from the fountain?" (potion.c:501, 510) -- answered 'n'; before, ask took that
-        question for the item prompt ("drink" in it) and typed the potion's letter there: no potion drunk and the
-        step done again every tick (455 quaffs in a game), a letter 'y' drank from the fountain (water moccasins,
-        a water demon)."""
-        if not self.opts.drink_prompt:
-            return self.ask("q", "drink")
+        """'q' up to "What do you want to drink?": True if that question came (ask). On a fountain / sink the game
+        asks first "Drink from the fountain?" (potion.c:501, 510) -- answered 'n'; before, ask took that question for
+        the item prompt ("drink" in it) and typed the potion's letter there: no potion drunk and the step done again
+        every tick (455 quaffs in a game), a letter 'y' drank from the fountain (water moccasins, a water demon).
+        (A/B drink_prompt: +0.1 [0, +0.2], median 7567 -> 7567, 2 of 1000 changed)"""
         self.press("q", expect_prompt=True)
         if "drink from the" in self.message().lower() and self.obs["misc"][0]:
             self.msg_audit["drink_from_declined"] += 1

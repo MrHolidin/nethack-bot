@@ -20,30 +20,30 @@
   "steps": 14788,
   "keys": 14788,
   "keyhash": "d289ba23db1c5233",
-  "secs": 13.3
+  "secs": 12.6
  },
  "61001": {
-  "score": 53999.0,
-  "turns": 32495,
+  "score": 52568.0,
+  "turns": 34363,
   "max_depth": 11,
   "xl": 11,
   "last_msgs": [
-   "You miss the Woodland-elf.  The Woodland-elf thrusts his elven spear.",
-   "The Woodland-elf hits!  You can hear again.",
-   "The Woodland-elf hits!  You can hear again.",
-   "You faint from lack of food.",
-   "The Woodland-elf thrusts his elven spear.  The Woodland-elf hits!",
-   "The Woodland-elf thrusts his elven spear.  The Woodland-elf hits!",
-   "The Woodland-elf thrusts his elven spear.  The Woodland-elf hits!",
-   "The Woodland-elf thrusts his elven spear.  The Woodland-elf hits!",
-   "The Woodland-elf thrusts his elven spear.  The Woodland-elf hits!",
-   "The Woodland-elf thrusts his elven spear.  The Woodland-elf hits!"
+   "You hit the mumak!  The mumak butts!  The mumak bites!",
+   "You hit the mumak.",
+   "You hit the mumak.",
+   "You miss the mumak.",
+   "You miss the mumak.",
+   "You hit the mumak!  The mumak butts!  The mumak misses!",
+   "You hit the mumak!  The mumak butts!  The mumak misses!",
+   "You hit the mumak.",
+   "You hit the mumak.",
+   "You hit the mumak!  The mumak butts!"
   ],
   "truncated": false,
-  "steps": 72207,
-  "keys": 72207,
-  "keyhash": "6c11d4b111aa8640",
-  "secs": 113.2
+  "steps": 82497,
+  "keys": 82497,
+  "keyhash": "23494a4dd33c38f2",
+  "secs": 73.4
  },
  "61002": {
   "score": 1075.0,
@@ -66,7 +66,7 @@
   "steps": 2653,
   "keys": 2653,
   "keyhash": "927a0ae5352b7479",
-  "secs": 2.5
+  "secs": 2.4
  },
  "61003": {
   "score": 39384.0,
@@ -89,7 +89,7 @@
   "steps": 31750,
   "keys": 31750,
   "keyhash": "ce87959f5b594913",
-  "secs": 79.4
+  "secs": 39.8
  },
  "61004": {
   "score": 948.0,
@@ -112,7 +112,7 @@
   "steps": 2871,
   "keys": 2871,
   "keyhash": "1385aee64ac45d61",
-  "secs": 6.3
+  "secs": 3.0
  },
  "61005": {
   "score": 1472.0,
@@ -135,7 +135,7 @@
   "steps": 2825,
   "keys": 2825,
   "keyhash": "a983fb1315095b95",
-  "secs": 5.0
+  "secs": 2.7
  },
  "61006": {
   "score": 1031.0,
@@ -158,30 +158,30 @@
   "steps": 3194,
   "keys": 3194,
   "keyhash": "4ddd294ddfd6b391",
-  "secs": 5.9
+  "secs": 2.4
  },
  "61007": {
-  "score": 60272.0,
-  "turns": 13300,
-  "max_depth": 19,
-  "xl": 11,
+  "score": 7606.0,
+  "turns": 7190,
+  "max_depth": 10,
+  "xl": 5,
   "last_msgs": [
-   "Never mind.",
-   "Drink from the fountain? [yn] (n)",
-   "Drink from the fountain? [yn] (n)",
-   "What do you want to drink? [ino or ?*]",
-   "Never mind.",
-   "Drink from the fountain? [yn] (n)",
-   "Drink from the fountain? [yn] (n)",
-   "What do you want to drink? [ino or ?*]",
-   "Never mind.",
-   "The water moccasin bites!"
+   "The vampire lord bites!  The vampire lord hits!",
+   "The vampire lord bites!",
+   "The vampire lord bites!",
+   "You miss the vampire lord.  The vampire lord hits!",
+   "The vampire lord bites!",
+   "The vampire lord bites!",
+   "You miss the vampire lord.  The vampire lord hits!",
+   "The vampire lord bites!  Farvel level 6.",
+   "The vampire lord bites!  Farvel level 6.",
+   "You miss the vampire lord.  The vampire lord hits!"
   ],
   "truncated": false,
-  "steps": 23487,
-  "keys": 23487,
-  "keyhash": "1dc6f14ef2abcf92",
-  "secs": 97.6
+  "steps": 14030,
+  "keys": 14030,
+  "keyhash": "f0e3b7fd95e836a5",
+  "secs": 11.8
  },
  "61008": {
   "score": 107504.0,
@@ -204,7 +204,7 @@
   "steps": 31778,
   "keys": 31778,
   "keyhash": "ad27884618f7c1d4",
-  "secs": 128.2
+  "secs": 64.2
  },
  "61009": {
   "score": 14636.0,
@@ -227,7 +227,7 @@
   "steps": 8865,
   "keys": 8865,
   "keyhash": "1a0598d9ec3cd829",
-  "secs": 18.6
+  "secs": 8.8
  },
  "61010": {
   "score": 329.0,
@@ -250,7 +250,7 @@
   "steps": 1096,
   "keys": 1096,
   "keyhash": "9ba1051aff83c813",
-  "secs": 1.9
+  "secs": 1.0
  },
  "61011": {
   "score": 6879.0,
@@ -273,7 +273,7 @@
   "steps": 13028,
   "keys": 13028,
   "keyhash": "5b63a91fe726bad2",
-  "secs": 21.3
+  "secs": 11.2
  },
  "61012": {
   "score": 5833.0,
@@ -296,30 +296,30 @@
   "steps": 5722,
   "keys": 5722,
   "keyhash": "ee729ce62eab3545",
-  "secs": 13.9
+  "secs": 6.9
  },
  "61013": {
-  "score": 34899.0,
-  "turns": 10569,
+  "score": 34553.0,
+  "turns": 9800,
   "max_depth": 18,
   "xl": 10,
   "last_msgs": [
-   "The magic missile hits the rock troll!",
-   "The magic missile hits the gnome king!  The magic missile bounces!",
-   "The magic missile bounces!  The magic missile hits the hill orc!",
-   "What do you want to zap? [iuEN or ?*]",
+   "What do you want to zap? [bizEL or ?*]",
    "In what direction?",
-   "The magic missile misses the rock troll.",
-   "The magic missile hits the gnome king!  The magic missile bounces!",
-   "The magic missile bounces!  The magic missile hits the hill orc.",
-   "The cockatrice bites!  The cockatrice touches you!",
-   "The rock troll hits!  The rock troll hits!"
+   "You kill the hobgoblin!",
+   "You hit the gnome king!  The gnome king hits!",
+   "What do you want to zap? [bizEL or ?*]",
+   "In what direction?",
+   "The magic missile hits the gnome king.",
+   "What do you want to zap? [bizEL or ?*]",
+   "In what direction?",
+   "The magic missile hits the gnome king.  The gnome king hits!"
   ],
   "truncated": false,
-  "steps": 14307,
-  "keys": 14307,
-  "keyhash": "f57015377d089c41",
-  "secs": 71.4
+  "steps": 13939,
+  "keys": 13939,
+  "keyhash": "6ee71c7a0227f513",
+  "secs": 36.5
  },
  "61014": {
   "score": 2784.0,
@@ -342,30 +342,30 @@
   "steps": 4625,
   "keys": 4625,
   "keyhash": "7d1280f7b9b0cae3",
-  "secs": 7.0
+  "secs": 3.6
  },
  "61015": {
-  "score": 98163.0,
-  "turns": 32727,
-  "max_depth": 24,
-  "xl": 12,
+  "score": 16119.0,
+  "turns": 12577,
+  "max_depth": 13,
+  "xl": 9,
   "last_msgs": [
-   "Your helm blocks the attack to your head.",
-   "The mind flayer's tentacles suck you!",
-   "Your helm blocks the attack to your head.",
-   "The mind flayer's tentacles suck you!",
-   "Your helm blocks the attack to your head.",
-   "Your helm blocks the attack to your head.",
-   "You hit the mind flayer!  The mind flayer thrusts her orcish dagger.",
-   "The mind flayer hits!  The mind flayer's tentacles suck you!",
-   "Your helm blocks the attack to your head.",
-   "The mind flayer's tentacles suck you!  Your brain is eaten!"
+   "The ettin mummy hits!  The ettin mummy hits!",
+   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!",
+   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!",
+   "You hit the ettin mummy!",
+   "You hit the ettin mummy!",
+   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!",
+   "You hit the ettin mummy!  The ettin mummy hits!  The ettin mummy hits!",
+   "You destroy the ettin mummy!",
+   "Things that are here:",
+   "The Uruk-hai hits!"
   ],
   "truncated": false,
-  "steps": 72182,
-  "keys": 72182,
-  "keyhash": "0d52ab9d77c456cd",
-  "secs": 453.5
+  "steps": 18549,
+  "keys": 18549,
+  "keyhash": "e6bb126a78df277c",
+  "secs": 15.9
  },
  "61016": {
   "score": 3058.0,
@@ -388,7 +388,7 @@
   "steps": 6379,
   "keys": 6379,
   "keyhash": "f4f64359016b497b",
-  "secs": 10.0
+  "secs": 4.6
  },
  "61017": {
   "score": 1854.0,
@@ -411,7 +411,7 @@
   "steps": 3796,
   "keys": 3796,
   "keyhash": "0174a4018afa7ad3",
-  "secs": 14.6
+  "secs": 7.6
  },
  "61018": {
   "score": 58604.0,
@@ -434,7 +434,7 @@
   "steps": 19951,
   "keys": 19951,
   "keyhash": "769a3eff3cf489f8",
-  "secs": 38.3
+  "secs": 26.3
  },
  "61019": {
   "score": 953.0,
@@ -457,7 +457,7 @@
   "steps": 2175,
   "keys": 2175,
   "keyhash": "08952d9a92bf0195",
-  "secs": 1.9
+  "secs": 2.0
  },
  "61020": {
   "score": 4936.0,
@@ -480,7 +480,7 @@
   "steps": 8514,
   "keys": 8514,
   "keyhash": "8966c4278a9787c2",
-  "secs": 7.3
+  "secs": 7.7
  },
  "61021": {
   "score": 5069.0,
@@ -502,8 +502,8 @@
   "truncated": false,
   "steps": 8434,
   "keys": 8434,
-  "keyhash": "54663794ae949741",
-  "secs": 8.8
+  "keyhash": "d0977980d5432a66",
+  "secs": 8.3
  },
  "61022": {
   "score": 5178.0,
@@ -549,7 +549,7 @@
   "steps": 12500,
   "keys": 12500,
   "keyhash": "4f9aa45263574a5d",
-  "secs": 18.8
+  "secs": 18.3
  },
  "61024": {
   "score": 24558.0,
@@ -572,7 +572,7 @@
   "steps": 14381,
   "keys": 14381,
   "keyhash": "06c5aa08d7ba4897",
-  "secs": 15.6
+  "secs": 15.8
  },
  "61025": {
   "score": 2792.0,
@@ -595,53 +595,53 @@
   "steps": 5146,
   "keys": 5146,
   "keyhash": "2fb5dadbfd02287a",
-  "secs": 4.3
+  "secs": 4.0
  },
  "61026": {
-  "score": 1778.0,
-  "turns": 3954,
-  "max_depth": 7,
-  "xl": 5,
+  "score": 99156.0,
+  "turns": 22272,
+  "max_depth": 24,
+  "xl": 12,
   "last_msgs": [
-   "What do you want to zap? [el or ?*]",
-   "In what direction?",
-   "The magic missile hits the golden naga hatchling!",
-   "The gnome king swings his scimitar.  The gnome king hits!",
-   "The golden naga hatchling bites!",
-   "What do you want to zap? [el or ?*]",
-   "In what direction?",
-   "The magic missile hits the gnome king.  The magic missile bounces!",
-   "The gnome king swings his scimitar.  The gnome king hits!",
-   "The golden naga hatchling bites!"
+   "The energy vortex just misses!  The energy vortex misses!",
+   "You miss the energy vortex.  You are jolted with electricity!",
+   "The energy vortex engulfs you!",
+   "The air around you crackles with electricity.",
+   "The air around you crackles with electricity.",
+   "You hit the energy vortex.  You are jolted with electricity!",
+   "The air around you crackles with electricity.",
+   "You feel your magical energy drain away.",
+   "You feel your magical energy drain away.",
+   "You hit the energy vortex.  You are jolted with electricity!"
   ],
   "truncated": false,
-  "steps": 3964,
-  "keys": 3964,
-  "keyhash": "d752985225ebf935",
-  "secs": 6.0
+  "steps": 38125,
+  "keys": 38125,
+  "keyhash": "15b9b00d299e9b3d",
+  "secs": 156.2
  },
  "61027": {
-  "score": 3425.0,
-  "turns": 4354,
-  "max_depth": 7,
-  "xl": 7,
+  "score": 8956.0,
+  "turns": 7759,
+  "max_depth": 9,
+  "xl": 8,
   "last_msgs": [
-   "The wand hits you!  The gnome mummy hits!",
-   "The wand hits you!  The gnome mummy hits!",
-   "You kill the Mordor orc!  The Mordor orc misses!",
-   "The Mordor orc wields a cursed aklys!",
-   "The aklys welds itself to the Mordor orc's hand!",
-   "The gnome mummy hits!",
-   "The gnome mummy hits!",
-   "You hit the Mordor orc.",
-   "You hit the Mordor orc.",
-   "You miss the Mordor orc.  The Mordor orc hits!"
+   "The gnome king throws 3 daggers!  The 1st dagger misses the rock mole.",
+   "The 1st dagger misses you.  The 2nd dagger hits the rock mole.",
+   "The 3rd dagger misses the rock mole.  The 3rd dagger misses you.",
+   "The large cat bites!  The yeti hits!  The yeti hits!  The yeti bites!",
+   "The jaguar hits!  The jaguar hits!  The jaguar misses!",
+   "The Green-elf wields an elven short sword!  The gnome king hits!",
+   "The dwarf lord wields a dagger!",
+   "The Green-elf swings her elven broadsword.  The Green-elf misses!",
+   "The yeti hits!  The yeti misses!  The yeti bites!",
+   "The large cat bites!  The yeti hits!  The yeti hits!  The yeti bites!"
   ],
   "truncated": false,
-  "steps": 6017,
-  "keys": 6017,
-  "keyhash": "fee2e799a7408fa4",
-  "secs": 7.1
+  "steps": 12504,
+  "keys": 12504,
+  "keyhash": "f011fc74fe5361d5",
+  "secs": 12.4
  },
  "61028": {
   "score": 131615.0,
@@ -662,7 +662,7 @@
   "steps": 34431,
   "keys": 34431,
   "keyhash": "cfa134000f316ac9",
-  "secs": 72.5
+  "secs": 74.7
  },
  "61029": {
   "score": 4056.0,
@@ -685,7 +685,7 @@
   "steps": 6985,
   "keys": 6985,
   "keyhash": "06354ca3a2b8303a",
-  "secs": 7.1
+  "secs": 7.4
  },
  "61030": {
   "score": 105781.0,
@@ -708,7 +708,7 @@
   "steps": 83759,
   "keys": 83759,
   "keyhash": "61a5691829a7bfff",
-  "secs": 464.2
+  "secs": 467.9
  },
  "61031": {
   "score": 17622.0,
@@ -731,6 +731,6 @@
   "steps": 15590,
   "keys": 15590,
   "keyhash": "d80fd97ba41027cd",
-  "secs": 23.2
+  "secs": 24.0
  }
 }

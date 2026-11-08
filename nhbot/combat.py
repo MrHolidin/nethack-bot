@@ -26,7 +26,11 @@ SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns 
 SLEEP_HIT_RE = re.compile(r"The sleep ray hits (?:the )?([\w' -]+?)[.!]")
 BOLT_LIM = 8               # hack.h:18: monsters fire / zap at us only from closer than this (mthrowu.c m_lined_up)
 WAND_PWIN = 0.9            # an attack wand only when P(we win the fight) is at most this (wand_ev_pairs)
-SPORE_WAITS = 100          # spore_elb: turns at most a level waiting on Elbereth for a gas spore to drift off
+SPORE_WAITS = 100          # turns at most a level waiting on Elbereth for a gas spore to drift off (spore_back_off)
+# the nearest a gas spore may be when we throw at it: its explosion covers the 3x3 square round it (explode.c:163-171;
+# mon.c corpse_chance explodes it on its own square), so from 2 we stand outside (A/B spore_range: +93 [-141, +313],
+# median 7567 -> 7772, 39 of 1000 changed; 3 before)
+SPORE_THROW_MIN = 2
 PREY_PWIN = 0.95           # explore walks up to a hostile in view we beat with P(win) above this (prey_mask)
 
 
@@ -90,8 +94,8 @@ class CombatMixin:
         self.hunt = None               # hunt_shooter: the shooter we close in on
         self.hunts = self.hunt_steps = 0
         self.hunt_offline_steps = 0
-        self.unblocks = self.unblock_throws = self.unblock_melee = 0
-        self.spore_waits = Counter()     # spore_elb: level key -> turns spent getting a gas spore off us
+        self.unblocks = self.unblock_throws = 0
+        self.spore_waits = Counter()     # level key -> turns spent getting a gas spore off us (spore_back_off)
         self.ray_risk_stats = Counter()  # statistics only: our own ray back at us (nhbot.rays), per zap / skip
         self.ray_risk_log = []
         self.slept = {}                  # (level key, pos) -> (turn, name): a sleep ray of ours hit it (note_slept)
@@ -117,8 +121,8 @@ class CombatMixin:
 
     def ranged_target(self, lv):
         """A monster we never melee that a missile may kill (RANGED_TARGETS: floating eye, gas spore -- not closer
-        than spore_throw_min --, the jellies, brown / green mold, cockatrice, chickatrice; shoot_avoided: any of
-        shoot_cells) among avoid_cells, within 6 in a clear straight line -> (dir_key, dist, pos, step)."""
+        than SPORE_THROW_MIN --, the jellies, brown / green mold, cockatrice, chickatrice) among avoid_cells, within 6
+        in a clear straight line -> (dir_key, dist, pos, step)."""
         if not self.avoid_cells:
             return None
         y, x = self.pos()
@@ -130,23 +134,16 @@ class CombatMixin:
             if d == 0 or d > 6 or not in_line(dy, dx):
                 continue
             name = G.monster_name(g[ty, tx])
-            if self.opts.shoot_avoided:
-                if (ty, tx) not in self.shoot_cells:
-                    continue
-            elif name not in RANGED_TARGETS:
+            # (A/B shoot_avoided -- missiles at every avoided non-peaceful monster, not only these: -2787
+            # [-4458, -1068], median 6821)
+            if name not in RANGED_TARGETS:
                 continue
-            if name == "gas spore" and d < self.spore_throw_min():
+            if name == "gas spore" and d < SPORE_THROW_MIN:
                 continue
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             if line_clear(k_mem, g, y, x, sy, sx, d):
                 return DELTA2KEY[(sy, sx)], d, (ty, tx), (sy, sx)
         return None
-
-    def spore_throw_min(self):
-        """The nearest a gas spore may be when we throw at it. Its explosion covers the 3x3 square round it
-        (explode.c:163-171; mon.c corpse_chance explodes it on its own square), so from 2 we stand outside;
-        3 without spore_range."""
-        return 2 if self.opts.spore_range else 3
 
     def retrieve_goals(self, lv):
         """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
@@ -167,11 +164,12 @@ class CombatMixin:
         return out
 
     def spore_back_off(self, lv):
-        """spore_elb: a gas spore blocks the way, closer than we may throw at (its explosion covers the 3x3 square
+        """A gas spore blocks the way, closer than we may throw at (its explosion covers the 3x3 square
         round it, explode.c) -- and it floats up to us and stays: below its explosion's 4d6 (spore_ok) we waited
         next to it for good (79897: 20000 turns, starved). On an Elbereth it respects it is scared off
-        (monmove.c:341-346 distfleeck: monflee) -- write one (read back) and wait there; from spore_throw_min on
-        unblock_step throws at it. SPORE_WAITS turns at most a level. True if it used the turn."""
+        (monmove.c:341-346 distfleeck: monflee) -- write one (read back) and wait there; from SPORE_THROW_MIN on
+        unblock_step throws at it. SPORE_WAITS turns at most a level. True if it used the turn. (A/B spore_elb: +255
+        [+74, +448], median 7567 -> 7562, 19 of 1000 changed)"""
         if self.spore_waits[lv.key] >= SPORE_WAITS:
             return False
         self.cur_act = "unblock"
@@ -213,8 +211,8 @@ class CombatMixin:
 
     def unblock_step(self, lv, grids, goal):
         """Explore/descend goals are reachable only through squares held by monsters we refuse to melee
-        (a floating eye in a doorway, a mold in a corridor): throw whatever is expendable at the blocker;
-        stuck long with nothing to throw, hit a floating eye anyway (paralysis beats starving)."""
+        (a floating eye in a doorway, a mold in a corridor): throw whatever is expendable at the blocker; a gas spore
+        too close to throw at: Elbereth (spore_back_off)."""
         if not self.avoid_cells:
             return False
         k_mem, k_live, passable = grids
@@ -248,11 +246,9 @@ class CombatMixin:
         y, x = start
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
-        if self.opts.spore_elb and name == "gas spore" and d < self.spore_throw_min():
+        if name == "gas spore" and d < SPORE_THROW_MIN:
             return self.spore_back_off(lv)
-        shoot = blocker in self.shoot_cells if self.opts.shoot_avoided else True    # shoot_avoided: not the Oracle
-        if shoot and d <= 6 and in_line(dy, dx) \
-                and not (name == "gas spore" and d < self.spore_throw_min()):
+        if d <= 6 and in_line(dy, dx):
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
             clear = line_clear(k_mem, self.obs["glyphs"], y, x, sy, sx, d)
             ex = self.expendables() if clear else []
@@ -263,11 +259,7 @@ class CombatMixin:
                 self.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
-            if d == 1 and name == "floating eye" and lv.desperate and not self.opts.melee_policy:
-                # (melee_policy: its fight rule decides -- an eye we may hit is not in avoid_cells, never a blocker)
-                self.unblock_melee += 1
-                self.attack(blocker)
-                return True
+            # (a floating eye next to us on a desperate level is no blocker: may_melee lets us hit it then)
         # get next to it (any adjacent square is in line)
         if d > 1:
             adj = np.zeros((ROWS, COLS), dtype=bool)
@@ -281,8 +273,9 @@ class CombatMixin:
     def hunt_step(self, lv):
         """hunt_shooter: something hit us from range and nothing is next to us -> close in on the likeliest
         shooter: a visible hostile of the named kind, else one standing on a line with us within 8 squares
-        (monsters only fire when lined up, BOLT_LIM; shooter_range: within 7 -- mthrowu.c:1054-1055 m_lined_up: distmin <
-        BOLT_LIM = 8, hack.h:18). Pursue it for at most 25 turns, while HP >= 40%."""
+        (monsters only fire when lined up: within 7 -- mthrowu.c:1054-1055 m_lined_up: distmin < BOLT_LIM = 8, hack.h:18;
+        A/B shooter_range: +92 [-63, +259], median 7567 -> 7610, 8 of 1000 changed; 8 before). Pursue it for at most 25
+        turns, while HP >= 40%."""
         t = self.turn()
         y, x = self.pos()
         if self.hp_below(self.opts.hunt_hp):
@@ -293,8 +286,7 @@ class CombatMixin:
         if ev and t - ev[0] <= 2:
             self.shot_event = None
             vis = self.visible_hostiles(lv)
-            reach = BOLT_LIM - 1 if self.opts.shooter_range else 8   # shooter_range: m_lined_up: distmin < BOLT_LIM
-            lined = [(p, n) for p, n in vis if dist(p) <= reach and in_line(p[0] - y, p[1] - x)]
+            lined = [(p, n) for p, n in vis if dist(p) < BOLT_LIM and in_line(p[0] - y, p[1] - x)]
             cands = lined
             if ev[1]:
                 cands = [c for c in lined if c[1] == ev[1]] or [c for c in vis if c[1] == ev[1]] or lined
