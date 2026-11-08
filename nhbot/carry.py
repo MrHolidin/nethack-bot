@@ -53,6 +53,33 @@ SHOP_BUYS = {
     "lighting store": {nh.TOOL_CLASS},
 }
 
+# shop_facts: what each shop buys -- shknam.c:205-343 shtypes item lists, as shknam.c:782 saleable reads them: a class,
+# a (class, type) for an entry of one object type, VEGGY for health food's vegetarian class (shknam.c:373 veggy_item:
+# food of VEGGY material, eggs)
+VEGGY = "veggy"
+VEGGY_FOOD = {"kelp frond", "eucalyptus leaf", "apple", "orange", "pear", "melon", "banana", "carrot",
+              "sprig of wolfsbane", "clove of garlic", "slime mold", "lump of royal jelly", "cream pie", "candy bar",
+              "fortune cookie", "pancake", "lembas wafer", "cram ration", "food ration", "K-ration", "C-ration", "egg"}
+SHOP_SELLS = {
+    "general store": ALL,
+    "used armor dealership": (nh.ARMOR_CLASS, nh.WEAPON_CLASS),
+    "second-hand bookstore": (nh.SCROLL_CLASS, nh.SPBOOK_CLASS),
+    "liquor emporium": (nh.POTION_CLASS,),
+    "antique weapons outlet": (nh.WEAPON_CLASS, nh.ARMOR_CLASS),
+    "delicatessen": (nh.FOOD_CLASS, (nh.POTION_CLASS, "fruit juice"), (nh.POTION_CLASS, "booze"),
+                     (nh.POTION_CLASS, "water"), (nh.TOOL_CLASS, "ice box")),
+    "jewelers": (nh.RING_CLASS, nh.GEM_CLASS, nh.AMULET_CLASS),
+    "quality apparel and accessories": (nh.WAND_CLASS, (nh.ARMOR_CLASS, "leather gloves"),
+                                        (nh.ARMOR_CLASS, "elven cloak")),
+    "hardware store": (nh.TOOL_CLASS,),
+    "rare books": (nh.SPBOOK_CLASS, nh.SCROLL_CLASS),
+    "health food store": (VEGGY, (nh.POTION_CLASS, "fruit juice"), (nh.POTION_CLASS, "healing"),
+                          (nh.POTION_CLASS, "full healing"), (nh.SCROLL_CLASS, "food detection"),
+                          (nh.FOOD_CLASS, "lump of royal jelly")),
+    "lighting store": ((nh.TOOL_CLASS, "wax candle"), (nh.TOOL_CLASS, "tallow candle"), (nh.TOOL_CLASS, "brass lantern"),
+                       (nh.TOOL_CLASS, "oil lamp"), (nh.TOOL_CLASS, "magic lamp"), (nh.POTION_CLASS, "oil")),
+}
+
 CARRY_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
 MORE_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
 for _g in range(nh.MAX_GLYPH):
@@ -111,6 +138,13 @@ for _i in range(nh.NUM_OBJECTS):
     _n = nh.OBJ_NAME(_oc)
     if _n:
         OBJ_INFO.setdefault((ord(_oc.oc_class), _n), (_oc.oc_weight, _oc.oc_cost))
+FIXED_LOOK = {}                   # (class, description of one type only) -> that type ("faded pall" -> elven cloak)
+for _i in range(nh.NUM_OBJECTS):
+    _oc = nh.objclass(_i)
+    _d = nh.OBJ_DESCR(_oc)
+    if _d and nh.OBJ_NAME(_oc):
+        FIXED_LOOK.setdefault((ord(_oc.oc_class), _d), []).append(nh.OBJ_NAME(_oc))
+FIXED_LOOK = {k: v[0] for k, v in FIXED_LOOK.items() if len(v) == 1}
 APPEAR_WEIGHT = {}
 for _i in range(nh.NUM_OBJECTS):
     _oc = nh.objclass(_i)
@@ -119,6 +153,11 @@ for _i in range(nh.NUM_OBJECTS):
         APPEAR_WEIGHT[_d] = max(APPEAR_WEIGHT.get(_d, 0), _oc.oc_weight)
 
 ID_RE = re.compile(r"\b(potion|scroll|ring|wand|amulet|spellbook)s? of ([a-zA-Z' -]+?)(?: \(|$| called| named)")
+
+
+def is_clear_potion(ocls, text):
+    """Water (holy / unholy / plain): its look is fixed, "clear potion"."""
+    return ocls == nh.POTION_CLASS and re.match(r"^clear potions?$", base_name(text)[2]) is not None
 
 
 def singular(w):
@@ -292,10 +331,54 @@ class CarryMixin:
 
     def sellables(self, lv, stype):
         buys = SHOP_BUYS.get(stype, set())
+        facts = self.opts.shop_facts
         return [(it.letter, it.ocls, it.text) for it in self.items()
-                if it.ocls in self.carry_classes() and (buys is ALL or it.ocls in buys)
+                if it.ocls in self.carry_classes()
+                and (self.shop_buys(stype, it) and not self.offer_zero(it) if facts else buys is ALL or it.ocls in buys)
                 and not self.needed(it) and (lv.key, it.text) not in self.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and "unpaid" not in it.text]
+
+    def item_types(self, it):
+        """shop_facts: the object types Item it may be -- one when identified (or a look fixed to one type), else
+        what value.type_posterior still allows for its look."""
+        if is_clear_potion(it.ocls, it.text):
+            return {"water"}
+        post = self.type_posterior(it.text)
+        if post is not None:
+            return set(post)
+        name = describe(it.ocls, it.text)["key"][1]
+        return {FIXED_LOOK.get((it.ocls, name), name)}
+
+    def shop_buys(self, stype, it):
+        """shop_facts: may a shop of this type buy Item it (shknam.c:782 saleable, SHOP_SELLS)? An item whose type
+        we don't know: if any type it may be is bought (the shopkeeper's refusal then goes to sell_tried)."""
+        wants = SHOP_SELLS.get(stype, ())
+        if wants is ALL:
+            return True
+        types = None
+        for w in wants:
+            if w == VEGGY:
+                ok = it.ocls == nh.FOOD_CLASS and describe(it.ocls, it.text)["key"][1] in VEGGY_FOOD
+            elif isinstance(w, tuple):
+                if it.ocls != w[0]:
+                    continue
+                types = self.item_types(it) if types is None else types
+                ok = w[1] in types
+            else:
+                ok = it.ocls == w
+            if ok:
+                return True
+        return False
+
+    @staticmethod
+    def offer_zero(it):
+        """shop_facts: an item a shopkeeper offers nothing for, so won't buy (shk.c:3398-3412 getprice: uncursed
+        water -- a clear potion not known blessed / cursed --, a cancelled wand, partly eaten food)."""
+        if is_clear_potion(it.ocls, it.text):
+            return not re.search(r"\b(?:blessed|cursed)\b", it.text) or "uncursed" in it.text
+        if it.ocls == nh.WAND_CLASS and re.search(r"\(\d+:-1\)", it.text):
+            return True
+        return it.ocls == nh.FOOD_CLASS and "partly eaten" in it.text
 
     def keep_after_offer(self):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it;

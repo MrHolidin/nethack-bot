@@ -103,6 +103,15 @@ def _round(t, mult, div):
     return max(t, 1)
 
 
+def buy_price(cost, cha, sucker):
+    """shk.c:2066-2150 get_cost of one unit we buy, without the 1-in-3 unidentified surcharge: the base cost (5 if 0)
+    by the dunce cap / shirt and charisma factors, rounded."""
+    m, d = cha_factor(cha)
+    if sucker:
+        m, d = m * 4, d * 3
+    return _round(cost or 5, m, d)
+
+
 def _unit_prices(name, cls):
     """[(getprice, probability)] for one object of this type."""
     base = OBJ[_INDEX[(cls, name)]][3]

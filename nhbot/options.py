@@ -98,6 +98,11 @@ DEFAULTS = {
                                #      pray.c / eat.c init_uhunger; the golden glow too), a slime mold is 250; no
                                #      mimic corpse (helpless), violet fungus / yellow mold (hallucination), quantum
                                #      mechanic while Fast (speed lost) -- tins too (nhbot.survival)
+    "shop_facts": False,       # A/B: what a shop buys from shknam.c saleable (quality apparel: wands, leather gloves,
+                               #      elven cloaks only; lighting: candles, lamps, potions of oil; the health food
+                               #      store; the delicatessen's drinks), nothing offered it pays 0 for (uncursed water,
+                               #      a cancelled wand); the cheapest identify scroll by our Charisma (shk.c get_cost)
+                               #      (nhbot.carry.shop_buys, jewelry.identify_min_price)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

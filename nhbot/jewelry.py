@@ -25,7 +25,7 @@ import nle.nethack as nh
 
 from nhbot.game import MENU_ITEM_RE, PAGE_RE
 from nhbot.items import base_name
-from nhbot.pricemem import appearance
+from nhbot.pricemem import appearance, buy_price
 
 AMULET_ORDER = ("life saving", "reflection", "ESP", "versus poison", "magical breathing", "unchanging")
 RING_ORDER = ("free action", "regeneration", "protection", "increase damage", "increase accuracy", "gain strength",
@@ -39,7 +39,8 @@ IDENTIFY_RE = re.compile(r"\bscrolls? of identify\b")
 ID_MENU = "What would you like to identify"         # invent.c menu_identify ("first" / "next")
 SCROLL_SHOPS = ("general store", "second-hand bookstore", "rare books")
 PRICE_RE = re.compile(r"for sale, (\d+) zorkmids?")
-MIN_PRICE = 20                   # the base price: no identify scroll costs less
+MIN_PRICE = 20                   # the base price: no identify scroll costs less (shop_facts: identify_min_price)
+IDENTIFY_COST = 20               # objects.c SCROLL("identify", ..., 20)
 
 SCROLL_GLYPH = np.zeros(nh.MAX_GLYPH, dtype=bool)
 for _g in range(nh.MAX_GLYPH):
@@ -121,7 +122,14 @@ class JewelryMixin:
         return to_identify(it.ocls, it.text)            # in the inventory or on the floor (worth_taking)
 
     def buy_wanted(self, stype):
-        return self.identify_wanted() and stype in SCROLL_SHOPS and self.bl(nh.NLE_BL_GOLD) >= MIN_PRICE
+        return self.identify_wanted() and stype in SCROLL_SHOPS and self.bl(nh.NLE_BL_GOLD) >= self.identify_min_price()
+
+    def identify_min_price(self):
+        """The least an identify scroll can cost us. MIN_PRICE; shop_facts: shk.c get_cost of its base cost by our
+        Charisma (16+: 15, 18: 13, 19+: 10 -- below 20) and a dunce cap / visible shirt (pricemem.buy_price)."""
+        if not self.opts.shop_facts:
+            return MIN_PRICE
+        return buy_price(IDENTIFY_COST, self.bl(nh.NLE_BL_CHA), self.sucker())
 
     # ------------------------------------------------------------ wear
     def jewelry_wear_step(self, lv):
@@ -279,7 +287,7 @@ class JewelryMixin:
                 self.pay_fails += 1
             return True
         gold = self.bl(nh.NLE_BL_GOLD)
-        if not self.identify_wanted() or not lv.shop.any() or gold < MIN_PRICE:
+        if not self.identify_wanted() or not lv.shop.any() or gold < self.identify_min_price():
             return False
         here = self.pos()
 
