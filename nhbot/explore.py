@@ -14,13 +14,19 @@ from nhbot.goals import GOALS
 REST_DESCEND_MAX = 600      # ... at most this many turns a level
 
 
-class ExploreMixin:
-    def explore_init(self):
+class ExploreState:
+    """State of exploring and descending (ExploreMixin)."""
+    def __init__(self):
         self.maps_read = 0
         self.pet_waits = 0
         self.pet_waited_total = 0
         self.descent_rest = Counter()    # level key -> turns rested on its down staircase
         self.items_first_holds = 0       # descents held for an item goal still on the level
+
+
+class ExploreMixin:
+    def explore_init(self):
+        self.expl = ExploreState()
 
     def explore(self, lv):
         self.cur_act = "explore"
@@ -82,7 +88,7 @@ class ExploreMixin:
                 _, _, got = self.dijkstra(lv, k_mem, k_live, passable, start, stuff, want_dist=False)
                 if got is not None and got != start:
                     want_down = False
-                    self.items_first_holds += 1
+                    self.expl.items_first_holds += 1
 
         if self.sokoban_trip_step(lv, grids, want_down or lv.explored):
             return
@@ -150,12 +156,12 @@ class ExploreMixin:
         game stops it when something shows up) -- at most REST_DESCEND_MAX turns a level. True if it used the
         turn. (A/B rest_descend: +1416 [+390, +2448] over 1000 games.)"""
         if not self.hp_below(self.opts.descend_rest_hp) or self.bl(nh.NLE_BL_HUNGER) >= WEAK \
-                or self.visible_hostiles(lv) or self.descent_rest[lv.key] >= REST_DESCEND_MAX:
+                or self.visible_hostiles(lv) or self.expl.descent_rest[lv.key] >= REST_DESCEND_MAX:
             return False
         t0 = self.turn()
         self.cur_act = "rest"
         self.search_turns(20)
-        self.descent_rest[lv.key] += max(1, self.turn() - t0)
+        self.expl.descent_rest[lv.key] += max(1, self.turn() - t0)
         return True
 
     def should_descend(self, lv, frontier, on_level):
@@ -270,7 +276,7 @@ class ExploreMixin:
         lv.mapped = True
         if self.ask("r", "read"):
             self.press(it[0])
-            self.maps_read += 1
+            self.expl.maps_read += 1
             return True
         return False
 
@@ -279,14 +285,14 @@ class ExploreMixin:
         g = self.obs["glyphs"]
         ys, xs = np.nonzero(G.KIND[g] == G.PET)
         if len(ys) == 0:
-            self.pet_waits = 0
+            self.expl.pet_waits = 0
             return False
         y, x = self.pos()
         d = min(max(abs(a - y), abs(b - x)) for a, b in zip(ys, xs))
         far, turns = 7, 15
-        if d <= 1 or d > far or self.pet_waits >= turns:
-            self.pet_waits = 0
+        if d <= 1 or d > far or self.expl.pet_waits >= turns:
+            self.expl.pet_waits = 0
             return False
-        self.pet_waits += 1
-        self.pet_waited_total += 1
+        self.expl.pet_waits += 1
+        self.expl.pet_waited_total += 1
         return True

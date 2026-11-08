@@ -112,9 +112,9 @@ class Tick:
         return self.bot.visible_hostiles(self.lv)
 
 
-class PolicyMixin:
-    def policy_init(self):
-        self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in STEPS]
+class PolicyState:
+    """State of the step policy: the tick, its history, loop guard and wait counters (PolicyMixin)."""
+    def __init__(self):
         self.last_step = None
         self.tick_no = 0
         self.tick_seq = 0                # msg_seq at the start of this tick
@@ -132,41 +132,48 @@ class PolicyMixin:
         self.hallu_waits = 0             # hallu_wait: turns rested hallucinating
         self.ammo_pickups = 0
 
+
+class PolicyMixin:
+    def policy_init(self):
+        # the steps in STEPS order, bound to us: a dispatch table, not state
+        self.steps_by_name = [(n, getattr(self, "step_" + n)) for n in STEPS]
+        self.pol = PolicyState()
+
     def tick(self):
         lv = self.update_memory()
         self.cur_key = lv.key
-        self.last_step = None
-        self.chasing = None
-        self.tick_no += 1
+        self.pol.last_step = None
+        self.goals.chasing = None
+        self.pol.tick_no += 1
         self.nutrition_tick()                    # survival.py: hunger
-        self.tick_seq = self.msg_seq
+        self.pol.tick_seq = self.msg_seq
         self.threat_track()                      # threats.py: who is coming for us
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
         self.poly_track()                        # thieves.py: what fell from us when we changed form
         if self.opts.sokoban:
             self.soko_track(lv)                  # sokoban.py: what we carried on coming onto this square
         if self.mines_tick(lv):                  # explore.py; before the tick state is read: it may change level
-            self.last_step = "level_arrival"     # its time_by label
+            self.pol.last_step = "level_arrival"     # its time_by label
             return
         y, x = self.pos()
         c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP),
                  maxhp=self.bl(nh.NLE_BL_HPMAX), hunger=self.bl(nh.NLE_BL_HUNGER))
         for name, step in self.steps_by_name:
             if step(c):
-                self.last_step = name
+                self.pol.last_step = name
                 return
 
     # ------------------------------------------------------------------ emergencies
     def step_progress(self, c):
         lv, t = c.lv, c.t
         if (G.KIND[self.obs["glyphs"]] == G.PET).any():
-            self.pet_last_seen = t
-        if t != self.loop_turn:
-            self.loop_turn, self.loop_steps = t, self.steps
-        elif self.steps - self.loop_steps > 300:      # stuck in a no-time loop
-            self.loops += 1
-            self.loop_by[f"{self.last_step}/{self.cur_act}"] += 1
-            self.loop_steps = self.steps
+            self.pol.pet_last_seen = t
+        if t != self.pol.loop_turn:
+            self.pol.loop_turn, self.pol.loop_steps = t, self.steps
+        elif self.steps - self.pol.loop_steps > 300:      # stuck in a no-time loop
+            self.pol.loops += 1
+            self.pol.loop_by[f"{self.pol.last_step}/{self.cur_act}"] += 1
+            self.pol.loop_steps = self.steps
             self.raw_step(27); self.press("s")
             return True
         stall = t - max(lv.last_progress, lv.entered_turn)
@@ -175,7 +182,7 @@ class PolicyMixin:
             lv.fail[:] = 0
             lv.blocked[:] = False
             lv.last_reset = t
-            self.resets += 1
+            self.pol.resets += 1
         # desperation by the level's own clock, turns spent on it (Level.turns_here) -- counted from the first
         # arrival, a level re-entered had been "stalled" the whole time away: desperate at once. The obstacle reset
         # above keeps its old timing (desperate_time, which moved both, lost -1027)
@@ -184,7 +191,7 @@ class PolicyMixin:
         if not lv.desperate and (stall > 1500 or (age > 2500 and
                                                  not (self.kinds(lv) == G.DOWNSTAIR).any())):
             lv.desperate = True
-            self.desperations += 1
+            self.pol.desperations += 1
         return False
 
     def step_engulfed(self, c):
@@ -199,12 +206,12 @@ class PolicyMixin:
         if self.critically_low_hp(hp, maxhp) and self.can_pray():
             self.pray(); return True
         if hunger >= FAINTING:
-            if self.faint_since is None:
-                self.faint_since = t
+            if self.pol.faint_since is None:
+                self.pol.faint_since = t
         else:
-            self.faint_since = None
+            self.pol.faint_since = None
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
-                self.faint_since is not None and t - self.faint_since > self.opts.faint_wait), weak=True):
+                self.pol.faint_since is not None and t - self.pol.faint_since > self.opts.faint_wait), weak=True):
             self.pray(); return True
         if self.thief.polyd and self.handless() and self.can_pray():
             self.thief.poly_stats["prayed"] += 1
@@ -217,7 +224,7 @@ class PolicyMixin:
         deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
         if cond & deadly and not self.surv.god_angry and self.turn() - (self.surv.last_pray or -9999) > 2:
             # certain death otherwise: pray even if the timeout may not have expired
-            self.deadly_prayers += 1
+            self.pol.deadly_prayers += 1
             self.pray(); return True
         return False
 
@@ -244,14 +251,14 @@ class PolicyMixin:
         confdir): wait it out."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_STUN | nh.BL_MASK_CONF):
             if not c.hostiles or all(n in PASSIVE_MOLDS for _, n in c.hostiles):
-                self.stun_waits += 1
+                self.pol.stun_waits += 1
                 self.press("s")
                 return True
             if self.is_minetown(c.lv) and self.peaceful_next(c.lv, c.hostiles):
                 # a blow could go to the watch (hack.c:1442 domove confdir: stunned, or confused 1 in 5 -- a random
                 # direction): no melee in Minetown. A/B stun_peace +164 [-345, +656]; in the 10 games it fired +141
                 # a game, 4 deaths to the watch gone
-                self.stun_peace_waits += 1
+                self.pol.stun_peace_waits += 1
                 self.press("s")
                 return True
         return False
@@ -266,7 +273,7 @@ class PolicyMixin:
         """Wandering blind walks into things we can't see: wait."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND and not c.hostiles \
                 and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
-            self.blind_waits += 1
+            self.pol.blind_waits += 1
             # blind_strike: rest with '.', not search: searching reveals unseen neighbours as fresh 'I's, which
             # would look like the attacker when something else hits us in the same turn (61688)
             self.press("." if self.strike_scope_ok(c.lv) else "s")
@@ -279,7 +286,7 @@ class PolicyMixin:
         steps before), but no trips (shop, Excalibur, loot, ...), no exploring, no going to another level -- not
         Hungry, rest a turn instead."""
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU and self.bl(nh.NLE_BL_HUNGER) < HUNGRY:
-            self.hallu_waits += 1
+            self.pol.hallu_waits += 1
             self.press(".")
             return True
         return False
@@ -297,11 +304,11 @@ class PolicyMixin:
         st_here = self.stairs_kind_here(lv)
         adj_info = [(n, bool(PM_BY_NAME[n].mflags2 & M2_STALK) if n in PM_BY_NAME else None,
                      PM_BY_NAME[n].mmove if n in PM_BY_NAME else None) for _, n in hostiles]
-        self.hist.append((c.t, c.hp, c.maxhp, len(hostiles), vis_n, self.can_pray(), self.bl(nh.NLE_BL_DEPTH),
+        self.pol.hist.append((c.t, c.hp, c.maxhp, len(hostiles), vis_n, self.can_pray(), self.bl(nh.NLE_BL_DEPTH),
                           self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_AC), d_st,
                           int(st_here) if st_here is not None else 0, adj_info))
-        if len(self.hist) > 40:
-            self.hist.popleft()
+        if len(self.pol.hist) > 40:
+            self.pol.hist.popleft()
         return False
 
     def step_elbereth(self, c):
@@ -373,7 +380,7 @@ class PolicyMixin:
             if th:
                 key, d, tpos, (sy, sx) = rt
                 ray = ray_squares(c.y, c.x, sy, sx)
-                self.last_attack_target = tpos
+                self.acts.last_attack_target = tpos
                 self.throw(th[0][0], key, ray)
                 return True
         return False
@@ -386,13 +393,13 @@ class PolicyMixin:
         hw = self.here_window
         # the pile window lists what "Things that are here" leaves out
         txt = (sh[2] if sh else "") + (" | " + hw[2] if hw and sh and hw[:2] == sh[:2] else "")
-        if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.throws and not c.lv.shop[y, x] \
+        if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.acts.throws and not c.lv.shop[y, x] \
                 and any(floor_kind(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
                         # (A/B ammo_one -- stop for what take_ammo takes, stones too: -3134 [-4643, -1533], 6747)
                         for t in re.split(r" \| |You see here |\.$", txt) if t.strip()):
             self.seen_here = None
             self.take_ammo()
-            self.ammo_pickups += 1
+            self.pol.ammo_pickups += 1
             return True
         return False
 

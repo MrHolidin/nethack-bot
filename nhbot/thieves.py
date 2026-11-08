@@ -85,12 +85,12 @@ class ThievesMixin:
                 self.thief.theft_turn = self.turn()
                 self.thief.thefts += 1
             self.thief.stolen_pending = True
-        if self.combat.killed and any(t in self.combat.killed for t in THIEVES) and self.last_attack_target:
+        if self.combat.killed and any(t in self.combat.killed for t in THIEVES) and self.acts.last_attack_target:
             self.thief.nymph_kills += 1
             if self.thief.stolen_pending:
                 self.goal_event("loot", "abandoned", self.thief.loot_sq is not None)    # replaced by a newer one
                 self.goal_event("loot", "created")
-                self.thief.loot_sq = self.last_attack_target
+                self.thief.loot_sq = self.acts.last_attack_target
                 self.thief.loot_key = self.cur_key
         if re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
             self.thief.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
@@ -123,7 +123,7 @@ class ThievesMixin:
                 continue
             if self.peaceful_now(lv, pos, far=True):
                 continue
-            self.last_attack_target = pos
+            self.acts.last_attack_target = pos
             self.cur_act = "fight"
             tw = self.throwables()
             if tw:

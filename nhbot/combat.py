@@ -129,12 +129,12 @@ class CombatMixin:
         """A monster we never melee that a missile may kill (RANGED_TARGETS: floating eye, gas spore -- not closer
         than SPORE_THROW_MIN --, the jellies, brown / green mold, cockatrice, chickatrice) among avoid_cells, within 6
         in a clear straight line -> (dir_key, dist, pos, step)."""
-        if not self.avoid_cells:
+        if not self.perc.avoid_cells:
             return None
         y, x = self.pos()
         g = self.obs["glyphs"]
         k_mem = self.kinds(lv)
-        for (ty, tx) in self.avoid_cells:
+        for (ty, tx) in self.perc.avoid_cells:
             dy, dx = ty - y, tx - x
             d = max(abs(dy), abs(dx))
             if d == 0 or d > 6 or not in_line(dy, dx):
@@ -219,11 +219,11 @@ class CombatMixin:
         """Explore/descend goals are reachable only through squares held by monsters we refuse to melee
         (a floating eye in a doorway, a mold in a corridor): throw whatever is expendable at the blocker; a gas spore
         too close to throw at: Elbereth (spore_back_off)."""
-        if not self.avoid_cells:
+        if not self.perc.avoid_cells:
             return False
         k_mem, k_live, passable = grids
         p2 = passable.copy()
-        for c in self.avoid_cells:
+        for c in self.perc.avoid_cells:
             p2[c] = bool(G.PASSABLE[k_mem[c]])
         start = self.pos()
         blocker = None
@@ -234,7 +234,7 @@ class CombatMixin:
                 while c != start:
                     path.append(c)
                     c = prev[c]
-                blocker = next((c for c in reversed(path) if c in self.avoid_cells), None)
+                blocker = next((c for c in reversed(path) if c in self.perc.avoid_cells), None)
         if blocker is None:
             # no goal left, but we are shut in a pocket: most of the known level lies past the blocker
             d1, _, _ = self.dijkstra(lv, k_mem, k_live, passable, start, None)
@@ -242,7 +242,7 @@ class CombatMixin:
             r1, r2 = d1 < (1 << 29), d2 < (1 << 29)
             if r1.sum() * 2 >= r2.sum():
                 return False
-            near = [c for c in self.avoid_cells if r2[c] and any(
+            near = [c for c in self.perc.avoid_cells if r2[c] and any(
                 0 <= c[0] + a < ROWS and 0 <= c[1] + b < COLS and r1[c[0] + a, c[1] + b] for a, b in NEIGH)]
             if not near:
                 return False
@@ -261,7 +261,7 @@ class CombatMixin:
             if ex:
                 ray = ray_squares(y, x, sy, sx)
                 self.cur_act = "unblock"
-                self.last_attack_target = blocker
+                self.acts.last_attack_target = blocker
                 self.combat.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
@@ -415,7 +415,7 @@ class CombatMixin:
             if kind in RAY_WANDS:          # statistics only: the ray coming back is in the P(win) of the zap
                 self.ray_risk_note(lv, (dy, dx), d, kind, letter, True)
             self.cur_act = "fight"
-            self.last_attack_target = pos
+            self.acts.last_attack_target = pos
             if len(self.combat.wand_pwin_log) < 30:
                 self.combat.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2), None,
                                            f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
@@ -452,8 +452,8 @@ class CombatMixin:
         (A/B prey_cache -- before: no square / hits / asleep in the key, kept for the game: -287 [-662, +76],
         median 7777 -> 7763; a correctness fix, accepted.)"""
         weapon = next((it.text for it in self.items() if it.wielded), None)
-        if self.combat.prey_cache_tick != self.tick_no:
-            self.combat.prey_cache, self.combat.prey_cache_tick = {}, self.tick_no
+        if self.combat.prey_cache_tick != self.pol.tick_no:
+            self.combat.prey_cache, self.combat.prey_cache_tick = {}, self.pol.tick_no
         lv = self.levels.get(self.cur_key)
         key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),
                self.bl(nh.NLE_BL_DEPTH), weapon, self.cur_key, pos, self.danger.our_hits.get((self.cur_key, pos), 0),
@@ -634,17 +634,17 @@ class CombatMixin:
         if mk:
             self.combat.kill_by[mk.group(1)] += 1
         self.combat.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
-        if mk and self.last_attack_target:
+        if mk and self.acts.last_attack_target:
             lvk = self.levels.get(self.cur_key)
             if lvk is not None:
-                lvk.stationary.pop(self.last_attack_target, None)   # killed it (a missile at a mold)
+                lvk.stationary.pop(self.acts.last_attack_target, None)   # killed it (a missile at a mold)
             if lvk is not None and mk.group(1) in CARRIERS:
-                lvk.kill_piles.add(self.last_attack_target)    # what it carried lies under its corpse (pickup.py)
-            old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
+                lvk.kill_piles.add(self.acts.last_attack_target)    # what it carried lies under its corpse (pickup.py)
+            old_corpse = lvk is not None and G.KIND[lvk.under[self.acts.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
-                self.combat.kills.append((self.turn(), mk.group(1), self.last_attack_target, self.cur_key))
+                self.combat.kills.append((self.turn(), mk.group(1), self.acts.last_attack_target, self.cur_key))
                 self.goal_event("corpse", "created")
-        if SHOT_AT_RE.search(m) and not TRAP_SHOT_RE.search(m) and self.turn() - self.own_zap_turn > 1:
+        if SHOT_AT_RE.search(m) and not TRAP_SHOT_RE.search(m) and self.turn() - self.acts.own_zap_turn > 1:
             self.combat.last_shot_turn = self.turn()
             mm = SHOOTER_RE.search(m)
             self.combat.shot_event = (self.turn(), mm.group(1) if mm else None)
@@ -652,5 +652,5 @@ class CombatMixin:
         # one in melee (hallu_strike: hallucinating, the name is random) (A/B attacked_us: -333 [-653, -55], median
         # 7777 -> 7787, 29 games of 1000 changed)
         melee = [who for who, kind in attacks_on_us(m) if kind == "melee"]
-        self.it_attacked |= "It" in melee
-        self.melee_on_us |= any(who.startswith("The ") for who in melee)
+        self.perc.it_attacked |= "It" in melee
+        self.perc.melee_on_us |= any(who.startswith("The ") for who in melee)

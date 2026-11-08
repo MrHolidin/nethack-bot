@@ -112,7 +112,7 @@ class RecordingBot(Bot):
         try:
             super().tick()
         finally:
-            step, act = self.last_step or "", self.cur_act or ""
+            step, act = self.pol.last_step or "", self.cur_act or ""
             for f in self.rec_frames[start:]:
                 f["p"], f["a"] = step, act
             self.record_equip()

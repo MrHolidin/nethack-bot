@@ -161,7 +161,7 @@ class ShopMixin:
             self.price_note_text(m)
         # the square under us is often not in our map memory yet, so 'on the door' can't be checked;
         # instead: we are inside only if we just fell / were teleported onto this level
-        if lv and self.shop_welcome(m) and not ARRIVED_RE.search(self.text_since(self.tick_seq)):
+        if lv and self.shop_welcome(m) and not ARRIVED_RE.search(self.text_since(self.pol.tick_seq)):
             # shop entrance: mark the shop from the door -- after falling in through a trap door we are
             # inside, and marking from there walls us in
             self.mark_shop(lv, self.pos())

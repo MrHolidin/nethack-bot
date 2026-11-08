@@ -54,20 +54,26 @@ STAT_FIELDS = ("created", "consumed", "expired", "abandoned", "vanished", "unfin
                "unreach_cell", "unreach_path", "kept")
 
 
+class GoalState:
+    """State of the goal ledger: open / closed goal squares and their statistics (GoalsMixin)."""
+    def __init__(self):
+        self.stats = {k: dict.fromkeys(STAT_FIELDS, 0) for k in tuple(GOALS) + CHASE_ONLY}
+        self.open = {}                 # (kind, level key) -> set of open goal squares (mask kinds)
+        self.closed = {}               # (kind, level key) -> squares done: consumed, or dropped there by us
+        self.chasing = None            # kind walked toward by this tick's action
+
+
 class GoalsMixin:
     def goals_init(self):
-        self.goal_stats = {k: dict.fromkeys(STAT_FIELDS, 0) for k in tuple(GOALS) + CHASE_ONLY}
-        self.goal_open = {}            # (kind, level key) -> set of open goal squares (mask kinds)
-        self.goal_closed = {}          # (kind, level key) -> squares done: consumed, or dropped there by us
-        self.chasing = None            # kind walked toward by this tick's action
+        self.goals = GoalState()
 
     # ------------------------------------------------------------------ events
     def goal_event(self, kind, event, n=1):
         if n:
-            self.goal_stats[kind][event] += n
+            self.goals.stats[kind][event] += n
 
     def goal_chase(self, kind):
-        self.chasing = kind
+        self.goals.chasing = kind
         if kind == "box":
             self.box.chase_turn = self.turn()
 
@@ -90,15 +96,15 @@ class GoalsMixin:
         for kind in EXPLORE_KINDS:
             cur = {(int(a), int(b)) for a, b in zip(*np.nonzero(self.goal_raw(kind, lv)))}
             key = (kind, lv.key)
-            prev = self.goal_open.get(key, set())
+            prev = self.goals.open.get(key, set())
             self.goal_event(kind, "created", len(cur - prev))
             self.goal_event(kind, "vanished", len(prev - cur))
-            self.goal_open[key] = cur
+            self.goals.open[key] = cur
 
     def goal_closed_set(self, kind, key):
         """Squares of this kind already done on level key: never a goal again (gold: a pile shows '$' on top
         again after we leave, so it is tried once; piles: inspected once; anything we dropped ourselves)."""
-        return self.goal_closed.setdefault((kind, key), set())
+        return self.goals.closed.setdefault((kind, key), set())
 
     def goal_close(self, kind, key, pos):
         """Mark done without counting a consumption (we dropped something here ourselves)."""
@@ -107,7 +113,7 @@ class GoalsMixin:
     def goal_done(self, kind, lv, pos):
         """A mask-kind goal at pos consumed (also when we got there before it was ever observed)."""
         key = (kind, lv.key)
-        op = self.goal_open.setdefault(key, set())
+        op = self.goals.open.setdefault(key, set())
         if pos in op:
             op.discard(pos)
         else:
@@ -177,8 +183,8 @@ class GoalsMixin:
         return out
 
     def goal_summary(self):
-        st = {k: dict(v) for k, v in self.goal_stats.items()}
-        for (kind, _), squares in self.goal_open.items():
+        st = {k: dict(v) for k, v in self.goals.stats.items()}
+        for (kind, _), squares in self.goals.open.items():
             st[kind]["unfinished"] += len(squares)
         t = self.turn()
         for r in self.combat.retrieve:

@@ -226,7 +226,7 @@ class MapMixin:
             # Sokoban: no other walk may push a boulder out of the plan or step into a pit / hole
             p[(k_mem == G.BOULDER) | (k_live == G.BOULDER) | (k_mem == G.TRAP)] = False
         # stationary dangerous monsters block
-        for (y, x) in self.avoid_cells:
+        for (y, x) in self.perc.avoid_cells:
             p[y, x] = False
         return p
 
@@ -363,21 +363,21 @@ class MapMixin:
         is used up here. True if a staircase brought us onto this level."""
         arrived_by_stairs = False
         if lv.key != self.prev_key:
-            arrived_by_stairs = self.took_stairs
-            if self.last_stair_dir and self.stair_from and self.stair_from[0] == self.prev_key \
+            arrived_by_stairs = self.acts.took_stairs
+            if self.acts.last_stair_dir and self.acts.stair_from and self.acts.stair_from[0] == self.prev_key \
                     and self.prev_key in self.levels:
-                self.levels[self.prev_key].stairs_to[self.stair_from[1]] = lv.key
+                self.levels[self.prev_key].stairs_to[self.acts.stair_from[1]] = lv.key
                 lv.stairs_to[self.pos()] = self.prev_key
             self.note_stair_arrival(lv)
             self.prev_key = lv.key
-        self.last_stair_dir = None
-        self.took_stairs = False
+        self.acts.last_stair_dir = None
+        self.acts.took_stairs = False
         return arrived_by_stairs
 
     def note_stair_arrival(self, lv):
         """On a new level by a staircase we took: the other end of it is under us."""
-        if self.last_stair_dir:
-            lv.set_terrain(self.pos(), UPSTAIR_GLYPH if self.last_stair_dir == ">" else DOWNSTAIR_GLYPH)
+        if self.acts.last_stair_dir:
+            lv.set_terrain(self.pos(), UPSTAIR_GLYPH if self.acts.last_stair_dir == ">" else DOWNSTAIR_GLYPH)
 
     def note_feature_here(self, text):
         """"There is a staircase down here." (invent.c look_here, said when something lies on the square we step on --
@@ -404,34 +404,34 @@ class MapMixin:
             lv.town_heard = True                              # the watch warned us -- Minetown (A/B minetown_watch:
                                                               # never fired without dig_through, accepted)
         if "under arrest" in m:
-            self.mines_kick_stats["arrest"] += 1
-        if "stop damaging that door" in m and lv and self.last_move_target:
-            lv.watch_warned.add(self.last_move_target)      # the next kick it sees means arrest
-            self.no_entry_mark(lv, self.last_move_target)
-            self.mines_kick_stats["warned"] += 1
-        if "diagonally into an intact doorway" in m and lv and self.last_move_target:
-            lv.door_seen[self.last_move_target] = lv.no_diag[self.last_move_target] = True
+            self.nav.mines_kick_stats["arrest"] += 1
+        if "stop damaging that door" in m and lv and self.nav.last_move_target:
+            lv.watch_warned.add(self.nav.last_move_target)      # the next kick it sees means arrest
+            self.no_entry_mark(lv, self.nav.last_move_target)
+            self.nav.mines_kick_stats["warned"] += 1
+        if "diagonally into an intact doorway" in m and lv and self.nav.last_move_target:
+            lv.door_seen[self.nav.last_move_target] = lv.no_diag[self.nav.last_move_target] = True
         if "diagonally out of an intact doorway" in m and lv:
             lv.door_seen[self.pos()] = lv.no_diag[self.pos()] = True
         for kind, caught, freed in TRAP_MSGS:
             if any(c in m for c in caught) and self.cur_key:
-                if self.trapped is None:
-                    self.trap_stats[kind] += 1
-                self.trapped = (kind, self.cur_key, self.pos())
+                if self.nav.trapped is None:
+                    self.nav.trap_stats[kind] += 1
+                self.nav.trapped = (kind, self.cur_key, self.pos())
             elif any(f in m for f in freed):
-                self.trapped = None
-        if "This door is locked" in m and self.last_move_target and lv:
-            lv.locked.add(self.last_move_target)
+                self.nav.trapped = None
+        if "This door is locked" in m and self.nav.last_move_target and lv:
+            lv.locked.add(self.nav.last_move_target)
         if self.squeeze_msg(m, lv):                           # carry.py: a diagonal squeeze refused for our weight
             pass
-        elif lv and self.last_move_target and "You try to move the boulder, but in vain" in m:
+        elif lv and self.nav.last_move_target and "You try to move the boulder, but in vain" in m:
             # hack.c:332 moverock (the only boulder message a step gets that stays true; a monster behind it,
             # "Perhaps that's why you cannot move it." (hack.c:172), moves on: left to the step-failure count)
-            if not self.dig_through_note(lv, self.pos(), self.last_move_target, "boulder"):
-                lv.blocked[self.last_move_target] = True
-        if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.last_move_target:
+            if not self.dig_through_note(lv, self.pos(), self.nav.last_move_target, "boulder"):
+                lv.blocked[self.nav.last_move_target] = True
+        if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.nav.last_move_target:
             # can't kick from here (wounded legs: dokick.c; in a pit): kicking the door again would loop
-            lv.blocked[self.last_move_target] = True
+            lv.blocked[self.nav.last_move_target] = True
         if lv and ("Closed for inventory" in m or any(engraving_says(t, "Closed for inventory")
                                                          for t in CFI_RE.findall(m))):
             # the closed shop's door: kicking it open angers the shopkeeper ("How dare you break my door?");

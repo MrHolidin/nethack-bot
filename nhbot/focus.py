@@ -114,12 +114,12 @@ class FocusMixin:
 
     def focus_note(self, m):
         """Count our landed hits on the square we attacked."""
-        if not self.last_attack_target or self.cur_key is None:
+        if not self.acts.last_attack_target or self.cur_key is None:
             return
         n = len(re.findall(r"You (?:hit|smite) ", m))
         if not n:
             return
-        pos = self.last_attack_target
+        pos = self.acts.last_attack_target
         g = int(self.obs["glyphs"][pos])
         if not nh.glyph_is_monster(g):
             return

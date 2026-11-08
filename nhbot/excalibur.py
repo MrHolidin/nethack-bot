@@ -104,7 +104,7 @@ class ExcaliburMixin:
         if not self.level_travel_step(lv, self.grids(lv), target, "excal", "excal_travel", known_only=True,
                                       max_cost=self.opts.excal_cost_up):
             return False
-        self.excal.trips += self.took_stairs
+        self.excal.trips += self.acts.took_stairs
         return True
 
     def excal_up_target(self, lv):

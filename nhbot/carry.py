@@ -191,11 +191,11 @@ class CarryMixin:
     def squeeze_msg(self, m, lv):
         """msg_map: a diagonal squeeze refused for our weight -- it needs inventory weight <= 600 (hack.c test_move):
         squeeze_step sheds a unit next tick, unless dig_through digs a corner instead. True if m said so."""
-        if not (lv and self.last_move_target and "You are carrying too much to get through" in m):
+        if not (lv and self.nav.last_move_target and "You are carrying too much to get through" in m):
             return False
         self.carry.squeeze_stats["refused"] += 1
-        if not self.dig_through_note(lv, self.pos(), self.last_move_target, "squeeze"):
-            self.carry.squeeze_pending = (lv.key, self.last_move_target)
+        if not self.dig_through_note(lv, self.pos(), self.nav.last_move_target, "squeeze"):
+            self.carry.squeeze_pending = (lv.key, self.nav.last_move_target)
         return True
 
     def squeeze_step(self, lv):

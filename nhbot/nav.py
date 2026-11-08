@@ -62,9 +62,10 @@ class PathPrev:
         return self.get(p) is not None
 
 
-class NavMixin:
-    def nav_init(self):
-        self._grids_key, self._grids = None, None    # grids: the cache and its key
+class NavState:
+    """State of walking: the grids cache, the last step, traps and doors (NavMixin)."""
+    def __init__(self):
+        self.grids_key, self.grids = None, None      # grids: the cache and its key
         self.last_move_target = None     # the square our last step went for (msg_map reads what it said)
         self.peaceful_waits = 0          # turns waited for a peaceful monster in our way
         self.shop_kicks_avoided = 0
@@ -72,6 +73,11 @@ class NavMixin:
         self.trap_stats = Counter()
         self.door_stats = Counter()
         self.mines_kick_stats = Counter()
+
+
+class NavMixin:
+    def nav_init(self):
+        self.nav = NavState()
 
     def dijkstra(self, lv, k_mem, k_live, passable, start, targets_mask=None, max_cost=10_000, want_dist=True):
         """Shortest paths from start: (dist array or None without want_dist, prev, the first target square
@@ -141,14 +147,14 @@ class NavMixin:
         every tick (a move that sends no key -- a door we won't kick -- still changes the map memory), with
         every key sent (any observation change), the shop visit state and the never-melee squares.
         The arrays are read-only: copy before changing."""
-        key = (self.tick_no, self.steps, lv.key, self.shop_active(lv), tuple(self.avoid_cells))
-        if self._grids_key != key:
+        key = (self.pol.tick_no, self.steps, lv.key, self.shop_active(lv), tuple(self.perc.avoid_cells))
+        if self.nav.grids_key != key:
             k_mem, k_live = self.kinds(lv), G.KIND[self.obs["glyphs"]]
             passable = self.passable_grid(lv, k_mem, k_live)
             for a in (k_mem, k_live, passable):
                 a.setflags(write=False)
-            self._grids_key, self._grids = key, (k_mem, k_live, passable)
-        return self._grids
+            self.nav.grids_key, self.nav.grids = key, (k_mem, k_live, passable)
+        return self.nav.grids
 
     def walk_to(self, lv, mask, max_cost=10_000, act=None, chase=None, grids=None, also=None):
         """One step toward the nearest square of mask by path. Returns (status, square):
@@ -179,7 +185,7 @@ class NavMixin:
         y, x = self.pos()
         ty, tx = target
         key = DELTA2KEY[(ty - y, tx - x)]
-        self.last_move_target = target
+        self.nav.last_move_target = target
         before = (y, x, self.turn())
         lv = self.level()
         self.trap_held(lv)                    # forgets the trap once we are out of it
@@ -188,21 +194,21 @@ class NavMixin:
             # "You kick at empty space." (dokick.c:1251-1257), a turn each, for ever
             # (A/B door_kick_stale: -83 [-537, +375], median 7726 -> 7850, 52 of 1000 changed)
             lv.locked.discard(target)
-            self.door_stats["stale_locked"] += 1
+            self.nav.door_stats["stale_locked"] += 1
         if target in lv.locked:
             if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
                 self.no_entry_mark(lv, target)    # closed shop: kicking the door angers the shopkeeper
-                self.shop_kicks_avoided += 1
+                self.nav.shop_kicks_avoided += 1
                 return
             if self.lock_door_step(lv, target):
                 return                        # lock_tools: unlocked with the tool, silently (nhbot.locktools)
             if target == GROTTO_STAIR_DOOR and self.is_grotto(lv) \
                     and target not in lv.watch_warned:
                 if self.law_nearby():         # dokick.c: the watch minds only a kick one of them can see
-                    self.mines_kick_stats["waited"] += 1
+                    self.nav.mines_kick_stats["waited"] += 1
                     self.press("s")
                     return
-                self.mines_kick_stats["kicks"] += 1
+                self.nav.mines_kick_stats["kicks"] += 1
                 self.kick(key)
                 return
             if lv.key[0] == 2:
@@ -218,8 +224,8 @@ class NavMixin:
             # making the square impassable for good after a few waits was tried and not taken -- peaceful_waits
             # counts)
             lv.fail[ty, tx] += 1
-            self.peaceful_waits += 1
-            self.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
+            self.nav.peaceful_waits += 1
+            self.perc.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
             self.press("s")
             return
         seq0 = self.msg_seq
@@ -227,22 +233,22 @@ class NavMixin:
         self.press(key)
         after = (*self.pos(), self.turn())
         if "intact doorway" in self.text_since(seq0) and not known:
-            self.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
+            self.nav.door_stats["diagonal_refused"] += 1      # msg_map marked the door; the square is not at fault
             return                                         # (a second refusal is counted: no loop without time)
         if self.opts.door_resists and "The door resists!" in self.text_since(seq0):
-            self.door_stats["resisted"] += 1    # lock.c doopen: a stuck door, opened with P ~ (Str+Dex+Con)/3 in 20 a try
+            self.nav.door_stats["resisted"] += 1    # lock.c doopen: a stuck door, opened with P ~ (Str+Dex+Con)/3 in 20 a try
             return                                # -- try again; not the square's fault (80014: left after two)
         if "The door opens." in self.text_since(seq0):
             # autoopen opened it (hack.c:798 test_move -> lock.c doopen_indir, a turn) -- no failed step into the
             # square (door_stale, which also let "locked" / "resists" off, lost -2049: 40807 such steps)
             # (A/B door_open_ok: -1920 [-3808, -6], median 7726 -> 7768, 966 of 1000 changed)
-            self.door_stats["door_opened"] += 1
+            self.nav.door_stats["door_opened"] += 1
             return
         if after[:2] == before[:2] and self.cur_key == (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)):
-            if self.trapped is not None and self.trapped[1:] == (lv.key, (y, x)) and after[2] > before[2]:
+            if self.nav.trapped is not None and self.nav.trapped[1:] == (lv.key, (y, x)) and after[2] > before[2]:
                 # in the trap we were caught in, the step took its turn: held, for however long -- the square is not
                 # at fault (A/B trap_noblock +76 [-1081, +1220], median +404)
-                self.trap_stats["fail_not_counted"] += 1
+                self.nav.trap_stats["fail_not_counted"] += 1
                 return
             lv.fail[ty, tx] += 1
             if lv.fail[ty, tx] >= 6:
@@ -251,10 +257,10 @@ class NavMixin:
     def trap_held(self, lv):
         """Still held by the trap the messages told of (failed steps that took a turn then are not counted)? Forgotten
         once we are elsewhere."""
-        if self.trapped is None:
+        if self.nav.trapped is None:
             return False
-        if self.trapped[1:] != (lv.key, self.pos()):
-            self.trapped = None
+        if self.nav.trapped[1:] != (lv.key, self.pos()):
+            self.nav.trapped = None
             return False
         return True
 
@@ -267,4 +273,4 @@ class NavMixin:
             self.settle()
         m = self.text_since(seq0)
         if "crashes open" in m or "shatters" in m:     # dokick.c:1286-1290
-            self.level().locked.discard(self.last_move_target)
+            self.level().locked.discard(self.nav.last_move_target)

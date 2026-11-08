@@ -168,8 +168,8 @@ class DangerMixin:
     def danger_msg(self, m):
         if OUR_HIT_RE.search(m):
             self.danger.hit_seen = True
-        if KILL_WORD_RE.search(m) and self.last_attack_target is not None:
-            self.danger.our_hits.pop((self.cur_key, self.last_attack_target), None)
+        if KILL_WORD_RE.search(m) and self.acts.last_attack_target is not None:
+            self.danger.our_hits.pop((self.cur_key, self.acts.last_attack_target), None)
         for mon, weapon in WIELD_RE.findall(m):
             w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon
             if w in WEAPON_DICE:
@@ -330,7 +330,7 @@ class DangerMixin:
         self.danger.pending = None
         if pend is not None:
             pt, php, parts = pend
-            target = self.last_attack_target if self.danger.attack_turn == pt else None
+            target = self.acts.last_attack_target if self.danger.attack_turn == pt else None
             if target is not None and self.danger.hit_seen:
                 key = (self.cur_key, target)
                 self.danger.our_hits[key] = self.danger.our_hits.get(key, 0) + 1
@@ -353,7 +353,7 @@ class DangerMixin:
     def danger_summary(self):
         if self.done and not self.truncated and self.danger.pending is not None:
             pt, php, parts = self.danger.pending
-            target = self.last_attack_target if self.danger.attack_turn == pt else None
+            target = self.acts.last_attack_target if self.danger.attack_turn == pt else None
             mean, pd = self.danger_combine(parts, target, php)
             self.danger_score((pt, php, mean, pd), php, died=True)
             self.danger.pending = None

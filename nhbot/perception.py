@@ -15,8 +15,9 @@ from nhbot.monsters import (ALWAYS_AVOID, M2_HOSTILE, M2_PEACEFUL, MR_BITS, MS_G
 from nhbot.rays import our_protection
 
 
-class PerceptionMixin:
-    def perception_init(self):
+class PerceptionState:
+    """State of telling peaceful from hostile and what is next to us (PerceptionMixin)."""
+    def __init__(self):
         self.farlooks = 0              # ';' looks that peaceful_now made
         self.peace_cls = {}            # permonst index -> 1 always peaceful / -1 never / 0 either (peace_class)
         self.peace_seen = {}           # (level, glyph, pos) -> (turn, peaceful): a look or 'Really attack?'
@@ -25,18 +26,23 @@ class PerceptionMixin:
         self.peace_turned = 0          # looks that found a kind created peaceful hostile
         self.empty_looks = 0           # looks whose description came back empty
         self.peaceful_wait_by = Counter()   # species: waits for a peaceful monster in our way (nav.move)
-        self._adjacent, self._adjacent_at = [], None     # adjacent_hostiles: the answer and (tick, steps, level) of it
+        self.adjacent, self.adjacent_at = [], None       # adjacent_hostiles: the answer and (tick, steps, level) of it
         self.avoid_cells = []          # squares of never-melee monsters, walked round (adjacent_hostiles)
         self.it_attacked = self.melee_on_us = False      # blind_strike / hallu_strike evidence this turn (msg_combat)
         self.prev_inv, self.inv_attackers, self.hallu_targets = set(), set(), set()
         self.blind_held = self.hallu_held = 0
+
+
+class PerceptionMixin:
+    def perception_init(self):
+        self.perc = PerceptionState()
 
     # ------------------------------------------------------------------ peacefulness
     def peace_class(self, idx):
         """makemon.c peace_minded() for us: 1 = always created peaceful (M2_PEACEFUL, quest leader / guardians,
         our race's friends), -1 = never (M2_HOSTILE, nemesis, our race's enemies, alignment of the other sign,
         A_NONE), 0 = either (co-aligned, a die roll; minions: by our alignment record)."""
-        c = self.peace_cls.get(idx)
+        c = self.perc.peace_cls.get(idx)
         if c is None:
             pm = nh.permonst(idx)
             f2 = pm.mflags2
@@ -53,13 +59,13 @@ class PerceptionMixin:
                 c = -1
             else:
                 c = 0
-            self.peace_cls[idx] = c
+            self.perc.peace_cls[idx] = c
         return c
 
     def track_hostile_marks(self, lv):
         """Follow marked monsters: still on their square, or the nearest monster of the same glyph within 2
         squares; lost (out of view) -> forgotten."""
-        marks = self.hostile_marks.get(lv.key)
+        marks = self.perc.hostile_marks.get(lv.key)
         if not marks:
             return set()
         g = self.obs["glyphs"]
@@ -76,7 +82,7 @@ class PerceptionMixin:
             if near:
                 q = min(near, key=lambda q: max(abs(q[0] - p[0]), abs(q[1] - p[1])))
                 out.append((gl, q)); taken.add(q)
-        self.hostile_marks[lv.key] = out
+        self.perc.hostile_marks[lv.key] = out
         return taken
 
     def peaceful_now(self, lv, pos, look=True, slack=0, far=False):
@@ -91,7 +97,7 @@ class PerceptionMixin:
         if pos in self.track_hostile_marks(lv):
             return False
         ck = (lv.key, g, pos)
-        s = self.peace_seen.get(ck)
+        s = self.perc.peace_seen.get(ck)
         if s is not None and s[0] >= self.turn() - slack:
             return s[1]
         cls = self.peace_class(nh.glyph_to_mon(g))
@@ -102,17 +108,17 @@ class PerceptionMixin:
             # next to us: look, also at kinds created peaceful -- they turn hostile (a throne room, onlookers
             # when we hit a peaceful, an angry shopkeeper) and need not attack in melee to be dangerous
             desc = self.describe_at(pos)
-            self.farlooks += 1
+            self.perc.farlooks += 1
             peaceful = "peaceful" in desc or "tame" in desc
             if not desc.strip():
-                self.empty_looks += 1
-            if len(self.peace_seen) > 400:
+                self.perc.empty_looks += 1
+            if len(self.perc.peace_seen) > 400:
                 t = self.turn()
-                self.peace_seen = {k: v for k, v in self.peace_seen.items() if v[0] >= t - 2}
-            self.peace_seen[ck] = (self.turn(), peaceful)
+                self.perc.peace_seen = {k: v for k, v in self.perc.peace_seen.items() if v[0] >= t - 2}
+            self.perc.peace_seen[ck] = (self.turn(), peaceful)
             if cls > 0 and not peaceful:
-                self.peace_turned += 1
-                marks = self.hostile_marks.setdefault(lv.key, [])
+                self.perc.peace_turned += 1
+                marks = self.perc.hostile_marks.setdefault(lv.key, [])
                 if (g, pos) not in marks:
                     marks.append((g, pos))           # stays hostile while we can follow it
             return peaceful
@@ -138,8 +144,8 @@ class PerceptionMixin:
                 match = lambda n: n in PM_BY_NAME and PM_BY_NAME[n].mflags2 & M2_PEACEFUL
             same = [p for p in adj if match(G.monster_name(int(g[p])))]
             if same and any(self.peaceful_now(lv, p, look=False, slack=1) for p in same):
-                self.peaceful_hits[G.monster_name(int(g[same[0]]))] += 1
-                marks = self.hostile_marks.setdefault(lv.key, [])
+                self.perc.peaceful_hits[G.monster_name(int(g[same[0]]))] += 1
+                marks = self.perc.hostile_marks.setdefault(lv.key, [])
                 for p in same:
                     if (int(g[p]), p) not in marks:
                         marks.append((int(g[p]), p))
@@ -182,32 +188,32 @@ class PerceptionMixin:
             if not here and not blind and max(abs(pos[0] - y), abs(pos[1] - x)) <= 1:
                 del lv.stationary[pos]
                 continue
-            if not here and pos not in self.avoid_cells and not self.may_melee(lv, name):
-                self.avoid_cells.append(pos)
+            if not here and pos not in self.perc.avoid_cells and not self.may_melee(lv, name):
+                self.perc.avoid_cells.append(pos)
 
     def adjacent_hostiles(self, lv):
         """The hostiles next to us we may hit, [(pos, name)]; on the way avoid_cells (the never-melee monsters within 7
         squares, and the remembered stationary ones) and Level.stationary are brought up to date. Worked out once per
         observation -- again only once a key was sent (a look may send some): the steps of a tick that ask again
         (items_gate) read the same answer."""
-        at = (self.tick_no, self.steps, lv.key)
-        if self._adjacent_at != at:
+        at = (self.pol.tick_no, self.steps, lv.key)
+        if self.perc.adjacent_at != at:
             out = self.find_adjacent_hostiles(lv)
-            self._adjacent, self._adjacent_at = out, (self.tick_no, self.steps, lv.key)
-        return list(self._adjacent)
+            self.perc.adjacent, self.perc.adjacent_at = out, (self.pol.tick_no, self.steps, lv.key)
+        return list(self.perc.adjacent)
 
     def find_adjacent_hostiles(self, lv):
         y, x = self.pos()
         g = self.obs["glyphs"]
         out = []
-        self.avoid_cells = []
+        self.perc.avoid_cells = []
         for yy in range(max(0, y - 7), min(ROWS, y + 8)):
             for xx in range(max(0, x - 7), min(COLS, x + 8)):
                 k = G.KIND[g[yy, xx]]
                 if k == G.MONSTER:
                     name = G.monster_name(g[yy, xx])
                     if not self.may_melee(lv, name):
-                        self.avoid_cells.append((yy, xx))
+                        self.perc.avoid_cells.append((yy, xx))
                     if self.never_melee(name) and name in PM_BY_NAME \
                             and PM_BY_NAME[name].mmove == 0:
                         lv.stationary[(yy, xx)] = name
@@ -234,13 +240,13 @@ class PerceptionMixin:
         return not self.adjacent_hostiles(lv) and self.turn() - self.combat.last_shot_turn > 5
 
     def mark_peaceful_target(self):
-        t = self.last_attack_target
+        t = self.acts.last_attack_target
         if t is None:
             return
         g = int(self.obs["glyphs"][t])
         lv = self.levels.get(self.cur_key)
         if lv is not None:
-            self.peace_seen[(lv.key, g, t)] = (self.turn(), True)      # this monster, this turn
+            self.perc.peace_seen[(lv.key, g, t)] = (self.turn(), True)      # this monster, this turn
 
     def line_targets(self, lv, max_d=6):
         """Hostile-looking monsters in a clear straight line: [(dirkey, d, pos, step)]."""
@@ -362,19 +368,19 @@ class PerceptionMixin:
         new 'I' next to us -> that one; an attack and a single 'I' next to us -> that one; otherwise unknown,
         don't hit (blind_wait then keeps us still)."""
         cur = {p for p, n in hostiles if n == "invisible"}
-        attacked, self.it_attacked = self.it_attacked, False
-        prev = self.prev_inv
-        known = self.inv_attackers
+        attacked, self.perc.it_attacked = self.perc.it_attacked, False
+        prev = self.perc.prev_inv
+        known = self.perc.inv_attackers
         if attacked:
             new = cur - prev
             known |= new if new else (cur if len(cur) == 1 else set())
         known &= cur
-        self.prev_inv, self.inv_attackers = cur, known
+        self.perc.prev_inv, self.perc.inv_attackers = cur, known
         if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND or not self.strike_scope_ok(lv):
             return hostiles
         out = [(p, n) for p, n in hostiles if n != "invisible" or p in known]
         if len(out) < len(hostiles):
-            self.blind_held += 1
+            self.perc.blind_held += 1
         return out
 
     def hallu_attackers(self, lv, hostiles):
@@ -386,17 +392,17 @@ class PerceptionMixin:
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
                and nh.glyph_is_monster(int(g[y + dy, x + dx]))]
-        attacked, self.melee_on_us = self.melee_on_us, False
-        known = self.hallu_targets
+        attacked, self.perc.melee_on_us = self.perc.melee_on_us, False
+        known = self.perc.hallu_targets
         if attacked and len(adj) == 1:
             known.add(adj[0])
         known &= set(adj)
-        self.hallu_targets = known
+        self.perc.hallu_targets = known
         if not int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU or not self.strike_scope_ok(lv):
             return hostiles
         out = [(p, n) for p, n in hostiles if p in known and not lv.shop[p]]
         if len(out) < len(hostiles):
-            self.hallu_held += 1
+            self.perc.hallu_held += 1
         return out
 
     def hallu_blind_ranged(self):
@@ -408,7 +414,7 @@ class PerceptionMixin:
     def peaceful_seen(self, lv):
         """A peaceful monster here, as far as we know: one a look found peaceful (peace_seen), a shop, Minetown."""
         return bool(lv.shop.any()) or self.is_minetown(lv) \
-            or any(k == lv.key and v[1] for (k, _, _), v in self.peace_seen.items())
+            or any(k == lv.key and v[1] for (k, _, _), v in self.perc.peace_seen.items())
 
     def strike_scope_ok(self, lv):
         """blind_strike / hallu_strike only in Minetown -- a Mines level with an altar, a fountain or

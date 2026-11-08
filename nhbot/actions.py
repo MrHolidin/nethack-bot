@@ -6,8 +6,9 @@ from nhbot.goals import GOALS
 from nhbot.items import base_name
 
 
-class ActionsMixin:
-    def actions_init(self):
+class ActionsState:
+    """State of our last actions: attack target, staircase, throws and zaps (ActionsMixin)."""
+    def __init__(self):
         self.last_attack_target = None   # the square we last attacked (melee, missile, wand): kills are noted there
         self.took_stairs = False         # the last action was a staircase (mapmem.note_arrival reads it)
         self.last_stair_dir = None       # '<' / '>' of the staircase we took this tick
@@ -15,6 +16,11 @@ class ActionsMixin:
         self.throws = 0
         self.zaps = 0
         self.own_zap_turn = -99          # a bouncing ray of ours is not an enemy shooter
+
+
+class ActionsMixin:
+    def actions_init(self):
+        self.acts = ActionsState()
 
     def attack(self, target):
         """Fight the monster on the square next to us (F + direction)."""
@@ -24,24 +30,24 @@ class ActionsMixin:
             self.press("s")
             return
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
-        self.last_attack_target = target
+        self.acts.last_attack_target = target
         self.danger.attack_turn = self.turn()           # danger: the monster we hit first may not act
-        self.last_move_target = None
+        self.nav.last_move_target = None
         self.press("F")
         self.press(key)
 
     def attack_engulfer(self):
         """Engulfed: hit in any direction -- the engulfer is all around us (no square to note)."""
-        self.last_attack_target = None
+        self.acts.last_attack_target = None
         self.press("F")
         self.press("h")
 
     def take_stairs(self, key):
         """Up ('<') or down ('>') the staircase we stand on. Where it led is noted next tick (mapmem.note_arrival:
         Level.stairs_to, the staircase under us on arrival)."""
-        self.last_stair_dir = key
-        self.stair_from = (self.cur_key, self.pos())
-        self.took_stairs = True
+        self.acts.last_stair_dir = key
+        self.acts.stair_from = (self.cur_key, self.pos())
+        self.acts.took_stairs = True
         self.press(key)
 
     def search_turns(self, n):
@@ -61,7 +67,7 @@ class ActionsMixin:
             self.press(key)
         else:
             self.settle()
-        self.throws += 1
+        self.acts.throws += 1
         self.elb_scuffed()                       # a throw scuffs the engraving under us
         self.combat.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
         self.goal_event("retrieve", "created")
@@ -69,7 +75,7 @@ class ActionsMixin:
     def zap(self, letter, key):
         """Zap the wand letter in direction key; its charges (charges.py) and whom a sleep ray hit (combat.py) noted.
         False if no zap was asked for."""
-        self.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
+        self.acts.own_zap_turn = self.turn()           # a bouncing ray of ours is not an enemy shooter
         seq0 = self.msg_seq
         wand = next(it for it in self.items() if it.letter == letter)
         if not self.ask("z", "zap"):
@@ -82,7 +88,7 @@ class ActionsMixin:
             self.settle()
         msgs = self.text_since(seq0)
         self.note_wand_use(wand, msgs)                   # charges.py
-        self.zaps += 1
+        self.acts.zaps += 1
         self.note_slept(key, msgs)
         return True
 
