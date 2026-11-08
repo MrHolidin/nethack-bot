@@ -26,6 +26,12 @@ DEFAULTS = {
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "fight_model2_all": False, # A/B: danger.win_prob and everything that uses it with fight_model2 (spells,
                                #      negative AC, unarmed, weapon skill, HP prior) -- the model focus uses
+    "keep_rule": False,        # A/B: one rule what we keep (value.keep_reason / keep_plan) for est_value, selling,
+                               #      throwing (expendables) and taking: worn, the alternate weapon, water, one digger
+                               #      (taken now: "digger"), the best wield candidate (+ a long sword for Excalibur),
+                               #      MISSILE_KEEP missile pieces (no crysknife), MAX_FOOD pieces of food we eat (no
+                               #      corpses, no tins), what carry.needed keeps; no lamp to rub thrown, no water sold
+                               #      (re-run on new seeds / base after rejection: -731 [-2505, +1053])
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)

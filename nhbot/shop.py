@@ -1,7 +1,8 @@
 """Shop visits: the shared state for a visit, selling, paying, and the digger a shopkeeper wants left outside.
 
 Sell: in a shop that buys the class (general store: everything), drop each item we have no use for deep
-inside the shop and accept the offer; take back what the shopkeeper won't buy (what we keep: carry.needed).
+inside the shop and accept the offer; take back what the shopkeeper won't buy (what we keep: carry.needed,
+keep_rule value.keep_reason).
 """
 import re
 
@@ -177,7 +178,7 @@ class ShopMixin:
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes()
                 and self.shop_buys(stype, it) and not self.offer_zero(it)
-                and not self.needed(it)
+                and (self.keep_reason(it) is None if self.opts.keep_rule else not self.needed(it))
                 and (lv.key, it.text) not in self.shop.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and not it.unpaid]
 
