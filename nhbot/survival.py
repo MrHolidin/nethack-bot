@@ -12,6 +12,7 @@ from nhbot.consts import DELTA2KEY, FAINTING, HUNGRY, NOT_HUNGRY, SATIATED, WEAK
 from nhbot.game import PAGE_RE
 from nhbot.goals import GOALS
 from nhbot.items import base_name
+from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_ACID, M1_POIS, M2_SHAPESHIFTER, M2_UNDEAD, M2_WERE, NEVER_EAT, PM_BY_NAME, RACE_FLAG, WERE_KIN
 from nhbot.weapondice import SKILL_LEVEL
 
@@ -36,6 +37,19 @@ FOOD_NUTRITION = {"food ration": 800, "cram ration": 600, "lembas wafer": 800, "
                   "lump of royal jelly": 200, "kelp frond": 30, "eucalyptus leaf": 30, "sprig of wolfsbane": 40,
                   "clove of garlic": 40, "meatball": 5, "meat stick": 5, "huge chunk of meat": 2000,
                   "meat ring": 5, "lichen corpse": 200, "lizard corpse": 40, "tripe ration": 200, "egg": 80}
+# food_facts: objects.c:769 FOOD("slime mold", ..., 250, ...)
+FOOD_NUTRITION_FIXED = {**FOOD_NUTRITION, "slime mold": 250}
+# food_facts: corpses (and tins) whose eating does what we won't have (eat.c cpostfx, also for a tin's meat):
+# a mimic -- helpless 20 / 40 / 50 turns mimicking gold (eat.c:1016-1033); hallucination 200 turns -- the violet
+# fungus and every kind with a stunning / hallucinating attack (eat.c:1107-1112: the yellow mold)
+MIMIC_CORPSES = {"small mimic": 20, "large mimic": 40, "giant mimic": 50}
+HALLU_CORPSES = {"violet fungus"} | {nh.permonst(i).mname for i in range(nh.NUMMONS)
+                                    if any(a[1] in ("STUN", "HALU") for a in ATTACKS[i])}
+# attrib.c *_abil: the roles intrinsically Fast, from this experience level (a quantum mechanic's corpse toggles it:
+# eat.c:1052-1060 -- eaten Fast we lose it)
+INTRINSIC_FAST_XL = {"Archeologist": 1, "Monk": 1, "Samurai": 1, "Barbarian": 7, "Caveman": 7, "Cavewoman": 7,
+                     "Knight": 7, "Valkyrie": 7}
+STOMACH_CONTENT_RE = re.compile(r"\bYour [a-z ]+ feels content\.")     # pray.c:368-370 fix_worst_trouble
 
 
 class SurvivalMixin:
@@ -71,6 +85,7 @@ class SurvivalMixin:
         self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
         self.horn_stats = Counter()
         self._hunger_at = (0, NOT_HUNGRY)    # (turn, status line hunger) at the last tick (nutrition_tick)
+        self.qm_fast = None            # food_facts: Fast as a quantum mechanic's corpse left us (None: never ate one)
 
     def pray(self):
         self.cur_act = "pray"
@@ -126,6 +141,19 @@ class SurvivalMixin:
     def nutrition_add(self, n):
         self.nutrition += n
 
+    def nutrition_set(self, n):
+        """food_facts: u.uhunger is n now (a prayer's init_uhunger) -- nutrition_tick takes off the turns since the
+        last tick, so they are added here."""
+        self.nutrition = n + max(0, self.turn() - self._hunger_at[0])
+
+    def intrinsic_fast(self):
+        """food_facts: intrinsically Fast -- by role and experience level (INTRINSIC_FAST_XL), or as the last quantum
+        mechanic we ate left us."""
+        if self.qm_fast is not None:
+            return self.qm_fast
+        xl = INTRINSIC_FAST_XL.get(self.role or "")
+        return xl is not None and self.bl(nh.NLE_BL_XP) >= xl
+
     def eat_from_inventory(self):
         for letter, ocls, s in self.inventory():
             if ocls != nh.FOOD_CLASS or not self.edible_now(s):
@@ -139,7 +167,8 @@ class SurvivalMixin:
                 break
             if "what do you want to eat" in self.message().lower():
                 self.press(letter)
-                self.nutrition_add(FOOD_NUTRITION.get(base_name(s)[2], 200))
+                table = FOOD_NUTRITION_FIXED if self.opts.food_facts else FOOD_NUTRITION
+                self.nutrition_add(table.get(base_name(s)[2], 200))
             else:
                 self.settle()
             return True
@@ -164,6 +193,9 @@ class SurvivalMixin:
             return False                      # undead: a zombie's / mummy's corpse is made old -- often tainted
         if f2 & RACE_FLAG.get((self.race or "").lower(), 0):
             return False                      # cannibalism
+        if self.opts.food_facts and (name in MIMIC_CORPSES or name in HALLU_CORPSES
+                                     or (name == "quantum mechanic" and self.intrinsic_fast())):
+            return False                      # helpless mimicking, hallucinating, our speed lost (tins too)
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
         if tin:
             return True
@@ -429,3 +461,13 @@ class SurvivalMixin:
             self.lycanthropy = False
         if "carrying so much" in m:
             self.no_eat_until = self.turn() + 20
+        if self.opts.food_facts:
+            if STOMACH_CONTENT_RE.search(m):
+                self.nutrition_set(900)       # pray.c:368-370 -> eat.c:119 init_uhunger: u.uhunger = 900
+            elif "surrounded by a golden glow" in m:
+                self.nutrition_set(max(900, self.nutrition - max(0, self.turn() - self._hunger_at[0])))
+                #                               pray.c:1110 pat_on_head: init_uhunger if u.uhunger < 900
+            if "You seem faster." in m:       # eat.c:1052-1060 a quantum mechanic (the only source of either)
+                self.qm_fast = True
+            elif "You seem slower." in m:
+                self.qm_fast = False

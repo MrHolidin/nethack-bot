@@ -94,6 +94,10 @@ DEFAULTS = {
     "elb_respect": False,      # A/B: one rule who ignores a written Elbereth (elb_rules.onscary_ignores, monmove.c
                                #      onscary: @, minotaurs, lawful minions / Angels, the Riders) for both elb_blocked
                                #      and elbereth.respects -- respects let the Riders count as scared
+    "food_facts": False,       # A/B: a prayer that fixes hunger sets nutrition to 900 ("Your stomach feels content.",
+                               #      pray.c / eat.c init_uhunger; the golden glow too), a slime mold is 250; no
+                               #      mimic corpse (helpless), violet fungus / yellow mold (hallucination), quantum
+                               #      mechanic while Fast (speed lost) -- tins too (nhbot.survival)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
