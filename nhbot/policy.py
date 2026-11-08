@@ -67,11 +67,15 @@ STEPS = (
 def step_order(opts):
     """STEPS as the options order them. heal_first: heal right after perceive -- before unihorn, stunned and blind,
     which wait (or apply the horn) while a known healing potion would mend the HP -- and blindness too
-    (potion.c:993-1010 peffects: healup's cureblind -- healing when not cursed, extra / full healing always)."""
+    (potion.c:993-1010 peffects: healup's cureblind -- healing when not cursed, extra / full healing always).
+    history_always: perceive and history out of the list -- tick runs them first, every tick."""
     order = list(STEPS)
     if opts.heal_first:
         order.remove("heal")
         order.insert(order.index("perceive") + 1, "heal")
+    if opts.history_always:
+        order.remove("perceive")             # history_always: both run every tick ahead of the list (tick)
+        order.remove("history")
     return tuple(order)
 
 
@@ -157,6 +161,12 @@ class PolicyMixin:
         y, x = self.pos()
         c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP),
                  maxhp=self.bl(nh.NLE_BL_HPMAX), hunger=self.bl(nh.NLE_BL_HUNGER))
+        if self.opts.history_always:
+            # history_always: perception and the fight record (danger_tick: our hits counted for win_prob, the
+            # damage prediction scored; summary 'hist') every tick, ahead of the steps that act -- in STEPS the
+            # record sat after pray / heal / blind / ..., and a tick one of those acted in recorded nothing
+            self.step_perceive(c)
+            self.step_history(c)
         for name, step in self.steps_by_name:
             if step(c):
                 self.last_step = name

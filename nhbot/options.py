@@ -45,6 +45,9 @@ DEFAULTS = {
                                #      disenchant / slime / gold-stealing hits do damage, negative AC takes rnd(-AC)
                                #      off each hit, poison's extra damage 24 in 240, a gelatinous cube's passive
                                #      d(1, 4) on misses too, cold zeroed only when we resist it (nhbot.danger)
+    "history_always": False,   # A/B: perception and the fight record (danger_tick -- our hits counted for win_prob --,
+                               #      summary 'hist') every tick before the steps that act, not only in ticks no
+                               #      step before 'history' (pray, heal, blind, ...) acted in (nhbot.policy.tick)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
