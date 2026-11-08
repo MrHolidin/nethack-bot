@@ -22,6 +22,9 @@ from nhbot.weapons import THROWABLE
 
 THROW_STONES = ("flint stone", "rock")
 CONTAINER_WORDS = ("bag", "sack", "box", "chest")    # never thrown (expendables) -- its contents would go too
+# never thrown (expendables): a mirror we break costs Luck -2 (dothrow.c:1974-1976 breakobj); unidentified it is a
+# "looking glass" (objects.c:668)
+LUCK_BREAKERS = ("mirror", "looking glass")
 
 
 SLEPT_TURNS = 30           # a sleep ray puts a monster down for d(6, 25) turns (zap.c): taken as asleep this long
@@ -221,7 +224,8 @@ class CombatMixin:
     def expendables(self):
         """Inventory items worth less than a way through: missiles first (the alternate weapon included), then
         gems, weapons, armor and tools that value.keep_reason doesn't keep (no lamp to rub, no wield candidate, no
-        digger), no container, not on us, not cursed -- the least worth (est_gold) first."""
+        digger), no container, no mirror (LUCK_BREAKERS), not on us, not cursed -- the least worth (est_gold) first.
+        (Mirrors thrown at blockers: 3 Luck -2 events in 70 logged games, without A/B -- user's decision.)"""
         if self.handless():
             return []
         out = self.throwables()
@@ -229,7 +233,7 @@ class CombatMixin:
         rest = [(self.est_gold(it.ocls, it.text), it.letter, it.text) for it in self.items()
                 if it.letter not in seen and not it.on_body and not it.alternate and not it.cursed
                 and it.ocls in (nh.GEM_CLASS, nh.WEAPON_CLASS, nh.ARMOR_CLASS, nh.TOOL_CLASS)
-                and not any(w in it.text for w in CONTAINER_WORDS) and self.keep_reason(it) is None]
+                and not any(w in it.text for w in CONTAINER_WORDS + LUCK_BREAKERS) and self.keep_reason(it) is None]
         return out + [(l, s) for _, l, s in sorted(rest, key=lambda c: c[0])]
 
     def unblock_step(self, lv, grids, goal):
