@@ -91,6 +91,9 @@ DEFAULTS = {
                                #      dipfountain asks neither, and blesses it); not an artifact (nhbot.excalibur.long_sword)
     "level_time": False,       # A/B: explore's descend_after and the mines_after hatch count turns spent ON the level
                                #      (Level.turns_here), not since the first arrival (nhbot.explore.explore)
+    "elb_respect": False,      # A/B: one rule who ignores a written Elbereth (elb_rules.onscary_ignores, monmove.c
+                               #      onscary: @, minotaurs, lawful minions / Angels, the Riders) for both elb_blocked
+                               #      and elbereth.respects -- respects let the Riders count as scared
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

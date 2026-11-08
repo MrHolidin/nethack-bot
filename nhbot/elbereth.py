@@ -83,6 +83,11 @@ class ElberethMixin:
         return not self.handless()
 
     def respects(self, pos, name):
+        """Does a monster of this name respect a written Elbereth? elb_respect: by elb_rules.onscary_ignores (the rule
+        elb_blocked uses too) for every kind of that name (a were's @ form doesn't)."""
+        if self.opts.elb_respect:
+            idxs = PM_INDICES.get(name) if name != "invisible" else None
+            return bool(idxs) and all(ELB.onscary_ignores(nh.permonst(i)) is None for i in idxs)
         if name == "invisible" or name in ELB_IGNORE_NAMES:
             return False
         pm = PM_BY_NAME.get(name)
@@ -94,8 +99,9 @@ class ElberethMixin:
         """Some visible monster that Elbereth won't stop (wrong type, or can hurt from range): don't write."""
         glyphs, me = self.obs["glyphs"], self.pos()
         pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
-        bl = ELB.blockers(glyphs, me, pp, lv.key[0])
-        if bl and not ELB.blockers(glyphs, me, pp, lv.key[0], optimistic=True):
+        onscary = self.opts.elb_respect
+        bl = ELB.blockers(glyphs, me, pp, lv.key[0], onscary=onscary)
+        if bl and not ELB.blockers(glyphs, me, pp, lv.key[0], optimistic=True, onscary=onscary):
             self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
         if bl:
             self.elb_block_reasons[bl[0][1].split(":")[0]] += 1

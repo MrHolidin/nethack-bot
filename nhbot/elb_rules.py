@@ -28,15 +28,39 @@ RANGED = {"BREA": "breath", "SPIT": "spit", "GAZE": "gaze", "MAGC": "spells"}
 GEHENNOM_DNUM, ENDGAME_DNUM = 1, 7
 
 
-def reason(mon_idx):
-    """None if Elbereth fully protects against this monster type, else why not."""
+RIDERS = {"Death", "Pestilence", "Famine"}
+
+
+def onscary_ignores(pm):
+    """elb_respect: why a monster of this kind is never scared by a written Elbereth, or None -- monmove.c:134-181
+    onscary by what the kind tells: the Wizard of Yendor, lawful minions and Angels (every M2_MINION kind of monst.c
+    is a lawful A), the Riders, humans and elves (S_HUMAN: shopkeepers, guards, priests, the watch, the Oracle
+    among them), minotaurs. Who is peaceful or blind, and Gehennom / the endgame, are the callers' to judge."""
+    if pm.mname in RIDERS:
+        return "Rider"
+    if pm.mlet == S_HUMAN:
+        return "@"
+    if pm.mlet == S_ANGEL or pm.mflags2 & M2_MINION:
+        return "lawful minion / Angel"
+    if pm.mname == "minotaur":
+        return "minotaur"
+    return None
+
+
+def reason(mon_idx, onscary=False):
+    """None if Elbereth fully protects against this monster type, else why not. onscary (elb_respect): who ignores
+    it by onscary_ignores, the rule elbereth.respects uses too."""
     pm = nh.permonst(mon_idx)
     name = pm.mname
-    if pm.mlet == S_HUMAN:
+    if onscary:
+        why = onscary_ignores(pm)
+        if why is not None:
+            return why + " ignores Elbereth"
+    elif pm.mlet == S_HUMAN:
         return "@ ignores Elbereth"
-    if name in IGNORES_BY_NAME:
+    elif name in IGNORES_BY_NAME:
         return IGNORES_BY_NAME[name] + " ignores Elbereth"
-    if pm.mlet == S_ANGEL or pm.mflags2 & M2_MINION:
+    elif pm.mlet == S_ANGEL or pm.mflags2 & M2_MINION:
         return "angelic/minion may ignore Elbereth"
     atk = ATTACK_TYPES[mon_idx]
     for a in atk:
@@ -50,6 +74,7 @@ def reason(mon_idx):
 
 
 _REASON = [reason(i) for i in range(nh.NUMMONS)]
+_REASON_ONSCARY = [reason(i, onscary=True) for i in range(nh.NUMMONS)]       # elb_respect
 
 # Class C: blocked only because they MIGHT carry missiles or a wand (makemon.c m_initweap gives a launcher
 # or throwables to a minority of them: gnome 4/14, gnome lord 4/12, hill orc 1/4, ...). A scared monster
@@ -57,12 +82,15 @@ _REASON = [reason(i) for i in range(nh.NUMMONS)]
 # it really has something to throw (thrwmu / find_offensive).
 MAYBE_ARMED = frozenset(i for i, r in enumerate(_REASON)
                         if r and r.startswith(("weapon user", "has hands and a mind")))
+MAYBE_ARMED_ONSCARY = frozenset(i for i, r in enumerate(_REASON_ONSCARY)
+                                if r and r.startswith(("weapon user", "has hands and a mind")))
 
 
-def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=()):
+def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=(), onscary=False):
     """[(name, reason)] for every visible non-peaceful monster that makes Elbereth useless, plus unseen
     attackers ('I' markers) within 2 squares.  Empty list = Elbereth is worth writing.
-    optimistic: class-C monsters (MAYBE_ARMED) don't block."""
+    optimistic: class-C monsters (MAYBE_ARMED) don't block. onscary (elb_respect): reasons by onscary_ignores."""
+    table, maybe_armed = (_REASON_ONSCARY, MAYBE_ARMED_ONSCARY) if onscary else (_REASON, MAYBE_ARMED)
     if dnum in (GEHENNOM_DNUM, ENDGAME_DNUM):
         return [("-", "Elbereth has no power here")]
     out = []
@@ -78,8 +106,8 @@ def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=()):
                 out.append(("unseen", "can't tell what it is"))
             elif k == G.MONSTER and (y, x) not in peaceful_pos:
                 idx = nh.glyph_to_mon(g)
-                r = _REASON[idx]
-                if r and optimistic and idx in MAYBE_ARMED:
+                r = table[idx]
+                if r and optimistic and idx in maybe_armed:
                     continue
                 if r and G.monster_name(g) not in skip_names:
                     out.append((G.monster_name(g), r))
