@@ -167,10 +167,13 @@ class ExcaliburMixin:
 
     def demon_win_prob(self):
         """P(we win a fight with a water demon next to us, from full HP) -- danger.win_prob, cached while what it
-        depends on stays the same (level, XL, max HP, AC, the weapon in hand)."""
+        depends on stays the same (level, XL, max HP, AC, the weapon in hand; under fight_model2_all our skill with
+        it too)."""
         weapon = next((it.text for it in self.items() if it.wielded), None)
         key = (self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC),
                weapon)
+        if self.opts.fight_model2_all:
+            key += (self.weapon_skill(),)
         if self.excal.demon_win[0] != key:
             self.excal.demon_win = (key, self.win_prob([(None, "water demon")]))
         return self.excal.demon_win[1]

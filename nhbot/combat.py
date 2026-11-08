@@ -447,7 +447,7 @@ class CombatMixin:
         """P(we win a fight with this monster next to us), cached while what it depends on stays the
         same within this tick (its name, square, our hits on it, asleep, our HP, max HP, AC, XL, the dungeon level,
         the weapon in hand); the RNG state restored. win_prob reads the monster's square -- our hits on the one there
-        (danger.our_hits) and whether our sleep ray put it down (asleep: P = 1) -- and much state the key leaves out
+        (danger.fight_hits) and whether our sleep ray put it down (asleep: P = 1) -- and much state the key leaves out
         (Str, encumbrance, resistances, speed): the cache lives for one tick (bounded, never stale).
         (A/B prey_cache -- before: no square / hits / asleep in the key, kept for the game: -287 [-662, +76],
         median 7777 -> 7763; a correctness fix, accepted.)"""
@@ -456,7 +456,7 @@ class CombatMixin:
             self.combat.prey_cache, self.combat.prey_cache_tick = {}, self.pol.tick_no
         lv = self.levels.get(self.cur_key)
         key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),
-               self.bl(nh.NLE_BL_DEPTH), weapon, self.cur_key, pos, self.danger.our_hits.get((self.cur_key, pos), 0),
+               self.bl(nh.NLE_BL_DEPTH), weapon, self.cur_key, pos, self.fight_hits(pos),
                lv is not None and self.asleep(lv, pos))
         if key not in self.combat.prey_cache:
             state = self.danger.win_rng.bit_generator.state

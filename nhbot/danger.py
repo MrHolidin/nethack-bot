@@ -18,6 +18,8 @@ P(death) = P(total damage >= HP) combined with the instant deaths. Calibration (
 mean damage and P(death) against what the next turn did -- statistics only.
 win_prob (sampled whole fights) decides: the prey explore walks up to (combat.prey_mask), whether and which attack
 wand to zap (combat.wand_ev_pairs), a fountain dip that may bring a water demon (excalibur).
+fight_model2_all (A/B, options.py): win_prob and the calibration statistics with the model focus scores by
+(focus.focus_parts): monster_turn_pmf / monster_round model2, our weapon skill, the newmonhp prior, focus's hit count.
 """
 import re
 from bisect import bisect_right
@@ -28,7 +30,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
-from nhbot.fightmodel import ac_reduce, cast_chance, cast_profile
+from nhbot.fightmodel import ac_reduce, cast_chance, cast_profile, hp_prior
 from nhbot.items import base_name, erosion
 from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
 from nhbot.monattacks import ATTACKS
@@ -132,6 +134,7 @@ class FightMon(NamedTuple):
     plys: tuple         # (P(a move freezes us), passive paralysis dice or None) (monster_paralysis)
     never: bool         # a kind we never melee (perception.never_melee)
     effects: tuple      # monster_effects of its hits
+    hp: object          # its HP pmf (fightmodel.hp_prior) under fight_model2_all; None: d(lev, 8) drawn as is
 
 
 def opening_hooks(index, alive, hps):
@@ -196,12 +199,16 @@ class DangerMixin:
 
     def monster_turn_pmf(self, name, bonus=0, model2=False, hurt=False):
         """(damage pmf of one action of this monster, P(instant death) per action); bonus: to its to-hit.
-        model2 (fight_model2, focus.focus_parts): each hit's damage less rnd(-AC) at a negative AC
-        (fightmodel.ac_reduce), a weapon attack of a kind we saw hit / miss without swinging one: its own dice only
-        (mon_unarmed), and its spells (AT_MAGC: fightmodel.cast_chance / cast_profile; hurt: we hit it -- it may cure
-        itself)."""
+        model2 (focus.focus_parts; win_prob and danger_tick under fight_model2_all): each hit's damage less rnd(-AC)
+        at a negative AC (fightmodel.ac_reduce), a weapon attack of a kind we saw hit / miss without swinging one: its
+        own dice only (mon_unarmed), its spells (AT_MAGC: fightmodel.cast_chance / cast_profile; hurt: we hit it -- it
+        may cure itself), and a leprechaun does not attack us while we carry no gold."""
         idx = PM_INDEX.get(name)
         if idx is None:
+            return np.array([1.0]), 0.0
+        if model2 and name == "leprechaun" and not self.bl(nh.NLE_BL_GOLD):
+            # monmove.c:574-576 dochug: we carry no gold and it carries some (makemon.c:764-765 m_initinv: d(depth,
+            # 30) at its making) -- it moves off instead of attacking (on calibration games 0.10 of the modelled damage)
             return np.array([1.0]), 0.0
         pm = nh.permonst(idx)
         level = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
@@ -251,13 +258,9 @@ class DangerMixin:
 
     def monster_round(self, name, model2=False, hurt=False):
         """(damage pmf, P(instant death)) of this monster's actions in one game turn (mcalcmove); model2, hurt:
-        monster_turn_pmf's (and model2: a leprechaun does not attack us while we carry no gold)."""
+        monster_turn_pmf's."""
         pm = PM_BY_NAME.get(name)
         if pm is None:
-            return np.array([1.0]), 0.0
-        if model2 and name == "leprechaun" and not self.bl(nh.NLE_BL_GOLD):
-            # monmove.c:574-576 dochug: we carry no gold and it carries some (makemon.c:764-765 m_initinv: d(depth,
-            # 30) at its making) -- it moves off instead of attacking (on calibration games 0.10 of the modelled damage)
             return np.array([1.0]), 0.0
         one, inst = self.monster_turn_pmf(name, model2=model2, hurt=hurt)
         k, frac = divmod(pm.mmove, 12)
@@ -317,14 +320,16 @@ class DangerMixin:
             out[max(1, dv + dbon + (skill if dv > 1 else 0))] += base[v]
         return conv(out, dice_pmf(1, dmg_die)) if dmg_die else out
 
-    def our_kill_prob(self, name, hits):
-        """P(this attack kills it): it took `hits` hits of ours already and lives; its HP d(level, 8)."""
+    def our_kill_prob(self, name, hits, model2=False):
+        """P(this attack kills it): it took `hits` hits of ours already and lives; its HP d(level, 8). model2
+        (fight_model2_all): the newmonhp prior (fightmodel.hp_prior: golems their fixed HP) and our weapon skill."""
         pm = PM_BY_NAME.get(name)
         if pm is None:
             return 0.0
         lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
-        hp = dice_pmf(lev, 8) if lev > 0 else dice_pmf(1, 4)
-        one = self.our_damage_pmf(name)
+        hp = hp_prior(name if model2 else None, lev)
+        hit_sk, dmg_sk = self.weapon_skill() if model2 else (0, 0)
+        one = self.our_damage_pmf(name, dmg_sk)
         dk = np.array([1.0])
         for _ in range(hits):
             dk = conv(dk, one)
@@ -334,11 +339,21 @@ class DangerMixin:
         if alive <= 0:
             return 1.0                                      # it should be dead by now: a tougher one
         dies = sum(hp[h] * (cdf(dk, h) - cdf(dk1, h)) for h in range(len(hp)) if hp[h])
-        return self.our_hit_prob(name) * dies / alive
+        return self.our_hit_prob(name, hit_sk) * dies / alive
+
+    def fight_hits(self, pos):
+        """Our hits on the monster at pos as the fight model counts them: focus.focus_hits_on (the message logged
+        again at our 'F' skipped) under fight_model2_all, else our_hits (danger_tick: a hit seen in the turn we
+        attacked)."""
+        if self.opts.fight_model2_all:
+            return self.focus_hits_on(pos)
+        return self.danger.our_hits.get((self.cur_key, pos), 0)
 
     def danger_parts(self, pos, name):
-        pmf, inst = self.monster_round(name)
-        pk = self.our_kill_prob(name, self.danger.our_hits.get((self.cur_key, pos), 0)) if name in PM_BY_NAME else 0.0
+        m2 = self.opts.fight_model2_all
+        hits = self.fight_hits(pos)
+        pmf, inst = self.monster_round(name, model2=m2, hurt=m2 and hits > 0)
+        pk = self.our_kill_prob(name, hits, model2=m2) if name in PM_BY_NAME else 0.0
         lv = self.levels.get(self.cur_key)
         scared = lv is not None and self.pos() in lv.elbereth and self.respects(pos, name)
         return pos, pmf, inst, pk, scared
@@ -400,7 +415,9 @@ class DangerMixin:
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths). A monster's HP:
-        d(level, 8), minus what our hits on it so far took, drawn again while that would leave it dead. Others
+        d(level, 8), minus what our hits on it so far (fight_hits) took, drawn again while that would leave it dead.
+        Under fight_model2_all the model focus uses: monster rounds and moves with model2 (hurt: we hit it), our
+        to-hit and damage with our weapon skill (focus.weapon_skill), the HP from fightmodel.hp_prior. Others
         joining the fight are not counted; a fight still on after max_turns counts as won. adjacent: (pos, name);
         pos None for a monster that isn't there yet (the water demon a dip may bring).
         opening (wand_ev): our first action is a zap instead of a melee hit -- a function (rng, alive_at, apply) ->
@@ -421,24 +438,29 @@ class DangerMixin:
             return 1.0
         rng = self.danger.win_rng
         hp0 = self.bl(nh.NLE_BL_HP)
+        m2 = self.opts.fight_model2_all
+        hit_sk, dmg_sk = self.weapon_skill() if m2 else (0, 0)
         mons = []
         for pos, name in sorted(adjacent, key=lambda t: PM_BY_NAME[t[1]].mlevel if t[1] in PM_BY_NAME else 0):
             pm = PM_BY_NAME.get(name)
             if pm is None:
                 continue
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
-            rnd_pmf, inst = self.monster_round(name)
-            mons.append(FightMon(max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
-                                 self.danger.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove,
-                                 name, self.monster_taint(name), self.monster_turn_pmf(name, 4),
+            hits = self.fight_hits(pos)
+            hurt = m2 and hits > 0
+            rnd_pmf, inst = self.monster_round(name, model2=m2, hurt=hurt)
+            mons.append(FightMon(max(lev, 0), self.our_hit_prob(name, hit_sk), self.our_damage_pmf(name, dmg_sk),
+                                 rnd_pmf, inst, hits, pos, self.monster_turn_pmf(name, model2=m2, hurt=hurt), pm.mmove,
+                                 name, self.monster_taint(name), self.monster_turn_pmf(name, 4, model2=m2, hurt=hurt),
                                  bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),
-                                 self.monster_effects(name)))
+                                 self.monster_effects(name), hp_prior(name, lev) if m2 else None))
         if not mons:
             return 1.0
         # (A/B walk_fight_all -- every fight by the full walk_fight model: -2810 [-4263, -1271], 6891)
         index = {m.pos: j for j, m in enumerate(mons) if m.pos is not None}
         # the pmfs drawn from, as choice's tables, by object (they all live in mons for the whole call)
-        cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m.dmg, m.rnd, m.turn[0], m.turn_helpless[0])}
+        cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m.dmg, m.rnd, m.turn[0], m.turn_helpless[0], m.hp)
+                if q is not None}
         state = self.our_state() if approach is not None else None
         plans = [self.ranged_plan(ranged.get(m.pos), m.name) if ranged else None for m in mons]
         zrng = self.danger.opening_rng
@@ -448,9 +470,14 @@ class DangerMixin:
         for _ in range(sims):
             hps = []
             hcap = []
-            for lev, dmg, hits in ((m.lev, m.dmg, m.hits) for m in mons):
+            for lev, dmg, hits, prior in ((m.lev, m.dmg, m.hits, m.hp) for m in mons):
                 for _try in range(20):
-                    h = full = int(rng.integers(1, 9, size=max(lev, 1)).sum()) if lev > 0 else int(rng.integers(1, 5))
+                    if prior is not None:
+                        h = full = cdf_draw(rng, cdfs[id(prior)])
+                    elif lev > 0:
+                        h = full = int(rng.integers(1, 9, size=lev).sum())
+                    else:
+                        h = full = int(rng.integers(1, 5))
                     if hits:
                         h -= cdf_draws(rng, cdfs[id(dmg)], hits)
                     if h > 0:

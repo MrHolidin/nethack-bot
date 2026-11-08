@@ -75,6 +75,18 @@ class FocusMixin:
                 rec[2] = self.turn()
                 self.focus.hits[key] = rec
 
+    def focus_hits_on(self, pos):
+        """Our hits on the monster at pos (focus.hits): the same kind still there, hit within HIT_MEMORY turns (a
+        monster that stepped off followed by its kind: others of a pack credited, worse); 0 for no square (a monster
+        not there yet)."""
+        if pos is None:
+            return 0
+        g = int(self.obs["glyphs"][pos])
+        rec = self.focus.hits.get((self.cur_key, pos))
+        if rec and nh.glyph_is_monster(g) and rec[0] == nh.glyph_to_mon(g) and self.turn() - rec[2] <= HIT_MEMORY:
+            return rec[1]
+        return 0
+
     def weapon_skill(self):
         """(to-hit, damage) of our skill with the weapon in hand: Basic for the weapons we start with (START_WEAPONS;
         another role: Basic for any), Unskilled for the others, one level up per advance message (weapon.c:1130-1140
@@ -107,11 +119,7 @@ class FocusMixin:
         hit_sk, dmg_sk = self.weapon_skill()
         p = self.our_hit_prob(ref, hit_sk)
         dmg = self.our_damage_pmf(ref, dmg_sk)
-        hits = 0
-        g = int(self.obs["glyphs"][pos])
-        rec = self.focus.hits.get((self.cur_key, pos))
-        if rec and nh.glyph_is_monster(g) and rec[0] == nh.glyph_to_mon(g) and self.turn() - rec[2] <= HIT_MEMORY:
-            hits = rec[1]           # (a monster that stepped followed by its kind: others of a pack credited, worse)
+        hits = self.focus_hits_on(pos)
         left = remaining_hp(hp_prior(None if unseen else name, lev), dmg, hits)
         if left is None:
             left = np.array([0.0, 1.0])                  # tougher than the prior allows: 1 HP left
