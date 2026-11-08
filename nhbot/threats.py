@@ -41,19 +41,25 @@ def _dist(a, b):
     return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
 
 
-class ThreatMixin:
-    def threats_init(self):
+class ThreatState:
+    """State of tracking the monsters in view (ThreatMixin)."""
+    def __init__(self):
         self.mon_tracks = []         # dicts: name, pos, seen, closer (turn), attacked (turn)
         self.tracks_key = None       # the level the tracks are on
         self.zapper = None           # (turn, track) that zapped an unknown wand: its effect names the kind
+
+
+class ThreatMixin:
+    def threats_init(self):
+        self.threats = ThreatState()
 
     def threat_track(self):
         """Match the monsters on screen (not pets) to the tracks; note who came closer by its own move."""
         t, me = self.turn(), self.pos()
         g = self.obs["glyphs"]
-        if self.tracks_key != self.cur_key:
-            self.mon_tracks, self.tracks_key = [], self.cur_key
-        tracks = [tr for tr in self.mon_tracks if t - tr["seen"] <= TRACK_FORGET]
+        if self.threats.tracks_key != self.cur_key:
+            self.threats.mon_tracks, self.threats.tracks_key = [], self.cur_key
+        tracks = [tr for tr in self.threats.mon_tracks if t - tr["seen"] <= TRACK_FORGET]
         free = list(tracks)
         for y, x in zip(*np.nonzero(G.KIND[g] == G.MONSTER)):
             p = (int(y), int(x))
@@ -70,12 +76,12 @@ class ThreatMixin:
             else:
                 tracks.append({"name": n, "pos": p, "seen": t, "first": t, "closer": None, "attacked": None,
                                "wands": set(), "missile": None, "breath": False})
-        self.mon_tracks = tracks
+        self.threats.mon_tracks = tracks
 
     def msg_threat(self, m):
         """A message naming a monster attacking us: the nearest track of that name in view attacked; its ranged
         attacks noted (module docstring)."""
-        if not self.mon_tracks:
+        if not self.threats.mon_tracks:
             return
         t = self.turn()
         # only attacks on us (messages.attacks_on_us), melee or ranged -- not "The jackal bites the little dog."
@@ -90,12 +96,12 @@ class ThreatMixin:
                 kind = wand[len("wand of "):] if wand.startswith("wand of ") else None
                 if kind in WAND_KINDS:
                     tr["wands"].add(kind)
-                self.zapper = (t, tr) if kind is None else None
-        if self.zapper is not None and t - self.zapper[0] <= 1:            # its effect: this turn or the next
+                self.threats.zapper = (t, tr) if kind is None else None
+        if self.threats.zapper is not None and t - self.threats.zapper[0] <= 1:            # its effect: this turn or the next
             kind = next((k for phrase, k in RAY_SEEN if phrase in m), None)
             if kind is not None:
-                self.zapper[1]["wands"].add(kind)
-                self.zapper = None
+                self.threats.zapper[1]["wands"].add(kind)
+                self.threats.zapper = None
         for name, count, what in MON_SHOOTS_RE.findall(m):
             tr = self.track_named(name)
             if tr is not None:
@@ -113,12 +119,12 @@ class ThreatMixin:
     def track_named(self, name):
         """The track of that name seen this turn or the last, nearest to us."""
         t, me = self.turn(), self.pos()
-        seen = [tr for tr in self.mon_tracks if tr["name"] == name and t - tr["seen"] <= 1]
+        seen = [tr for tr in self.threats.mon_tracks if tr["name"] == name and t - tr["seen"] <= 1]
         return min(seen, key=lambda r: _dist(r["pos"], me)) if seen else None
 
     def ranged_profile(self, pos):
         """The ranged attacks seen from the monster at pos (None: none): {"wands", "missile", "breath"}."""
-        tr = next((r for r in self.mon_tracks if r["pos"] == pos and r["seen"] == self.turn()), None)
+        tr = next((r for r in self.threats.mon_tracks if r["pos"] == pos and r["seen"] == self.turn()), None)
         if tr is None or not (tr["wands"] or tr["missile"] or tr["breath"]):
             return None
         return {"wands": sorted(tr["wands"]), "missile": tr["missile"], "breath": tr["breath"]}
@@ -128,7 +134,7 @@ class ThreatMixin:
         t, me = self.turn(), self.pos()
         if _dist(pos, me) <= 1:
             return True
-        tr = next((r for r in self.mon_tracks if r["pos"] == pos and r["seen"] == t), None)
+        tr = next((r for r in self.threats.mon_tracks if r["pos"] == pos and r["seen"] == t), None)
         if tr is None:
             return False
         if tr.get("first") == t:                 # just come into view: a threat if it can hit us next turn

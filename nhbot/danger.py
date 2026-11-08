@@ -147,27 +147,33 @@ def opening_hooks(index, alive, hps):
     return alive_at, apply
 
 
-class DangerMixin:
-    def danger_init(self):
+class DangerState:
+    """State of the danger model: monster weapons, our hits, win_prob draws, calibration (DangerMixin)."""
+    def __init__(self):
         self.mon_weapon = {}                     # monster name -> weapon we saw it use
-        self.danger_pending = None               # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
+        self.pending = None                      # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.our_hits = {}                       # (level key, square) -> our hits on the monster there
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
         self.hit_seen = False                    # this tick: a melee hit of ours
         self.attack_turn = -1                    # turn of our last melee attack (combat.attack)
-        self.danger_mean = defaultdict(lambda: [0, 0.0, 0.0])    # bin -> [n, sum predicted, sum actual]
-        self.danger_p = defaultdict(lambda: [0, 0.0, 0])         # bin -> [n, sum predicted, deaths]
+        self.mean = defaultdict(lambda: [0, 0.0, 0.0])           # bin -> [n, sum predicted, sum actual]
+        self.p = defaultdict(lambda: [0, 0.0, 0])                # bin -> [n, sum predicted, deaths]
+
+
+class DangerMixin:
+    def danger_init(self):
+        self.danger = DangerState()
 
     def danger_msg(self, m):
         if OUR_HIT_RE.search(m):
-            self.hit_seen = True
+            self.danger.hit_seen = True
         if KILL_WORD_RE.search(m) and self.last_attack_target is not None:
-            self.our_hits.pop((self.cur_key, self.last_attack_target), None)
+            self.danger.our_hits.pop((self.cur_key, self.last_attack_target), None)
         for mon, weapon in WIELD_RE.findall(m):
             w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon
             if w in WEAPON_DICE:
-                self.mon_weapon[mon] = w
+                self.danger.mon_weapon[mon] = w
 
     def hit_prob(self, level, i, bonus=0):
         """P(10 + AC_VALUE(ac) + level (+ bonus: 4 while we are helpless, mhitu.c multi < 0) > rnd(20 + i))."""
@@ -197,10 +203,10 @@ class DangerMixin:
             zero = ad in NO_DAMAGE or (ad == "COLD" and "cold" in self.our_resists())
             dmg = dice_pmf(n, d) if n and d and not zero else np.array([1.0])
             if at == "WEAP":
-                w = self.mon_weapon.get(name)
+                w = self.danger.mon_weapon.get(name)
                 dmg = conv(dmg, dice_pmf(1, WEAPON_DICE[w][0]) if w else dice_pmf(1, 6))
             # (A/B dmg_ac -- negative AC takes rnd(-AC) off each hit: -1141 [-2242, -60], 7523)
-            if ad in POISON and not self.poison_res:
+            if ad in POISON and not self.surv.poison_res:
                 alive *= 1 - p / 240                         # poisoned 1 in 8, deadly 1 in 30
                 extra = np.concatenate([np.zeros(6), np.full(10, 0.1)])     # rn1(10, 6): 6..15
                 # attrib.c:311-320 poisoned: i = rn2(30), 0 deadly, 1..5 an attribute, 6..29 the extra HP damage
@@ -299,7 +305,7 @@ class DangerMixin:
 
     def danger_parts(self, pos, name):
         pmf, inst = self.monster_round(name)
-        pk = self.our_kill_prob(name, self.our_hits.get((self.cur_key, pos), 0)) if name in PM_BY_NAME else 0.0
+        pk = self.our_kill_prob(name, self.danger.our_hits.get((self.cur_key, pos), 0)) if name in PM_BY_NAME else 0.0
         lv = self.levels.get(self.cur_key)
         scared = lv is not None and self.pos() in lv.elbereth and self.respects(pos, name)
         return pos, pmf, inst, pk, scared
@@ -320,41 +326,41 @@ class DangerMixin:
 
     def danger_tick(self, t, hp, adjacent):
         """Score the last prediction (with the attack we made since) against what happened; make the next."""
-        pend = self.danger_pending
-        self.danger_pending = None
+        pend = self.danger.pending
+        self.danger.pending = None
         if pend is not None:
             pt, php, parts = pend
-            target = self.last_attack_target if self.attack_turn == pt else None
-            if target is not None and self.hit_seen:
+            target = self.last_attack_target if self.danger.attack_turn == pt else None
+            if target is not None and self.danger.hit_seen:
                 key = (self.cur_key, target)
-                self.our_hits[key] = self.our_hits.get(key, 0) + 1
+                self.danger.our_hits[key] = self.danger.our_hits.get(key, 0) + 1
             if t == pt + 1 and hp <= php:
                 mean, pd = self.danger_combine(parts, target, php)
                 self.danger_score((pt, php, mean, pd), php - hp, died=False)
-        self.hit_seen = False
+        self.danger.hit_seen = False
         if adjacent:
-            self.danger_pending = (t, hp, [self.danger_parts(pos, name) for pos, name in adjacent])
+            self.danger.pending = (t, hp, [self.danger_parts(pos, name) for pos, name in adjacent])
 
     def danger_score(self, pend, actual, died):
         _, hp0, mean, pd = pend
         bm = next(i for i in range(len(MEAN_EDGES) - 1) if mean < MEAN_EDGES[i + 1])
-        r = self.danger_mean[bm]
+        r = self.danger.mean[bm]
         r[0] += 1; r[1] += mean; r[2] += actual
         bp = next(i for i in range(len(P_EDGES) - 1) if pd < P_EDGES[i + 1])
-        r = self.danger_p[bp]
+        r = self.danger.p[bp]
         r[0] += 1; r[1] += pd; r[2] += int(died or actual >= hp0)
 
     def danger_summary(self):
-        if self.done and not self.truncated and self.danger_pending is not None:
-            pt, php, parts = self.danger_pending
-            target = self.last_attack_target if self.attack_turn == pt else None
+        if self.done and not self.truncated and self.danger.pending is not None:
+            pt, php, parts = self.danger.pending
+            target = self.last_attack_target if self.danger.attack_turn == pt else None
             mean, pd = self.danger_combine(parts, target, php)
             self.danger_score((pt, php, mean, pd), php, died=True)
-            self.danger_pending = None
+            self.danger.pending = None
         return {"mean": {f"{MEAN_EDGES[k]}-{MEAN_EDGES[k + 1]}": [v[0], round(v[1], 1), v[2]]
-                         for k, v in sorted(self.danger_mean.items())},
+                         for k, v in sorted(self.danger.mean.items())},
                 "p": {f"{P_EDGES[k]}-{P_EDGES[k + 1]}": [v[0], round(v[1], 3), v[2]]
-                      for k, v in sorted(self.danger_p.items())}}
+                      for k, v in sorted(self.danger.p.items())}}
 
     # ------------------------------------------------------------ the fight to the end
     def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None):
@@ -380,7 +386,7 @@ class DangerMixin:
             adjacent = [t for t in adjacent if not self.asleep(self.levels[self.cur_key], t[0])]
         if not adjacent:
             return 1.0
-        rng = self.win_rng
+        rng = self.danger.win_rng
         hp0 = self.bl(nh.NLE_BL_HP)
         mons = []
         for pos, name in sorted(adjacent, key=lambda t: PM_BY_NAME[t[1]].mlevel if t[1] in PM_BY_NAME else 0):
@@ -390,7 +396,7 @@ class DangerMixin:
             lev = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
             rnd_pmf, inst = self.monster_round(name)
             mons.append(FightMon(max(lev, 0), self.our_hit_prob(name), self.our_damage_pmf(name), rnd_pmf, inst,
-                                 self.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove,
+                                 self.danger.our_hits.get((self.cur_key, pos), 0), pos, self.monster_turn_pmf(name), pm.mmove,
                                  name, self.monster_taint(name), self.monster_turn_pmf(name, 4),
                                  bool(pm.mflags1 & M1_REGEN), self.monster_paralysis(name), self.never_melee(name),
                                  self.monster_effects(name)))
@@ -402,7 +408,7 @@ class DangerMixin:
         cdfs = {id(q): pmf_cdf(q) for m in mons for q in (m.dmg, m.rnd, m.turn[0], m.turn_helpless[0])}
         state = self.our_state() if approach is not None else None
         plans = [self.ranged_plan(ranged.get(m.pos), m.name) if ranged else None for m in mons]
-        zrng = self.opening_rng
+        zrng = self.danger.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
         wins = 0
@@ -693,7 +699,7 @@ class DangerMixin:
         mis = profile["missile"]
         if mis:
             plan["missile"] = (MISSILE_DIE.get(mis["kind"], WEAPON_DICE.get(mis["kind"], (6,))[0]), mis["counts"],
-                               mis["poisoned"] and not self.poison_res)
+                               mis["poisoned"] and not self.surv.poison_res)
         if profile["breath"]:
             idx = PM_INDEX.get(name)
             br = next((a for a in ATTACKS[idx] if a[0] == "BREA"), None) if idx is not None else None

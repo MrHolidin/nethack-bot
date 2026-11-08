@@ -15,8 +15,9 @@ from nhbot.nav import line_clear
 from nhbot.pickup import STOLE_RE
 
 
-class ThievesMixin:
-    def thieves_init(self):
+class ThievesState:
+    """State of thieves, polymorph and gold flow (ThievesMixin)."""
+    def __init__(self):
         self.thefts = 0
         self.stolen_pending = False
         self.loot_sq = None
@@ -25,16 +26,21 @@ class ThievesMixin:
         self.loot_pickups = 0
         self.nymph_waits = 0
         self.nymph_elbs = 0
-        self._theft_turn = None
+        self.theft_turn = None
         self.polyd = False             # polymorphed: no wearing / wielding
         self.were_drop = None          # (level key, pos) where our armor fell when we turned into an animal
         self.poly_inv = set()          # poly_recover: bare names of what we carried at the tick before
         self.poly_new = False          # poly_recover: we just turned into something (poly_track compares)
         self.poly_stats = Counter()
         self.gold_flow = Counter()       # gold got / lost by cause (gold_flow_tick), summary 'gold_flow'
-        self._gold_prev = None
-        self._gold_seq = 0
-        self._gold_xl = {}               # XL -> most gold carried at it
+        self.gold_prev = None
+        self.gold_seq = 0
+        self.gold_xl = {}                # XL -> most gold carried at it
+
+
+class ThievesMixin:
+    def thieves_init(self):
+        self.thief = ThievesState()
 
     def lep_visible(self):
         """A leprechaun in view (not hallucinating: then any letter may be one)."""
@@ -48,24 +54,24 @@ class ThievesMixin:
         """Stats only: a change of the gold we carry since the last tick, by the messages that came with it --
         a leprechaun's touch ("Your purse feels lighter."), a foocubus, a vault guard, a shop, a fountain."""
         g = int(self.bl(nh.NLE_BL_GOLD))
-        if self._gold_prev is not None and g != self._gold_prev:
-            d = g - self._gold_prev
-            m = self.text_since(self._gold_seq)
+        if self.thief.gold_prev is not None and g != self.thief.gold_prev:
+            d = g - self.thief.gold_prev
+            m = self.text_since(self.thief.gold_seq)
             if self.bag.moved:
-                self.gold_flow["bag_in" if d < 0 else "bag_out"] += abs(d)      # gold_bag: ours all the same
+                self.thief.gold_flow["bag_in" if d < 0 else "bag_out"] += abs(d)      # gold_bag: ours all the same
             elif d > 0:
-                self.gold_flow["got_sold" if "You sold" in m else "got_other"] += d
+                self.thief.gold_flow["got_sold" if "You sold" in m else "got_other"] += d
             else:
                 why = ("leprechaun" if "purse feels lighter" in m else
                        "foocubus" if ("attracted" in m or "seduc" in m or "prettier" in m) else
-                       "vault" if self.vault_drops and "drop" in m and "gold" in m else
+                       "vault" if self.surv.vault_drops and "drop" in m and "gold" in m else
                        "shop" if ("bought" in m or "zorkmid" in m or "pay" in m.lower()) else
                        "fountain" if "fountain" in m else
                        "drop" if "You drop" in m else "other")
-                self.gold_flow["lost_" + why] -= d
+                self.thief.gold_flow["lost_" + why] -= d
         xl = int(self.bl(nh.NLE_BL_XP))
-        self._gold_xl[xl] = max(self._gold_xl.get(xl, 0), g)
-        self._gold_prev, self._gold_seq = g, self.msg_seq
+        self.thief.gold_xl[xl] = max(self.thief.gold_xl.get(xl, 0), g)
+        self.thief.gold_prev, self.thief.gold_seq = g, self.msg_seq
         self.bag.moved = False
 
     # ================================================================== nymphs
@@ -75,29 +81,29 @@ class ThievesMixin:
         stole = (re.search(r"\b(stole|steals|stolen)\b", m) or "charms you" in m) and \
             (any(t in m for t in THIEVES) or "She stole" in m or "He stole" in m)
         if stole or "It stole" in m or "It steals" in m or "She charms you" in m:
-            if self.turn() != self._theft_turn:
-                self._theft_turn = self.turn()
-                self.thefts += 1
-            self.stolen_pending = True
-        if self.killed and any(t in self.killed for t in THIEVES) and self.last_attack_target:
-            self.nymph_kills += 1
-            if self.stolen_pending:
-                self.goal_event("loot", "abandoned", self.loot_sq is not None)    # replaced by a newer one
+            if self.turn() != self.thief.theft_turn:
+                self.thief.theft_turn = self.turn()
+                self.thief.thefts += 1
+            self.thief.stolen_pending = True
+        if self.combat.killed and any(t in self.combat.killed for t in THIEVES) and self.last_attack_target:
+            self.thief.nymph_kills += 1
+            if self.thief.stolen_pending:
+                self.goal_event("loot", "abandoned", self.thief.loot_sq is not None)    # replaced by a newer one
                 self.goal_event("loot", "created")
-                self.loot_sq = self.last_attack_target
-                self.loot_key = self.cur_key
+                self.thief.loot_sq = self.last_attack_target
+                self.thief.loot_key = self.cur_key
         if re.search(r"You turn into an? \w+|shrink out of your|break out of your armor|armor falls around you", m):
-            self.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
+            self.thief.were_drop = (self.cur_key, self.pos())      # armor fell here; collect it once human again
         if re.search(r"You turn into an? ", m):
-            self.polyd = True                                 # weapons: no wielding in a borrowed body
-            self.poly_new = True
+            self.thief.polyd = True                                 # weapons: no wielding in a borrowed body
+            self.thief.poly_new = True
         if re.search(r"You return to \w+ form|You feel like a new ", m):
-            self.polyd = False
-        if re.search(r"You return to \w+ form", m) and self.were_drop:   # dwarves: "dwarven form"
-            self.goal_event("loot", "abandoned", self.loot_sq is not None)
+            self.thief.polyd = False
+        if re.search(r"You return to \w+ form", m) and self.thief.were_drop:   # dwarves: "dwarven form"
+            self.goal_event("loot", "abandoned", self.thief.loot_sq is not None)
             self.goal_event("loot", "created")
-            self.loot_key, self.loot_sq = self.were_drop
-            self.were_drop = None
+            self.thief.loot_key, self.thief.loot_sq = self.thief.were_drop
+            self.thief.were_drop = None
 
     def nymph_step(self, lv, hostiles):
         y, x = self.pos()
@@ -135,29 +141,26 @@ class ThievesMixin:
         # 2c) no way to shoot: stand on Elbereth (nymphs respect it and won't steal in melee)
         if not have_shot and (y, x) not in lv.elbereth:
             close = [t for t in th if max(abs(t[0][0] - y), abs(t[0][1] - x)) <= 4]
-            if close and self.nymph_elbs < 30 and self.elb_can_write(lv):
-                self.nymph_elbs += 1
+            if close and self.thief.nymph_elbs < 30 and self.elb_can_write(lv):
+                self.thief.nymph_elbs += 1
                 self.cur_act = "fight"
                 if not self.engrave_elbereth():
-                    self.elb_fail += 1
-                    self.elb_fail_at = (lv.key, self.pos(), self.turn())
-                    self.elb_stats["nymph_fail"] += 1
+                    self.elb_nymph_note(lv, "fail")
                 elif not self.elb_confirm(lv):
-                    self.elb_misspelled += 1
-                    self.elb_stats["nymph_misspelled"] += 1
+                    self.elb_nymph_note(lv, "misspelled")
                 else:
-                    self.elb_stats["nymph_ok"] += 1
+                    self.elb_nymph_note(lv, "ok")
                 return True
         # 3) no shot: never step next to a thief (that hands it the first move). Hold still and
         #    let it come; nymphs come back to steal more, so waiting is also how we get our items back.
         close = [t for t in th if 2 <= max(abs(t[0][0] - y), abs(t[0][1] - x)) <= self.opts.nymph_hold]
-        if close and self.nymph_waits < self.opts.nymph_wait_max:
-            self.nymph_waits += 1
+        if close and self.thief.nymph_waits < self.opts.nymph_wait_max:
+            self.thief.nymph_waits += 1
             self.cur_act = "fight"
             self.press("s")
             return True
         if not close:
-            self.nymph_waits = 0
+            self.thief.nymph_waits = 0
         return False
 
     def align_step(self, lv, th):
@@ -191,21 +194,21 @@ class ThievesMixin:
         drop_weapon: worn armor and the weapon fall where we stood -- were_drop) is named like stolen loot, so
         the loot pickup there takes it all back (take_reason alone leaves an artifact such as Excalibur)."""
         names = {base_name(it.text)[2] for it in self.items()}
-        if self.poly_new:
-            lost = self.poly_inv - names
+        if self.thief.poly_new:
+            lost = self.thief.poly_inv - names
             self.pick.stolen_names |= lost
             self.wield_forget(lost)
-            self.poly_stats["turned"] += 1
-            self.poly_stats["lost_items"] += len(lost)
-            self.poly_new = False
-        self.poly_inv = names
+            self.thief.poly_stats["turned"] += 1
+            self.thief.poly_stats["lost_items"] += len(lost)
+            self.thief.poly_new = False
+        self.thief.poly_inv = names
 
     def loot_step(self, lv):
-        if self.loot_sq is None or self.loot_key != lv.key:
+        if self.thief.loot_sq is None or self.thief.loot_key != lv.key:
             return False
-        return self.pursue("loot", lv, [self.loot_sq], self.loot_consume)
+        return self.pursue("loot", lv, [self.thief.loot_sq], self.loot_consume)
 
     def loot_consume(self, goal):
         self.pickup_all()
-        self.loot_pickups += 1
-        self.stolen_pending = False
+        self.thief.loot_pickups += 1
+        self.thief.stolen_pending = False

@@ -206,16 +206,16 @@ class PolicyMixin:
         if hunger >= WEAK and self.can_pray(hunger_emergency=(
                 self.faint_since is not None and t - self.faint_since > self.opts.faint_wait), weak=True):
             self.pray(); return True
-        if self.polyd and self.handless() and self.can_pray():
-            self.poly_stats["prayed"] += 1
+        if self.thief.polyd and self.handless() and self.can_pray():
+            self.thief.poly_stats["prayed"] += 1
             self.pray(); return True           # pray.c: a handless form is major trouble, fixed by rehumanize()
             #                                    (A/B poly_recover +1066 [+675, +1502])
-        if self.lycanthropy and self.can_pray() and \
+        if self.surv.lycanthropy and self.can_pray() and \
                 not any(n.startswith("were") for _, n in self.visible_hostiles(c.lv)):
             self.pray(); return True           # not while a lycanthrope in view can bite us again right after
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         deadly = nh.BL_MASK_STONE | nh.BL_MASK_SLIME | nh.BL_MASK_STRNGL | nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
-        if cond & deadly and not self.god_angry and self.turn() - (self.last_pray or -9999) > 2:
+        if cond & deadly and not self.surv.god_angry and self.turn() - (self.surv.last_pray or -9999) > 2:
             # certain death otherwise: pray even if the timeout may not have expired
             self.deadly_prayers += 1
             self.pray(); return True
@@ -317,10 +317,10 @@ class PolicyMixin:
         """On the loot square (our armor fell there when we changed form, a thief died there): one turn picks it all
         up, also with hostiles next to us or on Elbereth (a pick-up does not erase it). A/B loot_now +1481
         [+671, +2300]."""
-        if self.polyd or self.loot_sq is None or self.loot_key != c.lv.key \
-                or (c.y, c.x) != self.loot_sq:
+        if self.thief.polyd or self.thief.loot_sq is None or self.thief.loot_key != c.lv.key \
+                or (c.y, c.x) != self.thief.loot_sq:
             return False
-        return self.pursue("loot", c.lv, [self.loot_sq], self.loot_consume)
+        return self.pursue("loot", c.lv, [self.thief.loot_sq], self.loot_consume)
 
     def step_weapon(self, c):
         if self.wish.rub_back is not None:            # a lamp wielded to rub it: the weapon back once a threat shows
@@ -360,7 +360,7 @@ class PolicyMixin:
         if (c.y, c.x) not in c.lv.elbereth or c.hp >= c.maxhp * self.opts.rest_frac \
                 or self.visible_hostiles(c.lv) or not self.elb_confirm(c.lv):
             return False
-        self.elb_stats["rest_confirmed"] += 1
+        self.elb.stats["rest_confirmed"] += 1
         self.cur_act = "rest"
         self.search_turns(20)
         return True
@@ -398,14 +398,14 @@ class PolicyMixin:
 
     def step_retrieve_missiles(self, c):
         """Pick thrown weapons back up."""
-        if self.retrieve:
+        if self.combat.retrieve:
             goals = self.retrieve_goals(c.lv)
             if goals:
                 return self.pursue("retrieve", c.lv, goals, lambda g: self.take_ammo())
         return False
 
     def step_eat(self, c):
-        return c.hunger >= HUNGRY and self.turn() >= self.no_eat_until and self.eat_from_inventory()
+        return c.hunger >= HUNGRY and self.turn() >= self.surv.no_eat_until and self.eat_from_inventory()
 
     def step_sacrifice(self, c):
         return self.sacrifice_step(c.lv, c.hostiles)
@@ -414,7 +414,7 @@ class PolicyMixin:
         """A fresh corpse of our own kill nearby (shop corpses are merchandise)."""
         lv = c.lv
         # merch_risk only where the corpse lies (corpse_goals) -- not also at our own square (merch_one)
-        if c.hunger >= NOT_HUNGRY and self.kills:
+        if c.hunger >= NOT_HUNGRY and self.combat.kills:
             goals = self.corpse_goals(lv)
             if goals:
                 return self.pursue("corpse", lv, goals, lambda g: self.eat_corpse_here())

@@ -67,7 +67,7 @@ class WishMixin:
     def lamp_step(self):
         """Nothing threatening us (the caller checks): rub the next lamp, or wield the weapon back when done.
         True if it used the turn."""
-        if self.polyd or self.handless():
+        if self.thief.polyd or self.handless():
             return False
         lamp = self.lamp_to_rub()
         if lamp is None:
@@ -126,7 +126,7 @@ class WishMixin:
     def wishwand_step(self):
         """Nothing threatening us: zap a wand of wishing (equipment.answer_wish answers). True if it acted."""
         wand = next((it for it in self.items() if self.is_wishing_wand(it) and not self.wand_spent(it)), None)
-        if wand is None or self.polyd or self.handless():
+        if wand is None or self.thief.polyd or self.handless():
             return False
         self.cur_act = "wish"
         seq0 = self.msg_seq

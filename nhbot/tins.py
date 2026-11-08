@@ -127,7 +127,7 @@ class TinMixin:
 
     def tin_step(self, lv):
         """No threat in view (the caller checks): open and maybe eat one tin. True if it used the turn."""
-        if not self.tin_letters() or (self.bl(nh.NLE_BL_HUNGER) <= SATIATED and self.nutrition >= SATIATED_MAX) \
+        if not self.tin_letters() or (self.bl(nh.NLE_BL_HUNGER) <= SATIATED and self.surv.nutrition >= SATIATED_MAX) \
                 or int(self.last_bl[nh.NLE_BL_CONDITION]) & (nh.BL_MASK_HALLU | nh.BL_MASK_CONF | nh.BL_MASK_STUN):
             return self.swap_back("tin")                 # done (or can't now): the main weapon back
         wielded = next((it for it in self.items() if it.wielded), None)
@@ -154,7 +154,7 @@ class TinMixin:
                 else:
                     ok, what = False, "?"
                 gain = TIN_NUTRITION.get(what, 500)
-                if ok and self.nutrition + gain >= CHOKE:
+                if ok and self.surv.nutrition + gain >= CHOKE:
                     ok = False
                     self.tin.stats["too_full"] += 1
                 self.tin.stats["eaten" if ok else "refused"] += 1

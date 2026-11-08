@@ -47,8 +47,9 @@ INTRINSIC_FAST_XL = {"Archeologist": 1, "Monk": 1, "Samurai": 1, "Barbarian": 7,
 STOMACH_CONTENT_RE = re.compile(r"\bYour [a-z ]+ feels content\.")     # pray.c:368-370 fix_worst_trouble
 
 
-class SurvivalMixin:
-    def survival_init(self):
+class SurvivalState:
+    """State of eating, praying, the vault guard protocol, hunger and unicorn horns (SurvivalMixin)."""
+    def __init__(self):
         self.eaten_by = Counter()      # corpses eaten, by kind
         self.corpses_eaten = 0
         self.no_eat_until = 0          # no eating from the inventory before this turn ("carrying so much": msg_survival)
@@ -78,13 +79,18 @@ class SurvivalMixin:
         self.horn_bad = set()          # letters of unicorn horns that harmed us (cursed): not applied, sold
         self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
         self.horn_stats = Counter()
-        self._hunger_at = (0, NOT_HUNGRY)    # (turn, status line hunger) at the last tick (nutrition_tick)
+        self.hunger_at = (0, NOT_HUNGRY)     # (turn, status line hunger) at the last tick (nutrition_tick)
         self.qm_fast = None            # Fast as a quantum mechanic's corpse left us (None: never ate one)
+
+
+class SurvivalMixin:
+    def survival_init(self):
+        self.surv = SurvivalState()
 
     def pray(self):
         self.cur_act = "pray"
-        self.last_pray = self.turn()
-        self.prayers += 1
+        self.surv.last_pray = self.turn()
+        self.surv.prayers += 1
         self.press("#", expect_prompt=True)
         for c in "pray":
             self.raw_step(ord(c))
@@ -101,13 +107,13 @@ class SurvivalMixin:
     def can_pray(self, hunger_emergency=None, weak=False):
         # Weak/Fainting is major trouble (timeout <= 200 suffices); 500 turns after a prayer is ~88% safe.
         # A/B (1000 games): +273 [-1, +553], deaths while fainted 108 -> 76
-        if self.god_angry:
+        if self.surv.god_angry:
             return False
         t = self.turn()
-        if self.last_pray is None:
+        if self.surv.last_pray is None:
             return t > 100            # u.ublesscnt = 300 - (moves - 1) <= 200: a prayer in major trouble is safe (the
                                       # steps that pray are; step_history, heal_step, Sokoban only ask)
-        gap = t - self.last_pray
+        gap = t - self.surv.last_pray
         if hunger_emergency:          # fainting for 200+ turns: death is close, take the risk
             return gap > 300
         if weak:
@@ -122,29 +128,29 @@ class SurvivalMixin:
         u.uhunger estimated: 1 a turn, plus what we ate (nutrition_add); the status line pins it --
         Satiated > 1000, Not Hungry 150..1000, Hungry 50..149, Weak 1..49, Fainting <= 0 (eat.c newuhs), and
         a step down sets it to the edge just crossed."""
-        t0, h0 = self._hunger_at
+        t0, h0 = self.surv.hunger_at
         t, h = self.turn(), self.bl(nh.NLE_BL_HUNGER)
-        self.hunger_turns[h0] += t - t0
-        n = self.nutrition - max(0, t - t0)
+        self.surv.hunger_turns[h0] += t - t0
+        n = self.surv.nutrition - max(0, t - t0)
         if h > h0:                                   # a step down: right at the edge
             n = {NOT_HUNGRY: 1000, HUNGRY: 149, WEAK: 49, FAINTING: 0}.get(h, n)
         lo, hi = NUTRITION_BOUNDS.get(h, (-10 ** 6, 10 ** 6))
-        self.nutrition = min(max(n, lo), hi)
-        self._hunger_at = (t, h)
+        self.surv.nutrition = min(max(n, lo), hi)
+        self.surv.hunger_at = (t, h)
 
     def nutrition_add(self, n):
-        self.nutrition += n
+        self.surv.nutrition += n
 
     def nutrition_set(self, n):
         """u.uhunger is n now (a prayer's init_uhunger) -- nutrition_tick takes off the turns since the
         last tick, so they are added here."""
-        self.nutrition = n + max(0, self.turn() - self._hunger_at[0])
+        self.surv.nutrition = n + max(0, self.turn() - self.surv.hunger_at[0])
 
     def intrinsic_fast(self):
         """Intrinsically Fast -- by role and experience level (INTRINSIC_FAST_XL), or as the last quantum
         mechanic we ate left us."""
-        if self.qm_fast is not None:
-            return self.qm_fast
+        if self.surv.qm_fast is not None:
+            return self.surv.qm_fast
         xl = INTRINSIC_FAST_XL.get(self.role or "")
         return xl is not None and self.bl(nh.NLE_BL_XP) >= xl
 
@@ -177,8 +183,8 @@ class SurvivalMixin:
     def corpse_ok(self, name, tin=False):
         """Fresh corpse of our own kill: decide from the species' flags. tin: the meat of a tin -- eat.c
         consume_tin skips eatcorpse(), so no poison or acid damage (the intrinsics still come)."""
-        if self.lycanthropy:
-            kind = self.lyc_kind
+        if self.surv.lycanthropy:
+            kind = self.surv.lyc_kind
             kin = WERE_KIN.get(kind) if kind else set().union(*WERE_KIN.values())
             if name in kin:
                 return False                  # eat.c: our own were-kind is cannibalism (Luck, aggravate)
@@ -198,7 +204,7 @@ class SurvivalMixin:
         hp, hunger = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HUNGER)
         if tin:
             return True
-        if f1 & M1_POIS and not f1 & M1_ACID and self.poison_res:
+        if f1 & M1_POIS and not f1 & M1_ACID and self.surv.poison_res:
             return True                       # poison resistant: a poisonous corpse is ordinary food
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > 20
@@ -217,10 +223,10 @@ class SurvivalMixin:
             if kind and self.corpse_ok(kind):
                 seq0 = self.msg_seq
                 self.press("y")
-                self.corpses_eaten += 1
+                self.surv.corpses_eaten += 1
                 pm = PM_BY_NAME.get(kind)
                 self.nutrition_add(pm.cnutrit if pm is not None else 100)
-                self.eaten_by[kind] += 1
+                self.surv.eaten_by[kind] += 1
                 if "You stop eating" in self.text_since(seq0):
                     return "keep"                     # interrupted (monmove.c dochugw): the corpse stays a goal
                 return True
@@ -235,11 +241,11 @@ class SurvivalMixin:
         """Fresh corpses of our kills here that we would eat, within max_dist, nearest (straight line) first."""
         t = self.turn()
         kind = GOALS["corpse"]
-        n = len(self.kills)
-        self.kills = [k for k in self.kills if t - k[0] < kind.ttl]
-        self.goal_event("corpse", "expired", n - len(self.kills))
+        n = len(self.combat.kills)
+        self.combat.kills = [k for k in self.combat.kills if t - k[0] < kind.ttl]
+        self.goal_event("corpse", "expired", n - len(self.combat.kills))
         cands = []
-        for kt, name, pos, key in self.kills:
+        for kt, name, pos, key in self.combat.kills:
             if key != lv.key or not self.corpse_ok(name):
                 continue
             if G.KIND[lv.under[pos]] != G.CORPSE or self.merch_risk(lv, pos):
@@ -252,7 +258,7 @@ class SurvivalMixin:
         return [p for _, p in cands]
 
     def horn_is_bad(self, it):
-        return it.letter in self.horn_bad or it.cursed
+        return it.letter in self.surv.horn_bad or it.cursed
 
     def have_horn(self):
         """A unicorn horn we would apply is on us."""
@@ -263,12 +269,12 @@ class SurvivalMixin:
         """Apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us; the caller decides
         when (sickness: always, ahead of a prayer; the rest: nothing next to us). A horn that brings a new
         condition or takes an attribute is cursed: never applied again, and no longer kept (sold). True if acted."""
-        if self.polyd or self.handless():
+        if self.thief.polyd or self.handless():
             return False
         before = int(self.last_bl[nh.NLE_BL_CONDITION])
         if not before & HORN_FIXES:
-            self.horn_nothing = 0
-        if not before & troubles or before & HORN_FIXES == self.horn_nothing:
+            self.surv.horn_nothing = 0
+        if not before & troubles or before & HORN_FIXES == self.surv.horn_nothing:
             return False              # nothing to fix, or nothing the horn can fix (goop on the face: u.ucreamed)
         horn = next((it for it in self.items() if it.ocls == nh.TOOL_CLASS and "unicorn horn" in it.text
                      and not self.horn_is_bad(it)), None)
@@ -280,16 +286,16 @@ class SurvivalMixin:
             return False
         self.press(horn.letter)
         after = int(self.bl(nh.NLE_BL_CONDITION))
-        self.horn_stats["applied"] += 1
+        self.surv.horn_stats["applied"] += 1
         if "Nothing happens" in self.text_since(seq0):
-            self.horn_nothing = before & HORN_FIXES     # apply.c: no trouble it can fix; until the conditions change
-            self.horn_stats["nothing"] += 1
+            self.surv.horn_nothing = before & HORN_FIXES     # apply.c: no trouble it can fix; until the conditions change
+            self.surv.horn_stats["nothing"] += 1
         if before & ~after & HORN_FIXES:
-            self.horn_stats["fixed"] += 1
+            self.surv.horn_stats["fixed"] += 1
         msgs = self.text_since(seq0)
         if after & ~before & HORN_HARM or ATTR_LOSS_RE.search(msgs):
-            self.horn_bad.add(horn.letter)
-            self.horn_stats["bad"] += 1
+            self.surv.horn_bad.add(horn.letter)
+            self.surv.horn_stats["bad"] += 1
         return True
 
     def heal_step(self, hostiles):
@@ -300,14 +306,14 @@ class SurvivalMixin:
             self.cur_act = "heal"
             if self.ask_drink():
                 self.press(it[0])
-                self.quaffs += 1
+                self.surv.quaffs += 1
                 return True
         return False
 
     def enhance_step(self):
-        if not self.want_enhance:
+        if not self.surv.want_enhance:
             return False
-        self.want_enhance = False
+        self.surv.want_enhance = False
         for _ in range(6):
             self.raw_step(229)                       # M-e: #enhance
             tty = self.tty_text()
@@ -320,23 +326,23 @@ class SurvivalMixin:
                 break
             self.raw_step(ord(m.group(1)))
             self.settle()
-            self.enhances += 1
+            self.surv.enhances += 1
         return False                                 # takes no game time
 
     def vault_step(self, lv, hostiles):
         """Vault guard protocol: drop the gold, then follow the guard out along his corridor."""
-        if self.vault_drop:
+        if self.surv.vault_drop:
             bag = self.gold_bag()
             if bag is not None and self.bag.gold > 0:
-                self.vault_bag_outs += 1          # he wants the gold in our bag too (vault.c hidden_gold): out first
+                self.surv.vault_bag_outs += 1          # he wants the gold in our bag too (vault.c hidden_gold): out first
                 #                                   (A/B vault_bag_out +316 [+84, +574]: 9 of 10 guard deaths gone)
                 return self.bag_take_out(bag)
-            self.vault_drop = False
-            self.vault_drops += 1
+            self.surv.vault_drop = False
+            self.surv.vault_drops += 1
             if self.ask("d", "drop"):
                 self.press("$")
             return True
-        if self.turn() > self.vault_follow_until:
+        if self.turn() > self.surv.vault_follow_until:
             return False
         if any(n != "guard" for _, n in hostiles):
             return False                      # something else is attacking: fight first
@@ -345,29 +351,29 @@ class SurvivalMixin:
         guards = [(int(a), int(b)) for a, b in zip(ys, xs) if G.monster_name(int(g[a, b])) == "guard"]
         y, x = self.pos()
         if not guards:
-            if self.guard_trail and self.turn() - self.guard_trail[-1][1] > 20:
-                self.vault_follow_until = -1
+            if self.surv.guard_trail and self.turn() - self.surv.guard_trail[-1][1] > 20:
+                self.surv.vault_follow_until = -1
                 return False
-            last = self.guard_trail[-1][0] if self.guard_trail else None
+            last = self.surv.guard_trail[-1][0] if self.surv.guard_trail else None
             d = (last[0] - y, last[1] - x) if last else None
-            if d in DELTA2KEY and last != self.guard_stepped:
-                self.guard_stepped = last     # he went on into his dark corridor -- onto the square he left
-                self.vault_moves += 1
+            if d in DELTA2KEY and last != self.surv.guard_stepped:
+                self.surv.guard_stepped = last     # he went on into his dark corridor -- onto the square he left
+                self.surv.vault_moves += 1
                 self.cur_act = "vault"
                 self.press(DELTA2KEY[d])
                 return True
         else:
             gp = min(guards, key=lambda p: max(abs(p[0] - y), abs(p[1] - x)))
-            if not self.guard_trail or self.guard_trail[-1][0] != gp:
-                self.guard_trail.append((gp, self.turn()))
+            if not self.surv.guard_trail or self.surv.guard_trail[-1][0] != gp:
+                self.surv.guard_trail.append((gp, self.turn()))
         # step onto the newest square the guard has left that is next to us
-        gnow = self.guard_trail[-1][0] if self.guard_trail else None
+        gnow = self.surv.guard_trail[-1][0] if self.surv.guard_trail else None
         gd = (lambda p: max(abs(p[0] - gnow[0]), abs(p[1] - gnow[1]))) if gnow else None
-        for p, _ in reversed(self.guard_trail[:-1]):
+        for p, _ in reversed(self.surv.guard_trail[:-1]):
             d = (p[0] - y, p[1] - x)
             if p != gnow and d in DELTA2KEY and gd(p) < gd((y, x)):
                 # forward only, never back
-                self.vault_moves += 1
+                self.surv.vault_moves += 1
                 self.cur_act = "vault"
                 self.press(DELTA2KEY[d])
                 return True
@@ -382,8 +388,8 @@ class SurvivalMixin:
                      and dist((y + dy, x + dx)) < dist((y, x))]
             if steps:
                 q = min(steps, key=dist)
-                self.vault_moves += 1
-                self.vault_approach += 1
+                self.surv.vault_moves += 1
+                self.surv.vault_approach += 1
                 self.cur_act = "vault"
                 self.press(DELTA2KEY[(q[0] - y, q[1] - x)])
                 return True
@@ -395,46 +401,46 @@ class SurvivalMixin:
         """Poison resistance, skills, prayer outcome, the vault guard, lycanthropy, eating."""
         # eat.c givit(POISON_RES): "You feel healthy."; eating poison while resistant: "You seem unaffected"
         if "You feel healthy" in m or "You seem unaffected by the poison" in m:
-            self.poison_res = True
+            self.surv.poison_res = True
         # eat.c givit: FIRE_RES "You feel a momentary chill." (hallucinating "You be chillin'."), COLD_RES
         # "You feel full of hot air."
         if "You feel a momentary chill" in m or "You be chillin'" in m:
-            self.eaten_res.add("fire")
+            self.surv.eaten_res.add("fire")
         if "You feel full of hot air" in m:
-            self.eaten_res.add("cold")
+            self.surv.eaten_res.add("cold")
         if "more confident in your" in m:
-            self.skill_msgs += 1
-            self.want_enhance = True
-        recent = self.last_pray is not None and self.turn() - self.last_pray <= 5
+            self.surv.skill_msgs += 1
+            self.surv.want_enhance = True
+        recent = self.surv.last_pray is not None and self.turn() - self.surv.last_pray <= 5
         if "You feel that" in m and ("displeased" in m or "bummed" in m):
-            self.pray_failed += 1
+            self.surv.pray_failed += 1
             if recent:
-                self.god_angry = True     # pray.c angrygods case 0-1; p_type 0 (too soon) also did u.ugangr++
+                self.surv.god_angry = True     # pray.c angrygods case 0-1; p_type 0 (too soon) also did u.ugangr++
         if recent and any(p in m for p in ("Thou hast angered me", "Thou must relearn", "You feel guilty",
                                            "Then die, mortal", "Thou durst")):
-            self.god_angry = True
+            self.surv.god_angry = True
         if "drop that gold" in m or "drop that money" in m or "drop that hidden money" in m:
-            self.vault_drop = True
+            self.surv.vault_drop = True
         if "follow me" in m:
-            self.vault_follow_until = self.turn() + 300
-            self.guard_trail = []
-            self.guard_stepped = None
+            self.surv.vault_follow_until = self.turn() + 300
+            self.surv.guard_trail = []
+            self.surv.guard_stepped = None
         if "the guard disappears" in m:
-            self.vault_follow_until = -1              # out of his corridor: the escort is over (vault.c)
+            self.surv.vault_follow_until = -1              # out of his corridor: the escort is over (vault.c)
         if "You feel feverish" in m:
-            self.lycanthropy = True
+            self.surv.lycanthropy = True
             mk = re.search(r"\b(were(?:jackal|rat|wolf))\b", m)
-            self.lyc_kind = mk.group(1) if mk else None      # None: infected by something we didn't see
+            self.surv.lyc_kind = mk.group(1) if mk else None      # None: infected by something we didn't see
         if "You feel purified" in m:
-            self.lycanthropy = False
+            self.surv.lycanthropy = False
         if "carrying so much" in m:
-            self.no_eat_until = self.turn() + 20
+            self.surv.no_eat_until = self.turn() + 20
         if STOMACH_CONTENT_RE.search(m):
             self.nutrition_set(900)           # pray.c:368-370 -> eat.c:119 init_uhunger: u.uhunger = 900
         elif "surrounded by a golden glow" in m:
-            self.nutrition_set(max(900, self.nutrition - max(0, self.turn() - self._hunger_at[0])))
+            self.nutrition_set(max(900, self.surv.nutrition - max(0, self.turn() - self.surv.hunger_at[0])))
             #                                   pray.c:1110 pat_on_head: init_uhunger if u.uhunger < 900
         if "You seem faster." in m:           # eat.c:1052-1060 a quantum mechanic (the only source of either)
-            self.qm_fast = True
+            self.surv.qm_fast = True
         elif "You seem slower." in m:
-            self.qm_fast = False
+            self.surv.qm_fast = False

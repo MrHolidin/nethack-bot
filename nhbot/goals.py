@@ -144,15 +144,15 @@ class GoalsMixin:
     def goal_forget(self, kind, lv, goal):
         """Remove an own-tier goal at goal from its list; returns how many entries went."""
         if kind == "retrieve":
-            n = len(self.retrieve)
-            self.retrieve = [r for r in self.retrieve if goal not in r[1]]
-            return n - len(self.retrieve)
+            n = len(self.combat.retrieve)
+            self.combat.retrieve = [r for r in self.combat.retrieve if goal not in r[1]]
+            return n - len(self.combat.retrieve)
         if kind == "corpse":
-            n = len(self.kills)
-            self.kills = [k for k in self.kills if k[2] != goal or k[3] != lv.key]
-            return n - len(self.kills)
+            n = len(self.combat.kills)
+            self.combat.kills = [k for k in self.combat.kills if k[2] != goal or k[3] != lv.key]
+            return n - len(self.combat.kills)
         if kind == "loot":
-            self.loot_sq = None
+            self.thief.loot_sq = None
             return 1
         raise ValueError(kind)
 
@@ -181,10 +181,10 @@ class GoalsMixin:
         for (kind, _), squares in self.goal_open.items():
             st[kind]["unfinished"] += len(squares)
         t = self.turn()
-        for r in self.retrieve:
+        for r in self.combat.retrieve:
             st["retrieve"]["expired" if r[2] <= t else "unfinished"] += 1
-        for k in self.kills:
+        for k in self.combat.kills:
             st["corpse"]["expired" if t - k[0] >= GOALS["corpse"].ttl else "unfinished"] += 1
-        if self.loot_sq is not None:
+        if self.thief.loot_sq is not None:
             st["loot"]["unfinished"] += 1
         return st

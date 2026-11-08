@@ -106,7 +106,7 @@ class SacrificeMixin:
             self.cur_act = "sacrifice"
             return self.walk_to(lv, amask, grids=grids, act="sacrifice")[0] == "moved"
         cands = []
-        for kt, name, pos, key in self.kills:
+        for kt, name, pos, key in self.combat.kills:
             if key != lv.key or t - kt >= SAC_AGE or G.KIND[lv.under[pos]] != G.CORPSE or not self.sac_ok(name):
                 continue
             if amask[pos]:
@@ -131,9 +131,9 @@ class SacrificeMixin:
             if any(name + " corpse" in it.text for it in self.items()):
                 self.sac.carry = (kt, name)
                 self.sac.stats["picked"] += 1
-                self.kills = [k for k in self.kills if k[2] != pos or k[3] != lv.key]
+                self.combat.kills = [k for k in self.combat.kills if k[2] != pos or k[3] != lv.key]
             else:
-                self.kills = [k for k in self.kills if k[2] != pos or k[3] != lv.key]   # can't lift it
+                self.combat.kills = [k for k in self.combat.kills if k[2] != pos or k[3] != lv.key]   # can't lift it
                 self.sac.stats["not_lifted"] += 1
             return True
         tm = np.zeros_like(passable)
@@ -188,7 +188,7 @@ class SacrificeMixin:
             self.press(it.letter)
         said = self.text_since(seq0)
         self.sac.carry = None
-        self.kills = [k for k in self.kills if not (k[1] == name and k[3] == lv.key and k[2] == self.pos())]
+        self.combat.kills = [k for k in self.combat.kills if not (k[1] == name and k[3] == lv.key and k[2] == self.pos())]
         self.sac.stats["offered"] += 1
         for phrase, what in SAC_RESULTS:
             if phrase in said:

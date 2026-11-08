@@ -270,7 +270,7 @@ class EquipMixin:
     # ---------------------------------------------------------- main hook
     def equip_step(self, lv):
         """Called when no hostiles are visible. Returns True if it used the turn."""
-        if self.polyd or self.handless():
+        if self.thief.polyd or self.handless():
             return False                      # do_wear.c: very small / handless forms can't ("Don't even bother.")
         inv = self.armor_inventory()
         worn = self.worn_by_slot(inv)
@@ -356,7 +356,7 @@ class EquipMixin:
         seq0 = self.msg_seq
         if not self.ask("W", "what do you want to wear"):
             if "even bother" in self.asked:
-                self.polyd = True             # a form we failed to notice; cleared by "You return to ... form"
+                self.thief.polyd = True             # a form we failed to notice; cleared by "You return to ... form"
             return
         self.press(a["letter"])
         msgs = self.text_since(seq0)

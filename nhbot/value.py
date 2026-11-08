@@ -115,7 +115,7 @@ class ValueMixin:
         if key in self.value.deduced:
             return {self.value.deduced[key]: 1.0}
         cands = [n for n in candidates(key) if (_cls_of(n, key), n) not in self.value.known_types] or list(candidates(key))
-        engraved = self.wandid.wand_engraved.get(key)              # wandid: the engraving test narrowed the types
+        engraved = self.wandid.engraved.get(key)              # wandid: the engraving test narrowed the types
         if engraved:
             cands = [n for n in cands if n in engraved] or cands
         reads = list(self.prices.reads.get(key, {}).values())

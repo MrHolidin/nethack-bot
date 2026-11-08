@@ -82,8 +82,9 @@ def wand_effect(kind, name, depth, xl):
     return 1.0, halved(dmg, p_res, False)
 
 
-class CombatMixin:
-    def combat_init(self):
+class CombatState:
+    """State of our kills, throws, shooter hunts and zaps (CombatMixin)."""
+    def __init__(self):
         self.kill_by = Counter()       # our kills, by kind
         self.kill_count = 0
         self.kills = []                # (turn, name, square, level key) of our kills (fresh corpses)
@@ -103,6 +104,11 @@ class CombatMixin:
         self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
         self.prey_cache = {}             # prey_win by state
         self.prey_cache_tick = None      # the tick the cache is for
+
+
+class CombatMixin:
+    def combat_init(self):
+        self.combat = CombatState()
 
     def throwables(self):
         if self.handless():
@@ -148,12 +154,12 @@ class CombatMixin:
     def retrieve_goals(self, lv):
         """Squares on our rays (in throw order) where a weapon or gem lies now; expired rays dropped."""
         t = self.turn()
-        n = len(self.retrieve)
-        self.retrieve = [r for r in self.retrieve if r[2] > t]
-        self.goal_event("retrieve", "expired", n - len(self.retrieve))
+        n = len(self.combat.retrieve)
+        self.combat.retrieve = [r for r in self.combat.retrieve if r[2] > t]
+        self.goal_event("retrieve", "expired", n - len(self.combat.retrieve))
         g = self.obs["glyphs"]
         out = []
-        for key, ray, _ in self.retrieve:
+        for key, ray, _ in self.combat.retrieve:
             if key != lv.key:
                 continue
             for p in ray:
@@ -170,17 +176,17 @@ class CombatMixin:
         (monmove.c:341-346 distfleeck: monflee) -- write one (read back) and wait there; from SPORE_THROW_MIN on
         unblock_step throws at it. SPORE_WAITS turns at most a level. True if it used the turn. (A/B spore_elb: +255
         [+74, +448], median 7567 -> 7562, 19 of 1000 changed)"""
-        if self.spore_waits[lv.key] >= SPORE_WAITS:
+        if self.combat.spore_waits[lv.key] >= SPORE_WAITS:
             return False
         self.cur_act = "unblock"
         if self.pos() in lv.elbereth and self.elb_confirm(lv):
-            self.spore_waits[lv.key] += 1
+            self.combat.spore_waits[lv.key] += 1
             self.press("s")
             return True
         if not self.elb_can_write(lv) or not self.engrave_elbereth():
-            self.spore_waits[lv.key] = SPORE_WAITS      # no Elbereth here: give it up on this level
+            self.combat.spore_waits[lv.key] = SPORE_WAITS      # no Elbereth here: give it up on this level
             return False
-        self.spore_waits[lv.key] += 1
+        self.combat.spore_waits[lv.key] += 1
         self.elb_confirm(lv)
         return True
 
@@ -242,7 +248,7 @@ class CombatMixin:
                 return False
             blocker = min(near, key=lambda c: d2[c])
         name = G.monster_name(int(self.obs["glyphs"][blocker]))
-        self.unblocks += 1
+        self.combat.unblocks += 1
         y, x = start
         dy, dx = blocker[0] - y, blocker[1] - x
         d = max(abs(dy), abs(dx))
@@ -256,7 +262,7 @@ class CombatMixin:
                 ray = ray_squares(y, x, sy, sx)
                 self.cur_act = "unblock"
                 self.last_attack_target = blocker
-                self.unblock_throws += 1
+                self.combat.unblock_throws += 1
                 self.throw(ex[0][0], DELTA2KEY[(sy, sx)], ray)
                 return True
             # (a floating eye next to us on a desperate level is no blocker: may_melee lets us hit it then)
@@ -279,12 +285,12 @@ class CombatMixin:
         t = self.turn()
         y, x = self.pos()
         if self.hp_below(self.opts.hunt_hp):
-            self.hunt = None
+            self.combat.hunt = None
             return False
-        ev = self.shot_event
+        ev = self.combat.shot_event
         dist = lambda p: max(abs(p[0] - y), abs(p[1] - x))
         if ev and t - ev[0] <= 2:
-            self.shot_event = None
+            self.combat.shot_event = None
             vis = self.visible_hostiles(lv)
             lined = [(p, n) for p, n in vis if dist(p) < BOLT_LIM and in_line(p[0] - y, p[1] - x)]
             cands = lined
@@ -292,13 +298,13 @@ class CombatMixin:
                 cands = [c for c in lined if c[1] == ev[1]] or [c for c in vis if c[1] == ev[1]] or lined
             if cands:
                 p, n = min(cands, key=lambda c: dist(c[0]))
-                self.hunt = {"key": lv.key, "pos": p, "name": n, "until": t + 25, "lost": 0}
-                self.hunts += 1
-        h = self.hunt
+                self.combat.hunt = {"key": lv.key, "pos": p, "name": n, "until": t + 25, "lost": 0}
+                self.combat.hunts += 1
+        h = self.combat.hunt
         if not h:
             return False
         if h["key"] != lv.key or t > h["until"]:
-            self.hunt = None
+            self.combat.hunt = None
             return False
         same = [p for p, n in self.visible_hostiles(lv) if n == h["name"]]
         if same:
@@ -307,7 +313,7 @@ class CombatMixin:
         else:
             h["lost"] += 1
             if h["lost"] > 5:
-                self.hunt = None
+                self.combat.hunt = None
                 return False
         if dist(h["pos"]) <= 1:
             return False                       # next to it: the fight step takes over
@@ -333,8 +339,8 @@ class CombatMixin:
                 lined = lambda p: in_line(p[0] - ty, p[1] - tx)
                 off = [p for p in pool if not lined(p)]
                 self.cur_act = "hunt"
-                self.hunt_steps += 1
-                self.hunt_offline_steps += bool(off and any(lined(p) for p in pool))
+                self.combat.hunt_steps += 1
+                self.combat.hunt_offline_steps += bool(off and any(lined(p) for p in pool))
                 self.move((off or pool)[0])
                 return True
         adj = np.zeros((ROWS, COLS), dtype=bool)
@@ -343,12 +349,12 @@ class CombatMixin:
             if 0 <= ny < ROWS and 0 <= nx < COLS and passable[ny, nx]:
                 adj[ny, nx] = True
         if adj.any() and not adj[y, x]:
-            hs = self.hunt_steps
-            self.hunt_steps += 1                     # counted before the step, as before
+            hs = self.combat.hunt_steps
+            self.combat.hunt_steps += 1                     # counted before the step, as before
             if self.walk_to(lv, adj, max_cost=60, act="hunt", grids=(k_mem, k_live, passable))[0] == "moved":
                 return True
-            self.hunt_steps = hs
-        self.hunt = None
+            self.combat.hunt_steps = hs
+        self.combat.hunt = None
         return False
 
     def attack_wands(self):
@@ -374,12 +380,12 @@ class CombatMixin:
         g = self.obs["glyphs"]
         for sq in ray_squares(y, x, *DIRS[key], n=13):
             if G.KIND[g[sq]] == G.MONSTER and G.monster_name(int(g[sq])) in names:
-                self.slept[(lv.key, sq)] = (self.turn(), G.monster_name(int(g[sq])))
-                self.zap_stats["slept"] += 1
+                self.combat.slept[(lv.key, sq)] = (self.turn(), G.monster_name(int(g[sq])))
+                self.combat.zap_stats["slept"] += 1
 
     def asleep(self, lv, pos):
         """A sleep ray of ours hit the monster at pos less than SLEPT_TURNS ago and it is still there."""
-        v = self.slept.get((lv.key, pos)) if pos is not None else None
+        v = self.combat.slept.get((lv.key, pos)) if pos is not None else None
         if v is None or self.turn() - v[0] >= SLEPT_TURNS:
             return False
         g = int(self.obs["glyphs"][pos])
@@ -395,23 +401,23 @@ class CombatMixin:
         wands = self.attack_wands()
         if not wands:
             return False
-        if self.pos() in lv.elbereth or self.elb_state is not None:
-            self.zap_stats["held_elbereth"] += 1
+        if self.pos() in lv.elbereth or self.elb.state is not None:
+            self.combat.zap_stats["held_elbereth"] += 1
             return False
         targets = sorted(self.wand_targets(lv, hostiles), key=lambda t: self.asleep(lv, t[2]))
         for (key, d, pos, (dy, dx), name, pwin, gain), letter, kind in self.wand_ev_pairs(hostiles, targets, wands):
             if kind == "sleep" and self.asleep(lv, pos):
-                self.zap_stats["held_asleep"] += 1
+                self.combat.zap_stats["held_asleep"] += 1
                 continue
             if wand_resisted(kind, name):
-                self.zap_stats["held_resist"] += 1
+                self.combat.zap_stats["held_resist"] += 1
                 continue
             if kind in RAY_WANDS:          # statistics only: the ray coming back is in the P(win) of the zap
                 self.ray_risk_note(lv, (dy, dx), d, kind, letter, True)
             self.cur_act = "fight"
             self.last_attack_target = pos
-            if len(self.wand_pwin_log) < 30:
-                self.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2), None,
+            if len(self.combat.wand_pwin_log) < 30:
+                self.combat.wand_pwin_log.append((self.turn(), name, d, kind, round(pwin, 2), round(gain, 2), None,
                                            f"{self.bl(nh.NLE_BL_HP)}/{self.bl(nh.NLE_BL_HPMAX)}"))
             return self.zap(letter, key)
         return False
@@ -446,17 +452,17 @@ class CombatMixin:
         (A/B prey_cache -- before: no square / hits / asleep in the key, kept for the game: -287 [-662, +76],
         median 7777 -> 7763; a correctness fix, accepted.)"""
         weapon = next((it.text for it in self.items() if it.wielded), None)
-        if self.prey_cache_tick != self.tick_no:
-            self.prey_cache, self.prey_cache_tick = {}, self.tick_no
+        if self.combat.prey_cache_tick != self.tick_no:
+            self.combat.prey_cache, self.combat.prey_cache_tick = {}, self.tick_no
         lv = self.levels.get(self.cur_key)
         key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),
-               self.bl(nh.NLE_BL_DEPTH), weapon, self.cur_key, pos, self.our_hits.get((self.cur_key, pos), 0),
+               self.bl(nh.NLE_BL_DEPTH), weapon, self.cur_key, pos, self.danger.our_hits.get((self.cur_key, pos), 0),
                lv is not None and self.asleep(lv, pos))
-        if key not in self.prey_cache:
-            state = self.win_rng.bit_generator.state
-            self.prey_cache[key] = self.win_prob([(pos, name)])
-            self.win_rng.bit_generator.state = state
-        return self.prey_cache[key]
+        if key not in self.combat.prey_cache:
+            state = self.danger.win_rng.bit_generator.state
+            self.combat.prey_cache[key] = self.win_prob([(pos, name)])
+            self.danger.win_rng.bit_generator.state = state
+        return self.combat.prey_cache[key]
 
     def wand_targets(self, lv, hostiles):
         """Hostiles in a line within 6 we may zap, nearest first: next to us one of the hostiles, farther away one a
@@ -482,7 +488,7 @@ class CombatMixin:
         me = self.pos()
         approach = {p: max(0, max(abs(p[0] - me[0]), abs(p[1] - me[1])) - 1) for p, _ in fight if p is not None}
         ranged = {p: r for p, _ in fight if p is not None and (r := self.ranged_profile(p)) is not None}
-        state = self.win_rng.bit_generator.state
+        state = self.danger.win_rng.bit_generator.state
         p_fight = self.win_prob(fight, approach=approach, ranged=ranged)
         if p_fight > WAND_PWIN:
             return []
@@ -491,14 +497,14 @@ class CombatMixin:
         for t in targets:
             for letter, kind in wands:
                 if (t[3], letter) not in seen:
-                    self.win_rng.bit_generator.state = state
+                    self.danger.win_rng.bit_generator.state = state
                     seen[(t[3], letter)] = self.win_prob(fight, opening=self.zap_opening(lv, t[3], kind, letter, fight),
                                                          approach=approach, ranged=ranged)
                 p = seen[(t[3], letter)]
                 if p > p_fight:
                     out.append((p, (t[0], t[1], t[2], t[3], t[4], p_fight, p - p_fight), letter, kind))
         if not out:
-            self.zap_stats["held_ev"] += 1
+            self.combat.zap_stats["held_ev"] += 1
         out.sort(key=lambda e: -e[0])
         return [(tt, letter, kind) for _, tt, letter, kind in out]
 
@@ -536,7 +542,7 @@ class CombatMixin:
         mines = bool(lv.key and lv.key[0] == 2)
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
-            self.wandid.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
+            self.wandid.engraved.get(appearance(it.text)) == {"sleep", "death"}
         prot = self.our_resists()
         our_p = zap_hit_prob(self.bl(nh.NLE_BL_AC))
         reflect = "reflection" in prot
@@ -605,7 +611,7 @@ class CombatMixin:
                           mines=bool(lv.key and lv.key[0] == 2))
         it = next((i for i in self.items() if i.letter == letter), None)
         maybe_death = it is not None and "wand of" not in it.text and \
-            self.wandid.wand_engraved.get(appearance(it.text)) == {"sleep", "death"}
+            self.wandid.engraved.get(appearance(it.text)) == {"sleep", "death"}
         harm = ray_harm("death" if maybe_death else kind, self.our_resists(), self.bl(nh.NLE_BL_HP))
         return p, harm
 
@@ -614,20 +620,20 @@ class CombatMixin:
         p, harm = self.ray_risk(lv, step, kind, letter)
         ev = "zap" if safe else "held"
         bucket = "0" if p == 0 else "<5%" if p < 0.05 else "<20%" if p < 0.2 else "<50%" if p < 0.5 else ">=50%"
-        self.ray_risk_stats[f"{ev} p{bucket}"] += 1
-        self.ray_risk_stats[f"{ev} {harm['verdict']}"] += 1
-        if len(self.ray_risk_log) < 40:
-            self.ray_risk_log.append((self.turn(), ev, kind, d, round(p, 3), harm["verdict"]))
+        self.combat.ray_risk_stats[f"{ev} p{bucket}"] += 1
+        self.combat.ray_risk_stats[f"{ev} {harm['verdict']}"] += 1
+        if len(self.combat.ray_risk_log) < 40:
+            self.combat.ray_risk_log.append((self.turn(), ev, kind, d, round(p, 3), harm["verdict"]))
 
     def msg_combat(self, m):
         """Our hits and kills, being shot at, being attacked by something unseen."""
         self.focus_note(m)
         mk = KILLED_RE.search(m)
         if mk or KILL_RE.search(m):                    # KILLED_RE matches only what KILL_RE does
-            self.kill_count += 1
+            self.combat.kill_count += 1
         if mk:
-            self.kill_by[mk.group(1)] += 1
-        self.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
+            self.combat.kill_by[mk.group(1)] += 1
+        self.combat.killed = mk.group(1) if mk else None      # what this message says we killed (thieves read it too)
         if mk and self.last_attack_target:
             lvk = self.levels.get(self.cur_key)
             if lvk is not None:
@@ -636,12 +642,12 @@ class CombatMixin:
                 lvk.kill_piles.add(self.last_attack_target)    # what it carried lies under its corpse (pickup.py)
             old_corpse = lvk is not None and G.KIND[lvk.under[self.last_attack_target]] == G.CORPSE
             if not old_corpse:      # an older corpse already lay there: what we'd eat may be that one
-                self.kills.append((self.turn(), mk.group(1), self.last_attack_target, self.cur_key))
+                self.combat.kills.append((self.turn(), mk.group(1), self.last_attack_target, self.cur_key))
                 self.goal_event("corpse", "created")
         if SHOT_AT_RE.search(m) and not TRAP_SHOT_RE.search(m) and self.turn() - self.own_zap_turn > 1:
-            self.last_shot_turn = self.turn()
+            self.combat.last_shot_turn = self.turn()
             mm = SHOOTER_RE.search(m)
-            self.shot_event = (self.turn(), mm.group(1) if mm else None)
+            self.combat.shot_event = (self.turn(), mm.group(1) if mm else None)
         # the one parser of attacks on us (messages.attacks_on_us) -- "It ..." an unseen one (blind_strike), a named
         # one in melee (hallu_strike: hallucinating, the name is random) (A/B attacked_us: -333 [-653, -55], median
         # 7777 -> 7787, 29 games of 1000 changed)

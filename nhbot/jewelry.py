@@ -142,7 +142,7 @@ class JewelryMixin:
     # ------------------------------------------------------------ wear
     def jewelry_wear_step(self, lv):
         """No threat in view: put on the best amulet / rings we know (taking off a worse one). True if it acted."""
-        if self.polyd or self.handless():
+        if self.thief.polyd or self.handless():
             return False
         items = self.items()
         for ocls, slots in ((nh.AMULET_CLASS, 1), (nh.RING_CLASS, 2)):
@@ -171,7 +171,7 @@ class JewelryMixin:
         """Nothing next to us (the caller checks): a ring of regeneration is on only while HP is below
         the maximum -- it costs a nutrition point every other turn (eat.c gethungry) and does nothing at full HP.
         Put on into a free ring finger, taken off at full HP. True if it acted."""
-        if self.polyd or self.handless():
+        if self.thief.polyd or self.handless():
             return False
         rings = [it for it in self.items() if it.ocls == nh.RING_CLASS]
         regen = [it for it in rings if is_regen(it) and it.letter not in self.jewel.refused]

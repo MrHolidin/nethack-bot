@@ -231,7 +231,7 @@ class PerceptionMixin:
     def items_gate(self, lv):
         """May item goals be pursued / piles inspected now? Not in combat: nothing in melee range and not shot
         at in the last 5 turns. Goals and the steps that consume them use this same test."""
-        return not self.adjacent_hostiles(lv) and self.turn() - self.last_shot_turn > 5
+        return not self.adjacent_hostiles(lv) and self.turn() - self.combat.last_shot_turn > 5
 
     def mark_peaceful_target(self):
         t = self.last_attack_target
@@ -311,8 +311,8 @@ class PerceptionMixin:
         """The resistances we know we have: role / race and what we wear (rays.our_protection), what corpses gave --
         also what the ray / fight sums count (danger, combat; A/B resist_eaten -182 [-355, -23], 8 of 1000 games
         changed, two of them the whole loss -- accepted)."""
-        out = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body]) | self.eaten_res
-        return out | {"poison"} if self.poison_res else out
+        out = our_protection(self.role, self.race, [i.text for i in self.items() if i.on_body]) | self.surv.eaten_res
+        return out | {"poison"} if self.surv.poison_res else out
 
     def passive_immune(self, name):
         """Its only attack is a passive cold / fire one and we resist it -- hitting it is harmless: no longer avoided,

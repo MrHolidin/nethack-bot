@@ -14,28 +14,34 @@ from nhbot.messages import ELB_WIPED_RE
 from nhbot.monsters import PM_INDICES, SWARMERS
 
 
+class ElberethState:
+    """State of Elbereth engraving and resting on it (ElberethMixin)."""
+    def __init__(self):
+        self.elbereths = 0
+        self.state = None            # dict(pos, key, since, last_read, hp_hist)
+        self.engraves = 0
+        self.misspelled = 0
+        self.turns = 0
+        self.exits = collections.Counter()
+        self.fail_at = None
+        self.block_reasons = collections.Counter()
+        self.fail_msgs = []
+        self.fail = 0
+        self.rewrites = 0
+        self.only_c = 0
+        self.stats = collections.Counter()       # reads, confirmed rests, nymph engravings
+
+
 class ElberethMixin:
     def elbereth_init(self):
-        self.elbereths = 0
-        self.elb_state = None        # dict(pos, key, since, last_read, hp_hist)
-        self.elb_engraves = 0
-        self.elb_misspelled = 0
-        self.elb_turns = 0
-        self.elb_exits = collections.Counter()
-        self.elb_fail_at = None
-        self.elb_block_reasons = collections.Counter()
-        self.elb_fail_msgs = []
-        self.elb_fail = 0
-        self.elb_rewrites = 0
-        self.elb_only_c = 0
-        self.elb_stats = collections.Counter()   # reads, confirmed rests, nymph engravings
+        self.elb = ElberethState()
 
     def engrave_elbereth(self):
         if int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
             return False                         # hallucinating: each letter garbled 1 in 2 (engrave.c)
         if not self.engrave("-", "Elbereth"):
             return False
-        self.elbereths += 1                      # lv.elbereth only once read back (elb_confirm)
+        self.elb.elbereths += 1                      # lv.elbereth only once read back (elb_confirm)
         return True
 
     def read_engraving(self):
@@ -70,15 +76,15 @@ class ElberethMixin:
         pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
         bl = ELB.blockers(glyphs, me, pp, lv.key[0])
         if bl and not ELB.blockers(glyphs, me, pp, lv.key[0], optimistic=True):
-            self.elb_only_c += 1                  # ticks where only class-C monsters stood in the way
+            self.elb.only_c += 1                  # ticks where only class-C monsters stood in the way
         if bl:
-            self.elb_block_reasons[bl[0][1].split(":")[0]] += 1
+            self.elb.block_reasons[bl[0][1].split(":")[0]] += 1
         return bool(bl)
 
     def elb_can_write(self, lv):
         """Engraving is possible here and now: square, hands, not the square that just failed,
         not levitating / blind / stunned / confused."""
-        if not self.can_engrave_here(lv) or self.elb_fail_at == (lv.key, self.pos(), self.turn()):
+        if not self.can_engrave_here(lv) or self.elb.fail_at == (lv.key, self.pos(), self.turn()):
             return False
         cond = int(self.last_bl[nh.NLE_BL_CONDITION])
         if cond & nh.BL_MASK_HALLU:
@@ -100,7 +106,7 @@ class ElberethMixin:
     def elb_confirm(self, lv):
         """Read the engraving under us; lv.elbereth follows what it says. True if Elbereth."""
         ok = self.read_engraving() == "Elbereth"
-        self.elb_stats["read_ok" if ok else "read_not"] += 1
+        self.elb.stats["read_ok" if ok else "read_not"] += 1
         if ok:
             lv.elbereth.add(self.pos())
         else:
@@ -124,13 +130,13 @@ class ElberethMixin:
         return not self.elb_blocked(lv)
 
     def elb_step(self, lv, hostiles):
-        st = self.elb_state
+        st = self.elb.state
         y, x = self.pos()
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
         if st is not None:
             if st["pos"] != (y, x) or st["key"] != lv.key:
-                self.elb_exits["moved"] += 1
-                self.elb_state = None
+                self.elb.exits["moved"] += 1
+                self.elb.state = None
             else:
                 bad = [n for p, n in hostiles if not self.respects(p, n)]
                 st["hp_hist"].append(hp)
@@ -140,36 +146,36 @@ class ElberethMixin:
                     st["last_read"] = self.turn()
                     if not self.elb_confirm(lv):
                         if self.elb_blocked(lv):
-                            self.elb_exits["blocked"] += 1
-                            self.elb_state = None
+                            self.elb.exits["blocked"] += 1
+                            self.elb.state = None
                             return False
-                        self.elb_rewrites += 1
+                        self.elb.rewrites += 1
                         st["hp_hist"] = [hp]
                         return self.elb_write(lv)
                 losing = len(st["hp_hist"]) > 4 and st["hp_hist"][-1] < st["hp_hist"][-5] - 2
                 if bad or losing:
-                    self.elb_exits["ignored" if bad else "ranged"] += 1
-                    self.elb_state = None
+                    self.elb.exits["ignored" if bad else "ranged"] += 1
+                    self.elb.state = None
                     return False                       # fight / let tactics handle it
                 visible = self.visible_hostiles(lv)
                 early = not visible and hp >= maxhp * self.opts.elb_early
                 if hp >= maxhp * self.opts.elb_exit or early:
-                    self.elb_exits["healed"] += 1
-                    self.elb_state = None
+                    self.elb.exits["healed"] += 1
+                    self.elb.state = None
                     return False
                 if self.turn() - st["since"] > self.opts.elb_max:
-                    self.elb_exits["timeout"] += 1
-                    self.elb_state = None
+                    self.elb.exits["timeout"] += 1
+                    self.elb.state = None
                     return False
                 if self.turn() - st["last_read"] >= 4:
                     st["last_read"] = self.turn()
                     if not self.elb_confirm(lv):
                         if self.elb_blocked(lv):
-                            self.elb_exits["blocked"] += 1
-                            self.elb_state = None
+                            self.elb.exits["blocked"] += 1
+                            self.elb.state = None
                             return False
                         return self.elb_write(lv)
-                self.elb_turns += 1
+                self.elb.turns += 1
                 self.cur_act = "rest"
                 self.press("s")
                 return True
@@ -177,25 +183,35 @@ class ElberethMixin:
             return False
         return self.elb_write(lv)
 
+    def elb_nymph_note(self, lv, how):
+        """thieves: what came of an Elbereth written against a nymph: "fail" (not engraved: not again on this
+        square this turn), "misspelled" or "ok"."""
+        if how == "fail":
+            self.elb.fail += 1
+            self.elb.fail_at = (lv.key, self.pos(), self.turn())
+        elif how == "misspelled":
+            self.elb.misspelled += 1
+        self.elb.stats["nymph_" + how] += 1
+
     def elb_write(self, lv):
         """Engrave and verify by reading. Any failure to reach the text prompt (fountain/altar/stairs,
         polymorphed into a handless form, levitating, ...) backs off instead of retrying every tick."""
         for attempt in range(3):
             ok = self.engrave_elbereth()
-            self.elb_engraves += 1
+            self.elb.engraves += 1
             if not ok:
                 # precondition missed a case: log it (to find it), and don't retry on this square this turn
-                self.elb_fail += 1
-                self.elb_fail_msgs.append(" ".join(m for _, m in list(self.messages)[-2:])[:80])
-                self.elb_fail_at = (lv.key, self.pos(), self.turn())
-                self.elb_state = None
+                self.elb.fail += 1
+                self.elb.fail_msgs.append(" ".join(m for _, m in list(self.messages)[-2:])[:80])
+                self.elb.fail_at = (lv.key, self.pos(), self.turn())
+                self.elb.state = None
                 return False
             if self.elb_confirm(lv):
-                self.elb_state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
+                self.elb.state = {"pos": self.pos(), "key": lv.key, "since": self.turn(),
                                   "last_read": self.turn(), "hp_hist": [self.bl(nh.NLE_BL_HP)]}
                 self.cur_act = "rest"
                 return True
-            self.elb_misspelled += 1
-        self.elb_state = None
+            self.elb.misspelled += 1
+        self.elb.state = None
         return True
 

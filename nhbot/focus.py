@@ -71,11 +71,17 @@ def expected_remaining_hp(level, dealt):
     return sum((h - dealt) * p for h, p in alive.items()) / z
 
 
+class FocusState:
+    """State of focusing on one target (FocusMixin)."""
+    def __init__(self):
+        self.hits = {}              # (level key, pos) -> [mon index, hits, last turn]
+        self.picks = 0              # times focus chose a different target than lowest-level
+        self.calls = 0
+
+
 class FocusMixin:
     def focus_init(self):
-        self.focus_hits = {}        # (level key, pos) -> [mon index, hits, last turn]
-        self.focus_picks = 0        # times focus chose a different target than lowest-level
-        self.focus_calls = 0
+        self.focus = FocusState()
 
     def wielded(self):
         for it in self.items():
@@ -119,12 +125,12 @@ class FocusMixin:
             return
         key = (self.cur_key, pos)
         idx = nh.glyph_to_mon(g)
-        rec = self.focus_hits.get(key)
+        rec = self.focus.hits.get(key)
         if rec is None or rec[0] != idx or self.turn() - rec[2] > 30:
             rec = [idx, 0, self.turn()]
         rec[1] += n
         rec[2] = self.turn()
-        self.focus_hits[key] = rec
+        self.focus.hits[key] = rec
 
     def focus_score(self, pos):
         # (A/B fight_model -- scored with danger's fight model instead: -1411 [-2662, -184], 7148)
@@ -134,7 +140,7 @@ class FocusMixin:
         idx = nh.glyph_to_mon(g)
         pm = nh.permonst(idx)
         p, dmg = self.my_attack(idx)
-        rec = self.focus_hits.get((self.cur_key, pos))
+        rec = self.focus.hits.get((self.cur_key, pos))
         hits = rec[1] if rec and rec[0] == idx and self.turn() - rec[2] <= 30 else 0
         rem = expected_remaining_hp(pm.mlevel, hits * dmg)
         ttk = rem / max(p * dmg, 0.05)
@@ -142,8 +148,8 @@ class FocusMixin:
 
     def focus_target(self, hostiles):
         """The (pos, name) hostile to hit among several: the highest focus_score."""
-        self.focus_calls += 1
+        self.focus.calls += 1
         best = max(hostiles, key=lambda t: self.focus_score(t[0]))[0]
         if best != min(hostiles, key=lambda t: self.mon_level(t[0]))[0]:
-            self.focus_picks += 1
+            self.focus.picks += 1
         return best

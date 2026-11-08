@@ -109,7 +109,7 @@ class WeaponsMixin:
     def weapon_upgrade(self, inv):
         """Wield the best-ranked weapon we carry if it beats the wielded one (or nothing is wielded).
         Never a known-cursed one; never switch away from a cursed (welded) one; each candidate tried once."""
-        if self.polyd or self.handless():
+        if self.thief.polyd or self.handless():
             return False                     # animal forms can't hold weapons ("Don't be ridiculous!")
         items = self.items()
         cur_it = next((it for it in items if it.wielded), None)
@@ -132,7 +132,7 @@ class WeaponsMixin:
         seq0 = self.msg_seq
         self.wield(l)
         if "Don't be ridiculous" in self.text_since(seq0):
-            self.polyd = True                # a form we failed to notice; retry after "You return to ... form"
+            self.thief.polyd = True                # a form we failed to notice; retry after "You return to ... form"
             return True
         self.weapons.wield_tried = tried | {(l, s)}
         self.weapons.rewields += 1

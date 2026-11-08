@@ -25,7 +25,7 @@ class ActionsMixin:
             return
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
         self.last_attack_target = target
-        self.attack_turn = self.turn()           # danger: the monster we hit first may not act
+        self.danger.attack_turn = self.turn()           # danger: the monster we hit first may not act
         self.last_move_target = None
         self.press("F")
         self.press(key)
@@ -63,7 +63,7 @@ class ActionsMixin:
             self.settle()
         self.throws += 1
         self.elb_scuffed()                       # a throw scuffs the engraving under us
-        self.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
+        self.combat.retrieve.append((self.cur_key, ray, self.turn() + GOALS["retrieve"].ttl))
         self.goal_event("retrieve", "created")
 
     def zap(self, letter, key):

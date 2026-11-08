@@ -49,7 +49,7 @@ WAND_OF_RE = re.compile(r"wand of ([a-z ]+?)(?: \(| called| named|$)")
 class WandIdState:
     """State of identifying wands by engraving (WandIdMixin)."""
     def __init__(self):
-        self.wand_engraved = {}          # appearance key -> frozenset of the types the engraving test left
+        self.engraved = {}               # appearance key -> frozenset of the types the engraving test left
         self.stats = Counter()
         self.refused = set()             # (level key, square) where the game refused an engraving
 
@@ -68,7 +68,7 @@ class WandIdMixin:
         m = WAND_OF_RE.search(it.text)
         if m:
             return m.group(1).strip()
-        s = self.wandid.wand_engraved.get(appearance(it.text))
+        s = self.wandid.engraved.get(appearance(it.text))
         if s is not None and len(s) == 1:
             return next(iter(s))
         if s == {"sleep", "death"}:
@@ -80,7 +80,7 @@ class WandIdMixin:
             if it.ocls != nh.WAND_CLASS or self.wand_spent(it):
                 continue
             key = appearance(it.text)
-            if key is not None and key not in self.wandid.wand_engraved:
+            if key is not None and key not in self.wandid.engraved:
                 return it, key
         return None, None
 
@@ -108,7 +108,7 @@ class WandIdMixin:
         self.note_wand_use(it, msgs)                     # charges.py: a charge used, or it is spent
         now = next((i for i in self.items() if i.letter == it.letter), None)
         if now is None or appearance(now.text) != key:
-            self.wandid.wand_engraved[key] = frozenset()        # identified by the game (or gone)
+            self.wandid.engraved[key] = frozenset()        # identified by the game (or gone)
             self.value.type_version += 1
             self.wandid.stats["named_by_game"] += 1
             return True
@@ -116,7 +116,7 @@ class WandIdMixin:
             self.wandid.stats["empty"] += 1
             return True                                  # tested again once recharged? no: empty stays empty
         found = next((s for rx, s in RESULTS if rx.search(msgs)), None)
-        self.wandid.wand_engraved[key] = found if found is not None else NO_MESSAGE
+        self.wandid.engraved[key] = found if found is not None else NO_MESSAGE
         self.value.type_version += 1
         self.wandid.stats["msg" if found is not None else "no_msg"] += 1
         return True
