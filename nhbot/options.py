@@ -95,7 +95,7 @@ DEFAULTS = {
                                #      elven cloaks only; lighting: candles, lamps, potions of oil; the health food
                                #      store; the delicatessen's drinks), nothing offered it pays 0 for (uncursed water,
                                #      a cancelled wand); the cheapest identify scroll by our Charisma (shk.c get_cost)
-                               #      (nhbot.carry.shop_buys, jewelry.identify_min_price)
+                               #      (nhbot.shop.shop_buys, jewelry.identify_min_price)
     "excal_travel": False,     # A/B: Excalibur's walk back up by level_travel_step toward the nearest level with a
                                #      fountain we may use -- no up staircase known to lead elsewhere (Sokoban's), only the
                                #      one known to lead there while one is; one fountain mask (excalibur.fountains) for

@@ -195,6 +195,17 @@ class PriceMemoryMixin:
         self.price_stats = {"buy": 0, "sell": 0}
         self.for_sale = {}           # (level key, square) -> {floor text: price} from the tags read there
 
+    def sucker(self):
+        """Visible dunce cap or a shirt with nothing over it: shopkeepers add 1/3 to what we buy and offer a third
+        instead of half for what we sell (shk.c:2128-2132 get_cost, 2332-2338 set_cost; a low-level Tourist too,
+        not counted)."""
+        worn = [it.text for it in self.items() if it.worn]
+        if any("dunce cap" in s for s in worn):
+            return True
+        shirt = any("shirt" in s for s in worn)
+        over = any(re.search(r"mail|armor|jacket|cloak|robe|apron|tunic|coat", s) for s in worn if "shirt" not in s)
+        return shirt and not over
+
     def _record(self, text, kind, price, rid, qty=None):
         """One price reading of the item named text; qty: the stack size a sell offer leaves out of its text
         (shk.c:3253 "for your <xname>"), else the count the text starts with."""

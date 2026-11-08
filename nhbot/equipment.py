@@ -16,7 +16,6 @@ import re
 
 import nle.nethack as nh
 
-from nhbot.game import MENU_RE
 from nhbot.items import base_name, erosion, parse_item
 from nhbot.pricemem import ARMOR_APPEAR
 
@@ -181,7 +180,6 @@ class EquipMixin:
         self.equip_events = []        # (turn, action, name)
         self.wishes = []              # (turn, what we asked for, what came)
         self.armor_called = {}        # appearance -> type, for armor we wished for ("fencing gloves" -> power)
-        self.food_picked = 0
 
     # ---------------------------------------------------------- inventory view
     def armor_true_text(self, s):
@@ -389,29 +387,3 @@ class EquipMixin:
             return False
         self.equip_events.append((self.turn(), "takeoff", a["name"]))
         return True
-
-    # ---------------------------------------------------------- floor items
-    def look_here(self):
-        """Names of items on our square (':' look), without consuming a turn."""
-        self.raw_step(ord(":"))
-        names = []
-        for _ in range(20):
-            tty = self.tty_text()
-            msg = self.message()
-            m = re.search(r"You (?:see|feel) here (.+?)\.", msg) or re.search(r"You (?:see|feel) here (.+?)\.", tty.replace("\n", " "))
-            if m:
-                names.append(m.group(1))
-            if "Things that are here" in tty or "There are several objects here" in tty:
-                if "Things that are here" in tty:
-                    for item in (l.strip() for l in self.menu_lines(tty, "Things that are here")):
-                        if not item or item.startswith("--More--") or item.startswith("(end)"):
-                            continue
-                        names.append(item.replace("--More--", "").strip())
-            if self.obs["misc"][2] or "--More--" in tty.replace("\n", "") or MENU_RE.search(tty):
-                self.raw_step(13 if "(end)" not in tty else 27)
-                continue
-            break
-        self.settle()
-        self.price_note_text(" | ".join(names))
-        return names
-

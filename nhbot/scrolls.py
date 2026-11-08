@@ -59,15 +59,6 @@ class ScrollMixin:
         self.enchant_stats = Counter()   # msg_enchant: what enchant armor / weapon did, from the game's words
         self.enchant_log = []            # (turn, effect, item) of the first ENCHANT_LOG of them
 
-    def sucker(self):
-        """Visible dunce cap or a shirt with nothing over it: shopkeepers add 1/3."""
-        worn = [it.text for it in self.items() if it.worn]
-        if any("dunce cap" in s for s in worn):
-            return True
-        shirt = any("shirt" in s for s in worn)
-        over = any(re.search(r"mail|armor|jacket|cloak|robe|apron|tunic|coat", s) for s in worn if "shirt" not in s)
-        return shirt and not over
-
     def scroll_is_good(self, s):
         """Identified as one of GOOD_TYPES, or every type its shop prices allow is one of them."""
         if GOOD_RE.search(s):

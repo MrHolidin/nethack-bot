@@ -18,6 +18,7 @@ from nhbot import glyphs as G
 from nhbot.carry import (ALL_GLYPH, CARRY_CLASSES, CARRY_GLYPH, GEM_NAMES, MORE_GLYPH, NO_TOOLS, OBJ_INFO,
                          TOOL_WORDS, WEAPON_GLYPH, WEAPON_NAME_OF, one_of)
 from nhbot.equipment import GLOVES, parse_armor
+from nhbot.game import MENU_RE
 from nhbot.items import CURSED_RE, base_name, parse_item
 from nhbot.tins import MAX_TINS
 from nhbot.weapons import THROWABLE
@@ -99,6 +100,7 @@ class PickupMixin:
         self.lift_want = None          # lift_heavy: the want of the pick-up under way (pickup, lift_answer)
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
+        self.food_picked = 0           # food stacks taken from piles (armor_pickup_here)
 
     def kind_of(self, text):
         """floor_kind, names made singular by items.singular_name with name_parse."""
@@ -292,6 +294,31 @@ class PickupMixin:
         if bad:
             self.pickup_stats["lone_dropped"] += 1
             self.drop_units(lone.group(1))
+
+    # ------------------------------------------------------------------ the square
+    def look_here(self):
+        """Names of items on our square (':' look), without consuming a turn."""
+        self.raw_step(ord(":"))
+        names = []
+        for _ in range(20):
+            tty = self.tty_text()
+            msg = self.message()
+            m = re.search(r"You (?:see|feel) here (.+?)\.", msg) or re.search(r"You (?:see|feel) here (.+?)\.", tty.replace("\n", " "))
+            if m:
+                names.append(m.group(1))
+            if "Things that are here" in tty or "There are several objects here" in tty:
+                if "Things that are here" in tty:
+                    for item in (l.strip() for l in self.menu_lines(tty, "Things that are here")):
+                        if not item or item.startswith("--More--") or item.startswith("(end)"):
+                            continue
+                        names.append(item.replace("--More--", "").strip())
+            if self.obs["misc"][2] or "--More--" in tty.replace("\n", "") or MENU_RE.search(tty):
+                self.raw_step(13 if "(end)" not in tty else 27)
+                continue
+            break
+        self.settle()
+        self.price_note_text(" | ".join(names))
+        return names
 
     # ------------------------------------------------------------------ the menu
     def pickup(self, want, site):
