@@ -28,6 +28,7 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot.carry import WEAPON_NAME_OF
+from nhbot.fightmodel import ac_reduce, cast_chance, cast_profile
 from nhbot.items import base_name, erosion
 from nhbot.messages import KILL_WORD_RE, OUR_HIT_RE
 from nhbot.monattacks import ATTACKS
@@ -53,6 +54,9 @@ MISSILE_DIE = {"arrow": 6, "elven arrow": 7, "orcish arrow": 5, "silver arrow": 
 BREATH_KIND = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning", "SLEE": "sleep", "MAGM": "magic missile",
                "DISN": "death", "ACID": "fire", "DRST": "fire", "RBRE": "fire"}
 WIELD_RE = re.compile(r"The ([a-zA-Z' -]+?) (?:swings|thrusts|wields) (?:his|her|its|an?|the|\d+)? ?([a-z' -]+?)[.!]")
+# a seen monster's melee hit or miss (mhitu.c hitmsg default "%s hits!", missmu); a weapon attack with a weapon in hand
+# says "swings" / "thrusts" first (mhitu.c:767-772, 100-106 mswings, a seen monster) -- without it, none
+MON_MELEE_RE = re.compile(r"\bThe ([a-zA-Z' -]+?) (?:hits|misses|just misses)!")
 WIN_SIMS = 200                   # win_prob: sampled fights
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
@@ -151,6 +155,7 @@ class DangerState:
     """State of the danger model: monster weapons, our hits, win_prob draws, calibration (DangerMixin)."""
     def __init__(self):
         self.mon_weapon = {}                     # monster name -> weapon we saw it use
+        self.mon_unarmed = set()                 # monster names we saw hit / miss with no weapon swung
         self.pending = None                      # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.our_hits = {}                       # (level key, square) -> our hits on the monster there
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
@@ -174,6 +179,9 @@ class DangerMixin:
             w = re.sub(r"s$", "", weapon) if weapon not in WEAPON_DICE else weapon
             if w in WEAPON_DICE:
                 self.danger.mon_weapon[mon] = w
+        for mon in MON_MELEE_RE.findall(m):
+            if mon not in self.danger.mon_weapon:
+                self.danger.mon_unarmed.add(mon)
 
     def hit_prob(self, level, i, bonus=0):
         """P(10 + AC_VALUE(ac) + level (+ bonus: 4 while we are helpless, mhitu.c multi < 0) > rnd(20 + i))."""
@@ -186,15 +194,29 @@ class DangerMixin:
             p += min(max(tmp - 1, 0), n) / n
         return p / len(acs)
 
-    def monster_turn_pmf(self, name, bonus=0):
-        """(damage pmf of one action of this monster, P(instant death) per action); bonus: to its to-hit."""
+    def monster_turn_pmf(self, name, bonus=0, model2=False, hurt=False):
+        """(damage pmf of one action of this monster, P(instant death) per action); bonus: to its to-hit.
+        model2 (fight_model2, focus.focus_parts): each hit's damage less rnd(-AC) at a negative AC
+        (fightmodel.ac_reduce), a weapon attack of a kind we saw hit / miss without swinging one: its own dice only
+        (mon_unarmed), and its spells (AT_MAGC: fightmodel.cast_chance / cast_profile; hurt: we hit it -- it may cure
+        itself)."""
         idx = PM_INDEX.get(name)
         if idx is None:
             return np.array([1.0]), 0.0
         pm = nh.permonst(idx)
         level = adj_level(pm.mlevel, self.bl(nh.NLE_BL_DEPTH), self.bl(nh.NLE_BL_XP))
         pmf, alive = np.array([1.0]), 1.0
+        ac = self.bl(nh.NLE_BL_AC)
         for i, (at, ad, n, d) in enumerate(ATTACKS[idx]):
+            if model2 and at == "MAGC":
+                q = cast_chance(ad, level, pm.mmove)
+                if q:
+                    us = {"resists": self.our_resists(), "hurt": hurt, "wizard": name == "Wizard of Yendor",
+                          "blind": bool(int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_BLIND)}
+                    cast, death = cast_profile(ad, level, n, d, us)
+                    pmf = conv(pmf, self._mix(np.array([1.0]), cast, q))
+                    alive *= 1 - q * death
+                continue
             if at not in MELEE:
                 continue
             p = self.hit_prob(level, i, bonus)
@@ -204,7 +226,10 @@ class DangerMixin:
             dmg = dice_pmf(n, d) if n and d and not zero else np.array([1.0])
             if at == "WEAP":
                 w = self.danger.mon_weapon.get(name)
-                dmg = conv(dmg, dice_pmf(1, WEAPON_DICE[w][0]) if w else dice_pmf(1, 6))
+                if w or not (model2 and name in self.danger.mon_unarmed):
+                    dmg = conv(dmg, dice_pmf(1, WEAPON_DICE[w][0]) if w else dice_pmf(1, 6))
+            if model2:
+                dmg = ac_reduce(dmg, ac)                     # before the poison's own losehp (attrib.c poisoned)
             # (A/B dmg_ac -- negative AC takes rnd(-AC) off each hit: -1141 [-2242, -60], 7523)
             if ad in POISON and not self.surv.poison_res:
                 alive *= 1 - p / 240                         # poisoned 1 in 8, deadly 1 in 30
@@ -224,12 +249,17 @@ class DangerMixin:
         out[:len(b)] += w * b
         return out
 
-    def monster_round(self, name):
-        """(damage pmf, P(instant death)) of this monster's actions in one game turn (mcalcmove)."""
+    def monster_round(self, name, model2=False, hurt=False):
+        """(damage pmf, P(instant death)) of this monster's actions in one game turn (mcalcmove); model2, hurt:
+        monster_turn_pmf's (and model2: a leprechaun does not attack us while we carry no gold)."""
         pm = PM_BY_NAME.get(name)
         if pm is None:
             return np.array([1.0]), 0.0
-        one, inst = self.monster_turn_pmf(name)
+        if model2 and name == "leprechaun" and not self.bl(nh.NLE_BL_GOLD):
+            # monmove.c:574-576 dochug: we carry no gold and it carries some (makemon.c:764-765 m_initinv: d(depth,
+            # 30) at its making) -- it moves off instead of attacking (on calibration games 0.10 of the modelled damage)
+            return np.array([1.0]), 0.0
+        one, inst = self.monster_turn_pmf(name, model2=model2, hurt=hurt)
         k, frac = divmod(pm.mmove, 12)
         pk = np.array([1.0])
         for _ in range(k):
@@ -250,13 +280,14 @@ class DangerMixin:
         name = WEAPON_NAME_OF.get(name, name)
         return (name if name in WEAPON_DICE else None), (ench or 0), (0, 0)
 
-    def our_hit_prob(self, name):
-        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20)."""
+    def our_hit_prob(self, name, skill=0):
+        """uhitm.c find_roll_to_hit: 1 + Luck(0) + abon + monster AC + XL + weapon to-hit - encumbrance > rnd(20);
+        skill: our weapon skill's to-hit (uhitm.c:318 weapon_hit_bonus; focus.weapon_skill reads it)."""
         pm = PM_BY_NAME[name]
         st, dx, xl = self.bl(nh.NLE_BL_STR125), self.bl(nh.NLE_BL_DEX), self.bl(nh.NLE_BL_XP)
         abon = to_hit_abon(st, dx, xl)
         w, ench, (hit_die, _) = self.our_weapon()
-        tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0)
+        tmp = 1 + abon + pm.ac + xl + ench + (WEAPON_DICE[w][2] if w else 0) + skill
         # (A/B skill_bonus -- our to-hit and damage counted our weapon skill: -577 [-1832, +703], median 7134)
         # (A/B helpless_bonus -- to-hit +4 on monsters we slept, +2 on fleeing ones: -1049 [-1988, -67], median 7561)
         cap = self.bl(nh.NLE_BL_CAP)
@@ -266,9 +297,11 @@ class DangerMixin:
             return min(max(tmp - 1, 0), 20) / 20
         return sum(min(max(tmp + k - 1, 0), 20) for k in range(1, hit_die + 1)) / (20 * hit_die)   # + rnd(die)
 
-    def our_damage_pmf(self, name):
+    def our_damage_pmf(self, name, skill=0):
         """weapon.c dmgval -- the small / large die + enchantment (not below 0), then less the erosion (rusty,
-        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die."""
+        corroded, ...: 1..3, not below 1) -- plus dbon, at least 1 (uhitm.c hmon); plus an artifact's damage die.
+        skill: our weapon skill's damage (weapon_dam_bonus), only on a dmgval above 1 (uhitm.c:769 valid_weapon_attack,
+        1111; focus.weapon_skill)."""
         pm = PM_BY_NAME[name]
         dbon = str_dbon(self.bl(nh.NLE_BL_STR125))       # weapon.c dbon
         w, ench, (_, dmg_die) = self.our_weapon()
@@ -276,12 +309,12 @@ class DangerMixin:
         eros = erosion(wielded.text) if w and wielded is not None else 0
         d = (WEAPON_DICE[w][1] if pm.msize >= 3 else WEAPON_DICE[w][0]) if w else 2
         base = dice_pmf(1, d)
-        out = np.zeros(max(2, d + max(ench, 0) + dbon + 1))
+        out = np.zeros(max(2, d + max(ench, 0) + dbon + max(skill, 0) + 1))
         for v in range(1, d + 1):
             dv = max(0, v + ench)
             if dv > 0:
                 dv = max(1, dv - eros)
-            out[max(1, dv + dbon)] += base[v]
+            out[max(1, dv + dbon + (skill if dv > 1 else 0))] += base[v]
         return conv(out, dice_pmf(1, dmg_die)) if dmg_die else out
 
     def our_kill_prob(self, name, hits):
