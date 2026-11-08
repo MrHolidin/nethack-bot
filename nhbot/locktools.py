@@ -56,7 +56,7 @@ class LockToolMixin:
             self.lock_stats["door_open"] += 1
         elif "stop picking that lock" in said or "under arrest" in said:
             lv.watch_warned.add(target)
-            lv.blocked[target] = True
+            self.no_entry_mark(lv, target)
             self.lock_stats["door_warned"] += 1
         return True
 

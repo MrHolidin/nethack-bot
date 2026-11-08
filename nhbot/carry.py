@@ -253,7 +253,7 @@ class CarryMixin:
             self.squeeze_stats["dropped"] += 1
             return True
         self.squeeze_stats["nothing_to_drop"] += 1
-        lv.blocked[target] = True
+        self.no_entry_mark(lv, target)
         return False
 
     def carry_drop_step(self, force=False, max_tier=4):

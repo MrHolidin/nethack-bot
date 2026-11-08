@@ -107,6 +107,10 @@ DEFAULTS = {
                                #      fountain we may use -- no up staircase known to lead elsewhere (Sokoban's), only the
                                #      one known to lead there while one is; one fountain mask (excalibur.fountains) for
                                #      the dip, the climb and the target (nhbot.excalibur.excal_go_up)
+    "blocked_split": False,    # A/B: squares a standing rule keeps us out of (watch-warned / closed-for-inventory /
+                               #      Mines doors, lock warnings, a squeeze we can't shed for, a boulder given up) in
+                               #      Level.no_entry, never forgotten; the stall reset forgets only the learned
+                               #      failures (Level.blocked / fail) (nhbot.mapmem.no_entry_mark)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters

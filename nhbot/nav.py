@@ -193,7 +193,7 @@ class NavMixin:
             self.door_stats["stale_locked"] += 1
         if target in lv.locked:
             if any(max(abs(cy - ty), abs(cx - tx)) <= 1 for cy, cx in lv.cfi):
-                lv.blocked[ty, tx] = True     # closed shop: kicking the door angers the shopkeeper
+                self.no_entry_mark(lv, target)    # closed shop: kicking the door angers the shopkeeper
                 self.shop_kicks_avoided += 1
                 return
             if self.lock_door_step(lv, target):
@@ -207,8 +207,11 @@ class NavMixin:
                 self.mines_kick_stats["kicks"] += 1
                 self.kick(key)
                 return
-            if lv.key[0] == 2 or self.law_nearby():
-                lv.blocked[ty, tx] = True     # never kick doors in the Mines (Minetown watch)
+            if lv.key[0] == 2:
+                self.no_entry_mark(lv, target)    # never kick doors in the Mines (Minetown watch)
+                return
+            if self.law_nearby():
+                lv.blocked[ty, tx] = True     # the watch / a shopkeeper in view: not now
                 return
             self.kick(key)
             return

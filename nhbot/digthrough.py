@@ -71,6 +71,7 @@ class DigThroughMixin:
         if open_now:
             lv.blocked[sq] = False
             lv.fail[sq] = 0
+            lv.no_entry[sq] = False
             self.dig_job = None
             self.dig_note_stat("opened_" + kind)
             return False
@@ -80,7 +81,7 @@ class DigThroughMixin:
             self.dig_job = None
             self.dig_note_stat("gave_up")
             if kind == "boulder":
-                lv.blocked[sq] = True
+                self.no_entry_mark(lv, sq)
             return False
         d = DELTA2KEY[(sq[0] - here[0], sq[1] - here[1])]
         self.cur_act = "dig_through"
