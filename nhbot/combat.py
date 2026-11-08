@@ -108,6 +108,7 @@ class CombatMixin:
         self.zap_stats = Counter()       # sleep marks; zaps held: asleep target, resisting target, on Elbereth
         self.wand_pwin_log = []          # zaps: (turn, target, distance, wand, P(win) fighting on, gain, None, HP)
         self.prey_cache = {}             # prey_win by state
+        self.prey_cache_tick = None      # prey_cache: the tick the cache is for
 
     def throwables(self):
         if self.handless():
@@ -421,10 +422,20 @@ class CombatMixin:
 
     def prey_win(self, name, pos):
         """P(we win a fight with this monster next to us), cached while what it depends on stays the
-        same (its name, our HP, max HP, AC, XL, the dungeon level, the weapon in hand); the RNG state restored."""
+        same (its name, our HP, max HP, AC, XL, the dungeon level, the weapon in hand; prey_cache: also its square,
+        our hits on it and asleep, for this tick only); the RNG state restored."""
         weapon = next((it.text for it in self.items() if it.wielded), None)
         key = (name, self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX), self.bl(nh.NLE_BL_AC), self.bl(nh.NLE_BL_XP),
                self.bl(nh.NLE_BL_DEPTH), weapon)
+        if self.opts.prey_cache:
+            # prey_cache: win_prob also reads the monster's square -- our hits on the one there (danger.our_hits)
+            # and whether our sleep ray put it down (asleep: P = 1) -- and much state the key above leaves out
+            # (Str, encumbrance, resistances, speed); the cache lives for one tick (bounded, never stale)
+            if self.prey_cache_tick != self.tick_no:
+                self.prey_cache, self.prey_cache_tick = {}, self.tick_no
+            lv = self.levels.get(self.cur_key)
+            key += (self.cur_key, pos, self.our_hits.get((self.cur_key, pos), 0),
+                    lv is not None and self.asleep(lv, pos))
         if key not in self.prey_cache:
             state = self.win_rng.bit_generator.state
             self.prey_cache[key] = self.win_prob([(pos, name)])

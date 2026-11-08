@@ -48,6 +48,9 @@ DEFAULTS = {
     "history_always": False,   # A/B: perception and the fight record (danger_tick -- our hits counted for win_prob --,
                                #      summary 'hist') every tick before the steps that act, not only in ticks no
                                #      step before 'history' (pray, heal, blind, ...) acted in (nhbot.policy.tick)
+    "prey_cache": False,       # A/B: prey_win's cache keyed also on the monster's square, our hits on it and whether it
+                               #      is asleep (all read by win_prob), and kept for one tick only -- it grew without
+                               #      limit and went stale (nhbot.combat.prey_win)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- parameters
