@@ -252,7 +252,7 @@ class EquipMixin:
         return worn
 
     def slot_allowed(self, slot):
-        if slot == SHIELD and (self.equip.no_shield or self.two_handed()):
+        if slot == SHIELD and (self.equip.no_shield or self.two_handed() or self.dig_needs_hands()):
             return False
         if slot == SUIT and self.equip.no_suit:
             return False

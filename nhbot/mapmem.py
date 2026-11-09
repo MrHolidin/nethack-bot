@@ -343,6 +343,12 @@ class MapMixin:
         1000 changed)"""
         lv.no_entry[sq] = True
 
+    def door_forced_open(self, lv, door):
+        """A locked door we kicked open (it crashed open or shattered: dokick.c:1286-1290): no longer locked, and no
+        longer kept out of for its lock (no_entry_mark: nav.move never kicks a door in the Mines)."""
+        lv.locked.discard(door)
+        lv.no_entry[door] = False
+
     def stairs_mask(self, lv, kind, k_mem=None):
         """The squares of the remembered staircases of kind (G.UPSTAIR / G.DOWNSTAIR) we may walk to and take:
         k_mem (default: kinds) == kind, less the squares where the game said there is none (Level.not_stairs,

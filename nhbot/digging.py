@@ -11,6 +11,7 @@ class DiggingState:
     def __init__(self):
         self.refused = set()           # level keys whose floor would not be dug ("too hard to dig in"), or where a
                                        # cursed shield keeps a mattock out of our hands (dig_wield)
+        self.shield_off = -10          # turn a shield came off for the mattock (dig_wield, dig_needs_hands)
 
 
 class DiggingMixin:
@@ -73,9 +74,16 @@ class DiggingMixin:
         if kind == "mattock" and shield is not None:
             if not self.take_off(shield):             # a two-handed digger: not with a shield on (wield.c)
                 self.digging.refused.add(lv.key)          # a cursed shield: no mattock
+            self.digging.shield_off = self.turn()
             return True
         self.swap_in("dig", it)
         return True
+
+    def dig_needs_hands(self):
+        """equipment.slot_allowed: a shield just came off for the mattock, not worn again before it is wielded (then
+        two_handed keeps it off) -- mines_luckstone (its minend-2 digging went round taking the shield off and putting
+        it back on: 79611)."""
+        return self.opts.mines_luckstone and self.turn() - self.digging.shield_off <= 2
 
     def dig_unwield(self):
         """The weapon back in our hands after digging (weapons.swap_back, job "dig"). True if it used the turn."""
