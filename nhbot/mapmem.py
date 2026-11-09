@@ -198,6 +198,8 @@ class MapMixin:
         terrain layer); the item still shows on the squares nothing special lies under. Item goals (gold, piles,
         corpses) read the top glyph, lv.under, instead."""
         k = G.KIND[lv.under]
+        if self.opts.statue_walk:
+            k = np.where(G.STATUE_GLYPH[lv.under], G.OBJECT, k).astype(k.dtype)   # glyphs.STATUE_GLYPH
         tk = G.KIND[lv.terrain]
         hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
         if hidden.any():

@@ -151,6 +151,8 @@ class NavMixin:
         key = (self.pol.tick_no, self.steps, lv.key, self.shop_active(lv), tuple(self.perc.avoid_cells))
         if self.nav.grids_key != key:
             k_mem, k_live = self.kinds(lv), G.KIND[self.obs["glyphs"]]
+            if self.opts.statue_walk:
+                k_live = np.where(G.STATUE_GLYPH[self.obs["glyphs"]], G.OBJECT, k_live).astype(k_live.dtype)
             passable = self.passable_grid(lv, k_mem, k_live)
             for a in (k_mem, k_live, passable):
                 a.setflags(write=False)
