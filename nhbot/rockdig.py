@@ -6,8 +6,9 @@ zi/rockobj.py). The bot took the glyph for floor: the step into it is "It's soli
 time), and after a few of those (nav.move: blocked at 6 failures, forgotten by step_progress) it came back for more.
 Here: that answer on a square showing something makes it a dig job -- the square dug open with the pick-axe /
 mattock from where we stood (dig.c dig: rock becomes a passage), what lies on it then taken as anything is
-(step_gold_here, the pile pickup); without a digger, or where we may not dig, the square kept out of for good
-(no_entry_mark). Not in Sokoban, not on a Minetown level (dig.c watch_dig) but Orcish Town, not by a shop
+(step_gold_here, the pile pickup); without a digger, or where we may not dig, the square blocked as a learned
+failure (forgotten by step_progress: a dwarf may dig it open, a digger may come our way), a square that would not give
+way kept out of for good (no_entry_mark). Not in Sokoban, not on a Minetown level (dig.c watch_dig) but Orcish Town, not by a shop
 (shopdig: digthrough.dig_ok)."""
 from nhbot import glyphs as G
 
@@ -39,8 +40,8 @@ class RockDigMixin:
 
     def rock_note(self, lv, here, target):
         """mapmem.msg_map: "It's solid stone." for our step from here to target -- if target shows something lying
-        there (mineralize's gold / gems), a dig job; we can't or may not dig: kept out of for good. True if it was
-        such a square."""
+        there (mineralize's gold / gems), a dig job; we can't or may not dig: blocked for now. True if it was such a
+        square."""
         if not self.opts.rock_dig or lv is None:
             return False
         if G.KIND[int(self.obs["glyphs"][target])] not in LOOKS_LIKE_THINGS \
@@ -51,7 +52,7 @@ class RockDigMixin:
         if self.dig_hand_means() is None or self.in_sokoban(lv) or lv.key in self.digging.refused \
                 or (not orcs and (self.is_minetown(lv) or self.minetown_rooms(lv))) \
                 or not (orcs or self.dig_ok(lv, target)):
-            self.no_entry_mark(lv, target)
+            lv.blocked[target] = True
             self.rock_stat("kept_out")
             return True
         if self.rock_dig.job is None or self.rock_dig.job[:3] != (lv.key, here, target):

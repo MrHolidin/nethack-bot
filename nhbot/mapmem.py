@@ -328,8 +328,12 @@ class MapMixin:
 
     def is_minetown(self, lv):
         """A Mines level with an altar, a fountain or a shop: Minetown (every variant has a temple altar;
-        filler Mines levels and Mines' End have none of the three)."""
+        filler Mines levels have none of the three -- but Mines' End has fountains: minend-2 one, minend-3 two,
+        mines.des; A/B minend_not_town: Minetown only where the dungeon puts it, Mines level 3 or 4 --
+        dungeon.def:74 "minetn" @ (3, 2), dungeon.c:377-379 level_range)."""
         if lv is None or lv.key[0] != 2:
+            return False
+        if self.opts.minend_not_town and not 3 <= lv.key[1] <= 4:
             return False
         if lv.town_heard:
             return True
