@@ -360,6 +360,8 @@ class PickupMixin:
         """lift_heavy: "You have a little trouble lifting X.  Continue?" (pickup.c lift_object: we'd be Burdened)
         -- yes if the pick-up asked for X and worth_taking judges it worth more than what the drop step will shed
         for it; much trouble (Stressed) or more: no."""
+        if self.luck_lift(m):
+            return True                       # mines_luckstone: a tested gray stone, whatever the drop step sheds for it
         if re.search(r"a little trouble (lifting|removing) \d+ gold pieces?\.", m):
             return True                       # coins: 100 weigh 1, worth more than anything we carry (a vault's
             #                                   gold left lying had vault_rob / vault_exit walk back for it; out of
