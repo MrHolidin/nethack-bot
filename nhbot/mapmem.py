@@ -200,6 +200,8 @@ class MapMixin:
         k = G.KIND[lv.under]
         tk = G.KIND[lv.terrain]
         hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
+        if self.opts.look_under:
+            hidden |= G.STATUE_GLYPH[lv.under] & G.IS_TERRAIN[tk]     # look_under: a statue hides it too
         if hidden.any():
             # nothing lies on a closed door: an item there means it was opened or broken since we saw it
             tk = np.where(tk == G.DOOR_CLOSED, G.DOOR_OPEN, tk)

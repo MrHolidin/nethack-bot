@@ -122,7 +122,10 @@ class ExploreMixin:
             self.mines_return_start(lv, "bottom")
             if self.mines_return_step(lv, grids):
                 return
-        # (A/B look_under -- stood once on every item / statue square before searching: -1889 [-3311, -454], median 7561)
+        # (A/B look_under -- stood once on every item / statue square before searching: -1889 [-3311, -454], median 7561;
+        # back for a new A/B)
+        if self.opts.look_under and not downstairs.any() and self.look_under_step(lv, grids):
+            return
         # nothing left: a monster we won't melee may be all that separates us from the rest of the level
         if self.unblock_step(lv, grids, frontier | downstairs):
             return
@@ -136,6 +139,23 @@ class ExploreMixin:
         if self.magic_map_step(lv):
             return
         self.search_mode(lv, grids)
+
+    def look_under_step(self, lv, grids):
+        """A/B look_under: no way down known and nothing left to explore -- before searching for hidden passages,
+        stand once on every square something lies on (an item, a statue): the staircase may be under it (79037,
+        79482, 79822, 79994, 79956, 79271: the down staircase under a statue, 17k-36k turns searching; statues don't
+        stop a step, hack.c test_move). Standing there the game says "There is a staircase down here."
+        (note_feature_here). True if it moved."""
+        under = lv.under
+        cand = (G.IS_COVERED[G.KIND[under]] | G.STATUE_GLYPH[under]) & (lv.visited == 0) & ~lv.shop
+        cand &= ~G.IS_TERRAIN[G.KIND[lv.terrain]]           # what lies under it is known already
+        if not cand.any():
+            return False
+        status, _ = self.walk_to(lv, cand, grids=grids, act="look_under", also=cand & G.STATUE_GLYPH[under])
+        if status == "moved":
+            self.map_stats["look_under_moves"] += 1
+            return True
+        return False
 
     def go_down(self, lv, grids, downstairs):
         """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
