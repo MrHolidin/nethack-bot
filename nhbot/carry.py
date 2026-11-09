@@ -56,7 +56,8 @@ for _i in range(nh.NUM_OBJECTS):
     if ord(_oc.oc_class) == nh.WEAPON_CLASS and nh.OBJ_DESCR(_oc):
         WEAPON_NAME_OF.setdefault(nh.OBJ_DESCR(_oc), nh.OBJ_NAME(_oc))
 NO_TOOLS = {"chest", "large box", "ice box", "beartrap", "land mine"}
-# also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks), and diggers
+# also spellbooks, gems/glass (not gray stones: a loadstone can't be dropped; not rocks -- the one exception is the
+# Mines' End luckstone nhbot.luckstone kick-tests and takes itself, mines_luckstone), and diggers
 DIGGER_WORDS = ("pick-axe", "dwarvish mattock", "broad pick")
 NO_GEMS = {"gray stone", "rock", "luckstone", "loadstone", "touchstone", "flint stone"}
 GEM_NAMES = set()
@@ -285,6 +286,9 @@ class CarryMixin:
                 return True                  # the unlocking tool we keep (nhbot.locktools)
         if any(w in s for w in DIGGER_WORDS):
             return True                      # a digger: kept (vaults, ways down), never sold
+        if self.luck_keeps(it):
+            return True                      # mines_luckstone: our kick-tested Mines' End luckstone, not known cursed
+                                             # -- the one gray stone kept (NO_GEMS), never dipped (nhbot.luckstone)
         if self.wish_needed(it):
             return True                      # a lamp to rub, a wand of wishing (nhbot.wishing)
         if self.jewelry_needed(it):

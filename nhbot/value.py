@@ -218,7 +218,7 @@ class ValueMixin:
           food        food we eat from the pack (KEEP_FOOD: no corpses, no tins) up to MAX_FOOD pieces, the most
                       nutrition per weight first
           needed      what carry.needed keeps (attack wands, healing, good scrolls, a lamp to rub, jewelry, the
-                      lock tool, ...) -- for weapons only by the rules above
+                      lock tool, the Mines' End luckstone, ...) -- for weapons only by the rules above
         Cached for the game state (tick, keys sent, the texts)."""
         key = (self.pol.tick_no, self.steps, tuple((x.letter, x.ocls, x.text) for x in inv))
         if self.value.keep_memo[0] == key:

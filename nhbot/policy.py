@@ -63,6 +63,7 @@ STEPS = (
     "housekeeping",      # shop, Excalibur, loot, scrolls, armor, the pile we stand on
     "vault_find",        # vault_find: dig to a vault our map shows (nhbot.vault)
     "rest",
+    "luckstone",         # mines_luckstone: the Mines' End luckstone found, kick-tested, kept (nhbot.luckstone)
     "gold_here",
     "explore",
 )
@@ -457,6 +458,9 @@ class PolicyMixin:
             self.search_turns(20)
             return True
         return False
+
+    def step_luckstone(self, c):
+        return self.luckstone_step(c.lv, c)
 
     def step_gold_here(self, c):
         lv, y, x = c.lv, c.y, c.x

@@ -24,6 +24,8 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "msg_dedup": False,        # A/B: messages NLE shows again after our 'F' (and other re-shows) not counted again by
                                #      any handler (events.repeat)
+    "mines_luckstone": False,  # A/B: at Mines' End go to the luckstone, kick-test that it is no loadstone ("Thump!"), keep
+                               #      it (named, value.keep_plan); drop it if known cursed (nhbot.luckstone)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
