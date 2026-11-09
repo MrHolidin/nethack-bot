@@ -22,6 +22,8 @@ class ExploreState:
         self.pet_waited_total = 0
         self.descent_rest = Counter()    # level key -> turns rested on its down staircase
         self.items_first_holds = 0       # descents held for an item goal still on the level
+        self.revisit_done = set()        # revisit_up: level keys we climbed back to
+        self.revisit_stats = Counter()
 
 
 class ExploreMixin:
@@ -92,6 +94,8 @@ class ExploreMixin:
 
         if self.sokoban_trip_step(lv, grids, want_down or lv.explored):
             return
+        if want_down and self.revisit_up(lv, grids):
+            return
         if want_down and self.go_down(lv, grids, downstairs):
             return
 
@@ -104,8 +108,9 @@ class ExploreMixin:
         # (frontier never covers our square: visited) (A/B goal_here: +618 [-96, +1316], median 7777 -> 7571)
         targets[y, x] = False
         if targets.any():
-            status, _ = self.walk_to(lv, targets, grids=grids,
-                                     chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))
+            status, reached = self.walk_to(lv, targets, grids=grids,
+                                           chase=lambda r: next((k for k, m in goals.items() if m[r]), "frontier"))
+            lv.unexplored = status == "moved" and bool(frontier[reached]) and on_level <= self.opts.descend_after
             if status == "unreachable":
                 lv.explored = True            # what frontier is left we can't get to
             if status == "moved":
@@ -137,6 +142,27 @@ class ExploreMixin:
             return
         self.search_mode(lv, grids)
 
+    def revisit_up(self, lv, grids):
+        """A/B revisit_up: done here and about to go down, but the level above (same branch) was never seen (we
+        fell past it) or was left with a frontier still in reach (a hole, a trap door, a teleport): climb back to
+        it first -- once per level. True if it used the turn. (Removed with the rejected flags at 996b35e: +308
+        [-190, +816] then; back for a new A/B.)"""
+        if not self.opts.revisit_up or self.mines.return_on or lv.key[1] <= 1:
+            return False
+        above = (lv.key[0], lv.key[1] - 1)
+        prev = self.levels.get(above)
+        if above in self.expl.revisit_done or (prev is not None and not prev.unexplored):
+            return False
+        up = grids[0] == G.UPSTAIR
+        if up[self.pos()]:
+            self.expl.revisit_done.add(above)
+            lv.unexplored = False             # done here too
+            self.expl.revisit_stats["never_seen" if prev is None else "unexplored"] += 1
+            self.cur_act = "revisit"
+            self.take_stairs("<")
+            return True
+        return bool(up.any()) and self.walk_to(lv, up, act="revisit", grids=grids)[0] == "moved"
+
     def go_down(self, lv, grids, downstairs):
         """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
         start = self.pos()
@@ -147,6 +173,7 @@ class ExploreMixin:
             if self.rest_before_descent(lv):
                 return True
             self.mines_descent()
+            lv.unexplored = False             # left on purpose: done here
             self.take_stairs(">")
             return True
         return self.walk_to(lv, downstairs, chase="downstairs", grids=grids)[0] == "moved"
