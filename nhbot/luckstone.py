@@ -255,6 +255,7 @@ class LuckState:
         self.done = set()                # level keys finished
         self.home = None                 # the Mines' End level key while a teleporter sent us away from it
         self.home_since = 0              # ... since this turn
+        self.last = None                 # [turn, what, level key] of our last action (summary: what we did last)
         self.seq = 0                     # the last TESTED number given
         self.price_luck = set()          # TESTED names a shopkeeper's offer showed to be the luckstone
         self.report = {}                 # game summary: variant, digger on arrival, outcome, counts
@@ -268,7 +269,12 @@ class LuckstoneMixin:
     def luckstone_summary(self):
         """Game summary entries."""
         stones = [it.text for it in self.items() if it.ocls == nh.GEM_CLASS and NAMED_RE.search(it.text)]
-        return {"luckstone": dict(self.luck.stats), "luckstone_report": dict(self.luck.report, carried=stones)}
+        sites = {f"{p[0]},{p[1]}": v for (k, p), v in self.luck.status.items()
+                 if isinstance(p, tuple) and isinstance(p[0], int) and isinstance(v, str)}
+        end = [int(self.bl(nh.NLE_BL_DNUM)), int(self.bl(nh.NLE_BL_DLEVEL))] if self.last_bl is not None else None
+        return {"luckstone": dict(self.luck.stats), "luckstone_report": dict(
+            self.luck.report, carried=stones, sites=sites, end_key=end, last_act=self.luck.last,
+            home=list(self.luck.home) if self.luck.home else None)}
 
     # ------------------------------------------------------------------ our stones
     def luck_items(self):
@@ -318,6 +324,7 @@ class LuckstoneMixin:
     def luck_pickup_grays(self):
         """Pick up the gray stones here (luck_lift says yes to a lift into Burdened) and name them; how many came."""
         before = {it.letter for it in self.items()}
+        self.luck_did("collect")
         self.luck.lifting = True
         try:
             self.pickup(lambda t: "gray stone" in t, "luckstone")
@@ -432,6 +439,10 @@ class LuckstoneMixin:
         self.luck.stats["outcome_" + outcome] += 1
         return self.dig_unwield()
 
+    def luck_did(self, what):
+        """Note our last action (summary last_act)."""
+        self.luck.last = [self.turn(), what, list(self.cur_key) if self.cur_key else None]
+
     def luck_status(self, lv, p, st):
         self.luck.status[(lv.key, p)] = st
         self.luck.stats[st] += 1
@@ -453,6 +464,7 @@ class LuckstoneMixin:
         if not down.any():
             return False
         self.luck.stats["home_steps"] += 1
+        self.luck_did("home")
         return self.stairs_step(lv, self.grids(lv), down, ">")
 
     # ------------------------------------------------------------------ walking and doors
@@ -462,7 +474,10 @@ class LuckstoneMixin:
         mask = np.zeros((ROWS, COLS), dtype=bool)
         for t in targets:
             mask[t] = True
-        return self.walk_to(lv, mask, act="luckstone", also=mask)[0]
+        st = self.walk_to(lv, mask, act="luckstone", also=mask)[0]
+        if st == "moved":
+            self.luck_did("walk")
+        return st
 
     def luck_door(self, lv, door, out):
         """On out, straight beside door (a secret door of the map): search for it (SEARCH_MAX turns at most), then
@@ -473,6 +488,7 @@ class LuckstoneMixin:
             if self.luck.searched[(lv.key, door)] >= SEARCH_MAX:
                 return False
             t0 = self.turn()
+            self.luck_did("search")
             self.search_turns(5)
             self.luck.searched[(lv.key, door)] += max(1, self.turn() - t0)
             return True
@@ -520,6 +536,7 @@ class LuckstoneMixin:
         """Kick toward the adjacent square target; the messages it brought. Not a step (nav.not_stepping): no failure
         is put on the square (mapmem blocks a door the legs refused to kick -- here a wait instead)."""
         self.not_stepping()
+        self.luck_did("kick")
         y, x = self.pos()
         seq0 = self.msg_seq
         self.kick(DELTA2KEY[(target[0] - y, target[1] - x)])
@@ -662,8 +679,8 @@ class LuckstoneMixin:
                 return True
             self.luck_status(lv, p, "door_given_up")
             return False
-        if not self.luck_unseen_or_gray(p):
-            self.luck_status(lv, p, "empty")
+        if not self.luck.kicks[(lv.key, "pile", p)] and not self.luck_unseen_or_gray(p):
+            self.luck_status(lv, p, "empty")                 # (once kicked, the gems under the stone show)
             return False
         if b is None:                                        # walls behind the stone: a mimic or an object?
             if self.luck_legs_wait():
@@ -699,6 +716,7 @@ class LuckstoneMixin:
                 self.luck.stash = (lv.key, here, set())
                 self.luck.stats["stash"] += 1
             self.luck.stash[2].add(stack_key(it.text))
+            self.luck_did("stash")
             self.drop_units(it.letter)
             return True
         worn = [it for it in self.items() if it.ocls == nh.ARMOR_CLASS and it.worn and not it.cursed]
@@ -706,6 +724,7 @@ class LuckstoneMixin:
             it = max(worn, key=item_weight)                  # off, then dropped like the rest next tick
             a = parse_armor(it.text) or {"slot": None}
             a["letter"] = it.letter
+            self.luck_did("strip")
             if self.take_off(a):
                 self.luck.stats["squeeze_unworn"] += 1
                 self.luck.squeeze_refused = refused
@@ -843,6 +862,7 @@ class LuckstoneMixin:
             self.luck.tunnel = None
             return False
         self.cur_act = "luckstone"
+        self.luck_did("dig")
         said = self.dig_at(lv, target, means)
         if said is None:
             return True                                      # the digger wielded this turn
@@ -963,6 +983,7 @@ class LuckstoneMixin:
                     self.luck.stats["teleporter_resisted"] += 1
                 elif (self.bl(nh.NLE_BL_DNUM), self.bl(nh.NLE_BL_DLEVEL)) != lv.key:
                     self.luck.home = lv.key                  # sent off: back down (luck_go_home)
+                    self.luck_did("teleported")
                     self.luck.home_since = self.turn()
             return True
         if self.luck_doors_step(lv, TEMPLATES["minend-3"][3]):
