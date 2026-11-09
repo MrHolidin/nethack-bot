@@ -3,6 +3,8 @@ of digging, a pick-axe, a dwarvish mattock), the pick-axe / mattock into our han
 (weapons.swap_in / swap_back, job "dig"), applying it in a direction."""
 import nle.nethack as nh
 
+from nhbot.consts import DELTA2KEY
+
 
 class DiggingState:
     """State of digging down (DiggingMixin)."""
@@ -38,6 +40,28 @@ class DiggingMixin:
         if mattock is not None:
             return "mattock", mattock
         return None
+
+    def dig_hand_means(self):
+        """dig_means' pick-axe or mattock (not a wand of digging: its ray digs on past the square we want, zap.c
+        zap_dig), or None."""
+        means = self.dig_means()
+        if means is not None and means[0] != "wand":
+            return means
+        items = self.items()
+        welded = any(it.wielded and it.cursed and "pick-axe" not in it.text and "mattock" not in it.text
+                     for it in items)
+        mattock = None if welded else next((it for it in items if "dwarvish mattock" in it.text and not it.cursed),
+                                           None)
+        return ("mattock", mattock) if mattock is not None else None
+
+    def dig_at(self, lv, target, means):
+        """One apply of the pick-axe / mattock (wielded first: dig_wield) toward the adjacent square target -- dig.c
+        dig: a rock or wall square becomes a passage over several turns, an occupation that goes on by itself. The
+        text the game answered; None: no apply this turn (wielding took it, or no apply)."""
+        if self.dig_wield(lv, means):
+            return None
+        y, x = self.pos()
+        return self.apply_digger(means[1], DELTA2KEY[(target[0] - y, target[1] - x)])
 
     def dig_wield(self, lv, means):
         """The pick-axe / mattock into our hands (the weapon back later: dig_unwield; a mattock: the shield off
