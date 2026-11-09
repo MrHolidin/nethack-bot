@@ -55,8 +55,8 @@ class RockDigMixin:
         """mapmem.msg_map: "It's solid stone." for our step from here to target -- if target shows something lying
         there (mineralize's gold / gems), a dig job; we can't or may not dig: blocked for now. True if it was such a
         square."""
-        if lv is None:
-            return False
+        if lv is None or max(abs(target[0] - here[0]), abs(target[1] - here[1])) != 1:
+            return False             # a travel / far target (79243 crashed digging toward one 36 squares off)
         if G.KIND[int(self.obs["glyphs"][target])] not in LOOKS_LIKE_THINGS \
                 and G.KIND[int(lv.under[target])] not in LOOKS_LIKE_THINGS:
             return False
