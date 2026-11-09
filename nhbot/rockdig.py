@@ -30,6 +30,18 @@ class RockDigState:
 class RockDigMixin:
     def rock_dig_init(self):
         self.rock_dig = RockDigState()
+        if self.opts.rock_dig:                   # game.digger_held: vault_rob_step puts the digger away otherwise
+            self.digger_holders.append(lambda lv: self.rock_dig.job is not None and self.rock_dig.job[0] == lv.key)
+
+    def rock_digger(self):
+        """dig_hand_means' pick-axe / mattock if it can't weld itself to us: in our hands already, or known not
+        cursed (a cursed one wielded is stuck there: wield.c, "welds itself to your hand(s)!" -- 79190, a dwarf's
+        mattock); else None."""
+        means = self.dig_hand_means()
+        if means is None:
+            return None
+        it = means[1]
+        return means if it.wielded or "uncursed" in it.text or "blessed" in it.text else None
 
     def rock_dig_summary(self):
         """Game summary entries."""
@@ -49,7 +61,7 @@ class RockDigMixin:
             return False
         self.rock_stat("seen")
         orcs = self.is_orctown(lv)
-        if self.dig_hand_means() is None or self.in_sokoban(lv) or lv.key in self.digging.refused \
+        if self.rock_digger() is None or self.in_sokoban(lv) or lv.key in self.digging.refused \
                 or (not orcs and (self.is_minetown(lv) or self.minetown_rooms(lv))) \
                 or not (orcs or self.dig_ok(lv, target)):
             lv.blocked[target] = True
@@ -74,7 +86,7 @@ class RockDigMixin:
         if key != lv.key or self.pos() != here or hostiles:
             self.rock_dig.job = None               # moved off, or a fight: the next step into it plans it again
             return False
-        means = self.dig_hand_means()
+        means = self.rock_digger()
         if means is None or tries >= ROCK_DIG_TRIES:
             self.rock_dig.job = None
             self.no_entry_mark(lv, sq)
