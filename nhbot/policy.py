@@ -151,6 +151,7 @@ class PolicyMixin:
         self.threat_track()                      # threats.py: who is coming for us
         self.gold_flow_tick()                    # thieves.py: stats of the gold we got and lost
         self.poly_track()                        # thieves.py: what fell from us when we changed form
+        self.attr_track()                        # survival.py: attributes as the tick starts (horn_attrs)
         if self.opts.sokoban:
             self.soko_track(lv)                  # sokoban.py: what we carried on coming onto this square
         if self.mines_tick(lv):                  # explore.py; before the tick state is read: it may change level
@@ -245,7 +246,7 @@ class PolicyMixin:
         return self.unihorn_step(HORN_SICK)
 
     def step_unihorn(self, c):
-        return not c.hostiles and self.unihorn_step(HORN_FIXES)
+        return not c.hostiles and self.unihorn_step(HORN_FIXES, attrs=self.opts.horn_attrs)
 
     def step_stunned(self, c):
         """Stunned, a move or an attack goes in a random direction; confused, 1 in 5 does (hack.c:1442 domove
