@@ -71,6 +71,7 @@ class GameMixin:
             if "Things that are here" in tty:
                 self.here_window = (self.turn(), self.pos(), " | ".join(
                     l.strip() for l in self.menu_lines(tty, "Things that are here")))
+                self.luck_note_pile(self.here_window[2])         # luckstone.py: a gray stone in a pile here
             # mapmem: "There is a staircase down here." -- atop the window, or first on the top line, where the
             # message observation holds only the last message of the line ("You see here a large box.")
             self.note_feature_here(tty if "Things that are here" in tty else self.top_line())
@@ -343,6 +344,7 @@ class GameMixin:
         lv = self.levels.get(self.cur_key) if self.cur_key else None
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
+            self.luck_note_pile(m)
         self.msg_survival(m)
         self.msg_enchant(m)
         self.focus_note(msg)
