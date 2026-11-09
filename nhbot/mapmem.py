@@ -104,7 +104,7 @@ class Level:
         self.entered_turn = None
         self.entered_xl = None     # experience level at the first arrival (stats)
         self.explored = False      # the last explore step here found no frontier: none left, or none we can reach
-        self.unexplored = False    # revisit_up: the last explore step here walked toward a frontier we can reach (we
+        self.unexplored = False    # explore.revisit_up: the last explore step here walked toward a frontier we can reach (we
                                    # left by a hole / trap door / teleport, not by the stairs on purpose)
         self.stairs_to = {}        # staircase square -> the level key it led to when we took it (both ends)
         self.altar_align = {}      # sacrifice: altar square -> its alignment, read on stepping there

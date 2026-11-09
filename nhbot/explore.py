@@ -143,11 +143,12 @@ class ExploreMixin:
         self.search_mode(lv, grids)
 
     def revisit_up(self, lv, grids):
-        """A/B revisit_up: done here and about to go down, but the level above (same branch) was never seen (we
-        fell past it) or was left with a frontier still in reach (a hole, a trap door, a teleport): climb back to
-        it first -- once per level. True if it used the turn. (Removed with the rejected flags at 996b35e: +308
-        [-190, +816] then; back for a new A/B.)"""
-        if not self.opts.revisit_up or self.mines.return_on or lv.key[1] <= 1:
+        """Done here and about to go down, but the level above (same branch) was never seen (we fell past it) or
+        was left with a frontier still in reach (a hole, a trap door, a teleport): climb back to it first -- once
+        per level. True if it used the turn. (A/B revisit_up: +194 [-1192, +1616] on 79k with 2 crashes in other
+        code, fixed at 10c24b1 -- +431 with those two games replayed; in the 379 games it fired median +2343;
+        accepted, the user's decision.)"""
+        if self.mines.return_on or lv.key[1] <= 1:
             return False
         above = (lv.key[0], lv.key[1] - 1)
         prev = self.levels.get(above)
