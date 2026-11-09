@@ -177,7 +177,7 @@ class ShopMixin:
         return [(it.letter, it.ocls, it.text) for it in self.items()
                 if it.ocls in self.carry_classes()
                 and self.shop_buys(stype, it) and not self.offer_zero(it)
-                and self.keep_reason(it) is None
+                and (self.keep_reason(it) is None or self.luck_price_check(it))
                 and (lv.key, it.text) not in self.shop.sell_tried
                 and not it.on_body and not it.alternate and not it.quivered and not it.unpaid]
 
@@ -223,10 +223,13 @@ class ShopMixin:
             return True
         return it.ocls == nh.FOOD_CLASS and "partly eaten" in it.text
 
-    def keep_after_offer(self):
+    def keep_after_offer(self, msg):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it;
-        keep_100: likewise a potion of the 100 group."""
+        keep_100: likewise a potion of the 100 group; mines_luckstone: the offer (msg) shows a gray stone of ours is
+        the luckstone (luck_offer_keep)."""
         c, s = self.shop.selling_item
+        if self.luck_offer_keep(c, s, msg):
+            return True
         if c == nh.SCROLL_CLASS and self.scroll_is_good(s):
             self.scroll_stat("kept_good")
             return True                    # the offer just showed it is enchant armor/weapon or remove curse

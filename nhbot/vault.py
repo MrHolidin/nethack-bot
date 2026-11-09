@@ -116,7 +116,8 @@ class VaultMixin:
             return self.vault_walk_out(lv)
         if box is None:
             self.vault.since = None
-            return self.vault.plan is None and self.dig_through.job is None and self.dig_unwield()
+            return self.vault.plan is None and self.dig_through.job is None and not self.luck_digging(lv) \
+                and self.dig_unwield()
         if self.vault.plan is not None and self.vault.plan["key"] == lv.key:
             self.vault.done.add(lv.key)               # vault_find: the tunnel is through
             self.vault.out = (lv.key, self.vault.plan["start"])

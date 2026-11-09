@@ -118,7 +118,8 @@ class ExploreMixin:
             return
 
         # mines_return: nothing left to explore and no way down on a deep Mines level: Mines' End, the bottom
-        if lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any():
+        if lv.key[0] == 2 and lv.key[1] >= 8 and not downstairs.any() and not self.luck_holds(lv):
+            # (mines_luckstone: not while the luckstone hunt has work here -- nhbot.luckstone)
             self.mines_return_start(lv, "bottom")
             if self.mines_return_step(lv, grids):
                 return
@@ -128,7 +129,7 @@ class ExploreMixin:
             return
         # the Mines' cave levels (mkmap) have no secret doors or corridors -- no way on found: leave the Mines
         # instead of searching -- but a Minetown of rooms and corridors is searched (minetown_rooms)
-        if lv.key[0] == 2 and not self.mines.return_on and not self.minetown_rooms(lv):
+        if lv.key[0] == 2 and not self.mines.return_on and not self.minetown_rooms(lv) and not self.luck_holds(lv):
             self.mines_return_start(lv, "no_way")
             if self.mines_return_step(lv, grids):
                 return
