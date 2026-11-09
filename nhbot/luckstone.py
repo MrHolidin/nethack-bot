@@ -1,4 +1,5 @@
-"""Mines' End luckstone (A/B mines_luckstone, off by default): find the gray stones where the level file puts the
+"""Mines' End luckstone (A/B mines_luckstone with mattock_shield against mattock_shield: +839 [-154, +1802] on
+79k; accepted as plain behaviour, the user's decision -- Mines' End deaths 35 against 22, 14 against 1 on minend-3): find the gray stones where the level file puts the
 luckstone, prove each is no loadstone, keep them; a shopkeeper's offer tells which one is the luckstone.
 
 The variants (mines.des, NetHack 3.6.6; dungeon.def:76 RNDLEVEL "minend" 3, mkmaze.c:967 picks one when the level is
@@ -314,10 +315,9 @@ class LuckState:
 class LuckstoneMixin:
     def luckstone_init(self):
         self.luck = LuckState()
-        if self.opts.mines_luckstone:                        # game.py: what the hunt is told and asked
-            self.pile_readers.append(self.luck_note_pile)
-            self.level_holders.append(self.luck_holds)
-            self.digger_holders.append(self.luck_digging)
+        self.pile_readers.append(self.luck_note_pile)        # game.py: what the hunt is told and asked
+        self.level_holders.append(self.luck_holds)
+        self.digger_holders.append(self.luck_digging)
 
     def luckstone_summary(self):
         """Game summary entries."""
@@ -336,20 +336,18 @@ class LuckstoneMixin:
 
     def luck_keeps(self, it):
         """carry.needed: a stone of ours, not known cursed."""
-        return self.opts.mines_luckstone and it.ocls == nh.GEM_CLASS and bool(NAMED_RE.search(it.text)) \
-            and not it.cursed
+        return it.ocls == nh.GEM_CLASS and bool(NAMED_RE.search(it.text)) and not it.cursed
 
     def luck_price_check(self, it):
         """shop.sellables: a kept stone whose type a sell offer would tell (TESTED<n>) -- offered, and sold only if
         the offer shows it is no luckstone (luck_offer_keep)."""
-        return self.opts.mines_luckstone and it.ocls == nh.GEM_CLASS and bool(TESTED_RE.search(it.text)) \
-            and not it.cursed
+        return it.ocls == nh.GEM_CLASS and bool(TESTED_RE.search(it.text)) and not it.cursed
 
     def luck_offer_keep(self, ocls, text, msg):
         """shop.keep_after_offer: the offer for a TESTED stone (msg) -- the luckstone's price: keep it (named NAME
         next tick); a touchstone's or flint's: sell it. No reading (short of gold, a stack we can't split): keep."""
         m = TESTED_RE.search(text) if ocls == nh.GEM_CLASS else None
-        if not self.opts.mines_luckstone or m is None:
+        if m is None:
             return False
         got = OFFER_RE.search(msg)
         if "offers only" in msg or got is None:
@@ -371,8 +369,7 @@ class LuckstoneMixin:
     def luck_lift(self, m):
         """pickup.lift_answer: "You have a little trouble lifting a gray stone." while we pick up our stones
         (luck.lifting) -- yes: Burdened, the drop step sheds what is worth least per weight, never these."""
-        return self.opts.mines_luckstone and self.luck.lifting and "a little trouble lifting" in m \
-            and "gray stone" in m
+        return self.luck.lifting and "a little trouble lifting" in m and "gray stone" in m
 
     def luck_pickup_grays(self):
         """Pick up the gray stones here (luck_lift says yes to a lift into Burdened) and name them; how many came."""
@@ -461,11 +458,11 @@ class LuckstoneMixin:
 
     # ------------------------------------------------------------------ the step
     def luckstone_step(self, lv, c):
-        """mines_luckstone, nothing in view: our stones' housekeeping (luck_housekeeping); sent off Mines' End by a
+        """Nothing in view: our stones' housekeeping (luck_housekeeping); sent off Mines' End by a
         teleporter: back down; on Mines' End, in our own form, from HP_MIN of max HP: the variant's sites (luck_minend1 / 2 / 3), then
         the gray stones lying elsewhere (luck_loose_step) -- those also once the level is done, while we are on it (a
         carrier killed later drops its stone). True if it used the turn."""
-        if not self.opts.mines_luckstone or c.vis:
+        if c.vis:
             return False
         if self.luck_housekeeping():
             return True

@@ -11,8 +11,6 @@ DEFAULTS = {
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "soko_xl": 0,              # with sokoban: up into it only from this experience level on (0: any)
-    "horn_attrs": False,       # A/B: an attribute the game said we lost ("You feel weak!", "You feel weaker!", ...) is
-                               #      mended with the unicorn horn (apply.c use_unicorn_horn; survival.attr_lowered)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
@@ -24,10 +22,6 @@ DEFAULTS = {
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
                                #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
-    "mines_luckstone": False,  # A/B: at Mines' End go to the luckstone, kick-test that it is no loadstone ("Thump!"), keep
-                               #      it (named, value.keep_plan); drop it if known cursed (nhbot.luckstone)
-    "mattock_shield": False,   # A/B: a shield taken off to wield a mattock is not worn again before the mattock is in our
-                               #      hands (digging.dig_needs_hands; the take-off / put-on loop of 79611)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified

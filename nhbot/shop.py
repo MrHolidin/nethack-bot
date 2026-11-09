@@ -225,7 +225,7 @@ class ShopMixin:
 
     def keep_after_offer(self, msg):
         """read_good: the offer just recorded may show the scroll we are selling is a good one: keep it;
-        keep_100: likewise a potion of the 100 group; mines_luckstone: the offer (msg) shows a gray stone of ours is
+        keep_100: likewise a potion of the 100 group; luckstone.py: the offer (msg) shows a gray stone of ours is
         the luckstone (luck_offer_keep)."""
         c, s = self.shop.selling_item
         if self.luck_offer_keep(c, s, msg):

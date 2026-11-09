@@ -81,9 +81,9 @@ class DiggingMixin:
 
     def dig_needs_hands(self):
         """equipment.slot_allowed: a shield just came off for the mattock, not worn again before it is wielded (then
-        two_handed keeps it off) -- A/B mattock_shield (digging with a mattock went round taking the shield off and
-        putting it back on: 79611)."""
-        return self.opts.mattock_shield and self.turn() - self.digging.shield_off <= 2
+        two_handed keeps it off) -- digging with a mattock went round taking the shield off and putting it back on:
+        79611 (A/B mattock_shield: 2 games of 1000 changed, -71 [-142, 0]; accepted with mines_luckstone)."""
+        return self.turn() - self.digging.shield_off <= 2
 
     def dig_unwield(self):
         """The weapon back in our hands after digging (weapons.swap_back, job "dig"). True if it used the turn."""

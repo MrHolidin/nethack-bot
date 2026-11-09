@@ -1,26 +1,26 @@
 {
  "61000": {
-  "score": 7338.0,
-  "turns": 6739,
-  "max_depth": 8,
-  "xl": 8,
+  "score": 5459.0,
+  "turns": 6588,
+  "max_depth": 11,
+  "xl": 7,
   "last_msgs": [
-   "The elven broadsword welds itself to the Grey-elf's hand!",
-   "The Grey-elf swings her elven broadsword.  The Grey-elf hits!",
-   "You hit the Grey-elf!  The Grey-elf swings her elven broadsword.",
-   "The Grey-elf hits!",
-   "The Grey-elf hits!",
-   "You kill the Grey-elf!  The Grey-elf swings his elven broadsword.",
-   "The Grey-elf misses!",
-   "You hit the Grey-elf!",
-   "You hit the Grey-elf!  The Grey-elf swings his elven broadsword.",
-   "The Grey-elf hits!"
+   "v - a violet gem.",
+   "You step onto a level teleport trap!",
+   "You are momentarily blinded by a flash of light.",
+   "Your pack shakes violently!",
+   "You hear a E flat squeak in the distance.",
+   "You see here a pair of low boots.",
+   "You see here a pair of low boots.",
+   "You see here a pair of low boots.",
+   "x - a pair of low boots.",
+   "You fall into a pit!  You land on a set of sharp iron spikes!"
   ],
   "truncated": false,
-  "steps": 12255,
-  "keys": 12255,
-  "keyhash": "e2ef2704f555f279",
-  "secs": 8.6
+  "steps": 11148,
+  "keys": 11148,
+  "keyhash": "5110b5c49f7d47b6",
+  "secs": 9.8
  },
  "61001": {
   "score": 1776.0,
@@ -43,30 +43,30 @@
   "steps": 6072,
   "keys": 6072,
   "keyhash": "020fbcc5b3e11faf",
-  "secs": 3.4
+  "secs": 3.9
  },
  "61002": {
-  "score": 36636.0,
-  "turns": 44436,
-  "max_depth": 10,
+  "score": 33251.0,
+  "turns": 19142,
+  "max_depth": 11,
   "xl": 10,
   "last_msgs": [
-   "The newt bites!  The Green-elf swings his elven broadsword.",
-   "The Green-elf hits!  The newt bites!",
-   "The Green-elf swings his elven broadsword.  The Green-elf hits!",
-   "The newt misses!  The Green-elf swings his elven broadsword.",
-   "The Green-elf just misses!  The newt misses!",
-   "The Green-elf swings his elven broadsword.  The Green-elf hits!",
-   "The newt bites!  The Green-elf swings his elven broadsword.",
-   "The Green-elf hits!  The newt bites!",
-   "The Green-elf swings his elven broadsword.  The Green-elf hits!",
-   "The Green-elf swings his elven broadsword.  The Green-elf hits!"
+   "You hit the black unicorn!  The black unicorn butts!",
+   "The black unicorn misses!  The black unicorn butts!",
+   "The black unicorn kicks!",
+   "The black unicorn kicks!",
+   "You miss the black unicorn.  The black unicorn butts!",
+   "The black unicorn kicks!  The black unicorn butts!",
+   "The black unicorn misses!",
+   "What do you want to zap? [ACKMSW or ?*]",
+   "In what direction?",
+   "The magic missile hits the black unicorn.  The gecko bites!"
   ],
   "truncated": false,
-  "steps": 137328,
-  "keys": 137328,
-  "keyhash": "f41be4331f203a06",
-  "secs": 276.0
+  "steps": 104019,
+  "keys": 104019,
+  "keyhash": "82479da0d95da397",
+  "secs": 128.9
  },
  "61003": {
   "score": 3238.0,
@@ -89,7 +89,7 @@
   "steps": 9139,
   "keys": 9139,
   "keyhash": "6e4bf5caad3f3bb2",
-  "secs": 6.9
+  "secs": 7.3
  },
  "61004": {
   "score": 1411.0,
@@ -112,7 +112,7 @@
   "steps": 3689,
   "keys": 3689,
   "keyhash": "250e152de2dae4a9",
-  "secs": 3.8
+  "secs": 3.4
  },
  "61005": {
   "score": 123177.0,
@@ -135,7 +135,7 @@
   "steps": 116186,
   "keys": 116186,
   "keyhash": "e7d8c0997dafd004",
-  "secs": 354.9
+  "secs": 364.1
  },
  "61006": {
   "score": 2517.0,
@@ -158,7 +158,7 @@
   "steps": 7457,
   "keys": 7457,
   "keyhash": "0850a2a683b21b6f",
-  "secs": 5.4
+  "secs": 5.2
  },
  "61007": {
   "score": 4372.0,
@@ -207,27 +207,27 @@
   "secs": 2.7
  },
  "61009": {
-  "score": 91102.0,
-  "turns": 22422,
-  "max_depth": 22,
+  "score": 135913.0,
+  "turns": 45806,
+  "max_depth": 19,
   "xl": 12,
   "last_msgs": [
-   "The gremlin hits!  The gremlin bites!  The gremlin misses!",
-   "The gremlin hits!  The gremlin hits!  The gremlin misses!",
-   "The gremlin hits!",
-   "The gremlin hits!",
-   "You kill the gremlin!  The gremlin hits!  The gremlin hits!",
-   "The gremlin bites!  The gremlin hits!  The gremlin hits!",
-   "The gremlin hits!  The gremlin bites!  The gremlin hits!",
-   "The gremlin misses!  The gremlin misses!  The gremlin bites!",
-   "The gremlin hits!  The gremlin hits!  The gremlin misses!",
-   "The gremlin bites!  The gremlin misses!  The gremlin hits!"
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head.",
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head.",
+   "The master mind flayer's tentacles suck you!",
+   "Your helm blocks the attack to your head.",
+   "The master mind flayer just misses!",
+   "The master mind flayer's tentacles suck you!  Your brain is eaten!",
+   "You feel stupid!  The ettin swings his club.  The ettin hits!",
+   "The ettin swings his club.  The ettin hits!"
   ],
   "truncated": false,
-  "steps": 51165,
-  "keys": 51165,
-  "keyhash": "dae9a8edce0c24d0",
-  "secs": 75.2
+  "steps": 62084,
+  "keys": 62084,
+  "keyhash": "9d5068f7582e1c87",
+  "secs": 96.8
  },
  "61010": {
   "score": 329.0,
@@ -250,7 +250,7 @@
   "steps": 1096,
   "keys": 1096,
   "keyhash": "9ba1051aff83c813",
-  "secs": 1.0
+  "secs": 0.9
  },
  "61011": {
   "score": 512.0,
@@ -273,51 +273,51 @@
   "steps": 1548,
   "keys": 1548,
   "keyhash": "72f92e8f51448c4a",
-  "secs": 1.4
+  "secs": 1.3
  },
  "61012": {
-  "score": 39056.0,
-  "turns": 12952,
-  "max_depth": 20,
+  "score": 34408.0,
+  "turns": 11596,
+  "max_depth": 14,
   "xl": 10,
   "last_msgs": [
-   "The ettin mummy hits!  The werejackal just misses!",
-   "The ettin mummy hits!  The werejackal just misses!",
-   "You hit the ettin mummy!",
-   "You hit the ettin mummy!",
-   "You hit the ettin mummy!  The frost giant hits!  The frost giant hits!",
-   "The frost giant hits!  The frost giant hits!  The ettin mummy hits!",
-   "The ettin mummy hits!",
+   "You miss the rock troll.",
+   "You miss the rock troll.",
+   "You hit the rock troll!  The rock troll swings his scimitar.",
+   "The rock troll hits!  The rock troll hits!  The rock troll misses!",
+   "The rock troll hits!  The rock troll hits!  The rock troll misses!",
+   "You miss the rock troll.  The rock troll swings his scimitar.",
+   "The rock troll hits!",
    "You die...  But wait...  Your medallion begins to glow!"
   ],
   "truncated": false,
-  "steps": 18770,
-  "keys": 18770,
-  "keyhash": "c8b07b7403bc8906",
-  "secs": 33.1
+  "steps": 17135,
+  "keys": 17135,
+  "keyhash": "17fc7ede08554463",
+  "secs": 30.1
  },
  "61013": {
-  "score": 26918.0,
-  "turns": 17293,
+  "score": 16564.0,
+  "turns": 10503,
   "max_depth": 11,
-  "xl": 10,
+  "xl": 9,
   "last_msgs": [
-   "You faint from lack of food.  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!  The stone giant swings his scimitar.",
-   "The stone giant hits!"
+   "The quasit misses!  The quasit misses!  The quasit misses!",
+   "The quasit hits!  The quasit hits!  The quasit bites!",
+   "The quasit hits!  The quasit hits!  The quasit bites!",
+   "You hit the quasit!  The quasit hits!",
+   "The quasit's sting was poisoned!  The quasit hits!  The quasit bites!",
+   "The quasit hits!  The quasit misses!  The quasit misses!",
+   "The quasit hits!  The quasit misses!  The quasit misses!",
+   "You kill the quasit!  But wait...",
+   "The quasit's medallion begins to glow!  The quasit looks much better!",
+   "The medallion crumbles to dust!  The quasit hits!  The quasit hits!"
   ],
   "truncated": false,
-  "steps": 31071,
-  "keys": 31071,
-  "keyhash": "c3d783a262a1b0be",
-  "secs": 40.6
+  "steps": 18890,
+  "keys": 18890,
+  "keyhash": "4f0ba6069aadf0e2",
+  "secs": 20.2
  },
  "61014": {
   "score": 3552.0,
@@ -340,7 +340,7 @@
   "steps": 3986,
   "keys": 3986,
   "keyhash": "5bb4e0c3293c9f8d",
-  "secs": 4.5
+  "secs": 4.1
  },
  "61015": {
   "score": 3769.0,
@@ -363,7 +363,7 @@
   "steps": 8346,
   "keys": 8346,
   "keyhash": "3db4dc872c5d70a0",
-  "secs": 6.2
+  "secs": 6.4
  },
  "61016": {
   "score": 36768.0,
@@ -386,7 +386,7 @@
   "steps": 34202,
   "keys": 34202,
   "keyhash": "a5bfabc121bf3e6f",
-  "secs": 30.2
+  "secs": 28.9
  },
  "61017": {
   "score": 6872.0,
@@ -409,7 +409,7 @@
   "steps": 7099,
   "keys": 7099,
   "keyhash": "26cb37be76e341fb",
-  "secs": 5.2
+  "secs": 5.0
  },
  "61018": {
   "score": 503.0,
@@ -455,7 +455,7 @@
   "steps": 2000,
   "keys": 2000,
   "keyhash": "7a67b77e600f0e67",
-  "secs": 1.7
+  "secs": 1.6
  },
  "61020": {
   "score": 6967.0,
@@ -478,7 +478,7 @@
   "steps": 8650,
   "keys": 8650,
   "keyhash": "575838ba90b245f9",
-  "secs": 6.8
+  "secs": 6.0
  },
  "61021": {
   "score": 1552.0,
@@ -501,7 +501,7 @@
   "steps": 5672,
   "keys": 5672,
   "keyhash": "db6b8347d26d82e5",
-  "secs": 4.7
+  "secs": 3.8
  },
  "61022": {
   "score": 2805.0,
@@ -524,7 +524,7 @@
   "steps": 6822,
   "keys": 6822,
   "keyhash": "3b4e737034eeaf7a",
-  "secs": 4.7
+  "secs": 4.3
  },
  "61023": {
   "score": 8674.0,
@@ -547,7 +547,7 @@
   "steps": 9581,
   "keys": 9581,
   "keyhash": "1364fabdb62bad3f",
-  "secs": 7.5
+  "secs": 7.4
  },
  "61024": {
   "score": 26787.0,
@@ -570,7 +570,7 @@
   "steps": 13900,
   "keys": 13900,
   "keyhash": "d10d3beeebe7723f",
-  "secs": 12.3
+  "secs": 12.2
  },
  "61025": {
   "score": 6116.0,
@@ -616,7 +616,7 @@
   "steps": 7830,
   "keys": 7830,
   "keyhash": "c182537ed45658d1",
-  "secs": 6.9
+  "secs": 7.7
  },
  "61027": {
   "score": 7392.0,
@@ -639,30 +639,30 @@
   "steps": 8909,
   "keys": 8909,
   "keyhash": "5eb9008a8e8208f4",
-  "secs": 9.4
+  "secs": 9.6
  },
  "61028": {
-  "score": 132042.0,
-  "turns": 30240,
+  "score": 117753.0,
+  "turns": 27399,
   "max_depth": 27,
   "xl": 12,
   "last_msgs": [
-   "You stop searching.",
-   "You stop searching.",
-   "A gush of water hits the human mummy on the head!",
-   "You see here 3 runed arrows.",
+   "You stop searching.  You faint from lack of food.",
+   "You regain consciousness.",
    "You see here a tripe ration.",
-   "Your leg feels better.",
-   "A mysterious force prevents the black unicorn from teleporting!",
-   "A mysterious force prevents the black unicorn from teleporting!",
-   "A mysterious force prevents the black unicorn from teleporting!",
-   "A mysterious force prevents the black unicorn from teleporting!"
+   "You stop searching.  You faint from lack of food.",
+   "A mysterious force prevents the tengu from teleporting!",
+   "A mysterious force prevents the tengu from teleporting!",
+   "A mysterious force prevents the tengu from teleporting!",
+   "A mysterious force prevents the tengu from teleporting!",
+   "A mysterious force prevents the tengu from teleporting!",
+   "A mysterious force prevents the tengu from teleporting!"
   ],
-  "truncated": true,
-  "steps": 200000,
-  "keys": 200000,
-  "keyhash": "91f288407c73e6b9",
-  "secs": 312.5
+  "truncated": false,
+  "steps": 84106,
+  "keys": 84106,
+  "keyhash": "09392543c7f3ebe6",
+  "secs": 195.9
  },
  "61029": {
   "score": 1541.0,
@@ -685,30 +685,30 @@
   "steps": 3630,
   "keys": 3630,
   "keyhash": "9b84bc42d151e370",
-  "secs": 3.2
+  "secs": 2.8
  },
  "61030": {
-  "score": 165646.0,
-  "turns": 36988,
-  "max_depth": 24,
-  "xl": 13,
+  "score": 22969.0,
+  "turns": 12909,
+  "max_depth": 12,
+  "xl": 10,
   "last_msgs": [
-   "You destroy the fog cloud!",
-   "You feel tired.",
-   "You feel tired.",
-   "You hit it.  It bites!  It bites!  It hits!  It hits!  It hits!",
-   "You hit it.  It bites!  It bites!  It hits!  It hits!  It hits!",
-   "You hit it.",
-   "You hit it.",
-   "You kill it!  It bites!  It bites!  It hits!  It hits!",
-   "You kill it!  It bites!  It bites!  It hits!  It hits!",
-   "You hit it.  It bites!  It bites!"
+   "The ice troll hits!  The ice troll hits!  You're covered in frost!",
+   "The frost doesn't seem cold!  Your black potion freezes and shatters!",
+   "Your purple-red potion freezes and shatters!",
+   "Your magenta potion freezes and shatters!  The ice troll bites!",
+   "The troll swings his scimitar.  The troll hits!  The troll hits!",
+   "The troll bites!  The plains centaur hits!  The plains centaur misses!",
+   "The troll bites!  The plains centaur hits!  The plains centaur misses!",
+   "You kill the troll!  The bugbear hits!  The ice troll hits!",
+   "The ice troll hits!  You're covered in frost!",
+   "The frost doesn't seem cold!  The ice troll bites!"
   ],
   "truncated": false,
-  "steps": 48828,
-  "keys": 48828,
-  "keyhash": "a69d50f8a5c03191",
-  "secs": 57.6
+  "steps": 24104,
+  "keys": 24104,
+  "keyhash": "492d99656c98f3c6",
+  "secs": 21.4
  },
  "61031": {
   "score": 1962.0,
@@ -731,6 +731,6 @@
   "steps": 5766,
   "keys": 5766,
   "keyhash": "c26f5a3e17bce18e",
-  "secs": 4.4
+  "secs": 4.3
  }
 }

@@ -21,7 +21,8 @@ HORN_SICK = nh.BL_MASK_FOODPOIS | nh.BL_MASK_TERMILL
 HORN_FIXES = HORN_SICK | nh.BL_MASK_BLIND | nh.BL_MASK_CONF | nh.BL_MASK_STUN | nh.BL_MASK_HALLU
 HORN_HARM = HORN_FIXES | nh.BL_MASK_DEAF
 ATTR_LOSS_RE = re.compile(r"You feel (?:weak|stupid|foolish|clumsy|fragile|repulsive)!")
-# A/B horn_attrs: an attribute lost, as the game says it -- attrib.c adjattrib ("You feel weak!", "very" for 2+ points:
+# An attribute lost (A/B horn_attrs: +309 [-676, +1261] on 79k, its 217 changed games median +1192; accepted), as
+# the game says it -- attrib.c adjattrib ("You feel weak!", "very" for 2+ points:
 # exercise, a mind flayer, ...) and poisontell after poisoned() took points ("You feel weaker!", attrib.c:238-245) --
 # and its status line field. The horn mends ABASE up to AMAX, 3 points of each at most per apply, a random number of
 # troubles in all (apply.c use_unicorn_horn); the hunger "You feel weak." ends in a period (eat.c:3062-3064)
@@ -92,7 +93,7 @@ class SurvivalState:
         self.horn_bad = set()          # letters of unicorn horns that harmed us (cursed): not applied, sold
         self.horn_nothing = 0          # the conditions a horn said "Nothing happens." to
         self.horn_stats = Counter()
-        self.attr_seen = {}            # horn_attrs: status line field -> its value at the start of this tick
+        self.attr_seen = {}            # status line field -> its value at the start of this tick
         self.attr_want = {}            # ... -> the value before the game said we lost points of it (attr_lowered)
         self.attr_tries = Counter()    # ... -> applies in a row that did not raise it
         self.hunger_at = (0, NOT_HUNGRY)     # (turn, status line hunger) at the last tick (nutrition_tick)
@@ -279,10 +280,8 @@ class SurvivalMixin:
                                          and not self.horn_is_bad(it) for it in self.items())
 
     def attr_track(self):
-        """horn_attrs, every tick: the attribute fields as the tick starts (a loss said during it is measured against
+        """Every tick: the attribute fields as the tick starts (a loss said during it is measured against
         them: msg_survival); a lowered one back at its old value no longer wanted."""
-        if not self.opts.horn_attrs:
-            return
         for _, f in ATTR_LOSS:
             v = self.surv.attr_seen[f] = int(self.bl(f))
             if f in self.surv.attr_want and v >= self.surv.attr_want[f]:
@@ -290,14 +289,14 @@ class SurvivalMixin:
                 self.surv.attr_tries.pop(f, None)
 
     def attr_lowered(self):
-        """horn_attrs: the attribute fields below the value they had before a loss the game told us of (Strength not
+        """The attribute fields below the value they had before a loss the game told us of (Strength not
         while Weak from hunger)."""
         return [f for f, v in self.surv.attr_want.items() if self.bl(f) < v
                 and not (f == nh.NLE_BL_STR125 and self.bl(nh.NLE_BL_HUNGER) >= WEAK_HUNGER)]
 
     def unihorn_step(self, troubles, attrs=False):
-        """Apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us, or (attrs: A/B horn_attrs) an
-        attribute is lowered (attr_lowered); the caller decides when (sickness: always, ahead of a prayer; the rest:
+        """Apply a unicorn horn while one of `troubles` (HORN_FIXES bits) is on us, or (attrs) an attribute is
+        lowered (attr_lowered); the caller decides when (sickness: always, ahead of a prayer; the rest:
         nothing next to us). A horn that brings a new condition or takes an attribute is cursed: never applied again,
         and no longer kept (sold). True if acted."""
         if self.thief.polyd or self.handless():
@@ -450,11 +449,10 @@ class SurvivalMixin:
             self.surv.eaten_res.add("fire")
         if "You feel full of hot air" in m:
             self.surv.eaten_res.add("cold")
-        if self.opts.horn_attrs:
-            for rx, f in ATTR_LOSS:
-                if f in self.surv.attr_seen and rx.search(m):
-                    self.surv.attr_want[f] = max(self.surv.attr_want.get(f, 0), self.surv.attr_seen[f])
-                    self.surv.horn_stats["attr_lost"] += 1
+        for rx, f in ATTR_LOSS:
+            if f in self.surv.attr_seen and rx.search(m):
+                self.surv.attr_want[f] = max(self.surv.attr_want.get(f, 0), self.surv.attr_seen[f])
+                self.surv.horn_stats["attr_lost"] += 1
         if "more confident in your" in m:
             self.surv.skill_msgs += 1
             self.surv.want_enhance = True
