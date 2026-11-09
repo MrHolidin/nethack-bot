@@ -813,8 +813,9 @@ class LuckstoneMixin:
         out = self.luck_kick_pile(lv, p, 1)
         if out in ("acted", "wait"):
             return out == "acted"
-        if b is None and out in ("thump", "blocked"):
-            out = "blind_object"                             # walls behind: range 1, any object "Thump!"s
+        if b is None and out in ("thump", "blocked", "kicked"):
+            out = "blind_object"     # walls behind: range 1, any object "Thump!"s; nothing flew out (79945 crashed
+                                     # collecting along a line that isn't there)
         self.luck_status(lv, p, out)
         return False
 
