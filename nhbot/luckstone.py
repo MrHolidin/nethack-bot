@@ -68,6 +68,7 @@ TESTED_RE = re.compile(rf" named ({TESTED}\d+)\b")
 OFFER_RE = re.compile(r"offers (\d+) gold pieces? for your (.+?)\.\s+Sell (?:it|them)")
 OFF_Y, OFF_X = 3, 2                  # our (y, x) = (map y + OFF_Y, map x + OFF_X): see the module docstring
 ORTHO = ((-1, 0), (1, 0), (0, -1), (0, 1))
+DIAG = ((-1, -1), (-1, 1), (1, -1), (1, 1))
 SEARCH_MAX = 40                      # turns searching for one secret door (detect.c:1732-1735 dosearch0: found when
                                      # !rnl(7), about 1 in 7 a turn at Luck 0)
 DOOR_KICKS = 20                      # kicks at one locked door (dokick.c:1276: it gives when rnl(35) < (Str + Dex +
@@ -169,6 +170,9 @@ for _g in range(nh.MAX_GLYPH):
 FLOORISH = np.zeros(G.EFFECT + 1, dtype=bool)        # kinds of a square that is no wall or rock
 for _k in (G.FLOOR, G.DOORWAY, G.DOOR_OPEN, G.TRAP, G.UPSTAIR, G.DOWNSTAIR, G.OBJECT, G.GOLD, G.CORPSE):
     FLOORISH[_k] = True
+OPEN_KIND = FLOORISH.copy()                           # ... by the terrain alone (no object, corpse, gold)
+for _k in (G.OBJECT, G.GOLD, G.CORPSE):
+    OPEN_KIND[_k] = False
 SHUT = (G.WALL, G.UNKNOWN, G.DOOR_CLOSED)            # a secret door not found (a wall to us), or a closed door
 FLOOR_LIT = nh.GLYPH_CMAP_OFF + 19                    # S_room: a floor square we see lit (S_darkroom: remembered dark)
 
@@ -339,6 +343,8 @@ class LuckstoneMixin:
             if it.letter not in before and it.ocls == nh.GEM_CLASS and "gray stone" in it.text \
                     and " named " not in it.text:
                 got += 1
+                if "taken_after" not in self.luck.report:   # turns on the level when the first stone was kept
+                    self.luck.report["taken_after"] = int(self.level().turns_here)
                 self.luck.seq += 1
                 if self.name_item(it.letter, f"{TESTED}{self.luck.seq}"):
                     self.luck.stats["kept"] += 1
@@ -603,7 +609,7 @@ class LuckstoneMixin:
         grays = [n for n in self.look_here() if "gray stone" in n]
         if not grays:
             nxt = (at[0] + line[0], at[1] + line[1]) if line else None
-            if nxt is not None and 0 <= nxt[0] < ROWS and 0 <= nxt[1] < COLS and FLOORISH[self.kinds(lv)[nxt]] \
+            if nxt is not None and 0 <= nxt[0] < ROWS and 0 <= nxt[1] < COLS and self.luck_open(lv, nxt) \
                     and abs(nxt[0] - b[0]) + abs(nxt[1] - b[1]) <= 10:
                 self.luck.collect_at[key] = nxt
                 self.luck.stats["followed"] += 1
@@ -766,19 +772,19 @@ class LuckstoneMixin:
         if means is None or lv.key in self.digging.refused:
             self.luck.report["outcome"] = "no_digger"
             return False
-        here = self.pos()
-        if here not in CHAMBER and not self.luck_reachable(lv, [q for q in CHAMBER if self.luck_open(lv, q)]):
+        todo = [q for q in sorted(CHAMBER, key=lambda q: q != STONE_2) if self.luck.status.get((lv.key, q))
+                not in ("taken", "empty", "thump", "mimic", "no_lane", "lost", "not_picked")]
+        if not todo:
+            took = any(v == "taken" for (k, _), v in self.luck.status.items() if k == lv.key)
+            return self.luck_finish(lv, "taken" if took else "not_found")
+        if self.pos() not in CHAMBER and not self.luck_reachable(lv, [q for q in CHAMBER if self.luck_open(lv, q)]):
             return self.luck_tunnel_step(lv, means)
-        for q in sorted(CHAMBER, key=lambda q: q != STONE_2):
-            st = self.luck.status.get((lv.key, q))
-            if st in ("taken", "empty", "thump", "mimic", "no_lane", "lost"):
-                continue
-            return self.luck_chamber_square(lv, q, means)
-        took = any(v == "taken" for (k, _), v in self.luck.status.items() if k == lv.key)
-        return self.luck_finish(lv, "taken" if took else "not_found")
+        return self.luck_chamber_square(lv, todo[0], means)
 
     def luck_open(self, lv, p):
-        return bool(FLOORISH[self.kinds(lv)[p]])
+        """A square we know as open ground -- by the terrain seen there (Level.terrain): an object glyph alone is no
+        proof (the Mines' rock holds gems: mkmap.c mineralize; "It's solid stone.")."""
+        return bool(OPEN_KIND[G.KIND[lv.terrain[p]]] or OPEN_KIND[G.KIND[self.obs["glyphs"][p]]])
 
     def luck_reachable(self, lv, squares):
         """Any of squares reachable by path from here."""
@@ -834,29 +840,28 @@ class LuckstoneMixin:
         return False
 
     def luck_lane(self, lv, q):
-        """(h, b) for the pile on q: h a chamber square straight beside q, b beyond q on the other side, with no open
-        square known beyond it (the stones stop on b). Best a b of rock we dig ourselves (DIG_OK_2: the square beyond
-        is rock too, as far as the map tells -- a dwarf may have tunnelled there, luck_collect then follows the line);
-        else a b open already, the square beyond it known as wall or rock."""
-        k = self.kinds(lv)
-        best = None
-        for dy, dx in ORTHO:
+        """(h, b) for the pile on q: h a chamber square beside q, b beyond q on the other side (straight first; a
+        diagonal kick flies as well, dokick.c:686 bhit). Best a b of rock we dig ourselves (DIG_OK_2, not refused:
+        "This wall is too hard to dig into"), the square beyond it rock as far as the map tells; then a b open
+        already with the square beyond known shut; last a b open with open ground beyond (a dwarf's tunnel: the
+        stones fly on, luck_collect follows the line)."""
+        cands = []
+        for rank_dir, (dy, dx) in enumerate(ORTHO + DIAG):
             h, b, bb = (q[0] - dy, q[1] - dx), (q[0] + dy, q[1] + dx), (q[0] + 2 * dy, q[1] + 2 * dx)
             if h not in CHAMBER or b in CHAMBER or (lv.key, b) in self.luck.no_dig:
                 continue
-            if FLOORISH[k[bb]] or TEMPLATES["minend-2"][0][bb]:
+            open_b, open_bb = self.luck_open(lv, b), self.luck_open(lv, bb) or TEMPLATES["minend-2"][0][bb]
+            if not open_b and not DIG_OK_2[b]:
                 continue
-            if DIG_OK_2[b] and not FLOORISH[k[b]]:
-                return h, b
-            if FLOORISH[k[b]] and best is None:
-                best = (h, b)
-        return best
+            rank = (0 if not open_b and not open_bb else 1 if not open_bb else 2, rank_dir)
+            cands.append((rank, (h, b)))
+        return min(cands)[1] if cands else None
 
     def luck_dig(self, lv, target, means, here):
         """Apply the digger from here toward the adjacent target (dig_at); a square that would not give way after
         DIG_TRIES applies is noted (no_dig). True if it used the turn."""
         key = (lv.key, target)
-        if self.luck.dug[key] >= DIG_TRIES:
+        if self.luck.dug[key] >= DIG_TRIES or key in self.luck.no_dig:
             self.luck.no_dig.add(key)
             self.luck.lane.pop((lv.key, here), None)
             self.luck.tunnel = None
@@ -904,7 +909,7 @@ class LuckstoneMixin:
         if i + 1 >= len(path):
             return False
         nxt = path[i + 1]
-        if FLOORISH[G.KIND[self.obs["glyphs"][nxt]]] or FLOORISH[self.kinds(lv)[nxt]]:
+        if self.luck_open(lv, nxt):
             self.cur_act = "luckstone"
             self.move(nxt)
             return True
