@@ -53,6 +53,7 @@ STEPS = (
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
     "dig_through",       # dig_through: the corner of a refused squeeze / a boulder that won't move, dug (nhbot.digthrough)
+    "rock_dig",          # rock_dig: gold / gems seen inside rock dug out (nhbot.rockdig)
     "ammo_here",
     "retrieve_missiles",
     "eat",
@@ -448,6 +449,9 @@ class PolicyMixin:
 
     def step_dig_through(self, c):
         return self.dig_through_step(c.lv, c.hostiles)
+
+    def step_rock_dig(self, c):
+        return self.rock_dig_step(c.lv, c.hostiles)
 
     def step_vault_find(self, c):
         return self.vault_find_step(c.lv, c.vis)

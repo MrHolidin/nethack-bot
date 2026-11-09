@@ -432,6 +432,8 @@ class MapMixin:
             # "Perhaps that's why you cannot move it." (hack.c:172), moves on: left to the step-failure count)
             if not self.dig_through_note(lv, self.pos(), self.nav.last_move_target, "boulder"):
                 lv.blocked[self.nav.last_move_target] = True
+        if lv and self.nav.last_move_target and "It's solid stone" in m:
+            self.rock_note(lv, self.pos(), self.nav.last_move_target)    # rockdig.py: gold / gems seen in rock
         if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.nav.last_move_target:
             # can't kick from here (wounded legs: dokick.c; in a pit): kicking the door again would loop
             lv.blocked[self.nav.last_move_target] = True

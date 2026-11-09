@@ -11,6 +11,8 @@ DEFAULTS = {
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
                                #      by the plans of soko_data (tools/soko_solve.py), the prize taken (nhbot.sokoban)
     "soko_xl": 0,              # with sokoban: up into it only from this experience level on (0: any)
+    "rock_dig": False,         # A/B: gold / gems seen inside solid rock ("It's solid stone." when we step there) dug out
+                               #      with the pick-axe / mattock; without one the square is kept out of (nhbot.rockdig)
     "door_resists": False,     # A/B: "The door resists!" (a stuck door, not locked) is no failed step: tried again
     "zoo_not_shop": False,     # A/B: "Welcome to David's treasure zoo!" is no shop greeting (nhbot.shop.shop_welcome)
     "dig_through": False,      # A/B: a diagonal squeeze refused for our weight -- one of its two corners dug (pick-axe,
