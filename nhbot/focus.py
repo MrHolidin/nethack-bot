@@ -26,7 +26,7 @@ HIT_MEMORY = 30           # turns our hits on a square are remembered
 class FocusState:
     """State of focusing on one target (FocusMixin)."""
     def __init__(self):
-        self.hits = {}              # (level key, pos) -> [mon index, hits, last turn], the 'F' step's message skipped
+        self.hits = {}              # (level key, pos) -> [mon index, hits, last turn]
         self.skill = {}             # skill name -> advances read ("You are now more skilled in ...")
         self.unseen = deque()       # (turn, HP lost) of each message with an unseen monster's attack
         self.hp = None              # our HP at the last message
@@ -41,8 +41,8 @@ class FocusMixin:
     def focus_note(self, msg):
         """Our reading of a message: our hits on the square we attacked (a kill forgets them), our weapon skill's
         advances, an unseen attacker's attacks (an "It" melee line and no "The ..." one) and the HP they cost us.
-        game.on_message leaves out the message logged at the step of our attack's 'F' (the one before, shown again)
-        -- counted as a hit it was one more, and a kill in it forgot the new target's hits."""
+        game.on_message hands it no repeat (events.Message.repeat: after our attack's 'F' NLE shows the message
+        before again) -- counted as a hit it was one more, and a kill in it forgot the new target's hits."""
         hp = self.bl(nh.NLE_BL_HP)
         for adv in msg.all(SkillAdvanced)[:1]:           # one advance read per message
             self.focus.skill[adv.skill] = self.focus.skill.get(adv.skill, 0) + 1

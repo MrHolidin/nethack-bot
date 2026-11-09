@@ -207,7 +207,7 @@ class GameMixin:
     def log_msg(self, m):
         """Log a message and hand it to the domains (on_message) -- the one place that tells a new message from one
         shown again: the same text at the same step is dropped; after a key the game reads before clearing the
-        message window (events.RESHOW_KEYS) the same text is a repeat -- logged and handed on, marked."""
+        message window (events.RESHOW_KEYS) the same text is a repeat -- logged, marked, read by no handler (on_message)."""
         m = m.strip()
         if m and m == self._last_logged and self.steps == self._last_logged_step:
             return
@@ -333,25 +333,21 @@ class GameMixin:
 
     def on_message(self, msg):
         """Every logged message, parsed once (events.Message), to each domain in this order: the raw-text readers get
-        the text, the others read its events."""
+        the text, the others read its events. A repeat (events.Message.repeat: shown again, said once) goes to none:
+        read again it was a second kill / kill_by / fresh corpse, focus hit, theft, attack on us."""
         m = msg.text
         if msg.repeat:
+            # (A/B msg_dedup: -1594 [-2719, -489] on 79k, +671 [-442, +1830] on 80k; accepted for correctness)
             self.msg_audit["repeat"] += 1
-            if self.opts.msg_dedup:
-                return                   # msg_dedup: shown again, said once -- logged, read by no handler
+            return                       # in self.messages (text_since reads it), read by no handler
         lv = self.levels.get(self.cur_key) if self.cur_key else None
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
-        # without msg_dedup: the message logged at the step after attack()'s 'F' (the one before, shown again:
-        # events.RESHOW_KEYS) is not read by focus and the destroyed-item count
-        after_attack_f = not self.opts.msg_dedup and self.steps == self.acts.attack_step + 1
         self.msg_survival(m)
         self.msg_enchant(m)
-        if not after_attack_f:
-            self.focus_note(msg)
+        self.focus_note(msg)
         self.msg_combat(msg)
-        if not after_attack_f:
-            self.danger_items_msg(msg)
+        self.danger_items_msg(msg)
         self.danger_weapons_msg(msg)
         self.msg_peace(msg, lv)
         self.msg_map(m, lv)

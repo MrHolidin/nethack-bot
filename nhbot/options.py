@@ -22,8 +22,6 @@ DEFAULTS = {
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
                                #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
-    "msg_dedup": False,        # A/B: messages NLE shows again after our 'F' (and other re-shows) not counted again by
-                               #      any handler (events.repeat)
     "mines_luckstone": False,  # A/B: at Mines' End go to the luckstone, kick-test that it is no loadstone ("Thump!"), keep
                                #      it (named, value.keep_plan); drop it if known cursed (nhbot.luckstone)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the

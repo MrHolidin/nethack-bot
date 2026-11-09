@@ -20,7 +20,7 @@
   "steps": 12255,
   "keys": 12255,
   "keyhash": "e2ef2704f555f279",
-  "secs": 10.9
+  "secs": 8.6
  },
  "61001": {
   "score": 1776.0,
@@ -43,30 +43,30 @@
   "steps": 6072,
   "keys": 6072,
   "keyhash": "020fbcc5b3e11faf",
-  "secs": 4.2
+  "secs": 3.4
  },
  "61002": {
-  "score": 71888.0,
-  "turns": 24105,
-  "max_depth": 22,
-  "xl": 11,
+  "score": 36636.0,
+  "turns": 44436,
+  "max_depth": 10,
+  "xl": 10,
   "last_msgs": [
-   "The air elemental misses!  The air elemental misses!",
-   "The air elemental engulfs you!",
-   "You are pummeled with debris!  You are pummeled with debris!",
-   "You are pummeled with debris!  You get expelled!",
-   "The air elemental misses!  The air elemental hits!",
-   "The air elemental hits!  The air elemental engulfs you!",
-   "You are pummeled with debris!  You are pummeled with debris!",
-   "You are pummeled with debris!  You are pummeled with debris!",
-   "You are pummeled with debris!  You are pummeled with debris!",
-   "You are pummeled with debris!  You are pummeled with debris!"
+   "The newt bites!  The Green-elf swings his elven broadsword.",
+   "The Green-elf hits!  The newt bites!",
+   "The Green-elf swings his elven broadsword.  The Green-elf hits!",
+   "The newt misses!  The Green-elf swings his elven broadsword.",
+   "The Green-elf just misses!  The newt misses!",
+   "The Green-elf swings his elven broadsword.  The Green-elf hits!",
+   "The newt bites!  The Green-elf swings his elven broadsword.",
+   "The Green-elf hits!  The newt bites!",
+   "The Green-elf swings his elven broadsword.  The Green-elf hits!",
+   "The Green-elf swings his elven broadsword.  The Green-elf hits!"
   ],
   "truncated": false,
-  "steps": 66007,
-  "keys": 66007,
-  "keyhash": "08ed53f7d674f844",
-  "secs": 135.4
+  "steps": 137328,
+  "keys": 137328,
+  "keyhash": "f41be4331f203a06",
+  "secs": 276.0
  },
  "61003": {
   "score": 3238.0,
@@ -89,7 +89,7 @@
   "steps": 9139,
   "keys": 9139,
   "keyhash": "6e4bf5caad3f3bb2",
-  "secs": 8.5
+  "secs": 6.9
  },
  "61004": {
   "score": 1411.0,
@@ -109,33 +109,33 @@
    "The bolt of fire hits you!  Your wooden shield smoulders!"
   ],
   "truncated": false,
-  "steps": 3690,
-  "keys": 3690,
-  "keyhash": "498cfb2c1993ca18",
-  "secs": 4.9
+  "steps": 3689,
+  "keys": 3689,
+  "keyhash": "250e152de2dae4a9",
+  "secs": 3.8
  },
  "61005": {
-  "score": 43242.0,
-  "turns": 11447,
-  "max_depth": 13,
-  "xl": 11,
+  "score": 123177.0,
+  "turns": 38090,
+  "max_depth": 26,
+  "xl": 12,
   "last_msgs": [
-   "Your movements are slowed slightly because of your load.",
-   "What do you want to drop? [$a-zA-GIK-Z or ?*]",
-   "You drop an orcish helm.  Your movements are now unencumbered.",
-   "Things that are here:",
-   "The winged gargoyle hits!  The winged gargoyle misses!",
-   "The winged gargoyle bites!",
-   "The winged gargoyle bites!",
-   "You hit the winged gargoyle!  The winged gargoyle hits!",
-   "The winged gargoyle hits!  The winged gargoyle bites!",
-   "The winged gargoyle hits!  The winged gargoyle hits!"
+   "You see here an uncursed looking glass.",
+   "You see here an uncursed looking glass.",
+   "The fire elemental hits!  You're on fire!",
+   "The fire elemental hits!  You're on fire!",
+   "You hit the fire elemental!  You are suddenly very hot!",
+   "The fire elemental hits!",
+   "The fire elemental hits!",
+   "You hit the fire elemental!  You are suddenly very hot!",
+   "You hit the fire elemental!  You are suddenly very hot!",
+   "You hit the fire elemental!  You are suddenly very hot!"
   ],
   "truncated": false,
-  "steps": 24253,
-  "keys": 24253,
-  "keyhash": "cdc72d36c6bb99c3",
-  "secs": 34.7
+  "steps": 116186,
+  "keys": 116186,
+  "keyhash": "e7d8c0997dafd004",
+  "secs": 354.9
  },
  "61006": {
   "score": 2517.0,
@@ -158,7 +158,7 @@
   "steps": 7457,
   "keys": 7457,
   "keyhash": "0850a2a683b21b6f",
-  "secs": 6.7
+  "secs": 5.4
  },
  "61007": {
   "score": 4372.0,
@@ -181,7 +181,7 @@
   "steps": 8813,
   "keys": 8813,
   "keyhash": "78e845e573df808e",
-  "secs": 8.5
+  "secs": 7.2
  },
  "61008": {
   "score": 1004.0,
@@ -204,7 +204,7 @@
   "steps": 2872,
   "keys": 2872,
   "keyhash": "fb8546817eeafce8",
-  "secs": 4.2
+  "secs": 2.7
  },
  "61009": {
   "score": 91102.0,
@@ -227,7 +227,7 @@
   "steps": 51165,
   "keys": 51165,
   "keyhash": "dae9a8edce0c24d0",
-  "secs": 201.0
+  "secs": 75.2
  },
  "61010": {
   "score": 329.0,
@@ -250,7 +250,7 @@
   "steps": 1096,
   "keys": 1096,
   "keyhash": "9ba1051aff83c813",
-  "secs": 3.7
+  "secs": 1.0
  },
  "61011": {
   "score": 512.0,
@@ -273,30 +273,28 @@
   "steps": 1548,
   "keys": 1548,
   "keyhash": "72f92e8f51448c4a",
-  "secs": 4.4
+  "secs": 1.4
  },
  "61012": {
-  "score": 47593.0,
-  "turns": 13657,
-  "max_depth": 21,
+  "score": 39056.0,
+  "turns": 12952,
+  "max_depth": 20,
   "xl": 10,
   "last_msgs": [
-   "The elven broadsword welds itself to the elf-lord's hand!",
-   "You hit the elf-lord!  The elf-lord swings his elven broadsword.",
-   "The elf-lord hits!  The elf-lord swings his elven broadsword.",
-   "The elf-lord hits!",
-   "The elf-lord hits!",
-   "You hit the elf-lord!",
-   "You hit the elf-lord!",
-   "You hit the elf-lord!  The elf-lord swings his elven broadsword.",
-   "The elf-lord hits!  The elf-lord swings his elven broadsword.",
-   "The elf-lord hits!"
+   "The ettin mummy hits!  The werejackal just misses!",
+   "The ettin mummy hits!  The werejackal just misses!",
+   "You hit the ettin mummy!",
+   "You hit the ettin mummy!",
+   "You hit the ettin mummy!  The frost giant hits!  The frost giant hits!",
+   "The frost giant hits!  The frost giant hits!  The ettin mummy hits!",
+   "The ettin mummy hits!",
+   "You die...  But wait...  Your medallion begins to glow!"
   ],
   "truncated": false,
-  "steps": 19766,
-  "keys": 19766,
-  "keyhash": "a8da8d4b670a2cba",
-  "secs": 96.0
+  "steps": 18770,
+  "keys": 18770,
+  "keyhash": "c8b07b7403bc8906",
+  "secs": 33.1
  },
  "61013": {
   "score": 26918.0,
@@ -316,10 +314,10 @@
    "The stone giant hits!"
   ],
   "truncated": false,
-  "steps": 31073,
-  "keys": 31073,
-  "keyhash": "cf2f8b352104a591",
-  "secs": 106.4
+  "steps": 31071,
+  "keys": 31071,
+  "keyhash": "c3d783a262a1b0be",
+  "secs": 40.6
  },
  "61014": {
   "score": 3552.0,
@@ -342,7 +340,7 @@
   "steps": 3986,
   "keys": 3986,
   "keyhash": "5bb4e0c3293c9f8d",
-  "secs": 11.7
+  "secs": 4.5
  },
  "61015": {
   "score": 3769.0,
@@ -365,30 +363,30 @@
   "steps": 8346,
   "keys": 8346,
   "keyhash": "3db4dc872c5d70a0",
-  "secs": 17.2
+  "secs": 6.2
  },
  "61016": {
-  "score": 65730.0,
-  "turns": 21290,
-  "max_depth": 16,
+  "score": 36768.0,
+  "turns": 18758,
+  "max_depth": 15,
   "xl": 10,
   "last_msgs": [
-   "The gnome lord hits!",
-   "The gnome lord hits!",
-   "You hit the gnome lord!  The gnome lord hits!",
-   "You hit the gnome lord!  The gnome lord hits!",
-   "You kill the gnome lord!",
-   "You kill the gnome lord!",
-   "You stop searching.  The ettin hits!  The ettin hits!",
-   "You stop searching.  The ettin hits!  The ettin hits!",
-   "You hit the ettin!  The ettin hits!  The ettin hits!",
-   "The ettin mummy hits!"
+   "In what direction?",
+   "The bolt of fire hits the soldier!",
+   "The soldier's wooden shield smoulders!",
+   "The bolt of fire hits the soldier!  The bolt of fire hits the soldier!",
+   "The soldier wields a dagger!  The soldier throws a knife!",
+   "The knife misses the soldier.  A knife misses you.",
+   "The soldier throws a spear!  The spear hits the soldier.",
+   "The soldier throws a spear!  The spear hits the soldier.",
+   "You hit the lieutenant!  The soldier thrusts his dagger.",
+   "The soldier hits!  The lieutenant zaps a runed wand!"
   ],
   "truncated": false,
-  "steps": 39427,
-  "keys": 39427,
-  "keyhash": "611416360ae62eb5",
-  "secs": 94.3
+  "steps": 34202,
+  "keys": 34202,
+  "keyhash": "a5bfabc121bf3e6f",
+  "secs": 30.2
  },
  "61017": {
   "score": 6872.0,
@@ -411,7 +409,7 @@
   "steps": 7099,
   "keys": 7099,
   "keyhash": "26cb37be76e341fb",
-  "secs": 19.5
+  "secs": 5.2
  },
  "61018": {
   "score": 503.0,
@@ -434,7 +432,7 @@
   "steps": 7077,
   "keys": 7077,
   "keyhash": "21db3e1ec773c013",
-  "secs": 10.5
+  "secs": 2.8
  },
  "61019": {
   "score": 596.0,
@@ -457,7 +455,7 @@
   "steps": 2000,
   "keys": 2000,
   "keyhash": "7a67b77e600f0e67",
-  "secs": 4.3
+  "secs": 1.7
  },
  "61020": {
   "score": 6967.0,
@@ -480,7 +478,7 @@
   "steps": 8650,
   "keys": 8650,
   "keyhash": "575838ba90b245f9",
-  "secs": 17.7
+  "secs": 6.8
  },
  "61021": {
   "score": 1552.0,
@@ -503,7 +501,7 @@
   "steps": 5672,
   "keys": 5672,
   "keyhash": "db6b8347d26d82e5",
-  "secs": 13.0
+  "secs": 4.7
  },
  "61022": {
   "score": 2805.0,
@@ -526,7 +524,7 @@
   "steps": 6822,
   "keys": 6822,
   "keyhash": "3b4e737034eeaf7a",
-  "secs": 13.9
+  "secs": 4.7
  },
  "61023": {
   "score": 8674.0,
@@ -549,7 +547,7 @@
   "steps": 9581,
   "keys": 9581,
   "keyhash": "1364fabdb62bad3f",
-  "secs": 26.8
+  "secs": 7.5
  },
  "61024": {
   "score": 26787.0,
@@ -572,7 +570,7 @@
   "steps": 13900,
   "keys": 13900,
   "keyhash": "d10d3beeebe7723f",
-  "secs": 45.5
+  "secs": 12.3
  },
  "61025": {
   "score": 6116.0,
@@ -595,30 +593,30 @@
   "steps": 6653,
   "keys": 6653,
   "keyhash": "d12ab5331c2d115d",
-  "secs": 22.6
+  "secs": 5.6
  },
  "61026": {
-  "score": 6719.0,
-  "turns": 6272,
-  "max_depth": 10,
+  "score": 6849.0,
+  "turns": 5428,
+  "max_depth": 11,
   "xl": 8,
   "last_msgs": [
-   "Blecch!  Rotten food!  You feel rather light headed.",
-   "The master lich touches you!  You stop eating the dwarf lord corpse.",
-   "The air crackles around the master lich.",
-   "The air crackles around the master lich.",
-   "You miss the master lich.  The master lich touches you!",
-   "The master lich points at you, then curses.",
-   "The master lich points at you, then curses.",
-   "You miss the master lich.  The master lich touches you!",
-   "The master lich casts a spell at you!",
-   "Your head suddenly aches very painfully!"
+   "The vampire lord bites!",
+   "The vampire lord bites!",
+   "You hit the vampire lord!  The vampire lord hits!",
+   "The vampire lord bites!",
+   "The vampire lord bites!",
+   "You miss the vampire lord.  The vampire lord hits!",
+   "The vampire lord bites!",
+   "The vampire lord bites!",
+   "You miss the vampire lord.  The vampire lord hits!",
+   "The vampire lord bites!  The giant spider bites!"
   ],
   "truncated": false,
-  "steps": 8784,
-  "keys": 8784,
-  "keyhash": "b0a8a2cbd4669f97",
-  "secs": 29.7
+  "steps": 7830,
+  "keys": 7830,
+  "keyhash": "c182537ed45658d1",
+  "secs": 6.9
  },
  "61027": {
   "score": 7392.0,
@@ -641,30 +639,30 @@
   "steps": 8909,
   "keys": 8909,
   "keyhash": "5eb9008a8e8208f4",
-  "secs": 38.0
+  "secs": 9.4
  },
  "61028": {
-  "score": 75817.0,
-  "turns": 12308,
-  "max_depth": 22,
-  "xl": 11,
+  "score": 132042.0,
+  "turns": 30240,
+  "max_depth": 27,
+  "xl": 12,
   "last_msgs": [
-   "The door resists!",
-   "The door resists!",
-   "The door resists!",
-   "The minotaur hits!  The minotaur hits!  The minotaur butts!",
-   "The minotaur hits!  The minotaur hits!  The minotaur butts!",
-   "You hit the minotaur!  The minotaur hits!  The minotaur hits!",
-   "The minotaur butts!",
-   "The minotaur butts!",
-   "You hit the minotaur!  The minotaur hits!  The minotaur hits!",
-   "The minotaur butts!"
+   "You stop searching.",
+   "You stop searching.",
+   "A gush of water hits the human mummy on the head!",
+   "You see here 3 runed arrows.",
+   "You see here a tripe ration.",
+   "Your leg feels better.",
+   "A mysterious force prevents the black unicorn from teleporting!",
+   "A mysterious force prevents the black unicorn from teleporting!",
+   "A mysterious force prevents the black unicorn from teleporting!",
+   "A mysterious force prevents the black unicorn from teleporting!"
   ],
-  "truncated": false,
-  "steps": 23026,
-  "keys": 23026,
-  "keyhash": "0f544dc15bc88820",
-  "secs": 113.2
+  "truncated": true,
+  "steps": 200000,
+  "keys": 200000,
+  "keyhash": "91f288407c73e6b9",
+  "secs": 312.5
  },
  "61029": {
   "score": 1541.0,
@@ -687,30 +685,30 @@
   "steps": 3630,
   "keys": 3630,
   "keyhash": "9b84bc42d151e370",
-  "secs": 11.9
+  "secs": 3.2
  },
  "61030": {
-  "score": 130546.0,
-  "turns": 17106,
+  "score": 165646.0,
+  "turns": 36988,
   "max_depth": 24,
-  "xl": 12,
+  "xl": 13,
   "last_msgs": [
-   "The gremlin hits!  The gremlin misses!  The gremlin just misses!",
-   "The gremlin bites!  The gremlin hits!  The gremlin misses!",
-   "The gremlin misses!  The gremlin misses!  The gremlin misses!",
-   "The gremlin misses!  The gremlin misses!  The gremlin misses!",
-   "You kill the gremlin!",
-   "You kill the gremlin!",
-   "You kill the gremlin!  The gremlin hits!  The gremlin hits!",
-   "The gremlin misses!  The gremlin misses!  The gremlin hits!",
-   "The gremlin hits!  The gremlin misses!  The gremlin misses!",
-   "The gremlin misses!  The gremlin hits!  The gremlin bites!"
+   "You destroy the fog cloud!",
+   "You feel tired.",
+   "You feel tired.",
+   "You hit it.  It bites!  It bites!  It hits!  It hits!  It hits!",
+   "You hit it.  It bites!  It bites!  It hits!  It hits!  It hits!",
+   "You hit it.",
+   "You hit it.",
+   "You kill it!  It bites!  It bites!  It hits!  It hits!",
+   "You kill it!  It bites!  It bites!  It hits!  It hits!",
+   "You hit it.  It bites!  It bites!"
   ],
   "truncated": false,
-  "steps": 30407,
-  "keys": 30407,
-  "keyhash": "265a349dc1ee164f",
-  "secs": 156.3
+  "steps": 48828,
+  "keys": 48828,
+  "keyhash": "a69d50f8a5c03191",
+  "secs": 57.6
  },
  "61031": {
   "score": 1962.0,
@@ -733,6 +731,6 @@
   "steps": 5766,
   "keys": 5766,
   "keyhash": "c26f5a3e17bce18e",
-  "secs": 16.4
+  "secs": 4.4
  }
 }

@@ -9,8 +9,6 @@ class ActionsState:
     """State of our last actions: attack target, staircase, drop, throws and zaps (ActionsMixin)."""
     def __init__(self):
         self.last_attack_target = None   # the square we last attacked (melee, missile, wand): kills are noted there
-        self.attack_step = -1            # steps before the 'F' of our last melee attack (game.on_message: the message
-                                         # logged after it is the one before, shown again)
         self.attack_turn = -1            # turn of our last melee attack (danger: the monster we hit first may not act)
         self.took_stairs = False         # the last action was a staircase (mapmem.note_arrival reads it)
         self.last_stair_dir = None       # '<' / '>' of the staircase we took this tick
@@ -35,7 +33,6 @@ class ActionsMixin:
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
         self.acts.last_attack_target = target
         self.acts.attack_turn = self.turn()             # danger: the monster we hit first may not act
-        self.acts.attack_step = self.steps              # after 'F' NLE still shows the last message: logged again then
         self.not_stepping()
         self.press("F")
         self.press(key)
