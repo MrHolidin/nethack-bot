@@ -53,7 +53,7 @@ STEPS = (
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
     "dig_through",       # dig_through: the corner of a refused squeeze / a boulder that won't move, dug (nhbot.digthrough)
-    "rock_dig",          # rock_dig: gold / gems seen inside rock dug out (nhbot.rockdig)
+    "rock_dig",          # gold / gems seen inside rock dug out (nhbot.rockdig)
     "ammo_here",
     "retrieve_missiles",
     "eat",

@@ -1,4 +1,5 @@
-"""rock_dig (A/B, off by default): gold and gems lying inside solid rock. mklev.c:898-985 mineralize puts them in
+"""Gold and gems lying inside solid rock (A/B rock_dig: +992 [-165, +2128], 79k; the 37 games that dug median
++7290; accepted). mklev.c:898-985 mineralize puts them in
 STONE squares whose eight neighbours are stone too (gems three times as often in the Mines, mklev.c:937-939), 2 in 3
 on the square, 1 in 3 buried. We see one only once a passage runs beside it (a dwarf's tunnel, our own: display.c
 _map_location shows a seen square's top object, even on rock) -- standing next to it, as the games show (scratchpad
@@ -30,8 +31,8 @@ class RockDigState:
 class RockDigMixin:
     def rock_dig_init(self):
         self.rock_dig = RockDigState()
-        if self.opts.rock_dig:                   # game.digger_held: vault_rob_step puts the digger away otherwise
-            self.digger_holders.append(lambda lv: self.rock_dig.job is not None and self.rock_dig.job[0] == lv.key)
+        # game.digger_held: vault_rob_step puts the digger away otherwise
+        self.digger_holders.append(lambda lv: self.rock_dig.job is not None and self.rock_dig.job[0] == lv.key)
 
     def rock_digger(self):
         """dig_hand_means' pick-axe / mattock if it can't weld itself to us: in our hands already, or known not
@@ -54,7 +55,7 @@ class RockDigMixin:
         """mapmem.msg_map: "It's solid stone." for our step from here to target -- if target shows something lying
         there (mineralize's gold / gems), a dig job; we can't or may not dig: blocked for now. True if it was such a
         square."""
-        if not self.opts.rock_dig or lv is None:
+        if lv is None:
             return False
         if G.KIND[int(self.obs["glyphs"][target])] not in LOOKS_LIKE_THINGS \
                 and G.KIND[int(lv.under[target])] not in LOOKS_LIKE_THINGS:

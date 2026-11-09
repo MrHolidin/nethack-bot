@@ -1,26 +1,26 @@
 {
  "61000": {
-  "score": 5459.0,
-  "turns": 6588,
-  "max_depth": 11,
-  "xl": 7,
+  "score": 14789.0,
+  "turns": 9443,
+  "max_depth": 9,
+  "xl": 9,
   "last_msgs": [
-   "v - a violet gem.",
-   "You step onto a level teleport trap!",
-   "You are momentarily blinded by a flash of light.",
-   "Your pack shakes violently!",
-   "You hear a E flat squeak in the distance.",
-   "You see here a pair of low boots.",
-   "You see here a pair of low boots.",
-   "You see here a pair of low boots.",
-   "x - a pair of low boots.",
-   "You fall into a pit!  You land on a set of sharp iron spikes!"
+   "The dog bites!  The gnome lord thrusts one of his daggers.",
+   "The gnome lord hits!  You hear crashing rock.  The ape hits!",
+   "The ape hits!  The ape bites!  The dog bites!  The dog bites!",
+   "A gush of water hits the ape's right arm!  The ape hits!",
+   "The ape hits!  The ape bites!  The yeti hits!  The yeti hits!",
+   "The yeti bites!  You can move again.",
+   "The yeti bites!  You can move again.",
+   "You kill the ape!  The yeti hits!  The yeti hits!",
+   "The yeti just misses!  The dog bites!  A gush of water hits the ape!",
+   "The yeti hits!"
   ],
   "truncated": false,
-  "steps": 11148,
-  "keys": 11148,
-  "keyhash": "5110b5c49f7d47b6",
-  "secs": 9.8
+  "steps": 16008,
+  "keys": 16008,
+  "keyhash": "77ca72633c4d40b7",
+  "secs": 11.4
  },
  "61001": {
   "score": 1776.0,
@@ -43,7 +43,7 @@
   "steps": 6072,
   "keys": 6072,
   "keyhash": "020fbcc5b3e11faf",
-  "secs": 3.9
+  "secs": 3.3
  },
  "61002": {
   "score": 33251.0,
@@ -66,7 +66,7 @@
   "steps": 104019,
   "keys": 104019,
   "keyhash": "82479da0d95da397",
-  "secs": 128.9
+  "secs": 123.7
  },
  "61003": {
   "score": 3238.0,
@@ -89,7 +89,7 @@
   "steps": 9139,
   "keys": 9139,
   "keyhash": "6e4bf5caad3f3bb2",
-  "secs": 7.3
+  "secs": 7.0
  },
  "61004": {
   "score": 1411.0,
@@ -112,53 +112,53 @@
   "steps": 3689,
   "keys": 3689,
   "keyhash": "250e152de2dae4a9",
-  "secs": 3.4
+  "secs": 3.5
  },
  "61005": {
-  "score": 123177.0,
-  "turns": 38090,
-  "max_depth": 26,
-  "xl": 12,
+  "score": 8246.0,
+  "turns": 7157,
+  "max_depth": 10,
+  "xl": 8,
   "last_msgs": [
-   "You see here an uncursed looking glass.",
-   "You see here an uncursed looking glass.",
+   "You hit the shrieker!",
+   "You hit the shrieker!",
+   "You kill the shrieker!",
+   "An urge to take a bath overwhelms you.",
+   "You lost some of your money in the fountain!",
+   "An urge to take a bath overwhelms you.",
+   "You lost some of your money in the fountain!  The fountain dries up!",
+   "You hit the werejackal!  The werejackal misses!",
+   "You hit the werejackal!  The werejackal misses!",
+   "You kill the werejackal!"
+  ],
+  "truncated": false,
+  "steps": 9281,
+  "keys": 9281,
+  "keyhash": "63ee09dded1f7474",
+  "secs": 8.7
+ },
+ "61006": {
+  "score": 25424.0,
+  "turns": 15061,
+  "max_depth": 10,
+  "xl": 10,
+  "last_msgs": [
+   "You kill the pony!",
+   "You kill the yellow light!  It hits!",
+   "You kill the yellow light!  It hits!",
+   "You hit the fire elemental!  You are suddenly very hot!  It hits!",
    "The fire elemental hits!  You're on fire!",
-   "The fire elemental hits!  You're on fire!",
-   "You hit the fire elemental!  You are suddenly very hot!",
-   "The fire elemental hits!",
-   "The fire elemental hits!",
-   "You hit the fire elemental!  You are suddenly very hot!",
-   "You hit the fire elemental!  You are suddenly very hot!",
+   "Your clear potion boils and explodes!",
+   "Call a clear potion:",
+   "Your orange potion boils and explodes!",
+   "Call an orange potion:",
    "You hit the fire elemental!  You are suddenly very hot!"
   ],
   "truncated": false,
-  "steps": 116186,
-  "keys": 116186,
-  "keyhash": "e7d8c0997dafd004",
-  "secs": 364.1
- },
- "61006": {
-  "score": 2517.0,
-  "turns": 5838,
-  "max_depth": 6,
-  "xl": 6,
-  "last_msgs": [
-   "The soldier ant misses!  The soldier ant stings!",
-   "There is a doorway here.  Something is written here in the dust.",
-   "You read: \"Elhereth\".",
-   "What do you want to write with? [- abdetxY or ?*]",
-   "Do you want to add to the current engraving? [ynq] (y)",
-   "You wipe out the message that was written in the dust here.",
-   "You write in the dust with your fingertip.",
-   "What do you want to write in the dust here?",
-   "The soldier ant misses!  The soldier ant just misses!",
-   "The soldier ant misses!  The soldier ant stings!"
-  ],
-  "truncated": false,
-  "steps": 7457,
-  "keys": 7457,
-  "keyhash": "0850a2a683b21b6f",
-  "secs": 5.2
+  "steps": 28451,
+  "keys": 28451,
+  "keyhash": "e8d8341c20a5ec4c",
+  "secs": 28.8
  },
  "61007": {
   "score": 4372.0,
@@ -181,7 +181,7 @@
   "steps": 8813,
   "keys": 8813,
   "keyhash": "78e845e573df808e",
-  "secs": 7.2
+  "secs": 6.2
  },
  "61008": {
   "score": 1004.0,
@@ -204,30 +204,30 @@
   "steps": 2872,
   "keys": 2872,
   "keyhash": "fb8546817eeafce8",
-  "secs": 2.7
+  "secs": 2.5
  },
  "61009": {
-  "score": 135913.0,
-  "turns": 45806,
-  "max_depth": 19,
-  "xl": 12,
+  "score": 40327.0,
+  "turns": 18045,
+  "max_depth": 12,
+  "xl": 11,
   "last_msgs": [
-   "The master mind flayer's tentacles suck you!",
-   "Your helm blocks the attack to your head.",
-   "The master mind flayer's tentacles suck you!",
-   "Your helm blocks the attack to your head.",
-   "The master mind flayer's tentacles suck you!",
-   "Your helm blocks the attack to your head.",
-   "The master mind flayer just misses!",
-   "The master mind flayer's tentacles suck you!  Your brain is eaten!",
-   "You feel stupid!  The ettin swings his club.  The ettin hits!",
-   "The ettin swings his club.  The ettin hits!"
+   "The bugbear thrusts her unicorn horn.  The bugbear hits!",
+   "The orc shaman points at you, then curses.",
+   "The orc shaman points at you, then curses.",
+   "You hit the orc shaman!",
+   "You kill the lizard!  The bugbear thrusts her unicorn horn.",
+   "The bugbear misses!  The orc shaman drinks a potion of full healing!",
+   "The orc shaman looks completely healed.",
+   "You kill the stone giant!  The bugbear thrusts her unicorn horn.",
+   "The bugbear hits!  The orc shaman casts a spell at you!",
+   "Your brain is on fire!"
   ],
   "truncated": false,
-  "steps": 62084,
-  "keys": 62084,
-  "keyhash": "9d5068f7582e1c87",
-  "secs": 96.8
+  "steps": 25111,
+  "keys": 25111,
+  "keyhash": "7f4d167daca22ccd",
+  "secs": 24.4
  },
  "61010": {
   "score": 329.0,
@@ -250,7 +250,7 @@
   "steps": 1096,
   "keys": 1096,
   "keyhash": "9ba1051aff83c813",
-  "secs": 0.9
+  "secs": 1.0
  },
  "61011": {
   "score": 512.0,
@@ -294,30 +294,30 @@
   "steps": 17135,
   "keys": 17135,
   "keyhash": "17fc7ede08554463",
-  "secs": 30.1
+  "secs": 28.4
  },
  "61013": {
-  "score": 16564.0,
-  "turns": 10503,
-  "max_depth": 11,
-  "xl": 9,
+  "score": 48820.0,
+  "turns": 14658,
+  "max_depth": 19,
+  "xl": 11,
   "last_msgs": [
-   "The quasit misses!  The quasit misses!  The quasit misses!",
-   "The quasit hits!  The quasit hits!  The quasit bites!",
-   "The quasit hits!  The quasit hits!  The quasit bites!",
-   "You hit the quasit!  The quasit hits!",
-   "The quasit's sting was poisoned!  The quasit hits!  The quasit bites!",
-   "The quasit hits!  The quasit misses!  The quasit misses!",
-   "The quasit hits!  The quasit misses!  The quasit misses!",
-   "You kill the quasit!  But wait...",
-   "The quasit's medallion begins to glow!  The quasit looks much better!",
-   "The medallion crumbles to dust!  The quasit hits!  The quasit hits!"
+   "The rock troll bites!",
+   "You hit the rock troll!  The rock troll misses!  The rock troll hits!",
+   "The rock troll bites!",
+   "The rock troll bites!",
+   "You kill the rock troll!",
+   "You kill the rock troll!",
+   "The rock troll rises from the dead!  You stop searching.",
+   "The rock troll hits!  The rock troll hits!  The rock troll bites!",
+   "The rock troll hits!  The rock troll hits!  The rock troll bites!",
+   "You hit the rock troll!  The rock troll hits!  The rock troll hits!"
   ],
   "truncated": false,
-  "steps": 18890,
-  "keys": 18890,
-  "keyhash": "4f0ba6069aadf0e2",
-  "secs": 20.2
+  "steps": 28237,
+  "keys": 28237,
+  "keyhash": "598f73b3c25baec6",
+  "secs": 40.5
  },
  "61014": {
   "score": 3552.0,
@@ -340,7 +340,7 @@
   "steps": 3986,
   "keys": 3986,
   "keyhash": "5bb4e0c3293c9f8d",
-  "secs": 4.1
+  "secs": 4.5
  },
  "61015": {
   "score": 3769.0,
@@ -363,7 +363,7 @@
   "steps": 8346,
   "keys": 8346,
   "keyhash": "3db4dc872c5d70a0",
-  "secs": 6.4
+  "secs": 5.8
  },
  "61016": {
   "score": 36768.0,
@@ -386,7 +386,7 @@
   "steps": 34202,
   "keys": 34202,
   "keyhash": "a5bfabc121bf3e6f",
-  "secs": 28.9
+  "secs": 29.4
  },
  "61017": {
   "score": 6872.0,
@@ -409,7 +409,7 @@
   "steps": 7099,
   "keys": 7099,
   "keyhash": "26cb37be76e341fb",
-  "secs": 5.0
+  "secs": 5.4
  },
  "61018": {
   "score": 503.0,
@@ -432,7 +432,7 @@
   "steps": 7077,
   "keys": 7077,
   "keyhash": "21db3e1ec773c013",
-  "secs": 2.8
+  "secs": 2.9
  },
  "61019": {
   "score": 596.0,
@@ -478,7 +478,7 @@
   "steps": 8650,
   "keys": 8650,
   "keyhash": "575838ba90b245f9",
-  "secs": 6.0
+  "secs": 6.5
  },
  "61021": {
   "score": 1552.0,
@@ -501,30 +501,30 @@
   "steps": 5672,
   "keys": 5672,
   "keyhash": "db6b8347d26d82e5",
-  "secs": 3.8
+  "secs": 4.0
  },
  "61022": {
-  "score": 2805.0,
-  "turns": 5129,
-  "max_depth": 6,
-  "xl": 6,
+  "score": 12448.0,
+  "turns": 9567,
+  "max_depth": 13,
+  "xl": 9,
   "last_msgs": [
-   "You kill the Uruk-hai!",
-   "Things that are here:",
-   "There is an Uruk-hai corpse here; eat it? [ynq] (n)",
-   "What do you want to eat? [eG or ?*]",
-   "Never mind.",
-   "X - an orcish helm.",
-   "The centipede bites!",
-   "What do you want to throw? [$abtJOT or ?*]",
-   "In what direction?",
-   "The dagger hits the wood nymph!  The centipede bites!"
+   "It is missed.  The runed arrow hits the red naga.",
+   "The red naga is killed!  It is hit!  It is hit.  It is missed.",
+   "You are almost hit by an elven arrow.  It is hit.",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!",
+   "The elf-lord thrusts his elven short sword.  The elf-lord hits!"
   ],
   "truncated": false,
-  "steps": 6822,
-  "keys": 6822,
-  "keyhash": "3b4e737034eeaf7a",
-  "secs": 4.3
+  "steps": 15585,
+  "keys": 15585,
+  "keyhash": "c1a2873265f33e55",
+  "secs": 11.2
  },
  "61023": {
   "score": 8674.0,
@@ -547,7 +547,7 @@
   "steps": 9581,
   "keys": 9581,
   "keyhash": "1364fabdb62bad3f",
-  "secs": 7.4
+  "secs": 6.7
  },
  "61024": {
   "score": 26787.0,
@@ -570,7 +570,7 @@
   "steps": 13900,
   "keys": 13900,
   "keyhash": "d10d3beeebe7723f",
-  "secs": 12.2
+  "secs": 11.8
  },
  "61025": {
   "score": 6116.0,
@@ -593,7 +593,7 @@
   "steps": 6653,
   "keys": 6653,
   "keyhash": "d12ab5331c2d115d",
-  "secs": 5.6
+  "secs": 5.7
  },
  "61026": {
   "score": 6849.0,
@@ -616,7 +616,7 @@
   "steps": 7830,
   "keys": 7830,
   "keyhash": "c182537ed45658d1",
-  "secs": 7.7
+  "secs": 6.6
  },
  "61027": {
   "score": 7392.0,
@@ -639,7 +639,7 @@
   "steps": 8909,
   "keys": 8909,
   "keyhash": "5eb9008a8e8208f4",
-  "secs": 9.6
+  "secs": 8.9
  },
  "61028": {
   "score": 117753.0,
@@ -659,10 +659,10 @@
    "A mysterious force prevents the tengu from teleporting!"
   ],
   "truncated": false,
-  "steps": 84106,
-  "keys": 84106,
-  "keyhash": "09392543c7f3ebe6",
-  "secs": 195.9
+  "steps": 84101,
+  "keys": 84101,
+  "keyhash": "1d9a3f6690310d9d",
+  "secs": 200.4
  },
  "61029": {
   "score": 1541.0,
@@ -685,30 +685,30 @@
   "steps": 3630,
   "keys": 3630,
   "keyhash": "9b84bc42d151e370",
-  "secs": 2.8
+  "secs": 3.0
  },
  "61030": {
-  "score": 22969.0,
-  "turns": 12909,
-  "max_depth": 12,
-  "xl": 10,
+  "score": 89957.0,
+  "turns": 34470,
+  "max_depth": 10,
+  "xl": 12,
   "last_msgs": [
-   "The ice troll hits!  The ice troll hits!  You're covered in frost!",
-   "The frost doesn't seem cold!  Your black potion freezes and shatters!",
-   "Your purple-red potion freezes and shatters!",
-   "Your magenta potion freezes and shatters!  The ice troll bites!",
-   "The troll swings his scimitar.  The troll hits!  The troll hits!",
-   "The troll bites!  The plains centaur hits!  The plains centaur misses!",
-   "The troll bites!  The plains centaur hits!  The plains centaur misses!",
-   "You kill the troll!  The bugbear hits!  The ice troll hits!",
-   "The ice troll hits!  You're covered in frost!",
-   "The frost doesn't seem cold!  The ice troll bites!"
+   "Things that are here:",
+   "You kill the gecko!",
+   "There is a doorway here.  You see here a key.",
+   "There are several objects here.",
+   "You see here 9 rocks.",
+   "You see here 9 rocks.",
+   "You see here 10 rocks.",
+   "You hit the cobra!  The cobra bites!",
+   "You hit the cobra!  The cobra misses!",
+   "You kill the cobra!"
   ],
-  "truncated": false,
-  "steps": 24104,
-  "keys": 24104,
-  "keyhash": "492d99656c98f3c6",
-  "secs": 21.4
+  "truncated": true,
+  "steps": 200000,
+  "keys": 200000,
+  "keyhash": "48ee8a7bc581bff9",
+  "secs": 105.2
  },
  "61031": {
   "score": 1962.0,
@@ -731,6 +731,6 @@
   "steps": 5766,
   "keys": 5766,
   "keyhash": "c26f5a3e17bce18e",
-  "secs": 4.3
+  "secs": 4.1
  }
 }
