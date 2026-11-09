@@ -93,9 +93,9 @@ LEGS_WAIT = 10                       # turns without kicking after "no shape for
 PLAN_WAIT = 20                       # turns before the tunnel is planned again when it found no start
 TUNNEL_AFTER = 1000                  # turns on minend-2 after which the tunnel is planned even if exploring goes on
 HOME_TURNS = 3000                    # turns at most on the way back down after a teleporter
-# turns spent on Mines' End (Level.turns_here) after which it is given up: the Catacombs' long searches for closet
-# doors cost deaths (CI ls2_v4_79k: died there 14 of 72, the flag-off base 0; 10 of the 14 within 1000 turns of arrival)
-LEVEL_TURNS = {"minend-1": 3000, "minend-2": 3000, "minend-3": 1000}
+LEVEL_TURNS = 3000                   # turns spent on Mines' End (Level.turns_here) after which it is given up (1000 on
+                                     # minend-3, CI ls2_v6_79k: taken 39 of 73 against 51 of 72 at 3000, died there 12
+                                     # against 13)
 # sell offers for one unidentified gray stone (shk.c:2324-2370): half the price, or a third; rounded
 PRICES = {"luckstone": 60, "touchstone": 45, "flint": 1}
 
@@ -458,7 +458,7 @@ class LuckstoneMixin:
         if v is None:
             return False
         self.luck.home = None
-        if lv.turns_here > LEVEL_TURNS[v]:
+        if lv.turns_here > LEVEL_TURNS:
             return False if lv.key in self.luck.done else self.luck_finish(lv, "timeout")
         if lv.key in self.luck.done:
             return self.luck_loose_step(lv)
