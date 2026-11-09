@@ -32,6 +32,10 @@ class GameMixin:
         self._last_logged, self._last_logged_step = None, -1
         self.asked = ""                  # ask: the last question's message
         self.really_attacks = 0          # "Really attack?" questions (answered no)
+        # what a task (one behind an option: it subscribes at its init) is told or asked: a listing of what lies on our
+        # square (pile_listed); a deep Mines level it keeps us on -- no mines_return (level_held); a level where the
+        # digger stays in our hands (digger_held)
+        self.pile_readers, self.level_holders, self.digger_holders = [], [], []
         self._items, self._items_at = [], -1
         self._items_parsed, self._items_inv = [], None
         self._inv, self._inv_at = (), -1
@@ -55,6 +59,20 @@ class GameMixin:
             self.truncated = True
             raise GameOver()
 
+    def pile_listed(self, text):
+        """A listing of what lies on our square -- the "Things that are here" window (settle), "You see here ..."
+        (on_message), pickup.look_here -- to each of pile_readers."""
+        for read in self.pile_readers:
+            read(text)
+
+    def level_held(self, lv):
+        """explore: a task keeps us on this deep Mines level (level_holders) -- no mines_return yet."""
+        return any(held(lv) for held in self.level_holders)
+
+    def digger_held(self, lv):
+        """vault: a task keeps the pick-axe / mattock in our hands on this level (digger_holders)."""
+        return any(held(lv) for held in self.digger_holders)
+
     def press(self, key, expect_prompt=False):
         """Send one key, then clear --More-- and unexpected menus/prompts."""
         code = ord(key) if isinstance(key, str) else key
@@ -71,7 +89,7 @@ class GameMixin:
             if "Things that are here" in tty:
                 self.here_window = (self.turn(), self.pos(), " | ".join(
                     l.strip() for l in self.menu_lines(tty, "Things that are here")))
-                self.luck_note_pile(self.here_window[2])         # luckstone.py: a gray stone in a pile here
+                self.pile_listed(self.here_window[2])
             # mapmem: "There is a staircase down here." -- atop the window, or first on the top line, where the
             # message observation holds only the last message of the line ("You see here a large box.")
             self.note_feature_here(tty if "Things that are here" in tty else self.top_line())
@@ -344,7 +362,7 @@ class GameMixin:
         lv = self.levels.get(self.cur_key) if self.cur_key else None
         if lv is not None and ("You see here" in m or "Things that are here" in m or "several objects here" in m):
             self.seen_here = (self.turn(), self.pos(), m)
-            self.luck_note_pile(m)
+            self.pile_listed(m)
         self.msg_survival(m)
         self.msg_enchant(m)
         self.focus_note(msg)

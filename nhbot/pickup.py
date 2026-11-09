@@ -299,7 +299,7 @@ class PickupMixin:
             break
         self.settle()
         self.price_note_text(" | ".join(names))
-        self.luck_note_pile(" | ".join(names))      # luckstone.py: a gray stone in a pile here
+        self.pile_listed(" | ".join(names))
         return names
 
     # ------------------------------------------------------------------ the menu

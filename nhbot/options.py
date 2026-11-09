@@ -24,6 +24,8 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "mines_luckstone": False,  # A/B: at Mines' End go to the luckstone, kick-test that it is no loadstone ("Thump!"), keep
                                #      it (named, value.keep_plan); drop it if known cursed (nhbot.luckstone)
+    "mattock_shield": False,   # A/B: a shield taken off to wield a mattock is not worn again before the mattock is in our
+                               #      hands (digging.dig_needs_hands; the take-off / put-on loop of 79611)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified

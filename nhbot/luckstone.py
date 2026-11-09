@@ -98,6 +98,23 @@ LEVEL_TURNS = 3000                   # turns spent on Mines' End (Level.turns_he
                                      # against 13)
 # sell offers for one unidentified gray stone (shk.c:2324-2370): half the price, or a third; rounded
 PRICES = {"luckstone": 60, "touchstone": 45, "flint": 1}
+# what became of a site (luck_status) -- a niche, a chamber square, a spot or a loose stone ("loose", square)
+STATUSES = {
+    "kicked": "gray stones flew off its pile at a kick: collected along the line next",
+    "taken": "its gray stones picked up (named TESTED<n>)",
+    "thump": "the gray stone on top did not move: a loadstone (dokick.c:549, 647-651)",
+    "mimic": "a mimic posing as the stone (dokick.c:896-900)",
+    "blind_object": "walls behind it -- any object 'Thump!'s (dokick.c:573-575): taken once the loadstone is found",
+    "blocked": "something too heavy to kick lies on top (a corpse, a box, a boulder), or a pit / web",
+    "empty": "no gray stone: bare, or none where the kicked one flew",
+    "not_picked": "gray stones there, none came into the pack",
+    "ambiguous": "a gray stone lay where the kicked one landed before the kick: none taken (it was never tested)",
+    "no_lane": "no square to kick it from and into",
+    "too_heavy": "the pocket's squeeze refused with nothing unworn left to drop",
+    "door_given_up": "its secret door not found, or not opened",
+    "lost": "no path to the square it needs us on",
+    "unreachable": "out of reach once the level is explored (or we are leaving the Mines)",
+}
 
 # mines.des:849-867
 MINEND_1 = (
@@ -262,8 +279,9 @@ class LuckState:
     """State of the Mines' End luckstone hunt (LuckstoneMixin)."""
     def __init__(self):
         self.variant = {}                # level key -> (seen squares when judged, variant or None)
-        self.status = {}                 # (level key, site) -> its outcome; a site: a niche / chamber square / spot,
-                                         # or ("loose", square)
+        self.status = {}                 # (level key, site) -> one of STATUSES; a site: a niche / chamber square /
+                                         # spot, or ("loose", square)
+        self.doors_given_up = set()      # (level key, door): a secret door of the map searched for / kicked enough
         self.piles = {}                  # (level key, square) -> a listing there named a gray stone (luck_note_pile)
         self.searched = Counter()        # (level key, door) -> turns searched for it
         self.kicks = Counter()           # (level key, door) -> kicks at it; (level key, "pile", q) -> at a pile
@@ -296,15 +314,19 @@ class LuckState:
 class LuckstoneMixin:
     def luckstone_init(self):
         self.luck = LuckState()
+        if self.opts.mines_luckstone:                        # game.py: what the hunt is told and asked
+            self.pile_readers.append(self.luck_note_pile)
+            self.level_holders.append(self.luck_holds)
+            self.digger_holders.append(self.luck_digging)
 
     def luckstone_summary(self):
         """Game summary entries."""
         stones = [it.text for it in self.items() if it.ocls == nh.GEM_CLASS and NAMED_RE.search(it.text)]
-        sites = {f"{p[0]},{p[1]}": v for (k, p), v in self.luck.status.items()
-                 if isinstance(p, tuple) and isinstance(p[0], int) and isinstance(v, str)}
+        sites = {f"{p[0]},{p[1]}": v for (k, p), v in self.luck.status.items() if p[0] != "loose"}
+        loose = {f"{p[1][0]},{p[1][1]}": v for (k, p), v in self.luck.status.items() if p[0] == "loose"}
         end = [int(self.bl(nh.NLE_BL_DNUM)), int(self.bl(nh.NLE_BL_DLEVEL))] if self.last_bl is not None else None
         return {"luckstone": dict(self.luck.stats), "luckstone_report": dict(
-            self.luck.report, carried=stones, sites=sites, end_key=end, last_act=self.luck.last,
+            self.luck.report, carried=stones, sites=sites, loose=loose, end_key=end, last_act=self.luck.last,
             home=list(self.luck.home) if self.luck.home else None)}
 
     # ------------------------------------------------------------------ our stones
@@ -422,10 +444,8 @@ class LuckstoneMixin:
         return found
 
     def luck_holds(self, lv):
-        """explore: Mines' End with work left for us, or a teleporter sent us up from it (luck.home) -- no
+        """game.level_held: Mines' End with work left for us, or a teleporter sent us up from it (luck.home) -- no
         mines_return yet ("bottom", "no way")."""
-        if not self.opts.mines_luckstone:
-            return False
         if self.luck.home is not None:
             return True
         if lv.key in self.luck.done:
@@ -435,15 +455,14 @@ class LuckstoneMixin:
                                                            or lv.key in self.digging.refused))
 
     def luck_digging(self, lv):
-        """vault.vault_rob_step: the digger stays in our hands -- minend-2's work goes on here (luck_finish puts it
+        """game.digger_held: the digger stays in our hands -- minend-2's work goes on here (luck_finish puts it
         away)."""
-        return self.opts.mines_luckstone and lv.key not in self.luck.done \
-            and self.luck.variant.get(lv.key, (0, None))[1] == "minend-2"
+        return lv.key not in self.luck.done and self.luck.variant.get(lv.key, (0, None))[1] == "minend-2"
 
     # ------------------------------------------------------------------ the step
     def luckstone_step(self, lv, c):
         """mines_luckstone, nothing in view: our stones' housekeeping (luck_housekeeping); sent off Mines' End by a
-        teleporter: back down; on Mines' End from HP_MIN of max HP: the variant's sites (luck_minend1 / 2 / 3), then
+        teleporter: back down; on Mines' End, in our own form, from HP_MIN of max HP: the variant's sites (luck_minend1 / 2 / 3), then
         the gray stones lying elsewhere (luck_loose_step) -- those also once the level is done, while we are on it (a
         carrier killed later drops its stone). True if it used the turn."""
         if not self.opts.mines_luckstone or c.vis:
@@ -452,6 +471,8 @@ class LuckstoneMixin:
             return True
         if self.luck.home is not None and lv.key != self.luck.home:
             return self.luck_go_home(lv)
+        if self.poly_form() is not None:
+            return False         # not polymorphed: a small form can't open a door (lock.c:717, 79531 tried 7000 times)
         if c.hp < c.maxhp * HP_MIN:
             return False
         v = self.minend_variant(lv)
@@ -487,6 +508,8 @@ class LuckstoneMixin:
         self.luck.last = [self.turn(), what, list(self.cur_key) if self.cur_key else None]
 
     def luck_status(self, lv, site, st):
+        """What became of site (one of STATUSES)."""
+        assert st in STATUSES, st
         self.luck.status[(lv.key, site)] = st
         self.luck.stats[("loose_" if site[0] == "loose" else "") + st] += 1
         if st in ("thump", "mimic", "kicked"):
@@ -514,10 +537,10 @@ class LuckstoneMixin:
 
     # ------------------------------------------------------------------ 1. locate: where a gray stone lies
     def luck_note_pile(self, text):
-        """game / pickup.look_here: a listing of what lies on our square ("Things that are here", "You see here") --
-        on a deep Mines level, whether a gray stone is among it (a monster's drop, a corpse, gems may cover it: the map
+        """game.pile_listed: a listing of what lies on our square ("Things that are here", "You see here") -- on a
+        deep Mines level, whether a gray stone is among it (a monster's drop, a corpse, gems may cover it: the map
         shows only the top, display.c)."""
-        if not self.opts.mines_luckstone or self.cur_key is None or self.cur_key[0] != 2 or self.cur_key[1] < 8:
+        if self.cur_key is None or self.cur_key[0] != 2 or self.cur_key[1] < 8:
             return
         if re.search(r"(several|many) objects here", text) or text.strip() == "Things that are here:":
             return                                           # a count (pickup.c:629) or the window's title alone
@@ -574,7 +597,7 @@ class LuckstoneMixin:
         outs = {}
         for d in zip(*np.nonzero(char == "S")):
             d = (int(d[0]), int(d[1]))
-            if k[d] not in SHUT or self.luck.status.get((lv.key, d)) == "door_given_up":
+            if k[d] not in SHUT or (lv.key, d) in self.luck.doors_given_up:
                 continue
             for dy, dx in ORTHO:
                 o = (d[0] + dy, d[1] + dx)
@@ -585,14 +608,15 @@ class LuckstoneMixin:
         if here in outs:
             if self.luck_door(lv, outs[here], here):
                 return True
-            self.luck_status(lv, outs[here], "door_given_up")
+            self.luck.doors_given_up.add((lv.key, outs[here]))
+            self.luck.stats["door_given_up"] += 1
             return False
         return self.luck_walk(lv, outs) == "moved"
 
     def luck_door_left(self, lv, char):
         """A secret door of the map not given up yet (luck_doors_step may still open a way)."""
         k = self.kinds(lv)
-        return any(k[d] in SHUT and self.luck.status.get((lv.key, (int(d[0]), int(d[1])))) != "door_given_up"
+        return any(k[d] in SHUT and (lv.key, (int(d[0]), int(d[1]))) not in self.luck.doors_given_up
                    for d in zip(*np.nonzero(char == "S")))
 
     def luck_door(self, lv, door, out):
