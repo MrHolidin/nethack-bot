@@ -22,8 +22,6 @@ DEFAULTS = {
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
                                #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
-    "horn_poison_food": False, # A/B: with a unicorn horn a poisonous (not acidic) corpse is eaten at any hunger, HP over
-                               #      POISON_MEAL_HP; the Strength it takes (eat.c losestr, silent) mended by the horn
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
