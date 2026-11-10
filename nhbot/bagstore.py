@@ -4,8 +4,9 @@ out when a use comes up: in a shop (sold, priced), on an altar with one of them 
 us to an altar as the inventory's do: altar_mask), Burdened (carry may drop
 them), or one in the bag that a step would now want (carry.needed, an untested scroll still to read).
 The bag: one known to be a container -- a sack / oilskin sack by name, a bag of holding, or a "bag" bag_test opened and
-named BAG_OK_NAME (all four bags look "bag"; a bag of tricks applied makes a monster: apply.c bagotricks); one that may
-be a bag of holding only known not cursed (a cursed one loses what is in it: pickup.c boh_loss). The bag holding our
+named BAG_OK_NAME (all four bags look "bag"; a bag of tricks applied makes a monster: apply.c bagotricks); not known
+cursed -- a cursed bag of holding loses what is in it (pickup.c boh_loss), but bags are never made cursed (mkobj.c
+mksobj: no blessorcurse for them), only cursed later (a spell's rndcurse). The bag holding our
 things stays the one used and is never dropped or sold (carry.needed: store_holds).
 bag_test: an unknown "bag" of ours told apart at once -- dropped on plain floor, #looted there (a bag of tricks only
 bites, d10, and becomes known: lock.c doloot; a container opens, and what lies in it that the floor rules want is
@@ -52,10 +53,7 @@ class BagStoreMixin:
         """A bag of ours known to be a container we may keep things in (see the module notes)."""
         if not self.is_bag(it) or it.cursed or it.unpaid:
             return False
-        maybe_holding = "holding" in it.text or "sack" not in it.text      # a named "bag" may be one too
-        if not ("sack" in it.text or "holding" in it.text or f"named {BAG_OK_NAME}" in it.text):
-            return False
-        return not maybe_holding or "uncursed" in it.text or "blessed" in it.text
+        return "sack" in it.text or "holding" in it.text or f"named {BAG_OK_NAME}" in it.text
 
     def store_bag(self):
         """The bag our things go in: the one holding them already, else the best known container (a bag of holding
