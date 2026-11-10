@@ -22,6 +22,8 @@ DEFAULTS = {
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
                                #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
+    "elb_sim": False,          # A/B: Elbereth also when the fight sim (danger.win_prob held) says writing it and killing
+                               #      the ones that ignore it first beats fighting on (elbereth.elb_sim_wanted)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified

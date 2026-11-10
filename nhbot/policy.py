@@ -358,6 +358,10 @@ class PolicyMixin:
             return False
         awake = [t for t in hostiles if not self.asleep(c.lv, t[0])]
         cands = awake or hostiles                # one put to sleep comes after every awake one
+        if self.opts.elb_sim and (c.y, c.x) in c.lv.elbereth:
+            # A/B elb_sim: on our Elbereth the ones that ignore it first -- a blow at one that respects it erases it
+            # (mon.c setmangry: "You feel like a hypocrite", -5 alignment)
+            cands = [t for t in cands if not self.respects(*t)] or cands
         self.attack(cands[0][0] if len(cands) == 1 else self.focus_target(cands))
         return True
 

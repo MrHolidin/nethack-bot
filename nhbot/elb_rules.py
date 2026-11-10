@@ -74,8 +74,13 @@ def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=()):
     """[(name, reason)] for every visible non-peaceful monster that makes Elbereth useless, plus unseen
     attackers ('I' markers) within 2 squares.  Empty list = Elbereth is worth writing.
     optimistic: class-C monsters (MAYBE_ARMED) don't block."""
+    return [(n, r) for _, n, r in blocker_squares(glyphs, me, peaceful_pos, dnum, optimistic, skip_names)]
+
+
+def blocker_squares(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=()):
+    """blockers with the square of each: [(pos, name, reason)] (pos None: Elbereth has no power here)."""
     if dnum in (GEHENNOM_DNUM, ENDGAME_DNUM):
-        return [("-", "Elbereth has no power here")]
+        return [(None, "-", "Elbereth has no power here")]
     out = []
     py, px = me
     rows, cols = glyphs.shape
@@ -86,14 +91,14 @@ def blockers(glyphs, me, peaceful_pos, dnum, optimistic=False, skip_names=()):
             if (y, x) == (py, px):
                 continue
             if k == G.INVIS and max(abs(y - py), abs(x - px)) <= 2:
-                out.append(("unseen", "can't tell what it is"))
+                out.append(((y, x), "unseen", "can't tell what it is"))
             elif k == G.MONSTER and (y, x) not in peaceful_pos:
                 idx = nh.glyph_to_mon(g)
                 r = _REASON[idx]
                 if r and optimistic and idx in MAYBE_ARMED:
                     continue
                 if r and G.monster_name(g) not in skip_names:
-                    out.append((G.monster_name(g), r))
+                    out.append(((y, x), G.monster_name(g), r))
     return out
 
 

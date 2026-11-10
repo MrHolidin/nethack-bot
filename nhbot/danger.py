@@ -66,6 +66,8 @@ CLASS_NAME = {nh.POTION_CLASS: "potion", nh.SCROLL_CLASS: "scroll", nh.SPBOOK_CL
               nh.WAND_CLASS: "wand", nh.RING_CLASS: "ring"}
 RAY_OF_AD = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning"}     # a breath that is a ray destroy_item follows
 WIN_SIMS = 200                   # win_prob: sampled fights
+ELB_INTACT = (24 / 25) ** 8      # win_prob held: a dust Elbereth comes out right (engrave.c doengrave: each letter
+                                 # garbled 1 in 25)
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
 P_EDGES = (0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.01)
@@ -515,7 +517,7 @@ class DangerMixin:
         return out
 
     # ------------------------------------------------------------ the fight to the end
-    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None):
+    def win_prob(self, adjacent, sims=WIN_SIMS, max_turns=40, opening=None, approach=None, ranged=None, held=None):
         """P(we kill every adjacent hostile before they kill us), sampled (an RNG of our own, not the game's):
         each turn our actions (our_speed / 12) hit the lowest-level one alive (our_hit_prob, our_damage_pmf),
         then each one alive takes its round (monster_round: damage and the instant deaths; hurt: we hit it). Our
@@ -528,6 +530,11 @@ class DangerMixin:
         monster of this fight is still at pos, apply(pos, damage or None for asleep) does the zap's effect on it.
         Its draws come from a generator of their own and the melee draws of that action are still made, so a fight
         with and one without the opening see the same monster HP and the same later rolls.
+        held (A/B elb_sim, without approach): the squares of the monsters a written Elbereth holds off -- our first
+        action writes it (no blow; spelt right ELB_INTACT, drawn from the opening's generator); spelt right, the held
+        ones don't attack that turn (monmove.c distfleeck: scared at once) nor while one not held is alive, and our
+        blows go to those (a blow at a held one would erase it: mon.c setmangry); then the held ones are back and
+        fought as usual. No healing in between (the user's model).
         approach (wand_ev): {pos: squares it still has to walk} -- such a monster spends its moves (mcalcmove:
         mmove / 12 a turn, the remainder by chance) walking up before it attacks, one attack per move after; we
         only hit monsters next to us (none there: we wait).
@@ -566,6 +573,7 @@ class DangerMixin:
         state = self.our_state() if approach is not None else None
         plans = [self.ranged_plan(ranged.get(m.pos), m.name) if ranged else None for m in mons]
         zrng = self.danger.opening_rng
+        held = held or set()
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
         wins = 0
@@ -588,14 +596,18 @@ class DangerMixin:
                 if end > 0:
                     wins += TAINTED_WIN if tainted else 1
                 continue
+            elb = bool(held) and zrng.random() < ELB_INTACT
             for _turn in range(max_turns):
                 acts = k + (1 if frac and rng.random() < frac / 12 else 0)
                 for _a in range(acts):
                     if not alive:
                         break
-                    j = alive[0]
+                    free = [i for i in alive if mons[i].pos not in held] if elb else alive
+                    j = (free or alive)[0]
                     hit = rng.random() < mons[j].hit
                     d = cdf_draw(rng, cdfs[id(mons[j].dmg)]) if hit else 0
+                    if held and _turn == 0 and _a == 0:
+                        continue                         # writing Elbereth
                     if opening is not None and _turn == 0 and _a == 0:
                         lost, asleep, _ = opening(zrng, *opening_hooks(index, alive, hps))
                         hp -= lost
@@ -605,13 +617,16 @@ class DangerMixin:
                     if hit:
                         hps[j] -= d
                         if hps[j] <= 0:
-                            alive.pop(0)
+                            alive.remove(j)
                 if not alive:
                     break
                 asleep -= 1
                 if hp <= 0:
                     break
+                off = elb and (_turn == 0 or any(mons[i].pos not in held for i in alive))
                 for j in alive:
+                    if off and mons[j].pos in held:
+                        continue
                     if rng.random() < mons[j].inst:
                         hp = 0
                         break

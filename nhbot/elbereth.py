@@ -134,10 +134,39 @@ class ElberethMixin:
         threats = hostiles + [t for t in near if t not in hostiles]
         if not threats:
             return False
-        if sum(1 for _, n in threats if n in SWARMERS) < 2 \
-                and self.bl(nh.NLE_BL_HP) >= self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_hp:
+        if (sum(1 for _, n in threats if n in SWARMERS) >= 2
+                or self.bl(nh.NLE_BL_HP) < self.bl(nh.NLE_BL_HPMAX) * self.opts.elb_hp) and not self.elb_blocked(lv):
+            return True
+        return self.opts.elb_sim and self.elb_sim_wanted(lv, hostiles)
+
+    def elb_sim_wanted(self, lv, hostiles):
+        """A/B elb_sim: write Elbereth when the fight with it (win_prob held: the ones next to us that respect it
+        held off while we kill the rest, then fought) is likelier won than fighting on -- also with ones next to us
+        that ignore it. Not with anything that ignores it standing off (win_prob doesn't play it out) or nothing
+        next to us that respects it. Both fights from the same draws; the generators put back after (no other
+        decision moves)."""
+        if not hostiles:
             return False
-        return not self.elb_blocked(lv)
+        held = {p for p, n in hostiles if self.respects(p, n)}
+        if not held:
+            return False
+        adj = {p for p, _ in hostiles}
+        pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
+        if any(p not in adj for p, _, _ in ELB.blocker_squares(self.obs["glyphs"], self.pos(), pp, lv.key[0])):
+            return False
+        gens = (self.danger.win_rng.bit_generator, self.danger.opening_rng.bit_generator)
+        saved = [g.state for g in gens]
+        p_fight = self.win_prob(hostiles)
+        for g, s in zip(gens, saved):
+            g.state = s
+        p_elb = self.win_prob(hostiles, held=held)
+        for g, s in zip(gens, saved):
+            g.state = s
+        self.elb.stats["sim"] += 1
+        if p_elb <= p_fight:
+            return False
+        self.elb.stats["sim_write"] += 1
+        return True
 
     def elb_step(self, lv, hostiles):
         st = self.elb.state
