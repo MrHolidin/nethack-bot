@@ -224,8 +224,11 @@ class SurvivalMixin:
             return True
         if f1 & M1_POIS and not f1 & M1_ACID and self.surv.poison_res:
             return True                       # poison resistant: a poisonous corpse is ordinary food
-        if f1 & M1_POIS and not f1 & M1_ACID and horn and self.opts.horn_poison_food:
-            return hp > POISON_MEAL_HP        # A/B horn_poison_food: the Strength it takes the horn mends (msg_survival)
+        if f1 & M1_POIS and not f1 & M1_ACID and horn:
+            # the Strength it takes the horn mends (msg_survival); and it may give poison resistance (A/B
+            # horn_poison_food: +282 [-647, +1218], 149 of 1000 changed, median of those +2190, games resistant to
+            # poison 285 -> 360; accepted)
+            return hp > POISON_MEAL_HP
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
             return hunger >= WEAK and hp > POISON_MEAL_HP
         return True
@@ -456,10 +459,10 @@ class SurvivalMixin:
             if f in self.surv.attr_seen and rx.search(m):
                 self.surv.attr_want[f] = max(self.surv.attr_want.get(f, 0), self.surv.attr_seen[f])
                 self.surv.horn_stats["attr_lost"] += 1
-        # A/B horn_poison_food: a poisonous corpse takes 1-4 Strength without a word of it (eat.c eatcorpse: losestr ->
-        # adjattrib msgflg 1); resistant, nothing is taken ("You seem unaffected") and attr_lowered finds nothing
+        # a poisonous corpse takes 1-4 Strength without a word of it (eat.c eatcorpse: losestr -> adjattrib msgflg 1);
+        # resistant, nothing is taken ("You seem unaffected") and attr_lowered finds nothing
         f = nh.NLE_BL_STR125
-        if self.opts.horn_poison_food and "must have been poisonous" in m and f in self.surv.attr_seen:
+        if "must have been poisonous" in m and f in self.surv.attr_seen:
             self.surv.attr_want[f] = max(self.surv.attr_want.get(f, 0), self.surv.attr_seen[f])
             self.surv.horn_stats["poison_meal"] += 1
         if "more confident in your" in m:

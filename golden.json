@@ -1,26 +1,26 @@
 {
  "61000": {
-  "score": 10775.0,
-  "turns": 8561,
-  "max_depth": 10,
-  "xl": 8,
+  "score": 26109.0,
+  "turns": 15176,
+  "max_depth": 14,
+  "xl": 10,
   "last_msgs": [
-   "This troll corpse tastes terrible!",
-   "The bite-covered troll rises from the dead!",
-   "You stop eating the troll corpse.  The troll just misses!",
-   "The troll hits!  You return to dwarven form!  The troll bites!",
-   "What do you want to zap? [eknou or ?*]",
-   "Nothing happens.  The troll hits!  The troll hits!  The troll bites!",
-   "Nothing happens.  The troll hits!  The troll hits!  The troll bites!",
-   "You hit the troll!  The troll hits!  The troll hits!  The troll bites!",
-   "You hit the troll!  The troll hits!  The troll hits!  The troll bites!",
+   "The plains centaur hits!  The plains centaur kicks!",
+   "The plains centaur hits!  The plains centaur kicks!",
+   "You kill the plains centaur!",
+   "You kill the plains centaur!",
+   "The troll rises from the dead!  You stop searching.  The troll hits!",
+   "The troll hits!  The troll bites!",
+   "The troll hits!  The troll bites!",
+   "You hit the troll!",
+   "You hit the troll!",
    "You hit the troll!  The troll hits!  The troll hits!  The troll bites!"
   ],
   "truncated": false,
-  "steps": 16144,
-  "keys": 16144,
-  "keyhash": "f17e476f7eb49938",
-  "secs": 11.1
+  "steps": 29836,
+  "keys": 29836,
+  "keyhash": "d19b6c17392eee48",
+  "secs": 33.9
  },
  "61001": {
   "score": 1776.0,
@@ -43,7 +43,7 @@
   "steps": 6072,
   "keys": 6072,
   "keyhash": "020fbcc5b3e11faf",
-  "secs": 3.2
+  "secs": 3.9
  },
  "61002": {
   "score": 33251.0,
@@ -66,7 +66,7 @@
   "steps": 104019,
   "keys": 104019,
   "keyhash": "82479da0d95da397",
-  "secs": 118.9
+  "secs": 150.8
  },
  "61003": {
   "score": 7112.0,
@@ -89,7 +89,7 @@
   "steps": 13416,
   "keys": 13416,
   "keyhash": "304d251567f9a472",
-  "secs": 7.6
+  "secs": 10.1
  },
  "61004": {
   "score": 1411.0,
@@ -112,7 +112,7 @@
   "steps": 3689,
   "keys": 3689,
   "keyhash": "250e152de2dae4a9",
-  "secs": 3.2
+  "secs": 4.4
  },
  "61005": {
   "score": 8246.0,
@@ -135,7 +135,7 @@
   "steps": 9281,
   "keys": 9281,
   "keyhash": "63ee09dded1f7474",
-  "secs": 7.7
+  "secs": 10.7
  },
  "61006": {
   "score": 25424.0,
@@ -158,7 +158,7 @@
   "steps": 28451,
   "keys": 28451,
   "keyhash": "e8d8341c20a5ec4c",
-  "secs": 27.0
+  "secs": 36.0
  },
  "61007": {
   "score": 4372.0,
@@ -181,7 +181,7 @@
   "steps": 8813,
   "keys": 8813,
   "keyhash": "78e845e573df808e",
-  "secs": 6.0
+  "secs": 8.5
  },
  "61008": {
   "score": 1004.0,
@@ -204,30 +204,30 @@
   "steps": 2872,
   "keys": 2872,
   "keyhash": "fb8546817eeafce8",
-  "secs": 2.4
+  "secs": 3.3
  },
  "61009": {
-  "score": 23008.0,
-  "turns": 10770,
-  "max_depth": 12,
-  "xl": 9,
+  "score": 10611.0,
+  "turns": 8964,
+  "max_depth": 10,
+  "xl": 8,
   "last_msgs": [
-   "The shocking sphere misses!  The hill orc hits!  The leocrotta hits!",
-   "The marilith hits!  The hydra hits!",
-   "The marilith zaps a wand of magic missile!",
-   "The magic missile hits you!  The missiles bounce off!  Domo-kun hits!",
-   "The Dalek bites!  The Angel bites!  The orc mummy misses!",
-   "The silver dragon misses!  The gnome laureate bites!",
-   "The glass piercer hits!  The boomer hits!",
-   "The lion-dog zaps a wand of magic missile!",
-   "The magic missile hits you!  The missiles bounce off!",
-   "The acid blob hits!  The jabberwock bites!"
+   "The ape bites!  The giant ant bites!  The giant ant bites!",
+   "The giant ant passes between the iron bars.",
+   "The giant ant passes between the iron bars.",
+   "You kill the ape!  The giant ant passes between the iron bars.",
+   "You kill the ape!  The giant ant passes between the iron bars.",
+   "You hit the rope golem!  The Woodland-elf wields an elven bow!",
+   "The rope golem hits!  The rope golem misses!  The pony misses!",
+   "The pony bites!  The giant ant misses!  The giant ant bites!",
+   "The giant ant passes between the iron bars.  The giant ant bites!",
+   "The giant ant bites!  The giant ant bites!"
   ],
   "truncated": false,
-  "steps": 17591,
-  "keys": 17591,
-  "keyhash": "6f1e3fb3aeb59fdd",
-  "secs": 15.7
+  "steps": 12182,
+  "keys": 12182,
+  "keyhash": "6193f563b93172fb",
+  "secs": 13.9
  },
  "61010": {
   "score": 329.0,
@@ -250,7 +250,7 @@
   "steps": 1096,
   "keys": 1096,
   "keyhash": "9ba1051aff83c813",
-  "secs": 0.9
+  "secs": 1.2
  },
  "61011": {
   "score": 512.0,
@@ -273,7 +273,7 @@
   "steps": 1548,
   "keys": 1548,
   "keyhash": "72f92e8f51448c4a",
-  "secs": 1.1
+  "secs": 1.6
  },
  "61012": {
   "score": 89998.0,
@@ -294,7 +294,7 @@
   "steps": 124239,
   "keys": 124239,
   "keyhash": "5d1ce614d3334607",
-  "secs": 101.9
+  "secs": 126.3
  },
  "61013": {
   "score": 5984.0,
@@ -317,7 +317,7 @@
   "steps": 7898,
   "keys": 7898,
   "keyhash": "097b0efe1b963249",
-  "secs": 6.2
+  "secs": 7.9
  },
  "61014": {
   "score": 3552.0,
@@ -340,7 +340,7 @@
   "steps": 3986,
   "keys": 3986,
   "keyhash": "5bb4e0c3293c9f8d",
-  "secs": 4.4
+  "secs": 6.0
  },
  "61015": {
   "score": 26501.0,
@@ -363,7 +363,7 @@
   "steps": 34277,
   "keys": 34277,
   "keyhash": "fcf2d57cd8d37565",
-  "secs": 22.9
+  "secs": 28.2
  },
  "61016": {
   "score": 20504.0,
@@ -386,7 +386,7 @@
   "steps": 11996,
   "keys": 11996,
   "keyhash": "58c808c4a99b2171",
-  "secs": 10.5
+  "secs": 13.8
  },
  "61017": {
   "score": 5740.0,
@@ -409,7 +409,7 @@
   "steps": 9880,
   "keys": 9880,
   "keyhash": "cfcc3ba60b23c3f7",
-  "secs": 5.9
+  "secs": 8.0
  },
  "61018": {
   "score": 503.0,
@@ -432,7 +432,7 @@
   "steps": 7077,
   "keys": 7077,
   "keyhash": "21db3e1ec773c013",
-  "secs": 2.5
+  "secs": 3.5
  },
  "61019": {
   "score": 596.0,
@@ -455,7 +455,7 @@
   "steps": 2000,
   "keys": 2000,
   "keyhash": "7a67b77e600f0e67",
-  "secs": 1.4
+  "secs": 1.9
  },
  "61020": {
   "score": 6967.0,
@@ -478,7 +478,7 @@
   "steps": 8650,
   "keys": 8650,
   "keyhash": "575838ba90b245f9",
-  "secs": 5.8
+  "secs": 8.0
  },
  "61021": {
   "score": 1552.0,
@@ -501,7 +501,7 @@
   "steps": 5672,
   "keys": 5672,
   "keyhash": "db6b8347d26d82e5",
-  "secs": 3.8
+  "secs": 5.1
  },
  "61022": {
   "score": 16099.0,
@@ -524,7 +524,7 @@
   "steps": 20952,
   "keys": 20952,
   "keyhash": "007e92e6456fb1ca",
-  "secs": 13.4
+  "secs": 16.8
  },
  "61023": {
   "score": 34285.0,
@@ -547,30 +547,30 @@
   "steps": 21155,
   "keys": 21155,
   "keyhash": "d4e8f468472ff2e6",
-  "secs": 29.6
+  "secs": 38.1
  },
  "61024": {
-  "score": 53201.0,
-  "turns": 13475,
-  "max_depth": 19,
+  "score": 75946.0,
+  "turns": 20629,
+  "max_depth": 26,
   "xl": 11,
   "last_msgs": [
-   "The bugbear hits!  The vampire bat bites!  The vampire bat bites!",
-   "The earth elemental hits!",
-   "The earth elemental hits!",
-   "You hit the elf-lord!",
-   "You hit the elf-lord!",
-   "You hit the elf-lord!  The elf-lord swings his elven bow.",
-   "The elf-lord hits!  The elf-lord swings his elven bow.",
-   "The elf-lord hits!  The xan pricks your left leg!  The bugbear hits!",
-   "The vampire bat bites!  The vampire bat bites!  The succubus hits!",
-   "The succubus hits!  The earth elemental hits!"
+   "You can't take that off without taking off your cloak first.",
+   "You can't take that off without taking off your cloak first.",
+   "You miss the jabberwock.  The jabberwock bites!  The jabberwock bites!",
+   "The jabberwock hits!  The jabberwock hits!",
+   "What do you want to take off? [cluA or ?*]",
+   "You can't take that off without taking off your cloak first.",
+   "You can't take that off without taking off your cloak first.",
+   "You hit the jabberwock!  The jabberwock bites!  The jabberwock bites!",
+   "The jabberwock hits!  The jabberwock hits!  The jabberwock bites!",
+   "The jabberwock bites!"
   ],
   "truncated": false,
-  "steps": 19098,
-  "keys": 19098,
-  "keyhash": "c410925a729f5282",
-  "secs": 16.4
+  "steps": 43692,
+  "keys": 43692,
+  "keyhash": "cd413a79847f650a",
+  "secs": 38.8
  },
  "61025": {
   "score": 6116.0,
@@ -593,7 +593,7 @@
   "steps": 6653,
   "keys": 6653,
   "keyhash": "d12ab5331c2d115d",
-  "secs": 4.9
+  "secs": 6.9
  },
  "61026": {
   "score": 9018.0,
@@ -616,7 +616,7 @@
   "steps": 9388,
   "keys": 9388,
   "keyhash": "38c7d3c7c097afa3",
-  "secs": 8.1
+  "secs": 10.5
  },
  "61027": {
   "score": 11923.0,
@@ -639,7 +639,7 @@
   "steps": 10240,
   "keys": 10240,
   "keyhash": "2fb65ef11716063a",
-  "secs": 6.7
+  "secs": 9.7
  },
  "61028": {
   "score": 117753.0,
@@ -662,7 +662,7 @@
   "steps": 84101,
   "keys": 84101,
   "keyhash": "1d9a3f6690310d9d",
-  "secs": 192.9
+  "secs": 254.7
  },
  "61029": {
   "score": 1541.0,
@@ -685,7 +685,7 @@
   "steps": 3630,
   "keys": 3630,
   "keyhash": "9b84bc42d151e370",
-  "secs": 2.7
+  "secs": 3.8
  },
  "61030": {
   "score": 4804.0,
@@ -708,7 +708,7 @@
   "steps": 10124,
   "keys": 10124,
   "keyhash": "330b4105d16fb8c7",
-  "secs": 7.4
+  "secs": 10.6
  },
  "61031": {
   "score": 1962.0,
@@ -731,6 +731,6 @@
   "steps": 5766,
   "keys": 5766,
   "keyhash": "c26f5a3e17bce18e",
-  "secs": 4.0
+  "secs": 5.2
  }
 }
