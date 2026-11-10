@@ -34,6 +34,7 @@ ATTR_LOSS = ((re.compile(r"You feel (?:very )?weak!|You feel weaker!"), nh.NLE_B
              (re.compile(r"You feel (?:very )?repulsive!|You break out in hives!"), nh.NLE_BL_CHA))
 HORN_ATTR_TRIES = 6        # applies in a row that raised a lowered attribute not at all: given up (its maximum fell too,
                            # attrib.c adjattrib below ATTRMIN; sustain ability: apply.c Fixed_abil)
+POISON_MEAL_HP = 20        # a poisonous / acidic corpse eaten only above this HP: eat.c eatcorpse, rnd(15) damage
 WEAK_HUNGER = 3            # NLE_BL_HUNGER Weak and worse: Strength lowered for now (ATEMP, eat.c), no horn trouble
 
 # eat.c newuhs: the status line by u.uhunger
@@ -223,8 +224,10 @@ class SurvivalMixin:
             return True
         if f1 & M1_POIS and not f1 & M1_ACID and self.surv.poison_res:
             return True                       # poison resistant: a poisonous corpse is ordinary food
+        if f1 & M1_POIS and not f1 & M1_ACID and horn and self.opts.horn_poison_food:
+            return hp > POISON_MEAL_HP        # A/B horn_poison_food: the Strength it takes the horn mends (msg_survival)
         if f1 & (M1_POIS | M1_ACID):          # up to 15 damage: only when starving and healthy
-            return hunger >= WEAK and hp > 20
+            return hunger >= WEAK and hp > POISON_MEAL_HP
         return True
 
     def eat_corpse_here(self):
@@ -453,6 +456,12 @@ class SurvivalMixin:
             if f in self.surv.attr_seen and rx.search(m):
                 self.surv.attr_want[f] = max(self.surv.attr_want.get(f, 0), self.surv.attr_seen[f])
                 self.surv.horn_stats["attr_lost"] += 1
+        # A/B horn_poison_food: a poisonous corpse takes 1-4 Strength without a word of it (eat.c eatcorpse: losestr ->
+        # adjattrib msgflg 1); resistant, nothing is taken ("You seem unaffected") and attr_lowered finds nothing
+        f = nh.NLE_BL_STR125
+        if self.opts.horn_poison_food and "must have been poisonous" in m and f in self.surv.attr_seen:
+            self.surv.attr_want[f] = max(self.surv.attr_want.get(f, 0), self.surv.attr_seen[f])
+            self.surv.horn_stats["poison_meal"] += 1
         if "more confident in your" in m:
             self.surv.skill_msgs += 1
             self.surv.want_enhance = True
