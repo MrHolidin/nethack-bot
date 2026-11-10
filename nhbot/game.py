@@ -187,6 +187,27 @@ class GameMixin:
         self.settle()
         return True
 
+    def name_item(self, letter, name):
+        """#name one inventory object (C, "a particular object in inventory"): it then reads "... named <name>",
+        wherever it goes. True if the name was given."""
+        self.raw_step(ord("C"))
+        if "What do you want to name?" not in self.tty_text():
+            self.settle()
+            return False
+        self.raw_step(ord("i"))
+        if not self.obs["misc"][0]:
+            self.settle()
+            return False
+        self.raw_step(ord(letter))
+        if not self.obs["misc"][1]:
+            self.settle()                     # no name asked
+            return False
+        for c in name:
+            self.raw_step(ord(c))
+        self.raw_step(13)
+        self.settle()
+        return True
+
     def answer_yn(self, msg):
         m = msg.lower()
         if "offers" in m and "sell" in m:

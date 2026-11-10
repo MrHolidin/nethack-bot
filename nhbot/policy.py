@@ -91,6 +91,7 @@ HOUSEKEEPING = (
     ("altar", lambda b, c: b.altar_step(c.lv)),
     ("protection", lambda b, c: b.protection_step(c.lv)),
     ("box", lambda b, c: b.box_step(c.lv)),
+    ("bag_test", lambda b, c: b.bag_test_step(c.lv)),     # bag_store: an unknown bag told from a bag of tricks
     ("bag_in", lambda b, c: b.bag_in_step(c.lv)),         # bag_store: potions / scrolls nothing uses now, in the bag
     ("pile", lambda b, c: b.pile_to_inspect(c.lv, c.y, c.x) and b.armor_pickup_here(c.lv)),
 )

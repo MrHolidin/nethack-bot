@@ -277,6 +277,8 @@ class CarryMixin:
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None
         if bag is not None and bag.letter == it.letter:
             return True                      # gold_bag: the bag our gold goes in (nhbot.goldbag)
+        if c == nh.TOOL_CLASS and self.store_holds(it):
+            return True                      # bag_store: the bag our potions / scrolls are in (nhbot.bagstore)
         if c == nh.SCROLL_CLASS and any(n in s.replace("scrolls", "scroll") for n in FIND_SCROLLS) \
                 or c == nh.WAND_CLASS and "wand of digging" in s:
             return True                      # to find a vault and dig to it (nhbot.vault)

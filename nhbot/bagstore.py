@@ -2,14 +2,20 @@
 destroy only what is in the inventory (zap.c destroy_item walks invent; a container's contents are safe) -- and taken
 out when a use comes up: in a shop (sold, priced), on an altar with one of them untested (altar_step; they draw
 us to an altar as the inventory's do: altar_mask), Burdened (carry may drop
-them), or one in the bag that a step would now want (carry.needed, an untested scroll still to read). The bag is
-gold_bag's (nhbot.goldbag: never sold or dropped); a bag of holding only known not cursed (a cursed one loses what is
-in it: pickup.c boh_loss)."""
+them), or one in the bag that a step would now want (carry.needed, an untested scroll still to read).
+The bag: one known to be a container -- a sack / oilskin sack by name, a bag of holding, or a "bag" bag_test opened and
+named BAG_OK_NAME (all four bags look "bag"; a bag of tricks applied makes a monster: apply.c bagotricks); one that may
+be a bag of holding only known not cursed (a cursed one loses what is in it: pickup.c boh_loss). The bag holding our
+things stays the one used and is never dropped or sold (carry.needed: store_holds).
+bag_test: an unknown "bag" of ours told apart at once -- dropped on plain floor, #looted there (a bag of tricks only
+bites, d10, and becomes known: lock.c doloot; a container opens, and what lies in it that the floor rules want is
+taken out, as from a box), picked back up and, a container, named."""
 
 from collections import Counter
 
 import nle.nethack as nh
 
+from nhbot import glyphs as G
 from nhbot.altar import BUC_RE, buc_key
 from nhbot.consts import ALTAR_GLYPH
 from nhbot.items import Item
@@ -17,12 +23,16 @@ from nhbot.scrolls import TESTING_ENDS
 
 STORE_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS)
 STORE_MENU = ("Potions", "Scrolls")              # their lines in a container's "what type of objects?" menu
+BAG_OK_NAME = "ok"                               # bag_test: the name given to a "bag" that opened (#name, one object)
+BAG_TEST_HP = 15                                 # bag_test: only above this HP (a bag of tricks bites for d10)
 
 
 class BagStoreState:
     """State of the potions and scrolls kept in the bag (BagStoreMixin)."""
     def __init__(self):
         self.held = []                # (class, text) of what we put in and did not take out (texts as when put in)
+        self.bag_letter = None        # the letter of the bag they are in (while held)
+        self.test = None              # bag_test: (level key, square, phase "dropped" / "looted", it opened)
         self.stats = Counter()
 
 
@@ -34,12 +44,31 @@ class BagStoreMixin:
         """Game summary entries."""
         return {"bag_store": dict(self.bstore.stats, held=len(self.bstore.held))}
 
+    @staticmethod
+    def is_bag(it):
+        return it.ocls == nh.TOOL_CLASS and ("bag" in it.text or "sack" in it.text) and "tricks" not in it.text
+
+    def known_container(self, it):
+        """A bag of ours known to be a container we may keep things in (see the module notes)."""
+        if not self.is_bag(it) or it.cursed or it.unpaid:
+            return False
+        maybe_holding = "holding" in it.text or "sack" not in it.text      # a named "bag" may be one too
+        if not ("sack" in it.text or "holding" in it.text or f"named {BAG_OK_NAME}" in it.text):
+            return False
+        return not maybe_holding or "uncursed" in it.text or "blessed" in it.text
+
     def store_bag(self):
-        """gold_bag's bag, a bag of holding only if known uncursed / blessed; None: no such bag."""
-        bag = self.gold_bag()
-        if bag is None or "holding" in bag.text and "uncursed" not in bag.text and "blessed" not in bag.text:
-            return None
-        return bag
+        """The bag our things go in: the one holding them already, else the best known container (a bag of holding
+        first: it weighs less full). None: no such bag."""
+        if self.bstore.held:
+            return next((it for it in self.items() if it.letter == self.bstore.bag_letter and self.is_bag(it)), None)
+        bags = [it for it in self.items() if self.known_container(it)]
+        rank = lambda it: (0 if "holding" in it.text else 1 if "oilskin" in it.text else 2)  # noqa: E731
+        return min(bags, key=rank) if bags else None
+
+    def store_holds(self, it):
+        """carry.needed: the bag our things are in (never dropped, never sold)."""
+        return bool(self.bstore.held) and it.letter == self.bstore.bag_letter
 
     def storable(self, it):
         """A potion / scroll of ours no step is about to use: not unpaid, not carry.needed (healing, the good scrolls,
@@ -114,6 +143,8 @@ class BagStoreMixin:
         self.settle()
         left = {it.text for it in self.items()}
         moved = [(c, t) for t, c in texts.items() if t not in left]
+        if moved and not self.bstore.held:
+            self.bstore.bag_letter = bag.letter
         self.bstore.held += moved
         self.bstore.stats["put_in" if moved else "put_in_failed"] += 1
         self.bstore.stats["put_in_items"] += len(moved)
@@ -133,4 +164,103 @@ class BagStoreMixin:
         got = len(self.items()) - n0
         self.bstore.held = []                     # all of them out (what did not come is not there, as we know)
         self.bstore.stats["take_out" if got > 0 else "take_out_failed"] += 1
+        return True
+
+    # ------------------------------------------------------------ bag_test
+    def bag_unknown(self, it):
+        """A "bag" of ours that may be a bag of tricks: not known by name, not named by us."""
+        return self.is_bag(it) and not it.unpaid and "sack" not in it.text and "holding" not in it.text \
+            and "named" not in it.text and it.key not in self.bag.bad
+
+    def bag_test_step(self, lv):
+        """Housekeeping: tell an unknown bag of ours apart (module notes), one phase a tick -- drop, #loot, pick up
+        and name. A bag that holds our gold opened already: named at once. True if it used the turn."""
+        if not self.opts.bag_store:
+            return False
+        here = (lv.key, self.pos())
+        t = self.bstore.test
+        if t is not None:
+            if t[:2] != here:
+                self.bstore.test = None           # moved off: the bag stays there (the pile rules may take it again)
+                self.bstore.stats["test_left"] += 1
+                return False
+            if t[2] == "dropped":
+                opened = self.bag_loot_test()
+                self.bstore.test = here + ("looted", opened)
+                return True
+            return self.bag_test_pickup(t[3])
+        unknown = [it for it in self.items() if self.bag_unknown(it)]
+        if not unknown:
+            return False
+        gb = self.gold_bag()
+        for it in unknown:
+            if self.bag.gold > 0 and gb is not None and gb.letter == it.letter:
+                self.cur_act = "bag_test"
+                self.name_item(it.letter, BAG_OK_NAME)
+                self.bstore.stats["test_gold_named"] += 1
+                return False                      # naming costs no game time
+        cond = int(self.last_bl[nh.NLE_BL_CONDITION])
+        if lv.shop[self.pos()] or self.bl(nh.NLE_BL_HP) <= BAG_TEST_HP or self.poly_form() is not None \
+                or cond & (nh.BL_MASK_LEV | nh.BL_MASK_BLIND | nh.BL_MASK_HALLU) \
+                or G.KIND[int(self.terrain_glyphs(lv)[self.pos()])] != G.FLOOR:
+            return False
+        self.cur_act = "bag_test"
+        self.drop_units(unknown[0].letter)
+        self.bstore.test = here + ("dropped", None)
+        self.bstore.stats["test_dropped"] += 1
+        return True
+
+    def bag_loot_test(self):
+        """#loot the bag under us: True if it opened (a container: what the floor rules want taken out of it),
+        False if it bit (a bag of tricks, now known), None if neither."""
+        seq0 = self.msg_seq
+        self.cur_act = "bag_test"
+        self.press("#", expect_prompt=True)
+        for c in "loot":
+            self.raw_step(ord(c))
+        self.press(13, expect_prompt=True)
+        opened = took = False
+        for _ in range(12):
+            tty, msg = self.tty_text(), self.message()
+            if self.obs["misc"][0] and "loot it?" in msg:
+                self.press("y" if "bag" in msg else "n", expect_prompt=True)
+                continue
+            if "Do what with" in tty:
+                opened = True
+                if took:
+                    self.raw_step(27)
+                    break
+                took = True
+                self.raw_step(ord("o"))           # no "take out" line when it is empty: pressed again, closed
+                continue
+            if "Take out what type" in tty:
+                self.raw_step(ord("a"))
+                self.raw_step(13)
+                continue
+            if "Take out what?" in tty:
+                n = self.menu_pick("Take out what?", lambda x: self.take_reason(x) is not None)
+                self.bstore.stats["test_took"] += n
+                continue
+            break
+        self.settle()
+        said = self.text_since(seq0)
+        if "teeth" in said or "bites you" in said:
+            self.bstore.stats["test_tricks"] += 1
+            return False
+        if opened or "open the" in said or "is empty" in said:
+            self.bstore.stats["test_container"] += 1
+            return True
+        self.bstore.stats["test_unclear"] += 1
+        return None
+
+    def bag_test_pickup(self, opened):
+        """The tested bag picked back up; one that opened named BAG_OK_NAME. True (the turn used)."""
+        self.bstore.test = None
+        before = {it.letter for it in self.items()}
+        self.cur_act = "bag_test"
+        self.pickup(lambda x: ("bag" in x or "sack" in x) and "for sale" not in x, "bag_test")
+        new = [it for it in self.items() if it.letter not in before and self.is_bag(it) and "named" not in it.text]
+        if opened and len(new) == 1:
+            self.name_item(new[0].letter, BAG_OK_NAME)
+            self.bstore.stats["test_named"] += 1
         return True
