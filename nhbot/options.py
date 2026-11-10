@@ -22,6 +22,8 @@ DEFAULTS = {
     "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
                                #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
+    "desperate_all": False,    # A/B: on a desperate level (at desperate_melee_hp and up) melee every kind, the
+                               #      always-avoided ones too (perception.may_melee)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified

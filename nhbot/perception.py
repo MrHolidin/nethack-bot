@@ -345,10 +345,11 @@ class PerceptionMixin:
         anything not never_melee; a never-melee one only on a desperate level at 90% of max HP or more (not the
         always-avoided ones), a gas spore above its explosion (spore_ok). One we may not hit is walked round (avoid_cells)
         -- exactly then, so explore never walks into one the melee step refuses (before, a desperate level dropped it
-        from avoid_cells at any HP). (A/B melee_policy: -413 [-942, +116], median 7567 -> 7540, 103 of 1000 changed)"""
+        from avoid_cells at any HP). (A/B melee_policy: -413 [-942, +116], median 7567 -> 7540, 103 of 1000 changed)
+        A/B desperate_all: the always-avoided kinds too on a desperate level (a floating eye blocking the only way on)."""
         if not self.never_melee(name):
             return True
-        return (lv.desperate and name not in self.always_avoid()
+        return (lv.desperate and (self.opts.desperate_all or name not in self.always_avoid())
                 and not self.hp_below(self.opts.desperate_melee_hp)) or self.spore_ok(name)
 
     def spore_ok(self, name):
