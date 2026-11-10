@@ -16,6 +16,8 @@ gives it unlimited use of them):
   missiles  "The X shoots / throws 2 orcish arrows!": the kind, the volley sizes seen, poisoned or not;
   breath    "The X breathes ...": its breath attack (monattacks).
 """
+from collections import Counter
+
 import numpy as np
 
 from nhbot import glyphs as G
@@ -24,6 +26,7 @@ from nhbot.monsters import PM_BY_NAME
 
 ACTIVE_RECENT = 3            # turns: a move toward us this lately counts
 TRACK_FORGET = 10            # turns a track is kept unseen
+HOLD_TURNS = 10              # hold_position: turns at most waiting on the spot for the threats in view
 WAND_KINDS = ("striking", "magic missile", "fire", "cold", "sleep", "lightning", "death")
 
 
@@ -44,6 +47,8 @@ class ThreatState:
         self.mon_tracks = []         # dicts: name, pos, seen, closer (turn), attacked (turn)
         self.tracks_key = None       # the level the tracks are on
         self.zapper = None           # (turn, track) that zapped an unknown wand: its effect names the kind
+        self.hold_since = None       # hold_position: the turn we began waiting for the threats in view
+        self.hold_stats = Counter()
 
 
 class ThreatMixin:
@@ -124,6 +129,29 @@ class ThreatMixin:
         if tr is None or not (tr["wands"] or tr["missile"] or tr["breath"]):
             return None
         return {"wands": sorted(tr["wands"]), "missile": tr["missile"], "breath": tr["breath"]}
+
+    def hold_step(self, lv):
+        """A/B hold_position: monsters in view coming for us (active_threat), none of them seen to shoot, zap or
+        breathe (ranged_profile) -- wait for them on the spot ("s"), HOLD_TURNS turns at most till none is in view
+        any more; one next to us we can hit is the melee step's (before this one). True if it waited."""
+        th = [p for p, _ in self.visible_hostiles(lv) if self.active_threat(p)]
+        st = self.threats
+        if not th:
+            st.hold_since = None
+            return False
+        if any(self.ranged_profile(p) for p in th):
+            st.hold_stats["shot"] += 1
+            return False
+        t = self.turn()
+        if st.hold_since is None:
+            st.hold_since = t
+            st.hold_stats["holds"] += 1
+        if t - st.hold_since >= HOLD_TURNS:
+            return False
+        st.hold_stats["waits"] += 1
+        self.cur_act = "hold"
+        self.press("s")
+        return True
 
     def active_threat(self, pos):
         """The monster at pos is coming for us (module docstring)."""

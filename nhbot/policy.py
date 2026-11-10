@@ -52,6 +52,7 @@ STEPS = (
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
+    "hold",              # hold_position: threats coming that never shot -- wait for them on the spot (threats.hold_step)
     "dig_through",       # dig_through: the corner of a refused squeeze / a boulder that won't move, dug (nhbot.digthrough)
     "rock_dig",          # gold / gems seen inside rock dug out (nhbot.rockdig)
     "ammo_here",
@@ -374,6 +375,9 @@ class PolicyMixin:
         self.cur_act = "rest"
         self.search_turns(20)
         return True
+
+    def step_hold(self, c):
+        return self.opts.hold_position and self.hold_step(c.lv)
 
     def step_throw_at_blocker(self, c):
         """Ranged attacks on things we refuse to melee."""
