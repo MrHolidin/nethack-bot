@@ -73,6 +73,7 @@ STEPS = (
 # step_housekeeping: (name, job(bot, tick) -> True if it acted), in order -- with no hostile in view
 HOUSEKEEPING = (
     ("pay", lambda b, c: b.pay_step()),
+    ("bag_out", lambda b, c: b.bag_out_step(c.lv)),       # bag_store: before what sells, prices, BUC-tests
     ("tin_wait", lambda b, c: b.tin_wait_step(c.lv)),
     ("shop", lambda b, c: b.shop_step(c.lv)),
     ("fountain_plan", lambda b, c: b.fountain_plan_step(c.lv)),
@@ -90,6 +91,7 @@ HOUSEKEEPING = (
     ("altar", lambda b, c: b.altar_step(c.lv)),
     ("protection", lambda b, c: b.protection_step(c.lv)),
     ("box", lambda b, c: b.box_step(c.lv)),
+    ("bag_in", lambda b, c: b.bag_in_step(c.lv)),         # bag_store: potions / scrolls nothing uses now, in the bag
     ("pile", lambda b, c: b.pile_to_inspect(c.lv, c.y, c.x) and b.armor_pickup_here(c.lv)),
 )
 HOUSEKEEPING_CALM = ("loot", "pile")    # hostiles in view, but none in reach and nobody shooting (items_gate)

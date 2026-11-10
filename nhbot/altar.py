@@ -150,7 +150,7 @@ class AltarMixin:
             out = alt & False
             out[dropped[1]] = True
             return out
-        return alt if self.altar_untested() else alt & False
+        return alt if self.altar_untested() or self.store_untested() else alt & False
 
     def altar_step(self, lv):
         """On an altar, nothing threatening us (the caller checks): pick back up what we dropped, else drop the

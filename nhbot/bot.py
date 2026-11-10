@@ -20,6 +20,7 @@ from nhbot.charges import WandChargeMixin
 from nhbot.threats import ThreatMixin
 from nhbot.goals import GoalsMixin
 from nhbot.goldbag import GoldBagMixin
+from nhbot.bagstore import BagStoreMixin
 from nhbot.mapmem import MapMixin
 from nhbot.nav import NavMixin
 from nhbot.options import Options
@@ -60,7 +61,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, MinesMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
-          SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
+          SacrificeMixin, SokobanMixin, GoldBagMixin, BagStoreMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
           LuckstoneMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
@@ -110,6 +111,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         self.excal_init()
         self.thieves_init()
         self.goldbag_init()
+        self.bagstore_init()
         self.vault_init()
         self.digging_init()
         self.dig_through_init()
@@ -219,6 +221,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             "zaps": self.acts.zaps, "zap_stats": dict(self.combat.zap_stats), "wishes": self.equip.wishes, **self.wishing_summary(), "ray_risk": {"counts": dict(self.combat.ray_risk_stats), "log": self.combat.ray_risk_log}, "wand_pwin_log": self.combat.wand_pwin_log, **self.wandid_summary(), "danger": self.danger_summary(), "descent_rest": sum(self.expl.descent_rest.values()), "revisit": dict(self.expl.revisit_stats), "tins": dict(self.tin.stats), **self.altar_summary(), **self.potiontest_summary(), **self.jewelry_summary(), "browse": dict(self.shop.browse_stats), **self.gift_summary(), "tins_eaten": dict(self.tin.eaten_by),
             "thefts": self.thief.thefts, "gold_flow": dict(self.thief.gold_flow), "poly": dict(self.thief.poly_stats), "gold_by_xl": self.thief.gold_xl,
             **self.goldbag_summary(),
+            **self.bagstore_summary(),
             "elb_engraves": self.elb.engraves,
             "elb_misspelled": self.elb.misspelled,
             "elb_fail": self.elb.fail,
