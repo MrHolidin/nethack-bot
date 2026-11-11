@@ -130,8 +130,17 @@ class DeepMixin:
     def explore(self, lv):
         """explore.explore; first, on a deep level of the main dungeon: is this Medusa's level (told as soon as its
         water shows: the stairs up from below are closed at once), are we past it (summary)."""
+        st = self.deep
+        if self.opts.farm_dlvl and lv.key == (0, self.opts.farm_dlvl):
+            # farm_dlvl (a probe): this level is held, by the patrol, until farm_keys keys are spent
+            if self.steps < self.opts.farm_keys:
+                if st.above != lv.key:
+                    st.above = lv.key
+                    self.deep_mark("farm")
+            elif st.above == lv.key:
+                st.above = None
+                self.deep_mark("farm_end")
         if self.deep_on() and lv.key[0] == 0 and lv.key[1] >= MEDUSA_MIN:
-            st = self.deep
             if lv.key not in st.kind:
                 self.water_dead_end(lv, self.grids(lv)[0])
             past = any(k == "medusa" and key[1] < lv.key[1] for key, k in st.kind.items())
@@ -144,7 +153,7 @@ class DeepMixin:
     def search_mode(self, lv, grids):
         """explore has nothing left on this level but walls to search: at a water dead end, the hole / the way
         back up / the shaft / the patrol instead (dead_end_step)."""
-        if self.deep_on() and self.dead_end_step(lv, grids):
+        if (self.deep_on() or self.deep.above == lv.key) and self.dead_end_step(lv, grids):
             return
         super().search_mode(lv, grids)
 
@@ -211,7 +220,7 @@ class DeepMixin:
         if st.above == lv.key:
             if self.opts.medusa_dig and self.shaft_step(lv, grids):
                 return True
-            if self.opts.dead_end_patrol:
+            if self.opts.dead_end_patrol or self.opts.farm_dlvl:
                 return self.patrol_step(lv, grids)
             st.above = None                           # no shaft to take: as before (down again, the walls searched)
             return False

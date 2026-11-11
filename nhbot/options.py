@@ -32,6 +32,9 @@ DEFAULTS = {
     "dead_end_patrol": False,  # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
                                #      back up the stairs and a patrol of the level above for the rest of the game
                                #      (nhbot.deep)
+    "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol
+                               #      of dead_end_patrol) until farm_keys keys are sent; 0: off (nhbot.deep)
+    "farm_keys": 150_000,
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
