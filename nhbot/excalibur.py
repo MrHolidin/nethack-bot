@@ -299,7 +299,9 @@ class ExcaliburMixin:
                 if best is None or near < best[0]:
                     best = (near, (ny, nx))
         if best is None:
-            self.dip_trouble_end("no_square")
+            # boxed in (the moccasins come out around us, fountain.c dowatersnakes): this tick fights, a square
+            # may free up next
+            self.excal.trouble_stats["boxed"] += 1
             return False
         self.excal.trouble_stats["step_off"] += 1
         self.cur_act = "dipflee"
