@@ -29,6 +29,7 @@ def line_clear(k_mem, glyphs, y, x, dy, dx, d):
 _W = COLS + 2
 _N = (ROWS + 2) * _W
 _STEPS = tuple((dy * _W + dx, bool(dy and dx)) for dy, dx in NEIGH)
+_ORTHO_STEPS = tuple(s for s in _STEPS if not s[1])     # from a door: no diagonal step out
 _INF = 1 << 30
 _STEP_COST = np.ones(256, dtype=np.int64)           # cost of stepping into a square, by remembered kind
 _STEP_COST[G.TRAP], _STEP_COST[G.BOULDER], _STEP_COST[G.DOOR_CLOSED] = 40, 15, 3
@@ -116,11 +117,12 @@ class NavMixin:
                 break
             if d > max_cost:
                 break
-            di = door[i]
-            for off, diag in _STEPS:
+            # (the order neighbours are relaxed in changes nothing: each is relaxed once per pop, and the heap
+            # pops by (cost, index) alone -- so a door square skips its diagonals in one test)
+            for off, diag in (_ORTHO_STEPS if door[i] else _STEPS):
                 j = i + off
                 c = cost[j]
-                if c < 0 or (diag and (di or door[j])):
+                if c < 0 or (diag and door[j]):
                     continue
                 nd = d + c
                 # (A/B squeeze_path -- heavy, a rock-to-rock diagonal costs 100 more: -3571 [-5255, -1958], 6603)

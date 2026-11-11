@@ -36,8 +36,8 @@ import nle.nethack as nh
 from nhbot.carry import WEAPON_NAME_OF
 from nhbot.events import ItemDestroyed, MonMelee, MonWeapon
 from nhbot.fightmodel import (FIRE_PILLAR, LIGHTNING, PACK_CLASSES, RAY_DESTROY, RESIST_OF, SPELL_DESTROY, ac_reduce,
-                              cast_chance, cast_profile, hp_prior, melee_destroy_events, pack_destroy, spell_picks,
-                              uncancelled)
+                              cast_chance, cast_profile, dice, hp_prior, melee_destroy_events, pack_destroy,
+                              spell_picks, uncancelled)
 from nhbot.items import base_name, erosion, singular_name
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_REGEN, PM_BY_NAME, PM_INDEX, PM_INDICES
@@ -66,20 +66,16 @@ CLASS_NAME = {nh.POTION_CLASS: "potion", nh.SCROLL_CLASS: "scroll", nh.SPBOOK_CL
               nh.WAND_CLASS: "wand", nh.RING_CLASS: "ring"}
 RAY_OF_AD = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning"}     # a breath that is a ray destroy_item follows
 WIN_SIMS = 200                   # win_prob: sampled fights
+WIN_MEMO_MAX = 4096              # win_prob: fights remembered (all forgotten when full)
+UNIFORM_BLOCK = 1024            # Uniforms: doubles drawn from numpy at a time
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
 P_EDGES = (0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.01)
 
 
 def dice_pmf(n, d):
-    p = np.zeros(n * d + 1)
-    p[0] = 1.0
-    for _ in range(n):
-        q = np.zeros(len(p) + d)
-        for k in range(1, d + 1):
-            q[k:k + len(p)] += p / d
-        p = q[:n * d + 1] if len(q) > n * d + 1 else q
-    return p
+    """The pmf of the sum of n d-sided dice (fightmodel.dice, cached; a fresh array)."""
+    return dice(n, d)
 
 
 def conv(a, b):
@@ -118,9 +114,34 @@ def cdf_draw(rng, cdf):
     return bisect_right(cdf, rng.random())
 
 
-def cdf_draws(rng, cdf, n):
-    """int(rng.choice(len(p), size=n, p=p).sum()) for cdf = pmf_cdf(p): the same n uniform draws."""
-    return sum(bisect_right(cdf, u) for u in rng.random(n))
+def rng_key(rng):
+    """The state of a numpy Generator (PCG64) as a hashable value."""
+    st = rng.bit_generator.state
+    return st["state"]["state"], st["state"]["inc"], st["has_uint32"], st["uinteger"]
+
+
+class Uniforms:
+    """The doubles successive rng.random() calls would give, drawn UNIFORM_BLOCK at a time (one call of numpy per
+    block instead of one per draw: win_prob's draws were most of a long game's time). close() leaves rng exactly
+    where those single calls would have: the state from before, advanced by the draws used (random(n) gives the
+    same doubles as n calls of random())."""
+    __slots__ = ("rng", "state", "buf", "i", "used")
+
+    def __init__(self, rng):
+        self.rng, self.state = rng, rng.bit_generator.state
+        self.buf, self.i, self.used = [], 0, 0
+
+    def next(self):
+        if self.i == len(self.buf):
+            self.used += len(self.buf)
+            self.buf, self.i = self.rng.random(UNIFORM_BLOCK).tolist(), 0
+        self.i += 1
+        return self.buf[self.i - 1]
+
+    def close(self):
+        self.rng.bit_generator.state = self.state
+        if self.used + self.i:
+            self.rng.random(self.used + self.i)
 
 class FightMon(NamedTuple):
     """One monster of a fight win_prob samples."""
@@ -167,6 +188,8 @@ class DangerState:
         self.pending = None                      # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
+        self.tables, self.tables_at = {}, None   # fight_tables: this tick's monster tables, and (tick, steps)
+        self.win_memo = {}                       # win_prob: simple-model fight key -> (wins, win_rng state after)
         self.mean = defaultdict(lambda: [0, 0.0, 0.0])           # bin -> [n, sum predicted, sum actual]
         self.p = defaultdict(lambda: [0, 0.0, 0])                # bin -> [n, sum predicted, deaths]
         # item-loss statistics (items_tick): the item loss predicted for the next turn, scored like pending
@@ -210,7 +233,25 @@ class DangerMixin:
             p += min(max(tmp - 1, 0), n) / n
         return p / len(acs)
 
+    def fight_tables(self, kind, compute, *args):
+        """compute(*args) once per tick and observation (a key sent or a new tick computes again): the fight tables
+        (monster_turn_pmf, monster_round) read our state -- AC, level, resistances, pack, what monsters wield --
+        which only a key (and the messages after it) or a tick's trackers change; win_prob asks them for every
+        hostile in view, for prey_mask and wand_ev_pairs and danger_tick alike. Shared: never changed by callers."""
+        at = (self.pol.tick_no, self.steps)
+        if self.danger.tables_at != at:
+            self.danger.tables, self.danger.tables_at = {}, at
+        key = (kind,) + args
+        got = self.danger.tables.get(key)
+        if got is None:
+            got = self.danger.tables[key] = compute(*args)
+        return got
+
     def monster_turn_pmf(self, name, bonus=0, hurt=False):
+        """monster_turn_pmf_now, once per tick and observation (fight_tables)."""
+        return self.fight_tables("turn", self.monster_turn_pmf_now, name, bonus, hurt)
+
+    def monster_turn_pmf_now(self, name, bonus=0, hurt=False):
         """(damage pmf of one action of this monster, P(instant death) per action); bonus: to its to-hit. Each hit's
         damage less rnd(-AC) at a negative AC (fightmodel.ac_reduce), a weapon attack of a kind we saw hit / miss
         without swinging one: its own dice only (mon_unarmed), its spells (AT_MAGC: fightmodel.cast_chance /
@@ -343,6 +384,10 @@ class DangerMixin:
         return out
 
     def monster_round(self, name, hurt=False):
+        """monster_round_now, once per tick and observation (fight_tables)."""
+        return self.fight_tables("round", self.monster_round_now, name, hurt)
+
+    def monster_round_now(self, name, hurt=False):
         """(damage pmf, P(instant death)) of this monster's actions in one game turn (mcalcmove); hurt:
         monster_turn_pmf's."""
         pm = PM_BY_NAME.get(name)
@@ -568,15 +613,33 @@ class DangerMixin:
         zrng = self.danger.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
+        # the simple model is a function of its tables, our HP and speed and the generator's state alone: the same
+        # fight again (prey_win asks of every hostile in view every tick, the state restored) is looked up, with
+        # where it left the generator
+        memo_key = None
+        if approach is None and opening is None:
+            memo_key = (hp0, sp, sims, max_turns, rng_key(rng),
+                        tuple((m.hits, m.hit, m.inst, tuple(cdfs[id(m.hp)]), tuple(cdfs[id(m.dmg)]),
+                               tuple(cdfs[id(m.rnd)])) for m in mons))
+            got = self.danger.win_memo.get(memo_key)
+            if got is not None:
+                rng.bit_generator.state = got[1]
+                return got[0] / sims
+        # the simple model draws only rng.random(): those come in blocks (Uniforms); walk_fight draws integers too
+        uniforms = Uniforms(rng) if approach is None else None
+        rnd = uniforms.next if uniforms is not None else rng.random
+        hp_draw = [(cdfs[id(m.hp)], cdfs[id(m.dmg)], m.hits) for m in mons]
+        our_blow = [(m.hit, cdfs[id(m.dmg)]) for m in mons]         # the simple model's tables, by monster
+        its_round = [(m.inst, cdfs[id(m.rnd)]) for m in mons]
         wins = 0
         for _ in range(sims):
             hps = []
             hcap = []
-            for dmg, hits, prior in ((m.dmg, m.hits, m.hp) for m in mons):
+            for prior, dmg, hits in hp_draw:
                 for _try in range(20):
-                    h = full = cdf_draw(rng, cdfs[id(prior)])
-                    if hits:
-                        h -= cdf_draws(rng, cdfs[id(dmg)], hits)
+                    h = full = bisect_right(prior, rnd())
+                    for _h in range(hits):
+                        h -= bisect_right(dmg, rnd())
                     if h > 0:
                         break
                 hps.append(max(h, 1))
@@ -589,13 +652,14 @@ class DangerMixin:
                     wins += TAINTED_WIN if tainted else 1
                 continue
             for _turn in range(max_turns):
-                acts = k + (1 if frac and rng.random() < frac / 12 else 0)
+                acts = k + (1 if frac and rnd() < frac / 12 else 0)
                 for _a in range(acts):
                     if not alive:
                         break
                     j = alive[0]
-                    hit = rng.random() < mons[j].hit
-                    d = cdf_draw(rng, cdfs[id(mons[j].dmg)]) if hit else 0
+                    p_hit, dmg = our_blow[j]
+                    hit = rnd() < p_hit
+                    d = bisect_right(dmg, rnd()) if hit else 0
                     if opening is not None and _turn == 0 and _a == 0:
                         lost, asleep, _ = opening(zrng, *opening_hooks(index, alive, hps))
                         hp -= lost
@@ -612,14 +676,21 @@ class DangerMixin:
                 if hp <= 0:
                     break
                 for j in alive:
-                    if rng.random() < mons[j].inst:
+                    p_inst, rnd_cdf = its_round[j]
+                    if rnd() < p_inst:
                         hp = 0
                         break
-                    hp -= cdf_draw(rng, cdfs[id(mons[j].rnd)])
+                    hp -= bisect_right(rnd_cdf, rnd())
                 if hp <= 0:
                     break
             if hp > 0:
                 wins += 1
+        if uniforms is not None:
+            uniforms.close()
+        if memo_key is not None:
+            if len(self.danger.win_memo) >= WIN_MEMO_MAX:
+                self.danger.win_memo.clear()
+            self.danger.win_memo[memo_key] = (wins, rng.bit_generator.state)
         return wins / sims
 
     def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs, plans=None, hcap=None,

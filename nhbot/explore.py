@@ -241,6 +241,8 @@ class ExploreMixin:
         next to it (do.c u_collide_m, no message). So a noted square the map shows as that staircase -- or a
         boulder on it -- is it; one that shows something else stands for the staircases of that kind next to it.
         Squares where the game said there is no staircase (Level.not_stairs) never count."""
+        if not marks:
+            return set()                      # (mines_stairs asks of every main level every tick: kinds not needed)
         k_mem = self.kinds(lv)
         out = set()
         for p in marks:
