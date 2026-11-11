@@ -102,6 +102,10 @@ class PaceMixin:
             self.pace.hold = dict(key=list(lv.key), depth=int(self.bl(nh.NLE_BL_DEPTH)), start=self.pace_now())
         return True
 
+    def pace_holding(self, lv):
+        """A hold is on at this level's gate (it began when pace_gate first found it closed; no side effect)."""
+        return self.pace.hold is not None and self.pace.hold["key"] == list(lv.key)
+
     def pace_prayer_ahead(self):
         """pace_pray: the prayer we will say when Weak (step_pray) comes at least pace_pray turns after the last one
         -- late enough to be safe (pray.c can_pray: major trouble is helped while u.ublesscnt <= 200, set to

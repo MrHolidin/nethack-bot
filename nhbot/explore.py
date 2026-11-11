@@ -86,9 +86,10 @@ class ExploreMixin:
             if self.mines_return_step(lv, grids):
                 return
         if want_down and not diving \
-                and on_level <= self.opts.descend_after:
+                and (on_level <= self.opts.descend_after or self.pace_holding(lv)):
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
+            # (held at the pace gate: at any time -- what our kills there drop)
             stuff = np.zeros_like(gold)
             for kind, m in self.goal_masks(lv, passable, gold).items():
                 if kind in GOALS and GOALS[kind].holds_descent:
