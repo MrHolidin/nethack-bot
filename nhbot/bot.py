@@ -53,6 +53,7 @@ from nhbot.digthrough import DigThroughMixin
 from nhbot.rockdig import RockDigMixin
 from nhbot.locktools import LockToolMixin
 from nhbot.luckstone import LuckstoneMixin
+from nhbot.retreat import RetreatMixin
 
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
@@ -62,7 +63,7 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
-          LuckstoneMixin):
+          LuckstoneMixin, RetreatMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc",
                 "tty_cursor")
 
@@ -119,6 +120,7 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
         self.lock_init()
         self.luckstone_init()
         self.deep_init()
+        self.retreat_init()
         self.weapons_init()
         self.elbereth_init()
         self.shop_init()
@@ -302,7 +304,7 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
             "shops": self.shop.seen,
             "desperate": self.pol.desperations,
             "unblock": [self.combat.unblocks, self.combat.unblock_throws],
-            "vault": [self.surv.vault_drops, self.surv.vault_moves, self.surv.vault_approach, self.surv.vault_bag_outs], **self.vault_summary(), **self.dig_through_summary(), **self.rock_dig_summary(), **self.lock_summary(), **self.luckstone_summary(), **self.deep_summary(), "stun_peace_waits": self.pol.stun_peace_waits,
+            "vault": [self.surv.vault_drops, self.surv.vault_moves, self.surv.vault_approach, self.surv.vault_bag_outs], **self.vault_summary(), **self.dig_through_summary(), **self.rock_dig_summary(), **self.lock_summary(), **self.luckstone_summary(), **self.deep_summary(), **self.retreat_summary(), "stun_peace_waits": self.pol.stun_peace_waits,
             "items_first": self.expl.items_first_holds,
             **self.hidden_summary(),
             "mines_return_descents": self.mines.return_descents,
