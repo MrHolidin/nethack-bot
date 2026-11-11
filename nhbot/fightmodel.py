@@ -55,6 +55,12 @@ def skill_bonus(level):
 
 
 def dice(n, d):
+    """The pmf of the sum of n d-sided dice: a fresh array (the cached table is shared)."""
+    return _dice(n, d).copy()
+
+
+@lru_cache(maxsize=None)
+def _dice(n, d):
     p = np.zeros(n * d + 1)
     p[0] = 1.0
     for _ in range(n):
