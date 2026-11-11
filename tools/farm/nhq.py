@@ -115,7 +115,8 @@ class Job:
         os.makedirs(self.parts, exist_ok=True)
         seeds = list(range(spec["start"], spec["start"] + spec["n"]))
         self.todo = [s for s in seeds if not os.path.exists(self.part(s))]
-        self.n, self.running, self.t0 = len(seeds), {}, time.time()
+        self.n, self.running, self.t0 = len(seeds), {}, spec.get("submitted", time.time())
+        self.owner = tag.split("_")[0]               # the agent: the tag's prefix
         for s in list(self.todo):                    # games of the daemon before us: adopt the live ones
             try:
                 pid, t = open(self.pid_file(s)).read().split()
@@ -206,12 +207,30 @@ def daemon(a):
                 j.finish()
                 del jobs[tag]
                 print(time.strftime("%H:%M:%S"), "done", tag, flush=True)
+        for f in glob.glob(os.path.join(Q, "*.prio")):          # nhq prio TAG N
+            tag = os.path.basename(f)[:-5]
+            try:
+                if tag in jobs:
+                    jobs[tag].spec["prio"] = int(open(f).read())
+                    with open(os.path.join(Q, tag + ".json.tmp"), "w") as g:
+                        json.dump(jobs[tag].spec, g)
+                    os.rename(os.path.join(Q, tag + ".json.tmp"), os.path.join(Q, tag + ".json"))
+            except ValueError:
+                pass
+            os.remove(f)
+        share = {}
+        for j in jobs.values():
+            share[j.owner] = share.get(j.owner, 0) + len(j.running)
         busy, limit = sum(len(j.running) for j in jobs.values()), workers()
         while busy < limit:
             cand = [j for j in jobs.values() if j.todo]
             if not cand:
                 break
-            min(cand, key=lambda j: (j.spec["prio"], len(j.running), j.t0)).start()
+            # the lowest prio number; among equals the owner (agent) with the fewest games running, and of its
+            # jobs the oldest: an agent's screens run one after another, so its first answer comes soon
+            j = min(cand, key=lambda j: (j.spec["prio"], share.get(j.owner, 0), j.t0))
+            j.start()
+            share[j.owner] = share.get(j.owner, 0) + 1
             busy += 1
         st = {"t": time.time(), "workers": limit, "busy": busy,
               "jobs": [{"tag": j.tag, "prio": j.spec["prio"], "n": j.n, "running": len(j.running),
@@ -254,6 +273,12 @@ def wait(a):
 
 def cancel(a):
     open(os.path.join(Q, a.tag + ".cancel"), "w").close()
+
+
+def prio(a):
+    with open(os.path.join(Q, a.tag + ".prio.tmp"), "w") as f:
+        f.write(str(a.n))
+    os.rename(os.path.join(Q, a.tag + ".prio.tmp"), os.path.join(Q, a.tag + ".prio"))
 
 
 def run(a):
@@ -406,6 +431,7 @@ def main():
     sub.add_parser("status").set_defaults(f=status)
     p = sub.add_parser("wait"); p.add_argument("tags", nargs="+"); p.set_defaults(f=wait)
     p = sub.add_parser("cancel"); p.add_argument("tag"); p.set_defaults(f=cancel)
+    p = sub.add_parser("prio"); p.add_argument("tag"); p.add_argument("n", type=int); p.set_defaults(f=prio)
     p = sub.add_parser("ls"); p.add_argument("-n", type=int, default=40); p.set_defaults(f=ls)
     p = sub.add_parser("show"); p.add_argument("tag"); p.set_defaults(f=show)
     p = sub.add_parser("cmp"); p.add_argument("a"); p.add_argument("b"); p.set_defaults(f=cmp)
