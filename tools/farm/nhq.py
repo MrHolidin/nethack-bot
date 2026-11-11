@@ -385,8 +385,8 @@ def cmp(a):
     same = sum(A[s]["score"] == B[s]["score"] and A[s].get("turns") == B[s].get("turns") for s in seeds)
     print("  games changed: %d of %d" % (len(seeds) - same, len(seeds)))
     ca, cb = (collections.Counter(cause(X[s]) for s in seeds) for X in (A, B))
-    top = sorted(set(ca) | set(cb), key=lambda c: -abs(cb[c] - ca[c]))[:6]
-    print("  death causes changed most (A -> B): " + ", ".join("%s %d->%d" % (c, ca[c], cb[c]) for c in top))
+    top = [c for c in sorted(set(ca) | set(cb), key=lambda c: -abs(cb[c] - ca[c]))[:6] if ca[c] != cb[c]]
+    print("  death causes changed most (A -> B): " + (", ".join("%s %d->%d" % (c, ca[c], cb[c]) for c in top) or "none"))
     ma, mb = numbers([A[s] for s in seeds]), numbers([B[s] for s in seeds])
     print("  keys/game %.0f -> %.0f   secs/game %.0f -> %.0f" % (ma["steps"], mb["steps"], ma["secs"], mb["secs"]))
 
