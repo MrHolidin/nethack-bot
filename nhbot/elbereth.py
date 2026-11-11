@@ -187,6 +187,12 @@ class ElberethMixin:
                         return self.elb_write(lv)
                 self.elb.turns += 1
                 self.cur_act = "rest"
+                if self.opts.elb_rest_count and not visible and not hostiles:
+                    # nothing in view: a counted search -- the game stops it for a monster that ignores Elbereth (or
+                    # finds it worn off), not for one it scares (monmove.c dochugw: !onscary), and at full HP
+                    left = self.opts.elb_max - (self.turn() - st["since"])
+                    self.search_turns(max(1, min(self.opts.elb_rest_count, left)))
+                    return True
                 self.press("s")
                 return True
         if not self.elb_wanted(lv, hostiles):

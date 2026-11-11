@@ -29,6 +29,9 @@ DEFAULTS = {
     "peace_cache": 0,          # A/B: a look (';') telling a monster peaceful or not holds this many turns (0: the turn
                                #      only) -- for the monster on that square, or followed to a square within 2 when no
                                #      other one of its glyph is near (perception.peace_followed); looks cost 3-15 keys
+    "elb_rest_count": 0,       # A/B: resting on our Elbereth with nothing in view, search this many turns at once
+                               #      ("20s"; the game stops it for a monster that ignores Elbereth) instead of one a tick
+                               #      with a ':' read every 4 (0: off)
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
