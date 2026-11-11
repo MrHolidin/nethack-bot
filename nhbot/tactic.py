@@ -33,8 +33,8 @@ from nhbot.monsters import PM_BY_NAME
 
 OPTIONS = ("default", "melee", "pray", "elbereth", "quaff", "zap", "up", "down", "retreat")
 MACROS = ("up", "down")
-STAIR_TICKS = 14           # ticks at most a forced walk to a staircase lasts
-STAIR_COST = 40            # ... and the path cost at most at which a staircase is an option
+STAIR_TICKS = 10           # ticks at most a forced walk to a staircase lasts
+STAIR_COST = 15            # ... and the path cost at most at which a staircase is an option
 WIN_SIMS = 100             # sampled fights of the win_prob feature (its own generator: never danger.win_rng)
 NEIGH = [d for d in DELTA2KEY]
 
@@ -54,14 +54,22 @@ class TacticMixin:
         self.tac = TacticState()
         if self.opts.tactic_model:
             self.tactic_load(self.opts.tactic_model)
+        if self.opts.rollout:
+            from tools.rollout.collect import Collector       # experiments only: forks the process
+            cfg = dict(self.opts.rollout)
+            out = cfg.pop("out")
+            os.makedirs(out, exist_ok=True)
+            Collector(self, os.path.join(out, f"{self.seed}.jsonl"), **cfg)
 
     # ------------------------------------------------------------------ the step
     def tactic_step(self, c):
         tac = self.tac
         if tac.forced is not None:
+            # a macro in progress goes on -- unless our HP is critically low: the emergencies (prayer, a potion)
+            # come first again (the pilot's 'up' walked 10+ turns with a fox biting from behind and died unprayed)
             name, left = tac.forced
             tac.forced = (name, left - 1) if left > 1 else None
-            if self.tactic_do(name, c):
+            if not self.critically_low_hp(c.hp, c.maxhp) and self.tactic_do(name, c):
                 return True
             tac.forced = None
         if tac.hook is not None:

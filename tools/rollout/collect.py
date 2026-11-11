@@ -12,6 +12,7 @@ Output: one jsonl per game, a line per decision point:
     {"seed", "dp", "t", "feat": {...}, "legal": [...], "rolls": [{"opt", "rep", "ok", "first", "died", ...}]}
 """
 import argparse
+import atexit
 import hashlib
 import json
 import os
@@ -116,6 +117,7 @@ class Collector:
         self.root = None
         self.records = []
         bot.tac.hook = self.hook
+        atexit.register(self.close)              # the parent's exit only: a child leaves by os._exit
 
     def trigger(self, f):
         """A decision point: a hostile next to us and we are hurt, or danger.py says the fight is a risk; or hurt
@@ -201,25 +203,16 @@ def play(args):
     out = os.path.join(out_dir, f"{seed}.jsonl")
     if os.path.exists(out):
         os.remove(out)
-    bot = Bot(seed=seed, character="val")
-    orig_init = bot.tactic_init
-    col = {}
-
-    def tactic_init():                       # the hook goes in once run() has built the bot's state
-        orig_init()
-        col["c"] = Collector(bot, out, **cfg)
-    bot.tactic_init = tactic_init
+    bot = Bot(seed=seed, character="val", rollout={"out": out_dir, **cfg})     # nhbot.tactic installs the Collector
     try:
         s = bot.run()
+        col = bot.tac.hook.__self__
         info = {"seed": seed, "score": s["score"], "max_depth": s["max_depth"], "turns": s["turns"],
-                "dp": col["c"].n_dp, "triggered": col["c"].triggered, "roll_secs": round(col["c"].secs),
+                "dp": col.n_dp, "triggered": col.triggered, "roll_secs": round(col.secs),
                 "secs": round(time.monotonic() - t)}
     except Exception:
         import traceback
         info = {"seed": seed, "crash": traceback.format_exc()[-1500:]}
-    finally:
-        if "c" in col:
-            col["c"].close()
     with open(os.path.join(out_dir, "games.jsonl"), "a") as fh:
         fh.write(json.dumps(info) + "\n")
     return info

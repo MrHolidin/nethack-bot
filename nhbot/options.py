@@ -29,6 +29,8 @@ DEFAULTS = {
     "tactic_model": None,      # A/B: the fight's tactical option (melee / pray / Elbereth / potion / wand / stairs /
                                #      retreat) chosen by a model trained on counterfactual rollouts (nhbot.tactic,
                                #      tools/rollout): the path of its weights file, relative to nhbot/
+    "rollout": None,           # experiments: counterfactual rollouts by fork at the fight's decision points, written to
+                               #      <out>/<seed>.jsonl (tools/rollout): {"out": DIR, ...collect.DEFAULTS}
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
     "rest_frac": 0.5,          # rest (search 20) below this with nothing in view; rest on our Elbereth below it too
     "elb_hp": 0.5,             # write Elbereth below this

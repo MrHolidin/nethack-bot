@@ -1,0 +1,128 @@
+"""First reading of a rollout dataset: how often the scripted choice is wrong, which option wins where.
+
+    python -m tools.rollout.analyze DIR [DIR ...] [--h 300]
+
+Per decision point and option the rollouts give death within h turns (mean over the replicates). Everything here
+is paired: an option is compared with `default` on the decision points where it is legal, and the confidence
+intervals are bootstrap over games (the decision points of a game are not independent).
+"""
+import argparse
+import glob
+import json
+import os
+from collections import defaultdict
+
+import numpy as np
+
+HORIZONS = (20, 50, 100, 300)
+
+
+def load(dirs):
+    """The decision points of every game file under dirs, as dicts (rolls with a crash dropped)."""
+    recs = []
+    for d in dirs:
+        for f in sorted(glob.glob(os.path.join(d, "[0-9]*.jsonl"))):
+            with open(f) as fh:
+                for line in fh:
+                    r = json.loads(line)
+                    r["rolls"] = [x for x in r["rolls"] if "crash" not in x]
+                    recs.append(r)
+    return recs
+
+
+def died_by(x, h):
+    return int(bool(x["died"]) and x["dt"] < h)
+
+
+def option_stats(rec, h):
+    """option -> dict of the means over its replicates: death by h, final HP fraction, prayers used, score."""
+    by = defaultdict(list)
+    for x in rec["rolls"]:
+        by[x["opt"]].append(x)
+    out = {}
+    for o, xs in by.items():
+        out[o] = {"death": np.mean([died_by(x, h) for x in xs]),
+                  "hp": np.mean([0.0 if x["died"] else x["hp"] / max(x["maxhp"], 1) for x in xs]),
+                  "pray": np.mean([x["prayers"] for x in xs]), "score": np.mean([x["score"] for x in xs]),
+                  "ok": np.mean([x["ok"] for x in xs]), "n": len(xs),
+                  "first": xs[0].get("first")}
+    return out
+
+
+def boot_ci(vals, groups, n=400, seed=0):
+    """Mean of vals and its 95 % bootstrap interval, resampling whole groups (games)."""
+    vals, groups = np.asarray(vals, float), np.asarray(groups)
+    if not len(vals):
+        return float("nan"), float("nan"), float("nan")
+    ug, inv = np.unique(groups, return_inverse=True)
+    sums = np.bincount(inv, vals, len(ug))
+    cnts = np.bincount(inv, minlength=len(ug))
+    rng = np.random.default_rng(seed)
+    idx = rng.integers(0, len(ug), (n, len(ug)))
+    means = sums[idx].sum(1) / np.maximum(cnts[idx].sum(1), 1)
+    return vals.mean(), float(np.quantile(means, 0.025)), float(np.quantile(means, 0.975))
+
+
+def fmt(m, lo, hi, scale=100):
+    return f"{m * scale:+6.2f} [{lo * scale:+6.2f}, {hi * scale:+6.2f}]"
+
+
+def paired_table(recs, h, where=None, title=""):
+    """Per option: the decision points where it is legal (and where holds), death by h of default and of the
+    option there, and the paired difference with its interval (percentage points; negative: the option saves)."""
+    rows = defaultdict(lambda: ([], [], [], [], []))
+    n = 0
+    for r in recs:
+        if where is not None and not where(r):
+            continue
+        st = r["_st"][h]
+        if "default" not in st:
+            continue
+        n += 1
+        for o, s in st.items():
+            if o == "default" or s["ok"] < 1:
+                continue
+            a = rows[o]
+            a[0].append(st["default"]["death"]); a[1].append(s["death"]); a[2].append(r["seed"])
+            a[3].append(s["pray"] - st["default"]["pray"]); a[4].append(s["hp"] - st["default"]["hp"])
+    print(f"\n{title}  ({n} decision points; death within {h} turns, %; diff = option - default)")
+    print(f"  {'option':9s} {'n':>6s} {'default':>8s} {'option':>8s}  {'diff [95% CI]':28s} {'prayers':>8s} {'hp_end':>7s}")
+    for o in sorted(rows, key=lambda o: -len(rows[o][0])):
+        d, v, g, pr, hp = rows[o]
+        diff = np.array(v) - np.array(d)
+        print(f"  {o:9s} {len(d):6d} {np.mean(d) * 100:8.2f} {np.mean(v) * 100:8.2f}  {fmt(*boot_ci(diff, g)):28s} "
+              f"{np.mean(pr):+8.3f} {np.mean(hp):+7.3f}")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("dirs", nargs="+")
+    ap.add_argument("--h", type=int, default=300)
+    a = ap.parse_args()
+    recs = load(a.dirs)
+    for r in recs:
+        r["_st"] = {h: option_stats(r, h) for h in HORIZONS}
+    games = len({r["seed"] for r in recs})
+    print(f"{len(recs)} decision points of {games} games; {sum(len(r['rolls']) for r in recs)} rollouts")
+    firsts = defaultdict(int)
+    for r in recs:
+        firsts[r["_st"][a.h].get("default", {}).get("first")] += 1
+    print("scripted first step:", dict(sorted(firsts.items(), key=lambda t: -t[1])))
+    for h in HORIZONS:
+        d = [r["_st"][h]["default"]["death"] for r in recs if "default" in r["_st"][h]]
+        print(f"  default: death within {h:3d} turns {np.mean(d) * 100:.2f} %")
+    paired_table(recs, a.h, title="ALL")
+    paired_table(recs, 50, title="ALL")
+    for first in ("melee", "elbereth", "pray", "heal", "wands"):
+        paired_table(recs, a.h, lambda r, f=first: r["_st"][a.h]["default"]["first"] == f, f"scripted = {first}")
+    paired_table(recs, a.h, lambda r: r["feat"]["n_adj"] == 0, "no hostile adjacent (hurt, one within 3)")
+    for lo, hi in ((0, 0.2), (0.2, 0.35), (0.35, 0.5), (0.5, 0.75), (0.75, 1.01)):
+        paired_table(recs, a.h, lambda r, lo=lo, hi=hi: lo <= r["feat"]["hp_frac"] < hi and r["feat"]["n_adj"] > 0,
+                     f"adjacent, hp_frac in [{lo}, {hi})")
+    for lo, hi in ((0, 0.3), (0.3, 0.6), (0.6, 0.85), (0.85, 1.01)):
+        paired_table(recs, a.h, lambda r, lo=lo, hi=hi: lo <= r["feat"]["win_prob"] < hi and r["feat"]["n_adj"] > 0,
+                     f"adjacent, win_prob in [{lo}, {hi})")
+
+
+if __name__ == "__main__":
+    main()
