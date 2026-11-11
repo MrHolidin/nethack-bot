@@ -22,6 +22,7 @@ class GameOver(Exception):
 class GameMixin:
     def game_init(self):
         self.steps = 0                   # keys sent so far
+        self.klog = [] if self.opts.key_stats else None     # key_stats: the keys of this tick
         self.last_key = None             # the key sent last (log_msg: a message NLE shows again after it)
         self.reward = 0.0
         self.done = False
@@ -49,6 +50,8 @@ class GameMixin:
         self.obs, r, term, trunc, info = self.env.step(self.key2act[code])
         self.steps += 1
         self.last_key = code
+        if self.klog is not None:
+            self.klog.append(code)
         self.reward += r
         self.done = term or trunc
         if not self.done:
