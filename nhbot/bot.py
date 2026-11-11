@@ -191,7 +191,7 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
                 "ac": self.bl(nh.NLE_BL_AC), "gold": self.bl(nh.NLE_BL_GOLD),
                 "pet": self.turn() - self.pol.pet_last_seen <= 100, "magic_known": len(magic) - unknown,
                 "magic_unknown": unknown, "kills": len(self.combat.kills), "prayers": self.surv.prayers,
-                "score": int(self.reward)}
+                "score": int(self.reward), "keys": self.steps}
 
     def summary(self):
         last = [m for _, m in list(self.messages)[-10:]]
