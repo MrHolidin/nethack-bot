@@ -27,6 +27,7 @@ STORE_MENU = ("Potions", "Scrolls")              # their lines in a container's 
 BAG_OK_NAME = "ok"                               # bag_test: the name given to a "bag" that opened (#name, one object)
 BAG_TEST_HP = 15                                 # bag_test: only above this HP (a bag of tricks bites for d10)
 HANDS_RETRY = 500                                # turns before a bag is tried again after "You have no free hand"
+UNLOAD_HOLD = 100                                # turns nothing goes in after store_unload emptied the bag
 
 
 class BagStoreState:
@@ -36,6 +37,7 @@ class BagStoreState:
         self.bag_letter = None        # the letter of the bag they are in (while held)
         self.test = None              # bag_test: (level key, square, phase "dropped" / "looted", it opened)
         self.hands_busy = -HANDS_RETRY  # the turn a bag would not open for want of a free hand
+        self.unloaded = -UNLOAD_HOLD    # the turn store_unload emptied the bag
         self.stats = Counter()
 
 
@@ -65,6 +67,19 @@ class BagStoreMixin:
         bags = [it for it in self.items() if self.known_container(it)]
         rank = lambda it: (0 if "holding" in it.text else 1 if "oilskin" in it.text else 2)  # noqa: E731
         return min(bags, key=rank) if bags else None
+
+    def store_unload(self, it):
+        """carry_drop_step is about to drop it (Burdened, a squeeze refused for our weight, a smaller form): if it is
+        the bag our things are in, they come out first and are weighed one by one (the bag went with all of them --
+        80080, 80144, 80341, 80461, 80644, 80880 dropped it at a squeeze). True if it used the turn."""
+        if not self.store_holds(it):
+            return False
+        bag = self.store_bag()
+        if bag is None:
+            return False
+        self.bstore.stats["unload_before_drop"] += 1
+        self.bstore.unloaded = self.turn()
+        return self.store_take_out(bag)
 
     def store_holds(self, it):
         """carry.needed: the bag our things are in (never dropped, never sold)."""
@@ -133,7 +148,7 @@ class BagStoreMixin:
     def bag_in_step(self, lv):
         """Housekeeping, late: the storable potions and scrolls put in the bag -- not where they'd come out at once.
         True if it used the turn."""
-        if not self.opts.bag_store or self.hands_busy():
+        if not self.opts.bag_store or self.hands_busy() or self.turn() - self.bstore.unloaded < UNLOAD_HOLD:
             return False
         bag = self.store_bag()
         if bag is None:

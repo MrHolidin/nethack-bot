@@ -246,6 +246,8 @@ class CarryMixin:
         it = self.lift_undo(it, inv, same)
         if self.gold_bag_unload(it):
             return True                      # gold_bag: the gold out of the bag first, loose gold is kept
+        if self.store_unload(it):
+            return True                      # bag_store: our potions / scrolls out first, each weighed on its own
         if it.on_body:
             if it.ocls == nh.ARMOR_CLASS and it.worn:
                 a = parse_armor(it.text) or {"slot": None}
