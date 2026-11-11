@@ -58,6 +58,7 @@ class GameMixin:
         self._items, self._items_at = [], -1
         self._items_parsed, self._items_inv = [], None
         self._inv, self._inv_at = (), -1
+        self._obs_memo, self._obs_memo_at = {}, -1
         self.msg_audit = Counter()       # cases where message reading may go wrong (game.audit, pickup, ...)
         self.here_window = None          # (turn, pos, text) of the last 'Things that are here' window
         self.seen_here = None            # (turn, pos, message) of the last message listing what lies here
@@ -293,6 +294,15 @@ class GameMixin:
 
     def pos(self):
         return self.bl(nh.NLE_BL_Y), self.bl(nh.NLE_BL_X)
+
+    def per_obs(self, name, compute):
+        """compute() once per observation (a key sent makes a new one), its answer kept under name until then. For
+        what is a function of self.obs alone; the answer is shared: an immutable value (a tuple), never changed."""
+        if self._obs_memo_at != self.steps:
+            self._obs_memo, self._obs_memo_at = {}, self.steps
+        if name not in self._obs_memo:
+            self._obs_memo[name] = compute()
+        return self._obs_memo[name]
 
     def inventory(self):
         """(letter, class, text) per inventory line, read once per observation (a read-only tuple)."""

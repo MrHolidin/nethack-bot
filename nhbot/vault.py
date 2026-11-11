@@ -220,19 +220,24 @@ class VaultMixin:
         if got is not None and got[0] == h:
             return got[1]
         k = G.KIND[lv.under]
+        wall, gold, rock = k == G.WALL, k == G.GOLD, (k == G.UNKNOWN) | (k == G.WALL)
+
+        def every(a, offsets):
+            """Per top-left inner square (y0, x0) of a candidate: a holds at every (y0 + dy, x0 + dx) of offsets."""
+            out = np.ones((ROWS - 5, COLS - 5), dtype=bool)
+            for dy, dx in offsets:
+                out &= a[2 + dy:ROWS - 3 + dy, 3 + dx:COLS - 2 + dx]
+            return out
+
+        inner = [(i, j) for i in (0, 1) for j in (0, 1)]
+        ring = [(i, j) for i in range(-1, 3) for j in range(-1, 3) if (i, j) not in inner]
+        walled = every(wall, ring) & every(~wall, inner)
+        detected = every(gold, inner) & every(rock, ring)
+        hits = np.argwhere(walled | detected)          # row-major: the first candidate from the top left
         found = None
-        for y0 in range(2, ROWS - 3):
-            for x0 in range(3, COLS - 2):
-                inner = k[y0:y0 + 2, x0:x0 + 2]
-                box = k[y0 - 1:y0 + 3, x0 - 1:x0 + 3]
-                ring = np.concatenate([box[0], box[3], box[1:3, 0], box[1:3, 3]])
-                walled = (ring == G.WALL).all() and not (inner == G.WALL).any()
-                gold = (inner == G.GOLD).all() and np.isin(ring, (G.UNKNOWN, G.WALL)).all()
-                if walled or gold:
-                    found = [(y0 + i, x0 + j) for i in (0, 1) for j in (0, 1)]
-                    break
-            if found:
-                break
+        if len(hits):
+            y0, x0 = int(hits[0][0]) + 2, int(hits[0][1]) + 3
+            found = [(y0 + i, x0 + j) for i, j in inner]
         self.vault.loc_at[lv.key] = (h, found)
         return found
 
