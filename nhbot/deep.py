@@ -157,6 +157,9 @@ class DeepMixin:
                 self.deep_mark("past_medusa")
             if past and (self.opts.medusa_dive or st.diving) and self.dive_step(lv):
                 return
+            if st.kind.get(lv.key) == "medusa" and self.opts.dead_end_patrol and not st.diving \
+                    and self.back_up_step(lv, self.grids(lv)):
+                return                                # her level is reached: nothing to explore on the island
         super().explore(lv)
 
     def dig_now(self):
@@ -448,25 +451,32 @@ class DeepMixin:
         return self.hole_step(lv, grids, means)
 
     # ------------------------------------------------------------------ dead_end_patrol
-    def dead_end_leave_step(self, lv, grids):
-        """At a dead end with no hole to dig here: to the up stairs and up them -- the level above is where the
-        shaft or the patrol is -- unless that level may be Medusa's (the Castle reached by a fall past levels we
-        never saw); with dead_end_patrol the patrol is here then. True if it used the turn."""
+    def back_up_step(self, lv, grids):
+        """A step to the up stairs of a dead end, and up them -- the level above is where the shaft or the patrol
+        is -- unless that level may be Medusa's (the Castle reached by a fall past levels we never saw). True if it
+        used the turn."""
         st = self.deep
         above = (lv.key[0], lv.key[1] - 1)
         up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
-        if up.any() and st.kind.get(above) != "medusa" \
-                and (above in self.levels or st.kind.get(lv.key) == "medusa"):
-            if up[self.pos()]:
-                st.above = above
-                if self.opts.patrol_rise and not st.diving and self.opts.dead_end_patrol:
-                    st.rise_to = (above[0], max(1, above[1] - self.opts.patrol_rise))
-                self.deep_mark("back_up")
-                self.cur_act = "patrol"
-                self.take_stairs("<")
-                return True
-            if self.walk_to(lv, up, act="patrol", grids=grids)[0] == "moved":
-                return True
+        if not up.any() or st.kind.get(above) == "medusa" \
+                or not (above in self.levels or st.kind.get(lv.key) == "medusa"):
+            return False
+        if up[self.pos()]:
+            st.above = above
+            if self.opts.patrol_rise and not st.diving and self.opts.dead_end_patrol:
+                st.rise_to = (above[0], max(1, above[1] - self.opts.patrol_rise))
+            self.deep_mark("back_up")
+            self.cur_act = "patrol"
+            self.take_stairs("<")
+            return True
+        return self.walk_to(lv, up, act="patrol", grids=grids)[0] == "moved"
+
+    def dead_end_leave_step(self, lv, grids):
+        """At a dead end with no hole to dig here: back up (back_up_step); with no way up we may take and
+        dead_end_patrol, the patrol is here. True if it used the turn."""
+        st = self.deep
+        if self.back_up_step(lv, grids):
+            return True
         if not self.opts.dead_end_patrol or st.diving:
             return False
         st.above = lv.key
