@@ -85,7 +85,10 @@ class PaceMixin:
             return False
         if self.pace_diving():
             return self.pace_hold_end("dive")
-        if self.bl(nh.NLE_BL_XP) >= self.pace_need(self.bl(nh.NLE_BL_DEPTH) + 1):
+        # pace_ac: armor counts as strength too -- base_d1, Dlvl 9-12 at XL 10-11: 2.8 % die on a level at AC -7 or
+        # better, 7 % at -6..-4, 14 % at -3..0; XL 8-9 at AC <= -7 does as well as XL 10-11 at -6..-4
+        strength = self.bl(nh.NLE_BL_XP) - self.opts.pace_ac * self.bl(nh.NLE_BL_AC)
+        if strength >= self.pace_need(self.bl(nh.NLE_BL_DEPTH) + 1):
             return self.pace_hold_end("xl")
         if lv.key not in self.pace.since:
             self.pace.since[lv.key] = lv.turns_here

@@ -36,7 +36,9 @@ DEFAULTS = {
     "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens)
     "pace_food": 0,            # with pace: the gate is open while our estimated nutrition is below this (0: only when
                                #      Weak) -- 200 leaves before Hungry, the food we carry uneaten
-    "pace_pray": 0,            # with pace_food: ... unless the prayer for hunger we then come to will be at least this
+    "pace_ac": 0.0,            # with pace: the gate compares XL - pace_ac * AC with the schedule (0.5: two points of
+                               #      AC below zero count as an experience level)
+    "pace_pray": 0,           # with pace_food: ... unless the prayer for hunger we then come to will be at least this
                                #      many turns after the last one (0: never count on a prayer)
     "pace_patrol": 0,         # with pace: gated, a walk to a far square of the level and back every this many turns
                                #      (0: never) -- it brings out the monsters that stand behind walls
