@@ -47,7 +47,10 @@ from nhbot.consts import COLS, CORRIDOR_GLYPHS, FLOOR_GLYPH, NEIGH, ROWS, WEAK
 
 WAIT_COUNT = 20             # turns of one counted search at the gate with nothing in view (3 keys)
 WAIT_COUNT_SEEN = 5         # ... with a hostile in view that no step went for (2 keys)
-RETREAT_AFTER = 200         # pace_retreat: turns searched on a level with no way on before we leave it
+RETREAT_AFTER = 200         # pace_retreat: turns searched on a level of water (Medusa's) before we leave it
+RETREAT_SLOW = 1500         # ... on any other level: base_d1/d2, levels from Dlvl 20 on that we got past -- 6.7 %
+                            # were searched for more than 200 turns, 1.9 % for more than 1500
+RETREAT_WATER = 60          # squares of water we remember: Medusa's level (medusa-1..4.des: an island in a lake)
 SPOT_MAX = 25               # pace_spot: path cost at most from the stairs to the square we hold on
 SPOT_EVERY = 500            # ... chosen again after this many turns (the map may have grown)
 PATROL_HP = 0.8             # a patrol trip only from this fraction of max HP on
@@ -272,12 +275,15 @@ class PaceMixin:
 
     def pace_retreat_step(self, lv, grids):
         """pace_retreat: a main-dungeon level at that depth or below with nothing left to explore, no way down and
-        RETREAT_AFTER turns of searching behind us (Medusa's island: the way on is across the water) -- back up
+        RETREAT_AFTER turns of searching behind us on Medusa's island (the way on is across the water;
+        RETREAT_SLOW on a level without a lake: its stairs may be hidden) -- back up
         the stairs, to hold for good on the level above: its depth is ours already, and a hold on a staircase
         of an ordinary level is where the monsters come to us (on the island they cannot) at a third of the
         deaths per turn (base_d1 at Dlvl 21+: 0.15 per 1000 turns; holds at Dlvl 17-20: 0.04). True if it acted."""
         if not self.opts.pace_retreat or lv.key[0] != 0 or self.bl(nh.NLE_BL_DEPTH) < self.opts.pace_retreat \
                 or lv.search_turns < RETREAT_AFTER or self.pace_diving():
+            return False
+        if lv.search_turns < RETREAT_SLOW and int((grids[0] == G.LIQUID).sum()) < RETREAT_WATER:
             return False
         up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
         if not up.any():
