@@ -118,7 +118,8 @@ class RetreatMixin:
             return False
         ch = self.chasers(lv, c.hostiles)
         if walking and not losing:
-            if not ch or not self.hp_below(max(self.opts.retreat_hp, self.opts.retreat_pp_hp)):
+            hp_thr = self.opts.retreat_pp_hp if self.retreat_after_prayer() else self.opts.retreat_hp
+            if not ch or not self.hp_below(hp_thr):
                 self.retreat.walk = None
                 return False
         if self.retreat_stairs(c, ch):
