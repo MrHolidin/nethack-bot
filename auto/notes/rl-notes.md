@@ -75,3 +75,23 @@ faster (80 decision points a minute on 10 procs).
   `value_v2` blind to the HP fraction (V_v1 priced 30 % HP at 0.06–0.24 J against 0.008–0.04 J for 300 turns: by
   that rate resting always pays). V does price time (−205 … −1124 score per 300 turns at depth < 12), kills
   (+10 kills: +534 … +5556) and a used prayer (−1462 … −2137).
+
+### 22:06 — long rollouts, 389 points of 49 games (c1–c4), and what follows
+
+- `v:elb70` (235 pairs): deaths −3.0 at 300 turns, −0.4 at 1000, −4.3 [−11.7, +3.4] at 3000; score −82 at 300
+  [−161, −19], −137 at 1000, −295 at 3000 [−886, +271] (default 5760: −5 %). No sign of the old −18 %, no gain.
+- one forced Elbereth where the script fights (161 pairs): deaths +0.6 at 300, +1.2 at 3000 [−5.9, +7.9]; score
+  −70 at 3000 [−1044, +711]. One forced blow where the script writes (131 pairs): deaths −6.9 at 300
+  [−13.5, +1.2], −3.1 at 3000; score +227 [−680, +1101]. Nothing lasts.
+- Reading: on the ordinary fight the script's Elbereth / melee choice makes no measurable long-run difference
+  either way. The states where options differ by 5–20 pp are the fights nearly lost (win_prob < 0.6, HP < 25 %):
+  there melee is +8 … +10 pp worse than the script, the forced wand +11 … +17 pp worse, and the candidates are
+  the staircase up (win_prob 0.3–0.6, stairs within 15: −9.8 pp [−18.2, 0.0], J +116 [+49, +294] ×10⁻³, n 56) and a
+  prayer against the script's timer (HP < 25 %: −18.8 pp [−38.1, +3.0], n 16).
+- So the collection now concentrates there: `x1` (6 procs): trigger win_prob ≤ 0.7 or HP < 30 %, options
+  default / melee / pray / elbereth / quaff / up / down, `settle` 1200. `d9` (10 procs) goes on with the general
+  trigger for the chooser.
+- danger.win_prob against what happens (2 853 points, default policy): where it says ≥ 0.99 (974 points) 2.6 %
+  are dead within 20 turns and 3.5 % within 50; unseen attackers ('I': win_prob 1.0 by construction) 16.7 % dead
+  within 50; dwarf, jackal packs, hill orc, fire ant worse than modelled; pony, giant bat, giant ant, rothe much
+  safer than modelled.
