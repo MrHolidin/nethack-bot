@@ -24,18 +24,24 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    "loop_ticks": 0,           # A/B: the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
-                               #      too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn
-    "peace_cache": 0,          # A/B: a look (';') telling a monster peaceful or not holds this many turns (0: the turn
+    "loop_ticks": 20,          # A/B: the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
+                               #      too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn;
+                               #      accepted 2026-11-11, keys_all4_s vs base_d1, 500 games: keys/game 20134 -> 12753,
+                               #      CPU 86 -> 35 s, depth +0.410 [+0.026, +0.772], score +791 [-1880, +3455],
+                               #      truncated 7 -> 0
+    "peace_cache": 20,         # A/B: a look (';') telling a monster peaceful or not holds this many turns (0: the turn
                                #      only) -- for the monster on that square, or followed to a square within 2 when no
-                               #      other one of its glyph is near (perception.peace_followed); looks cost 3-15 keys
-    "elb_rest_count": 0,       # A/B: resting on our Elbereth with nothing in view, search this many turns at once
+                               #      other one of its glyph is near (perception.peace_followed); looks cost 3-15 keys;
+                               #      accepted with loop_ticks (keys_all4_s)
+    "elb_rest_count": 20,      # A/B: resting on our Elbereth with nothing in view, search this many turns at once
                                #      ("20s"; the game stops it for a monster that ignores Elbereth) instead of one a tick
-                               #      with a ':' read every 4 (0: off)
-    "peace_wait_max": 0,       # A/B: a peaceful monster in our way waited for this many turns in a row -- its square
-                               #      shut (Level.blocked) and the path goes round (nav.move; 0: wait for ever)
-    "farlook_jump": False,     # A/B: a farlook's cursor jumps to the monster with 'm' / 'M' when that takes fewer keys
+                               #      with a ':' read every 4 (0: off); accepted with loop_ticks (keys_all4_s)
+    "peace_wait_max": 20,      # A/B: a peaceful monster in our way waited for this many turns in a row -- its square
+                               #      shut (Level.blocked) and the path goes round (nav.move; 0: wait for ever);
+                               #      accepted with loop_ticks (keys_all4_s)
+    "farlook_jump": True,      # A/B: a farlook's cursor jumps to the monster with 'm' / 'M' when that takes fewer keys
                                #      (game.describe_at, monster_rank); not neutral: other squares are described on the way
+                               #      (accepted with loop_ticks: keys_all4_s)
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
     "medusa_dig": False,       # A/B: on Medusa's level (water, Dlvl 21-28, no way down) a hole dug through the floor on a
@@ -43,9 +49,10 @@ DEFAULTS = {
                                #      island; the stairs back up to her level never taken (nhbot.deep)
     "medusa_dive": False,      # A/B, with medusa_dig: below Medusa's level no exploring (mazes, minotaurs) -- the next
                                #      hole at once, down to the Castle
-    "dead_end_patrol": False,  # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
+    "dead_end_patrol": True,   # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
                                #      back up the stairs and a patrol of the level above for the rest of the game
-                               #      (nhbot.deep)
+                               #      (nhbot.deep); accepted 2026-11-11, D1, 1000 games (133 seeds replayed):
+                               #      score +4776 [+3784, +5809], depth -0.002
     "patrol_rise": 0,          # with dead_end_patrol: the patrol is this many levels above the level over the dead
                                #      end (weaker random monsters: makemon.c rndmonst, (depth + XL) / 2)
     "patrol_stale": 400,       # with dead_end_patrol: a square not within 2 squares of us for this many turns is
@@ -54,17 +61,18 @@ DEFAULTS = {
                                #      this many turns (0 / 1: every tick, as elsewhere)
     "patrol_hp": 0.0,          # with dead_end_patrol: below this share of max HP, nothing in view, the patrol rests
                                #      (0: only step_rest's rest_frac)
-    "dead_end_dive": 0,        # with dead_end_patrol: with this many keys of the budget left the patrol ends and we go
-                               #      down again -- with medusa_dig through the floor, past Medusa to the Castle
     "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol
                                #      of dead_end_patrol) until farm_keys keys are sent; 0: off (nhbot.deep)
     "farm_keys": 150_000,
-    "dip_pray": 0,             # A/B: dip into a fountain (any reason) only this many turns after the last prayer (none
+    "dip_pray": 500,           # A/B: dip into a fountain (any reason) only this many turns after the last prayer (none
                                #      yet: from turn 100) and with the god not angry -- the prayer is the rescue from
-                               #      the water demon (excalibur.dip_prayer_ok); 0: off. 500 = survival.can_pray's gap
-    "dip_elb": 0.0,            # A/B: a dip let out water moccasins, or a water demon we beat with P below this
+                               #      the water demon (excalibur.dip_prayer_ok); 0: off. 500 = survival.can_pray's gap;
+                               #      accepted 2026-11-11 with dip_elb 1.01, fountain_both3_s vs base_d1, 500 games:
+                               #      score +2526 [+59, +5055], depth +0.646 [+0.336, +0.952], fountain deaths 50 -> 31
+    "dip_elb": 1.01,           # A/B: a dip let out water moccasins, or a water demon we beat with P below this
                                #      (danger.win_prob): off the fountain, Elbereth, hold it while they are in view
-                               #      (excalibur.step_fountain_trouble); 0: off, 1.01: against every demon
+                               #      (excalibur.step_fountain_trouble); 0: off, 1.01: against every demon;
+                               #      accepted with dip_pray (fountain_both3_s)
     "dip_mines": False,        # A/B: the Mines' fountains that no watch minds -- Mines' End's, Orcish Town's -- used too
                                #      (excalibur.fountains); a watched Minetown's never (Excalibur there angers the watch)
     "dip_hold": 200,           # with dip_elb: turns at most holding that Elbereth
@@ -83,7 +91,9 @@ DEFAULTS = {
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
-    "rest_frac": 0.5,          # rest (search 20) below this with nothing in view; rest on our Elbereth below it too
+    "rest_frac": 0.7,          # rest (search 20) below this with nothing in view; rest on our Elbereth below it too
+                               #      (accepted 2026-11-11, 0.5 -> 0.7, orc_rest70_s vs base_d1, 500 games: score +3487
+                               #      [+190, +6779], depth +0.440 [-0.010, +0.878])
     "elb_hp": 0.5,             # write Elbereth below this
     "elb_exit": 0.85,          # leave Elbereth at this
     "elb_early": 0.6,          # ... or at this with nothing in view
