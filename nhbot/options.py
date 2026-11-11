@@ -38,6 +38,27 @@ DEFAULTS = {
                                #      (game.describe_at, monster_rank); not neutral: other squares are described on the way
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
+    "medusa_dig": False,       # A/B: on Medusa's level (water, Dlvl 21-28, no way down) a hole dug through the floor on a
+                               #      square with no water around it (pick-axe, mattock, wand of digging), past her
+                               #      island; the stairs back up to her level never taken (nhbot.deep)
+    "medusa_dive": False,      # A/B, with medusa_dig: below Medusa's level no exploring (mazes, minotaurs) -- the next
+                               #      hole at once, down to the Castle
+    "dead_end_patrol": False,  # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
+                               #      back up the stairs and a patrol of the level above for the rest of the game
+                               #      (nhbot.deep)
+    "patrol_rise": 0,          # with dead_end_patrol: the patrol is this many levels above the level over the dead
+                               #      end (weaker random monsters: makemon.c rndmonst, (depth + XL) / 2)
+    "patrol_stale": 400,       # with dead_end_patrol: a square not within 2 squares of us for this many turns is
+                               #      walked to again; nothing that old in reach: a counted search
+    "patrol_look": 0,          # with dead_end_patrol: on the patrol level a look (';') at a far monster only every
+                               #      this many turns (0 / 1: every tick, as elsewhere)
+    "patrol_hp": 0.0,          # with dead_end_patrol: below this share of max HP, nothing in view, the patrol rests
+                               #      (0: only step_rest's rest_frac)
+    "dead_end_dive": 0,        # with dead_end_patrol: with this many keys of the budget left the patrol ends and we go
+                               #      down again -- with medusa_dig through the floor, past Medusa to the Castle
+    "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol
+                               #      of dead_end_patrol) until farm_keys keys are sent; 0: off (nhbot.deep)
+    "farm_keys": 150_000,
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
