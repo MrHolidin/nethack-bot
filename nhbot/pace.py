@@ -44,8 +44,8 @@ class PaceState:
         self.keys = 0                    # keys sent for them
         self.stats = Counter()           # holds (levels gated), valve_time, valve_food (ticks), dive (levels)
         self.dive_from = None            # (turn, depth) the final dive began at
-        self.hold = None                 # the hold in progress: [level key, depth, turn, XL, exp] at its start
-        self.log = []                    # holds over: [key, depth, turn, XL, exp, turn, XL, exp, how it ended]
+        self.hold = None                 # the hold in progress: level key, depth, pace_now() at its start
+        self.log = []                    # holds over: ... and pace_now() at the end, how it ended
 
 
 class PaceMixin:
@@ -90,17 +90,19 @@ class PaceMixin:
             self.pace.stats["valve_food"] += 1
             return self.pace_hold_end("food")
         if self.pace.hold is None:
-            self.pace.hold = [list(lv.key)] + self.pace_now()
+            self.pace.hold = dict(key=list(lv.key), depth=int(self.bl(nh.NLE_BL_DEPTH)), start=self.pace_now())
         return True
 
     def pace_now(self):
-        return [int(self.bl(f)) for f in (nh.NLE_BL_DEPTH, nh.NLE_BL_TIME, nh.NLE_BL_XP, nh.NLE_BL_EXP)]
+        """[turn, XL, experience points, kills, estimated nutrition, max HP, prayers] now (the hold log)."""
+        return [int(self.bl(f)) for f in (nh.NLE_BL_TIME, nh.NLE_BL_XP, nh.NLE_BL_EXP)] + \
+            [self.combat.kill_count, self.surv.nutrition, int(self.bl(nh.NLE_BL_HPMAX)), self.surv.prayers]
 
     def pace_hold_end(self, how):
         """The gate lets us through (how: "xl", "time", "food", "dive"; "end": the game is over): the hold in
         progress goes to the log (summary 'pace'). False."""
         if self.pace.hold is not None:
-            self.pace.log.append(self.pace.hold + self.pace_now()[1:] + [how])
+            self.pace.log.append(dict(self.pace.hold, end=self.pace_now(), how=how))
             self.pace.hold = None
         return False
 
