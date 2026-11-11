@@ -66,6 +66,7 @@ CLASS_NAME = {nh.POTION_CLASS: "potion", nh.SCROLL_CLASS: "scroll", nh.SPBOOK_CL
               nh.WAND_CLASS: "wand", nh.RING_CLASS: "ring"}
 RAY_OF_AD = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning"}     # a breath that is a ray destroy_item follows
 WIN_SIMS = 200                   # win_prob: sampled fights
+UNIFORM_BLOCK = 1024            # Uniforms: doubles drawn from numpy at a time
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
 P_EDGES = (0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.01)
@@ -118,9 +119,28 @@ def cdf_draw(rng, cdf):
     return bisect_right(cdf, rng.random())
 
 
-def cdf_draws(rng, cdf, n):
-    """int(rng.choice(len(p), size=n, p=p).sum()) for cdf = pmf_cdf(p): the same n uniform draws."""
-    return sum(bisect_right(cdf, u) for u in rng.random(n))
+class Uniforms:
+    """The doubles successive rng.random() calls would give, drawn UNIFORM_BLOCK at a time (one call of numpy per
+    block instead of one per draw: win_prob's draws were most of a long game's time). close() leaves rng exactly
+    where those single calls would have: the state from before, advanced by the draws used (random(n) gives the
+    same doubles as n calls of random())."""
+    __slots__ = ("rng", "state", "buf", "i", "used")
+
+    def __init__(self, rng):
+        self.rng, self.state = rng, rng.bit_generator.state
+        self.buf, self.i, self.used = [], 0, 0
+
+    def next(self):
+        if self.i == len(self.buf):
+            self.used += len(self.buf)
+            self.buf, self.i = self.rng.random(UNIFORM_BLOCK).tolist(), 0
+        self.i += 1
+        return self.buf[self.i - 1]
+
+    def close(self):
+        self.rng.bit_generator.state = self.state
+        if self.used + self.i:
+            self.rng.random(self.used + self.i)
 
 class FightMon(NamedTuple):
     """One monster of a fight win_prob samples."""
@@ -568,15 +588,21 @@ class DangerMixin:
         zrng = self.danger.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
+        # the simple model draws only rng.random(): those come in blocks (Uniforms); walk_fight draws integers too
+        uniforms = Uniforms(rng) if approach is None else None
+        rnd = uniforms.next if uniforms is not None else rng.random
+        hp_draw = [(cdfs[id(m.hp)], cdfs[id(m.dmg)], m.hits) for m in mons]
+        our_blow = [(m.hit, cdfs[id(m.dmg)]) for m in mons]         # the simple model's tables, by monster
+        its_round = [(m.inst, cdfs[id(m.rnd)]) for m in mons]
         wins = 0
         for _ in range(sims):
             hps = []
             hcap = []
-            for dmg, hits, prior in ((m.dmg, m.hits, m.hp) for m in mons):
+            for prior, dmg, hits in hp_draw:
                 for _try in range(20):
-                    h = full = cdf_draw(rng, cdfs[id(prior)])
-                    if hits:
-                        h -= cdf_draws(rng, cdfs[id(dmg)], hits)
+                    h = full = bisect_right(prior, rnd())
+                    for _h in range(hits):
+                        h -= bisect_right(dmg, rnd())
                     if h > 0:
                         break
                 hps.append(max(h, 1))
@@ -589,13 +615,14 @@ class DangerMixin:
                     wins += TAINTED_WIN if tainted else 1
                 continue
             for _turn in range(max_turns):
-                acts = k + (1 if frac and rng.random() < frac / 12 else 0)
+                acts = k + (1 if frac and rnd() < frac / 12 else 0)
                 for _a in range(acts):
                     if not alive:
                         break
                     j = alive[0]
-                    hit = rng.random() < mons[j].hit
-                    d = cdf_draw(rng, cdfs[id(mons[j].dmg)]) if hit else 0
+                    p_hit, dmg = our_blow[j]
+                    hit = rnd() < p_hit
+                    d = bisect_right(dmg, rnd()) if hit else 0
                     if opening is not None and _turn == 0 and _a == 0:
                         lost, asleep, _ = opening(zrng, *opening_hooks(index, alive, hps))
                         hp -= lost
@@ -612,14 +639,17 @@ class DangerMixin:
                 if hp <= 0:
                     break
                 for j in alive:
-                    if rng.random() < mons[j].inst:
+                    p_inst, rnd_cdf = its_round[j]
+                    if rnd() < p_inst:
                         hp = 0
                         break
-                    hp -= cdf_draw(rng, cdfs[id(mons[j].rnd)])
+                    hp -= bisect_right(rnd_cdf, rnd())
                 if hp <= 0:
                     break
             if hp > 0:
                 wins += 1
+        if uniforms is not None:
+            uniforms.close()
         return wins / sims
 
     def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs, plans=None, hcap=None,
