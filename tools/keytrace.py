@@ -42,4 +42,6 @@ def raw_step(self, code):
 
 Bot.raw_step = raw_step
 s = Bot(seed=a.seed, character="val", **json.loads(a.kw)).run()
-print({k: s[k] for k in ("score", "turns", "steps", "max_depth", "loops", "loop_by", "truncated")})
+print({k: s[k] for k in ("score", "turns", "steps", "max_depth", "loops", "loop_by", "truncated", "msg_audit",
+                         "farlooks")})
+print(s.get("key_stats", {}).get("count"))
