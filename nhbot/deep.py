@@ -26,7 +26,7 @@ dead_end_patrol: at such a dead end with no way through -- back up the stairs we
 island) and walk about the ordinary level above for the rest of the game: the random monsters the game makes (1 in
 70 turns, allmain.c) come at us by greedy steps (monmove.c m_move) and stay stuck behind walls -- a hero who stands
 still meets few of them. On that level its down stairs are hidden from explore (stairs_mask), which goes on taking
-items and frontiers; where it would search walls, we walk to the nearest square not seen for PATROL_STALE turns.
+items and frontiers; where it would search walls, we walk to the nearest square not seen for patrol_stale turns.
 With no way up we may take (the Castle right below Medusa's level) the patrol is where we are, off the squares
 next to water (castle.des puts giant eels and sharks in the moat).
 
@@ -57,8 +57,7 @@ DIG_HP = 0.7                         # rest before the hole / the jump below thi
 DIG_APPLIES = 40                     # applies / zaps at most on one level
 DIG_NEAR = 3                         # a hostile within this many squares: the weapon back in our hands
 SHAFT_JUMPS = 12                     # falls from the level above Medusa's at most (0.75 ** 12: 3 % never get past)
-PATROL_STALE = 400                   # patrol: a square not near us for this many turns is walked to again
-PATROL_R = 2                         # ... near: within this many squares
+PATROL_R = 2                         # patrol: a square is near us within this many squares
 PATROL_WAIT = 10                     # ... nothing stale in reach: search this many turns (the count: cheap keys)
 
 
@@ -485,7 +484,7 @@ class DeepMixin:
 
     def patrol_step(self, lv, grids):
         """A step of the patrol: toward the nearest square in reach that was not within PATROL_R of us for
-        PATROL_STALE turns (never a trap, never next to water); none: search PATROL_WAIT turns. Always True."""
+        patrol_stale turns (never a trap, never next to water); none: search PATROL_WAIT turns. Always True."""
         st = self.deep
         k_mem, k_live, passable = grids
         t = self.turn()
@@ -501,7 +500,7 @@ class DeepMixin:
             self.cur_act = "rest"                     # patrol_hp: not on to the next stranger while hurt
             self.search_turns(20)
             return True
-        stale = passable & ((near_at == 0) | (t - near_at > PATROL_STALE)) & (k_mem != G.TRAP) \
+        stale = passable & ((near_at == 0) | (t - near_at > self.opts.patrol_stale)) & (k_mem != G.TRAP) \
             & ~dilate(k_mem == G.LIQUID)
         self.cur_act = "patrol"
         if stale.any() and self.walk_to(lv, stale, act="patrol", grids=grids)[0] == "moved":
