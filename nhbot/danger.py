@@ -188,6 +188,7 @@ class DangerState:
         self.pending = None                      # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
+        self.tables, self.tables_at = {}, None   # fight_tables: this tick's monster tables, and (tick, steps)
         self.win_memo = {}                       # win_prob: simple-model fight key -> (wins, win_rng state after)
         self.mean = defaultdict(lambda: [0, 0.0, 0.0])           # bin -> [n, sum predicted, sum actual]
         self.p = defaultdict(lambda: [0, 0.0, 0])                # bin -> [n, sum predicted, deaths]
@@ -232,7 +233,25 @@ class DangerMixin:
             p += min(max(tmp - 1, 0), n) / n
         return p / len(acs)
 
+    def fight_tables(self, kind, compute, *args):
+        """compute(*args) once per tick and observation (a key sent or a new tick computes again): the fight tables
+        (monster_turn_pmf, monster_round) read our state -- AC, level, resistances, pack, what monsters wield --
+        which only a key (and the messages after it) or a tick's trackers change; win_prob asks them for every
+        hostile in view, for prey_mask and wand_ev_pairs and danger_tick alike. Shared: never changed by callers."""
+        at = (self.pol.tick_no, self.steps)
+        if self.danger.tables_at != at:
+            self.danger.tables, self.danger.tables_at = {}, at
+        key = (kind,) + args
+        got = self.danger.tables.get(key)
+        if got is None:
+            got = self.danger.tables[key] = compute(*args)
+        return got
+
     def monster_turn_pmf(self, name, bonus=0, hurt=False):
+        """monster_turn_pmf_now, once per tick and observation (fight_tables)."""
+        return self.fight_tables("turn", self.monster_turn_pmf_now, name, bonus, hurt)
+
+    def monster_turn_pmf_now(self, name, bonus=0, hurt=False):
         """(damage pmf of one action of this monster, P(instant death) per action); bonus: to its to-hit. Each hit's
         damage less rnd(-AC) at a negative AC (fightmodel.ac_reduce), a weapon attack of a kind we saw hit / miss
         without swinging one: its own dice only (mon_unarmed), its spells (AT_MAGC: fightmodel.cast_chance /
@@ -365,6 +384,10 @@ class DangerMixin:
         return out
 
     def monster_round(self, name, hurt=False):
+        """monster_round_now, once per tick and observation (fight_tables)."""
+        return self.fight_tables("round", self.monster_round_now, name, hurt)
+
+    def monster_round_now(self, name, hurt=False):
         """(damage pmf, P(instant death)) of this monster's actions in one game turn (mcalcmove); hurt:
         monster_turn_pmf's."""
         pm = PM_BY_NAME.get(name)
