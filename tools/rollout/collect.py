@@ -37,8 +37,10 @@ DEFAULTS = {
     "max_dp": 150,             # decision points at most per game
     "max_secs": 2700,          # ... and wall-clock seconds of rollouts per game
     "options": None,           # the options tried (None: every legal one)
-    "variants": (),            # the policy variants tried: names of VARIANTS ("all": every one), and
-                               # "model=PATH": the bot with tactic_model = PATH (an absolute path)
+    "variants": (),            # the policy variants tried: names of VARIANTS ("all": every one); "model=PATH":
+                               # the bot with tactic_model = PATH (an absolute path), rolled out where the chooser
+                               # acts at once; {"name": N, "opts": {...}}: the bot under any options, rolled out at
+                               # every decision point
     "hp_frac": 0.5,            # trigger: HP below this fraction
     "pdeath": 0.003,           # ... or danger.py's P(death next turn) at least this
     "win_prob": 0.85,          # ... or win_prob at most this
@@ -107,9 +109,10 @@ def calm(bot):
     return bot.elb.state is None and not bot.hp_below(bot.opts.rest_frac) and not hostiles_in_view(bot)
 
 
-def rollout(bot, c, opt, horizon, record_keys=False, settle=0):
+def rollout(bot, c, opt, horizon, record_keys=False, settle=0, overrides=None):
     """In a child: force `opt` at this tick, play on for `horizon` turns (and up to `settle` more until calm); the
-    outcome as a dict. record_keys: also the number and a hash of the keys sent (the determinism check)."""
+    outcome as a dict. record_keys: also the number and a hash of the keys sent (the determinism check).
+    overrides: `opt` is a policy variant -- these bot options instead of a forced action."""
     keys = None
     if record_keys:
         keys, orig = [], bot.raw_step
@@ -123,12 +126,14 @@ def rollout(bot, c, opt, horizon, record_keys=False, settle=0):
     res = {"opt": opt, "ok": True, "first": None}
     marks, cps = [], list(CHECKPOINTS)
     try:
-        if opt.startswith("v:model="):           # the learned chooser in the loop from this tick on
-            bot.tactic_load(opt[len("v:model="):])
-            acted = bot.tactic_choose(c)
-        elif opt.startswith("v:"):               # a policy variant: the scripted steps under changed options
-            bot.opts._values.update(VARIANTS[opt[2:]][0])
+        if overrides is not None:
+            # a policy variant: the bot under changed options from this tick on; with a tactic_model among them the
+            # chooser is in the loop (and has its say at this tick, which is already past the tactic step's check)
+            bot.opts._values.update(overrides)
             acted = False
+            if overrides.get("tactic_model"):
+                bot.tactic_load(overrides["tactic_model"])
+                acted = bot.tactic_choose(c)
         else:
             acted = opt != "default" and bot.tactic_start(opt, c)
             res["ok"] = acted or opt == "default"
@@ -185,6 +190,18 @@ class Collector:
                 self.models[path] = TacticModel(json.load(fh))
         return self.models[path]
 
+    def overrides(self, opt):
+        """The bot options of the policy variant `opt` ("v:..."), None for a forced action."""
+        if not opt.startswith("v:"):
+            return None
+        name = opt[2:]
+        if name.startswith("model="):
+            return {"tactic_model": name[6:]}
+        for v in self.cfg["variants"] if self.cfg["variants"] != "all" else ():
+            if isinstance(v, dict) and v["name"] == name:
+                return dict(v["opts"])
+        return dict(VARIANTS[name][0])
+
     def trigger(self, f):
         """A decision point: a hostile next to us and we are hurt, or danger.py says the fight is a risk; or hurt
         with a hostile within 3 squares."""
@@ -215,7 +232,9 @@ class Collector:
         opts = [o for o in legal if cfg["options"] is None or o in cfg["options"]]
         names = VARIANTS if cfg["variants"] == "all" else cfg["variants"]
         for v in names:
-            if v.startswith("model="):
+            if isinstance(v, dict):
+                opts.append("v:" + v["name"])            # {"name", "opts"}: rolled out at every decision point
+            elif v.startswith("model="):
                 # a chooser in the loop: rolled out where it would act otherwise than the script right now (its
                 # pick is recorded); elsewhere its child would only repeat the default
                 pick = self.model(v[6:]).choose(feat, legal) if self.model(v[6:]).wants(feat) else "default"
@@ -260,7 +279,8 @@ class Collector:
         def child_main(bot):
             if seed is not None:
                 fork.reseed(bot, seed, lgen=seed)
-            return json.dumps(rollout(bot, c, opt, self.cfg["horizon"], record_keys, self.cfg["settle"])).encode()
+            return json.dumps(rollout(bot, c, opt, self.cfg["horizon"], record_keys, self.cfg["settle"],
+                                      self.overrides(opt))).encode()
 
         raw = fork.fork_child(bot, child_main, root=self.root)
         for name in os.listdir(self.root):               # a killed child's directory
