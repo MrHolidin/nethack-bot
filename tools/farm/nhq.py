@@ -181,6 +181,11 @@ class Job:
         os.rename(os.path.join(Q, self.tag + ".json"), os.path.join(Q, "done", self.tag + ".json"))
 
 
+def prio_class(p):
+    """0: prio <= 2 (smoke tests, baselines), 1: 3-4 (screens), 2: 5 and up (background)."""
+    return 0 if p <= 2 else 1 if p <= 4 else 2
+
+
 def daemon(a):
     for d in (Q, RES, SRC):
         os.makedirs(d, exist_ok=True)
@@ -231,7 +236,14 @@ def daemon(a):
                 break
             # the lowest prio number; among equals the owner (agent) with the fewest games running, and of its
             # jobs the oldest: an agent's screens run one after another, so its first answer comes soon
-            j = min(cand, key=lambda j: (j.spec["prio"], share.get(j.owner, 0), j.t0))
+            # three classes, strictly in order: prio <= 2 (smoke tests, baselines), 3-4 (screens), 5+ (background).
+            # Inside a class the workers are shared between the owners (agents) -- an owner with a prio-3 job
+            # counts three times -- and an owner's jobs run lowest prio first, then oldest: its first answer soon
+            heavy = {j.owner for j in cand if j.spec["prio"] == 3}
+            j = min(cand, key=lambda j: (prio_class(j.spec["prio"]),
+                                         j.spec["prio"] if j.spec["prio"] <= 2 else 0,
+                                         share.get(j.owner, 0) / (3 if j.owner in heavy else 1),
+                                         j.spec["prio"], j.t0))
             j.start()
             share[j.owner] = share.get(j.owner, 0) + 1
             busy += 1
