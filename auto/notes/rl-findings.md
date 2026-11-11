@@ -1,76 +1,104 @@
 # rl — findings for the orchestrator (agent `rl`, branch `a/rl`)
 
-Status 21:45 UTC: **preliminary** — 1 700 decision points of ~150 games (seeds 400100+), 2 futures per option,
-300 turns each. Intervals are 95 % bootstrap over games. "Deaths" = died within 300 turns of the decision, in
-percentage points, option − scripted default, paired on the future's seed. Tools and how to read them:
-`tools/rollout/README.md`. Log: `rl-notes.md`.
+Updated 22:45 UTC. Tools and how to read them: `tools/rollout/README.md`; log: `rl-notes.md`.
+Intervals are 95 % bootstrap over games. "Deaths" are percentage points, option − scripted default, paired on the
+future's seed. J ×10⁻³ = the difference in the game's value in the session's index (score / 27000 + depth / 11),
+banked at a death or valued at the calm end of the window (`tools/rollout/value.py`).
 
-## 0. Answer to "what was the rollout evidence for elb_hp 0.7?" (rl_elb70_s, rl_elbexit100_s)
+## 1. Two rules worth a whole-game A/B (candidates; micro-evidence strong, whole-game run queued)
 
-The rollouts say more Elbereth saves lives over 300 turns and costs score in the window:
+Both are in `nhbot/data/rule_r12.json`, switched on by the option `tactic_model: "data/rule_r12.json"` (off by
+default; `regress.py check` strict 32 / 32 with it off; branch `a/rl`, commit aa7cef6). They act in the fights
+that are nearly lost and nowhere else.
 
-| sustained variant (child plays on under the changed option) | n | deaths | score gained in the window |
+**R1 — mobbed and losing: write Elbereth even where the script holds it back.**
+`elbereth: >= 2 hostiles next to us, >= 2 of them respect Elbereth, danger.win_prob <= 0.3, HP <= 75 %` (and
+Elbereth can be written here). In 68 % of these states the script is not writing because of `elb_blocked` (some
+monster in view ignores Elbereth or might shoot), in the rest because HP is still above half. Typical: 3 next to
+us, 7 hostiles in view, HP 40 %, depth 9, XL 7; soldier ants, wolves / jackals, moccasins off the fountain,
+leocrottas, mixed mobs.
+
+- search sample (seeds 400100–406030, one forced Elbereth then the script, any HP; 164 pairs, 58 games): dead within 300
+  turns −10.4 [−20.2, −0.6], J +308 [+69, +538];
+- **confirmation on fresh seeds** (414000–414065, the rule written down first — `rl-notes.md` 22:27 — and run as
+  a *sustained* policy against the script, 1000 turns and on until calm; 111 pairs, 24 games): dead within 50
+  turns 40.5 % → **−22.5 [−34.4, −13.5]**, within 300 turns **−19.8 [−30.3, −9.1]**, within 1000 turns 64.9 % →
+  **−23.4 [−33.3, −12.4]**; J **+342 [+150, +533]**; score in the window +540. The gap does not close with the
+  horizon: these are deaths avoided, not postponed.
+- frequency: the rule acts at once in ~0.5 fights a game (37 such decision points in 66 games, at most one per 25
+  turns).
+
+**R2 — critically low HP and the script's prayer timer says no: pray from 150 turns after the last prayer.**
+`pray: HP critically low (pray.c's own test), can_pray false, > 150 turns since the last prayer, no healing
+potion in the pack, god not angry`. NetHack's rule (pray.c: timeout rnz(350) after a prayer, heard in major
+trouble when it is <= 200; my Monte Carlo of rnz): a prayer g turns after the last is heard with P = 0.50 at
+g = 150, 0.55 at 200, 0.66 at 300, 0.77 at 400, 0.87 at 500. The script waits for 500 (`pray_gap`).
+
+- rollouts of 3000 turns at critically-low-HP states (seeds 410000+, 3 futures; the default is dead within 300
+  turns in 72 % and within 3000 in 85 %):
+
+  | against the script | pairs / games | dead ≤ 300 | dead ≤ 1000 | dead ≤ 3000 | score by turn 3000 | J ×10⁻³ |
+  |---|---|---|---|---|---|---|
+  | pray now (once) | 126 / 21 | −17.5 [−36.5, −3.7] | −14.3 [−31.4, −2.8] | −8.7 [−22.6, +2.0] | +1140 [−503, +3619] (default 2601) | +173 [−172, +602] |
+  | `pray_gap` 150, sustained | 96 / 19 | −25.0 [−40.4, −11.1] | −17.7 [−34.5, −4.4] | −11.5 [−25.7, −1.0] | +1508 [+234, +3049] (default 1717) | +312 [+29, +676] |
+  | `pray_gap` 300, sustained | 63 / 13 | −30.2 [−52.2, −8.7] | | | | +335 [−116, +815] |
+  | melee (once) | 271 / 51 | +10.0 [+3.6, +16.0] | | | | −211 [−441, −7] |
+
+  The 3000-turn window includes what an unheard prayer costs (the god angered, the bot never prays again). Games
+  are still few (13–21): the size is uncertain, the sign is not in doubt at 300–1000 turns.
+- The rule is narrower than `pray_gap: 150` on purpose: `pray_gap` also governs the prayers for lycanthropy and
+  a handless polymorph, where nothing is lost by waiting.
+
+Whole game: `rl_r12b_s` (500 games of D1 against `base_d1`, commit aa7cef6) is queued behind `rl_elb70_s`. One
+game of the smoke test, seed 400201: the script dies at turn 5221 with 4 678 points mobbed by wolves and gnomes;
+with the rules it is alive at depth 21 with 96 212 points when my 60 000-key cap stops it (the rule acted twice).
+One game is an anecdote; it shows why a few avoided deaths can move the mean.
+
+## 2. What the rollouts say about everything else: the script's choices stand
+
+One forced action, then the script (general decision points: a hostile next to us and HP < 50 %, or danger.py
+flags the fight; ~4 000 points, 300 games):
+
+| forced instead of the script | where | deaths ≤ 300 turns | note |
 |---|---|---|---|
-| `elb_hp` 0.7 (Elbereth below 70 % HP) | 470 | −1.28 [−2.90, 0.00]; within 50 turns −1.17 [−2.11, −0.46] | −58 [−80, −40] |
-| `elb_exit` 1.0, `elb_early` 0.85 (stay until full HP) | 470 | −1.70 [−3.33, −0.22] | −23 [−43, −4] |
-| `elb_hp` 0.35 | 596 | +1.34 [−0.07, +2.73] | +41 [+24, +60] |
-| `rest_frac` 0.7 / 0.9 | 455 / 494 | 0.00 / −0.10 | −26 / −31 |
+| melee | script says Elbereth (782 pairs) | −0.1 [−2.2, +1.9]; ≤ 50 turns +1.2 [+0.1, +2.4] | no pace gain either (score −16) |
+| melee | fights nearly lost (789 pairs, 75 games) | +2.8 [0.0, +6.0]; ≤ 50 turns +4.9 [+2.6, +8.2] | |
+| zap the attack wand | everywhere (320) | +3.0 [−0.3, +5.7]; win_prob 0.3–0.6: +16.7 [+7.6, +28.6] | the script's wand rule is right to hold back |
+| quaff a healing potion | everywhere (160 in dangerous fights) | +0.6 [−4.4, +7.1] | |
+| down / up the stairs within 15 squares | everywhere (222 / 309) | +3.8 [−0.6, +8.9] / +0.5 [−3.2, +3.7] | at win_prob < 0.3: −10 [−30, +4] / −6 [−18, +1]: open |
+| Elbereth | ordinary fights where the script fights | −2.8 [−5.5, −0.2] at 300 turns, gone later | see 3. |
 
-I know the owner's whole-game result (−1209 [−1710, −741] on base b4). I queued the two runs **as a calibration
-of the harness's label, not as candidates**: the rollouts and the old whole-game A/B disagree in sign, and I need
-to know which holds on today's bot before any chooser is trained on "alive 300 turns later". What I found since
-in the old run itself (results branch, `a4_elbhp7` vs `b4`, 1000 seeds): with elb_hp 0.7 the games were
-*shorter* — turns 6064 → 5863, kills 98 → 93, Elbereths 5.5 → 13.5 a game, starved 100 → 109 — so on that bot
-more Elbereth meant dying earlier, not only playing slower; Elbereth has been reworked since (read-back,
-`elb_stale` +609), so the old sign may not hold. Also relevant: the owner's `elb_sim` (Elbereth when the fight
-sim with it beats fighting on) on today's base: −1163, 80 % CI [−3247, +1072] (`elb_sim_80k` − `base22_80k`,
-my recomputation): no gain. **If rl_elb70_s comes back negative, every "safer" row below is suspect** and the
-label needs a pace correction; I am measuring that directly too (rollouts of 3000 turns, `tools/rollout/horizon.py`).
-`rl_elbexit100_s` has not started: cancel it if you want the workers (`nhq cancel rl_elbexit100_s`).
+Sustained parameter variants: `pray_gap` 800: +13.2 [+5.3, +21.9] (n 19) — waiting longer is clearly worse;
+`rest_frac` 0.7 / 0.9: 0.0 / −0.1 deaths, −26 / −31 score a window; `elb_hp` 0.35: +1.3 [−0.1, +2.7], +41 score;
+`elb_exit` 0.7: −0.4 [−1.2, +0.4], +14 score.
 
-## 1. How often is the scripted choice wrong? (one forced action, then the script)
+## 3. The trap in the method: a 300-turn window overrates anything that postpones a fight
 
-| forced instead of the script | where | n | deaths | score in window |
-|---|---|---|---|---|
-| melee | script says Elbereth | 620 | +0.08 [−2.22, +2.55] | +21 |
-| Elbereth | script says melee (HP ≥ 50 % or Elbereth "blocked") | 428 | −2.80 [−5.46, −0.23] | −51 [−114, −3] |
-| … of which Elbereth not blocked, HP ≥ 50 %, the fight flagged by danger.py (win_prob ≤ 0.85 or P(death next turn) ≥ 0.3 %) | | 188 | **−4.26 [−7.50, −1.30]** (10.1 % → 5.9 %); within 50 turns −3.72 [−6.58, −1.87] | +49 [−10, +120] |
-| … of which Elbereth blocked (`elb_blocked`: a monster in view that ignores it / may shoot), HP < 50 % | | 186 | −0.54 [−5.31, +3.71]; within 50 turns −4.30 [−8.51, −0.24] | −76 |
-| zap the attack wand | everywhere it is possible | 320 | +2.97 [−0.31, +5.74] | −7 |
-| zap | script says Elbereth | 211 | +4.27 [0.00, +8.02] | +6 |
-| down the stairs (within 15 squares) | everywhere | 222 | +3.83 [−0.63, +8.86] | +12, max depth +0.28 |
-| up the stairs | everywhere | 309 | +0.49 [−3.17, +3.69] | −82 |
-| quaff a healing potion | everywhere | 61 | +3.28 [−1.67, +13.10] | −29 |
-| pray although the script's timer says no | critically low HP | 9 | 0.00 [−46, +39] | |
-| `pray_gap` 800 (sustained) | HP < 40 %, 480–800 turns since a prayer | 19 | **+13.2 [+5.3, +21.9]** | −65 |
-| `pray_gap` 300 (sustained) | HP < 40 %, 250–520 turns since a prayer | 35 | −1.43 [−3.12, 0.00] | +30 |
+`elb_hp` 0.7 and `elb_exit` 1.0 cut deaths within 300 turns (−1.3 [−2.9, 0.0], −1.7 [−3.3, −0.2]); played out
+for 3000 turns (389 points, 49 games) the gain is gone and the score is a little behind: `elb_hp` 0.7: deaths
+−0.4 at 1000 turns, score −137 at 1000, −295 [−886, +271] at 3000 (default 5760). One forced Elbereth in an
+ordinary fight: deaths +1.2 [−5.9, +7.9] at 3000. A window that ends with the bot still on its square and the
+monster still there counts a postponed fight as a won one; and about half of the default's rollouts are dead by
+turn 3000 in either hand, so the score is made by pace. That is why I queued `rl_elb70_s` (the owner's −1209 was
+on a much older bot): as a calibration of the label, not as a candidate. Since then every rollout plays on until
+the fight is over (`settle`) and is valued in J, and a rule counts only if its gain holds at 1000+ turns (R1, R2
+do). `rl_elbexit100_s` cancelled.
 
-Reading: the script's melee / wand / potion / stairs choices are not beaten by any single alternative — the wand
-and stairs logic is right to hold back, praying later is clearly worse, earlier is not clearly better. The one
-place the rollouts disagree with the script is **Elbereth in a dangerous fight while HP is still above half**
-(see 0. for why this is not yet a recommendation).
+## 4. Where the deaths are (for the other agents)
 
-## 2. The fights the games died in
+- 42 of 60 collecting games died within 25 turns of a decision point: the trigger sees about two thirds of all
+  deaths. In those last fights the default is dead within 50 turns in 74 % of fresh re-rolls.
+- 11 of 43 fatal fights were at the fountain: 4–5 water moccasins or a water demon at XL 5, full HP, standing on
+  the fountain (no Elbereth there). base_d1 + base_d2 (2000 games), commonest attacker in the last messages:
+  water demon 4.5 % of games, water moccasin 3.9 % (mean score 3.3 k / 4.4 k), troll 2.5 %, soldier ant 2.5 %,
+  starvation 2.5 % (mean 61 k), killer bee 2.4 %, fire ant 2.2 %, leocrotta 2.2 %, gremlin 1.8 % (mean 78 k).
+- danger.win_prob against what happens (2 853 points, the script playing): where it says >= 0.99 (974 points)
+  2.6 % are dead within 20 turns; unseen attackers ('I': 1.0 by construction) 16.7 % within 50; dwarf, jackal
+  packs, hill orc, fire ant are worse than modelled; pony, giant bat, giant ant, rothe much safer.
 
-42 of 60 finished collecting games died within 25 turns of their last decision point (63 % of the total score
-is in those games): the trigger sees about two thirds of all deaths. At that last point, every option re-rolled
-with fresh seeds (the default too — these states are picked by their outcome, so the default's death rate is
-high by selection):
+## 5. Open
 
-- default: dead within 50 turns in 74 % of the re-rolls;
-- Elbereth forced where the script did something else (31 points): 42 % (**−32 [−52, −15]**); within 300 turns
-  77 % → 60 % (−18 [−34, −5]);
-- 11 of 43 fatal fights (one more game had finished by then) are at the **fountain**: 4–5 water moccasins or a water demon at XL 5 with full HP,
-  standing on the fountain (no Elbereth possible there). On base_d1 + base_d2 (2000 games) the commonest
-  attacker in the last messages: water demon 4.5 % of games, water moccasin 3.9 % (mean score 3.3 k / 4.4 k),
-  troll 2.5 %, soldier ant 2.5 %, starvation 2.5 % (mean 61 k), killer bee 2.4 %, fire ant 2.2 %, leocrotta
-  2.2 %, gremlin 1.8 % (mean 78 k). The fountain agent's work covers the first two; the rollouts at water
-  moccasins (47 points): default dies 27.7 %, up the stairs −8 (n 12), down −17 (n 6), Elbereth −4.5 (n 11).
-
-## 3. What is in doubt
-
-- **The label.** "Alive 300 turns later" favours anything that slows the game down. `tools/rollout/value.py`
-  values a rollout by the game's index J instead (banked at a death; a value fitted on baseline snapshots if
-  alive), but that value does not see experience not gained (XL is its only growth feature). The calibration runs
-  in 0. decide how far the tables can be trusted.
-- Sample: 1 700 points; the cells above with n < 100 are hints, not results.
+- R1 / R2 whole-game (`rl_r12b_s`), more confirmation points (`m2`), R2's size (`x3` still collecting).
+- A learned chooser over the same states (stage 3) only if it beats R1 + R2 on held-out games.
+- The harness can screen any tactical option of another branch the same way in under an hour (merge the branch
+  into an evaluation checkout, add a line to `collect.VARIANTS`).
