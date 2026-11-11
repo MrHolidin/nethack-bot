@@ -89,6 +89,8 @@ class DeepState:
         self.no_up = set()             # level keys whose up stairs lead onto Medusa's island: never taken
         self.above = None              # the level key above a dead end we went back up to: its down stairs are
                                        # hidden; the shaft (medusa_dig), the patrol (dead_end_patrol) are there
+        self.rise_to = None            # dead_end_patrol, patrol_rise: the level key we climb to for the patrol
+        self.diving = False            # dead_end_dive: the keys are nearly spent -- no patrol any more, down
         self.near_at = {}              # dead_end_patrol: level key -> the turn each square was last within
                                        # PATROL_R of us (0: never)
         self.mark = {}                 # summary: event -> (turn, score, kills) when it first happened
@@ -140,15 +142,39 @@ class DeepMixin:
             elif st.above == lv.key:
                 st.above = None
                 self.deep_mark("farm_end")
+        elif st.above is not None and not st.diving and self.max_steps - self.steps < self.opts.dead_end_dive:
+            # dead_end_dive: the patrol is over -- down again (the stairs show), through the floor where we can
+            st.diving, st.above, st.rise_to = True, None, None
+            self.deep_mark("final_dive")
+        if st.rise_to is not None and self.rise_step(lv):
+            return
         if self.deep_on() and lv.key[0] == 0 and lv.key[1] >= MEDUSA_MIN:
             if lv.key not in st.kind:
                 self.water_dead_end(lv, self.grids(lv)[0])
             past = any(k == "medusa" and key[1] < lv.key[1] for key, k in st.kind.items())
             if past and "past_medusa_at" not in st.mark:
                 self.deep_mark("past_medusa")
-            if past and self.opts.medusa_dive and self.dive_step(lv):
+            if past and (self.opts.medusa_dive or st.diving) and self.dive_step(lv):
                 return
         super().explore(lv)
+
+    def dig_now(self):
+        """medusa_dig acts now: at once without dead_end_patrol; with it, when the patrol is over (dead_end_dive)."""
+        return self.opts.medusa_dig and (self.deep.diving or not self.opts.dead_end_patrol)
+
+    def rise_step(self, lv):
+        """patrol_rise: on the way up from the level above the dead end to the patrol level (DeepState.rise_to) by
+        the stairs we know (explore.level_travel_step). True if it used the turn; with no way up known the patrol
+        is where we are."""
+        st = self.deep
+        if lv.key[0] == 0 and lv.key[1] > st.rise_to[1]:
+            st.above = lv.key                         # its down stairs hidden while we pass, and if we stay
+            if self.level_travel_step(lv, self.grids(lv), st.rise_to, "patrol", "patrol_rise"):
+                return True
+        st.rise_to = None
+        if lv.key[0] == 0:
+            st.above = lv.key
+        return False
 
     def search_mode(self, lv, grids):
         """explore has nothing left on this level but walls to search: at a water dead end, the hole / the way
@@ -218,9 +244,9 @@ class DeepMixin:
         -- for the shaft or the patrol. True if it used the turn."""
         st = self.deep
         if st.above == lv.key:
-            if self.opts.medusa_dig and self.shaft_step(lv, grids):
+            if self.dig_now() and self.shaft_step(lv, grids):
                 return True
-            if self.opts.dead_end_patrol or self.opts.farm_dlvl:
+            if (self.opts.dead_end_patrol and not st.diving) or self.opts.farm_dlvl:
                 return self.patrol_step(lv, grids)
             st.above = None                           # no shaft to take: as before (down again, the walls searched)
             return False
@@ -228,9 +254,10 @@ class DeepMixin:
         if kind is None:
             return False
         self.deep_once("dead_end_" + kind, lv)
-        if self.opts.medusa_dig and kind == "medusa" and self.medusa_dig_step(lv, grids):
+        if self.dig_now() and kind == "medusa" and self.medusa_dig_step(lv, grids):
             return True
-        if self.opts.dead_end_patrol or (self.opts.medusa_dig and kind == "medusa" and self.shaft_hope(lv)):
+        if (self.opts.dead_end_patrol and not st.diving) \
+                or (self.dig_now() and kind == "medusa" and self.shaft_hope(lv)):
             return self.dead_end_leave_step(lv, grids)
         return False
 
@@ -421,13 +448,15 @@ class DeepMixin:
                 and (above in self.levels or st.kind.get(lv.key) == "medusa"):
             if up[self.pos()]:
                 st.above = above
+                if self.opts.patrol_rise and not st.diving and self.opts.dead_end_patrol:
+                    st.rise_to = (above[0], max(1, above[1] - self.opts.patrol_rise))
                 self.deep_mark("back_up")
                 self.cur_act = "patrol"
                 self.take_stairs("<")
                 return True
             if self.walk_to(lv, up, act="patrol", grids=grids)[0] == "moved":
                 return True
-        if not self.opts.dead_end_patrol:
+        if not self.opts.dead_end_patrol or st.diving:
             return False
         st.above = lv.key
         self.deep_once("patrol_here", lv)

@@ -32,6 +32,10 @@ DEFAULTS = {
     "dead_end_patrol": False,  # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
                                #      back up the stairs and a patrol of the level above for the rest of the game
                                #      (nhbot.deep)
+    "patrol_rise": 0,          # with dead_end_patrol: the patrol is this many levels above the level over the dead
+                               #      end (weaker random monsters: makemon.c rndmonst, (depth + XL) / 2)
+    "dead_end_dive": 0,        # with dead_end_patrol: with this many keys of the budget left the patrol ends and we go
+                               #      down again -- with medusa_dig through the floor, past Medusa to the Castle
     "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol
                                #      of dead_end_patrol) until farm_keys keys are sent; 0: off (nhbot.deep)
     "farm_keys": 150_000,
