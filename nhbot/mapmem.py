@@ -68,6 +68,11 @@ TOWN_SOUNDS = ("cursing shoplifters", "chime of a cash register", "Neiman and Ma
                "a soda fountain", "a slow drip", "a gurgling noise", "dishes being washed")
 
 
+# dokick.c:782-810 dokick: a kick refused for our body or load (no time) -- kicking the door again would loop (300835: a
+# form "too small to do any kicking", 105 guard firings)
+KICK_REFUSED = ("no shape for kicking", "not enough room to kick", "no legs to kick with", "too small to do any kicking",
+                "legs cannot kick effectively", "too heavy to balance yourself for a kick")
+
 class Level:
     def __init__(self, key):
         self.key = key
@@ -453,7 +458,7 @@ class MapMixin:
                 lv.blocked[self.nav.last_move_target] = True
         if lv and self.nav.last_move_target and "It's solid stone" in m:
             self.rock_note(lv, self.pos(), self.nav.last_move_target)    # rockdig.py: gold / gems seen in rock
-        if ("no shape for kicking" in m or "not enough room to kick" in m) and lv and self.nav.last_move_target:
+        if any(t in m for t in KICK_REFUSED) and lv and self.nav.last_move_target:
             # can't kick from here (wounded legs: dokick.c; in a pit): kicking the door again would loop
             lv.blocked[self.nav.last_move_target] = True
         if lv and ("Closed for inventory" in m or any(engraving_says(t, "Closed for inventory")

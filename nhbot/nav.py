@@ -190,6 +190,12 @@ class NavMixin:
         y, x = self.pos()
         ty, tx = target
         key = DELTA2KEY[(ty - y, tx - x)]
+        if ty != y and tx != x and self.poly_form() == "grid bug":
+            # a grid bug moves orthogonally only ("You can't get there from here...", cmd.c:4880, no time): no
+            # diagonal from here (Level.no_diag) -- the path goes square next tick
+            self.level().no_diag[y, x] = True
+            self.nav.door_stats["grid_bug_diagonal"] += 1
+            return
         self.nav.last_move_target = target
         before = (y, x, self.turn())
         lv = self.level()

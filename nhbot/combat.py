@@ -115,8 +115,9 @@ class CombatMixin:
         self.combat = CombatState()
 
     def throwables(self):
-        if self.handless():
-            return []                        # "You can't throw or shoot without hands."
+        if self.handless() or self.turn() - self.acts.no_throw_turn < 50:
+            return []                        # "You can't throw or shoot without hands."; a form "physically incapable
+                                             # of throwing" (actions.throw): the throw, no time, came every tick
         out = []
         for it in self.items():
             if it.held or it.cursed:

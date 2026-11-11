@@ -564,7 +564,10 @@ class LuckstoneMixin:
         """One step toward the nearest of targets (squares) by path -- they may be unseen yet (a dark closet). The
         status of walk_to."""
         mask = _mask(targets)
-        st = self.walk_to(lv, mask, act="luckstone", also=mask)[0]
+        # a target made passable (it may be unseen) -- not one the map shut (Level.blocked: a squeeze refused for our
+        # weight with nothing left to drop, carry.squeeze_step): stepping at it again took no time, every tick, till
+        # the loop guard (301048, 301959: 200 000 keys)
+        st = self.walk_to(lv, mask, act="luckstone", also=mask & ~lv.blocked)[0]
         if st == "moved":
             self.luck_did("walk")
         return st
