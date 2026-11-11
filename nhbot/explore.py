@@ -36,6 +36,8 @@ class ExploreMixin:
         k_mem, k_live, passable = grids = self.grids(lv)
         start = self.pos()
         y, x = start
+        if self.pace.peek_from is not None and self.pace_peek_back(lv, grids):
+            return
 
         unknown = (k_mem == G.UNKNOWN) & ~lv.near
         dil = np.zeros_like(unknown)
@@ -183,7 +185,7 @@ class ExploreMixin:
             return True
         if downstairs[start]:
             if gated:
-                return self.pace_wait(lv)
+                return self.pace_peek(lv, start) or self.pace_wait(lv)
             if not self.pace_diving() and self.pet_wait_before_stairs():
                 self.press("s")
                 return True

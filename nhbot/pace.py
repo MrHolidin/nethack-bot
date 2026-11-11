@@ -54,6 +54,9 @@ class PaceState:
         # next trip starts / this one is given up, the last goals (the next one lies away from them)
         self.patrol_key, self.patrol_goal, self.patrol_next, self.patrol_until = None, None, 0, 0
         self.patrol_seen = []
+        # pace_peek: the levels we looked below from, the one we are looking below from now (None: not), and
+        # whether the stairs back up were taken
+        self.peeked, self.peek_from, self.peek_up = set(), None, False
 
 
 class PaceMixin:
@@ -188,6 +191,39 @@ class PaceMixin:
         score = np.where(ok, score, -1)
         best = np.unravel_index(np.argmax(score), score.shape)
         return (int(best[0]), int(best[1])) if score[best] > 5 else None
+
+    def pace_peek(self, lv, pos):
+        """pace_peek, gated on a staircase never taken: one look at the level below before the wait -- down and
+        straight back up (pace_peek_back). A game that ends in the hold has reached that depth (50 points and the
+        depth objective), and the level below is made now, for the weaker hero we still are (makemon.c: monster
+        difficulty by our XL at creation). Once a level, at descend_rest_hp of max HP with no hostile in view."""
+        if not self.opts.pace_peek or lv.key in self.pace.peeked or pos in lv.stairs_to \
+                or self.hp_below(self.opts.descend_rest_hp) or self.visible_hostiles(lv):
+            return False
+        self.pace.peeked.add(lv.key)
+        self.pace.peek_from, self.pace.peek_up = lv.key, False
+        self.pace.stats["peeks"] += 1
+        self.cur_act = "pace"
+        self.take_stairs(">")
+        return True
+
+    def pace_peek_back(self, lv, grids):
+        """The look below (pace_peek) is over: back up the staircase we arrived on (or next to: a monster stood
+        on it). Out of reach, or the stairs led elsewhere: we stay where we are. True if it used the turn."""
+        if lv.key == self.pace.peek_from or self.pace.peek_up:
+            self.pace.peek_from = None
+            return False
+        up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
+        self.cur_act = "pace"
+        if up[self.pos()]:
+            self.pace.peek_up = True
+            self.take_stairs("<")
+            return True
+        if up.any() and self.walk_to(lv, up, grids=grids, max_cost=20)[0] == "moved":
+            return True
+        self.pace.peek_from = None
+        self.pace.stats["peek_stuck"] += 1
+        return False
 
     def pace_summary(self):
         if not self.opts.pace and not self.opts.pace_dive:

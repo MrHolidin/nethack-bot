@@ -42,6 +42,8 @@ DEFAULTS = {
                                #      many turns after the last one (0: never count on a prayer)
     "pace_patrol": 0,         # with pace: gated, a walk to a far square of the level and back every this many turns
                                #      (0: never) -- it brings out the monsters that stand behind walls
+    "pace_peek": False,        # with pace: before the wait at a gate, down the stairs once and straight back up --
+                               #      the depth is reached whatever becomes of the hold
     "pace_dive": 0,           # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,
                                #      down the first stairs found, nothing optional (0: never)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
