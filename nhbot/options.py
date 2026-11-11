@@ -24,6 +24,18 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "retreat": False,          # A/B: leave a melee fight we are losing (prayer not available, HP below retreat_hp,
+                               #      win_prob below retreat_win): by the stairs, Elbereth, an escape item (nhbot.retreat)
+    "retreat_hp": 0.5,         # with retreat: losing only below this fraction of max HP
+    "retreat_win": 0.5,        # ... and danger.win_prob of the fight next to us below this
+    "retreat_pp_window": 0,    # ... for this many turns after a prayer (0: none) the thresholds below instead
+    "retreat_pp_hp": 0.7,
+    "retreat_pp_win": 0.8,
+    "retreat_far": 30,         # path cost at most to a staircase when no chaser is faster than us
+    "retreat_near": 3,         # ... when one is
+    "retreat_cool": 30,        # turns after a flight a stalker followed: no stairs again
+    "retreat_rest": 0.9,       # after a flight: rest on the arrival staircase up to this fraction of max HP (0: off)
+    "retreat_elb": True,       # Elbereth when only class-C monsters (may carry missiles / wands) block it
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)

@@ -48,6 +48,7 @@ STEPS = (
                          # in the way attacked (nhbot.sokoban) -- before the fight steps
     "weapon",
     "wands",
+    "retreat",           # retreat: a fight being lost -- leave by the stairs, Elbereth, an escape item (nhbot.retreat)
     "melee",
     "hunt_shooter",
     "rest_on_elbereth",
