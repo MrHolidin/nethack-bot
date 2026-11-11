@@ -81,6 +81,8 @@ HOUSEKEEPING = (
                                                                                     # level is solved
     ("lamp", lambda b, c: not b.soko_stealth(c.lv) and b.lamp_step()),              # no lamp's djinni by a sleeping zoo
     ("read_scroll", lambda b, c: b.read_scroll_step(c.lv)),
+    ("oil_fix", lambda b, c: b.oil_fix_step()),           # oil: the rusty weapon in hand dipped into oil
+    ("oil_test", lambda b, c: b.oil_test_step()),         # oil: untried potions applied (only oil lights)
     ("jewelry_id", lambda b, c: b.jewelry_id_step(c.lv)),
     ("wandid", lambda b, c: b.wandid_step(c.lv)),
     ("quaff_test", lambda b, c: b.quaff_test_step(c.lv)),
