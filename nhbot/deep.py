@@ -22,18 +22,22 @@ medusa_dig: past Medusa through the floor.
   The level below Medusa's has its up stairs on her island (her gaze: death without reflection): never taken
   (DeepState.no_up -- stairs_mask, revisit_up).
 
-dead_end_patrol: at such a dead end with no way through -- back up the stairs we came by (never onto Medusa's
-island) and walk about the ordinary level above for the rest of the game: the random monsters the game makes (1 in
-70 turns, allmain.c) come at us by greedy steps (monmove.c m_move) and stay stuck behind walls or across the water: on the
-level above we met 7.0 kills per 500 turns, 5.7 points a turn, and lived half as long again. On that level its down stairs are hidden from explore (stairs_mask), which goes on taking
-items and frontiers; where it would search walls, we walk to the nearest square not seen for patrol_stale turns.
+dead_end_patrol: at such a dead end -- back up the stairs we came by (never onto Medusa's island; from her level
+as soon as its lake shows: the depth is reached) and walk about the ordinary level above for the rest of the game.
+The random monsters the game makes (1 in 70 turns, allmain.c) come at us by greedy steps (monmove.c m_move) and stay
+stuck behind walls or across the water: on the level above we made 7.0 kills per 500 turns, 5.7 points a turn, and
+lived half as long again. On that level its down stairs are hidden from explore (stairs_mask), which goes on taking
+items and frontiers, and the holes, trap doors and level teleporters we know are never walked over
+(passable_grid); where explore would search walls, we walk to the nearest square not seen for patrol_stale turns.
 With no way up we may take (the Castle right below Medusa's level) the patrol is where we are, off the squares
 next to water (castle.des puts giant eels and sharks in the moat).
+  patrol_rise: the patrol that many levels higher. patrol_hp: it rests while hurt. dead_end_dive: with that many
+  keys left it ends, and medusa_dig takes us down (below Medusa's level the next hole at once, as medusa_dive).
 
-The steps hang on methods explore calls, overridden here (the mixin comes first in Bot): search_mode -- the dead end
-is told where explore has nothing left but walls to search --, stairs_mask, passable_grid, revisit_up; and
-weapons.swap_back (the digger stays in our hands while the only hostiles in view are far). With both options off each override is the
-method it replaces.
+The steps hang on methods explore calls, overridden here (the mixin comes first in Bot): explore itself, search_mode
+-- the dead end is told where explore has nothing left but walls to search --, stairs_mask, passable_grid,
+revisit_up; and weapons.swap_back (the digger stays in our hands while the only hostiles in view are far). With the
+options off each override is the method it replaces.
 """
 from collections import Counter
 
