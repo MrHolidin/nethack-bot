@@ -36,6 +36,7 @@ from nhbot.thieves import ThievesMixin
 from nhbot.value import ValueMixin
 from nhbot.wandid import WandIdMixin
 from nhbot.danger import DangerMixin
+from nhbot.deep import DeepMixin
 from nhbot.tins import TinMixin
 from nhbot.actions import ActionsMixin
 from nhbot.altar import AltarMixin
@@ -57,13 +58,14 @@ from nhbot.luckstone import LuckstoneMixin
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
 
-class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
+class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, PerceptionMixin, SurvivalMixin, CombatMixin,
           ElberethMixin, ThievesMixin, WeaponsMixin, ExploreMixin, MinesMixin, ExcaliburMixin, ShopMixin, EquipMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
           LuckstoneMixin, PaceMixin):
-    OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
+    OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc",
+                "tty_cursor")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
@@ -118,6 +120,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         self.rock_dig_init()
         self.lock_init()
         self.luckstone_init()
+        self.deep_init()
         self.weapons_init()
         self.elbereth_init()
         self.shop_init()
@@ -157,9 +160,11 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             self.gift_apply()
             while True:
                 t0 = self.turn()
-                self.cur_act = "other"
+                self.prev_act, self.cur_act = self.cur_act, "other"
                 self.tick()
                 dt = self.turn() - t0
+                if self.klog is not None:
+                    self.key_stats_tick(dt)
                 if dt > 0:
                     # time per activity: the label an action set (fight, rest, explore, search, ...), else the
                     # policy step that acted
@@ -181,6 +186,37 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             pass
         return self.summary()
 
+    def key_stats_tick(self, dt):
+        """key_stats: the keys of the tick just played, by activity (the time_by label), free (no turn passed) or
+        not; the tick's key sequence (runs of one key shortened) by activity."""
+        if not hasattr(self, "kstat"):
+            from collections import Counter
+            self.kstat = {"keys": Counter(), "free": Counter(), "turns": Counter(), "ticks": Counter(),
+                          "key": Counter(), "seq": Counter(), "seqk": Counter()}
+        k, ks = self.klog, self.kstat
+        act = self.cur_act if self.cur_act != "other" else (self.pol.last_step or "other")
+        ks["keys"][act] += len(k)
+        ks["turns"][act] += dt
+        ks["ticks"][act] += 1
+        if dt == 0:
+            ks["free"][act] += len(k)
+        for c in k:
+            ks["key"][c] += 1
+        s = "".join(chr(c) if 32 < c < 127 else {13: "<CR>", 27: "<ESC>", 32: "<SP>"}.get(c, f"<{c}>") for c in k)
+        s = re.sub(r"(.)\1{3,}", lambda m: f"{m.group(1)}*{len(m.group(0))}", s)[:40]
+        ks["seq"][f"{act}|{dt > 0}|{s}"] += 1
+        ks["seqk"][f"{act}|{dt > 0}|{s}"] += len(k)
+        self.klog = []
+
+    def key_stats_summary(self):
+        ks = getattr(self, "kstat", None)
+        if ks is None:
+            return {}
+        return {"key_stats": {"keys": dict(ks["keys"]), "free": dict(ks["free"]), "turns": dict(ks["turns"]),
+                              "ticks": dict(ks["ticks"]), "key": {str(c): n for c, n in ks["key"].items()},
+                              "count": dict(self.kcount),
+                              "seq": {q: [ks["seq"][q], n] for q, n in ks["seqk"].most_common(80)}}}
+
     def snapshot(self):
         """State every SNAP_EVERY turns (stats "snaps"): to see where two runs of one seed part, and in what."""
         magic = [it for it in self.items() if it.ocls in MAGIC_CLASSES]
@@ -190,7 +226,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
                 "xl": self.bl(nh.NLE_BL_XP), "hp": self.bl(nh.NLE_BL_HP), "maxhp": self.bl(nh.NLE_BL_HPMAX),
                 "ac": self.bl(nh.NLE_BL_AC), "gold": self.bl(nh.NLE_BL_GOLD),
                 "pet": self.turn() - self.pol.pet_last_seen <= 100, "magic_known": len(magic) - unknown,
-                "magic_unknown": unknown, "kills": len(self.combat.kills), "prayers": self.surv.prayers}
+                "magic_unknown": unknown, "kills": len(self.combat.kills), "prayers": self.surv.prayers,
+                "score": int(self.reward), "keys": self.steps}
 
     def summary(self):
         last = [m for _, m in list(self.messages)[-10:]]
@@ -267,12 +304,13 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             "shops": self.shop.seen,
             "desperate": self.pol.desperations,
             "unblock": [self.combat.unblocks, self.combat.unblock_throws],
-            "vault": [self.surv.vault_drops, self.surv.vault_moves, self.surv.vault_approach, self.surv.vault_bag_outs], **self.vault_summary(), **self.dig_through_summary(), **self.rock_dig_summary(), **self.lock_summary(), **self.luckstone_summary(), "stun_peace_waits": self.pol.stun_peace_waits,
+            "vault": [self.surv.vault_drops, self.surv.vault_moves, self.surv.vault_approach, self.surv.vault_bag_outs], **self.vault_summary(), **self.dig_through_summary(), **self.rock_dig_summary(), **self.lock_summary(), **self.luckstone_summary(), **self.deep_summary(), "stun_peace_waits": self.pol.stun_peace_waits,
             "items_first": self.expl.items_first_holds,
             **self.pace_summary(),
             **self.hidden_summary(),
             "mines_return_descents": self.mines.return_descents,
             "peaceful_waits": self.nav.peaceful_waits,
+            "peace_wait_blocks": self.nav.peace_wait_blocks,
             "msg_audit": dict(self.msg_audit),
             "farlooks": self.perc.farlooks,
             "peaceful_hits": dict(self.perc.peaceful_hits),
@@ -300,4 +338,5 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             "race": self.race,
             "dnum": self.bl(nh.NLE_BL_DNUM),
             "last_msgs": self.death_msgs or last,
+            **self.key_stats_summary(),
         }

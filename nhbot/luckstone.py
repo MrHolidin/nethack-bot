@@ -99,6 +99,7 @@ LEVEL_TURNS = 3000                   # turns spent on Mines' End (Level.turns_he
                                      # against 13)
 # sell offers for one unidentified gray stone (shk.c:2324-2370): half the price, or a third; rounded
 PRICES = {"luckstone": 60, "touchstone": 45, "flint": 1}
+SQUEEZE_WAIT_MAX = 50           # luck_squeeze: turns waited for a peaceful monster in the niche before giving the pocket up
 # what became of a site (luck_status) -- a niche, a chamber square, a spot or a loose stone ("loose", square)
 STATUSES = {
     "kicked": "gray stones flew off its pile at a kick: collected along the line next",
@@ -112,6 +113,7 @@ STATUSES = {
     "ambiguous": "a gray stone lay where the kicked one landed before the kick: none taken (it was never tested)",
     "no_lane": "no square to kick it from and into",
     "too_heavy": "the pocket's squeeze refused with nothing unworn left to drop",
+    "peaceful_in_way": "a peaceful monster stayed in the pocket's niche for SQUEEZE_WAIT_MAX turns",
     "door_given_up": "its secret door not found, or not opened",
     "lost": "no path to the square it needs us on",
     "unreachable": "out of reach once the level is explored (or we are leaving the Mines)",
@@ -300,6 +302,7 @@ class LuckState:
         self.plan_wait = 0               # no tunnel planned before this turn
         self.stash = None                # (level key, square, {stack_key}) our things left before the squeeze
         self.squeeze_refused = False     # the last squeeze step was refused for our weight
+        self.squeeze_waits = 0           # turns waited for a peaceful monster in the pocket's niche (luck_squeeze)
         self.lifting = False             # picking up our stones now (luck_lift)
         self.legs_until = 0              # no kick before this turn (wounded legs)
         self.done = set()                # level keys finished
@@ -847,8 +850,19 @@ class LuckstoneMixin:
         self.luck.stats["squeeze_steps"] += 1
         seq0 = self.msg_seq
         self.press(DELTA2KEY[(SQUEEZE_IN[0] - here[0], SQUEEZE_IN[1] - here[1])])
+        said = self.text_since(seq0)
+        if "Really attack" in said:
+            # a peaceful monster in the niche (answered no: no game time) -- the same step every tick, ended only by
+            # the loop guard (300317: 150 000 keys); wait a turn for it, give the pocket up after SQUEEZE_WAIT_MAX
+            self.luck.squeeze_waits += 1
+            self.luck.stats["squeeze_peaceful"] += 1
+            if self.luck.squeeze_waits > SQUEEZE_WAIT_MAX:
+                self.luck_status(lv, POCKET_1, "peaceful_in_way")
+                return False
+            self.press("s")
+            return True
         # refused: no game time -- drop more, or give up, next tick
-        self.luck.squeeze_refused = "carrying too much" in self.text_since(seq0)
+        self.luck.squeeze_refused = "carrying too much" in said
         return True
 
     def luck_unstash(self, lv):

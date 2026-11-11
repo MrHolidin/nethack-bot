@@ -67,6 +67,16 @@ class GoldBagMixin:
         self.bag.stats["unload_before_drop"] += 1
         return self.bag_take_out(bag)
 
+    def gold_bag_stuck(self, it):
+        """it is the bag with our gold in it and we carry too much to apply it -- Overtaxed or worse: apply.c doapply
+        -> check_capacity (hack.c:3134, near_capacity() >= EXT_ENCUMBER) refuses ("You can't do that while carrying so much stuff.", no game time); the drop step
+        took it out of the bag again every tick till the loop guard (300066: 111 000 keys): drop something else."""
+        bag = self.gold_bag()
+        if bag is None or bag.letter != it.letter or self.bag.gold <= 0 or self.bl(nh.NLE_BL_CAP) < 4:
+            return False
+        self.bag.stats["unload_too_heavy"] += 1
+        return True
+
     def bag_open(self, bag):
         """Apply the bag: True if its "Do what with ..." menu is up. A bag that gives none (a bag of tricks
         makes a monster or bites) is not used again."""

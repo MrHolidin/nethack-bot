@@ -21,6 +21,7 @@ class PerceptionState:
         self.farlooks = 0              # ';' looks that peaceful_now made
         self.peace_cls = {}            # permonst index -> 1 always peaceful / -1 never / 0 either (peace_class)
         self.peace_seen = {}           # (level, glyph, pos) -> (turn, peaceful): a look or 'Really attack?'
+        self.peace_kept_at = -1        # peace_cache: keys sent when peace_follow last ran
         self.hostile_marks = {}        # level key -> [(glyph, pos)]: 'peaceful' monsters that attacked us
         self.peaceful_hits = Counter() # species: attacks on us by a monster we took for peaceful
         self.peace_turned = 0          # looks that found a kind created peaceful hostile
@@ -96,6 +97,9 @@ class PerceptionMixin:
         if pos in self.track_hostile_marks(lv):
             return False
         ck = (lv.key, g, pos)
+        if self.opts.peace_cache:
+            self.peace_follow(lv)
+            slack = max(slack, self.opts.peace_cache)
         s = self.perc.peace_seen.get(ck)
         if s is not None and s[0] >= self.turn() - slack:
             return s[1]
@@ -113,7 +117,8 @@ class PerceptionMixin:
                 self.perc.empty_looks += 1
             if len(self.perc.peace_seen) > 400:
                 t = self.turn()
-                self.perc.peace_seen = {k: v for k, v in self.perc.peace_seen.items() if v[0] >= t - 2}
+                keep = max(2, self.opts.peace_cache)
+                self.perc.peace_seen = {k: v for k, v in self.perc.peace_seen.items() if v[0] >= t - keep}
             self.perc.peace_seen[ck] = (self.turn(), peaceful)
             if cls > 0 and not peaceful:
                 self.perc.peace_turned += 1
@@ -123,11 +128,44 @@ class PerceptionMixin:
             return peaceful
         return cls > 0
 
+    def peace_follow(self, lv):
+        """peace_cache: the looks (peace_seen) follow their monsters, once per observation: kept while a monster of the
+        glyph is still on the square; one that left -- the one monster of its glyph within 2 squares that no other
+        look claims, and no other look that lost its monster near it either (which one went where is not known);
+        else forgotten (out of view, crowded, another level). So a look holds for its monster as long as we can follow
+        it and at most peace_cache turns; a monster we took for peaceful that attacks us is marked hostile anyway
+        (msg_peace), and "gets angry" forgets the level's looks (msg_peace)."""
+        if self.perc.peace_kept_at == self.steps:
+            return
+        self.perc.peace_kept_at = self.steps
+        gm = self.obs["glyphs"]
+        t0 = self.turn() - self.opts.peace_cache
+        keep, lost = {}, []
+        for (k, g, q), v in self.perc.peace_seen.items():
+            if k != lv.key or v[0] < t0:
+                continue
+            if int(gm[q]) == g:
+                keep[(k, g, q)] = v
+            else:
+                lost.append((g, q, v))
+        if lost:
+            near2 = lambda a, b: max(abs(a[0] - b[0]), abs(a[1] - b[1])) <= 2
+            mons = self.visible_monsters()
+            for g, q, v in lost:
+                cand = [m for m in mons if int(gm[m]) == g and near2(m, q) and (lv.key, g, m) not in keep]
+                if len(cand) == 1 and not any(h == g and q2 != q and near2(cand[0], q2) for h, q2, _ in lost):
+                    keep[(lv.key, g, cand[0])] = v
+        self.perc.peace_seen = keep
+
     def msg_peace(self, msg, lv):
         """A monster we take for peaceful attacked us: count it (by kind), and every one of that kind next to
         us is hostile from now on."""
         if lv is None or int(self.last_bl[nh.NLE_BL_CONDITION]) & nh.BL_MASK_HALLU:
             return
+        if self.opts.peace_cache and ("angry" in msg.text or "furious" in msg.text):
+            # "The gnome gets angry!", "You hear the shopkeeper's angry voice", a priest "is furious": a look may
+            # be out of date -- the level's looks forgotten
+            self.perc.peace_seen = {k: v for k, v in self.perc.peace_seen.items() if k[0] != lv.key}
         g = self.obs["glyphs"]
         y, x = self.pos()
         adj = [(y + dy, x + dx) for dy, dx in NEIGH if 0 <= y + dy < ROWS and 0 <= x + dx < COLS
