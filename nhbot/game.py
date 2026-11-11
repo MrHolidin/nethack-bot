@@ -3,6 +3,7 @@ import re
 from collections import Counter, deque
 
 import nle.nethack as nh
+import numpy as np
 
 from nhbot.consts import DELTA2KEY
 from nhbot.events import RESHOW_KEYS, Message
@@ -13,6 +14,22 @@ MENU_RE = re.compile(r"\(end\)|\(\d+ of \d+\)")      # a menu or text window is 
 MENU_ITEM_RE = re.compile(r"^\s*([a-zA-Z]) - (.*)$")
 MENU_ITEM_GOLD_RE = re.compile(r"^\s*([a-zA-Z$]) - (.*)$")   # gold's line too: "$ - 173 gold pieces" (goldbag)
 PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")       # a menu page: "(1 of 2)"
+
+
+LONG_WORM_TAIL = nh.GLYPH_MON_OFF + 326      # monnum_to_glyph(PM_LONG_WORM_TAIL): not in the 'm' list of a farlook
+
+
+def cursor_keys(dy, dx):
+    """The keys that move a farlook / getpos cursor by (dy, dx): diagonal first, by 8 with the capital keys."""
+    keys = []
+    while dy or dx:
+        sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
+        n = min(abs(dy), abs(dx)) if sy and sx else max(abs(dy), abs(dx))
+        step = 8 if n >= 8 else 1
+        key = DELTA2KEY[(sy, sx)]
+        keys.append(key.upper() if step == 8 else key)
+        dy, dx = dy - sy * step, dx - sx * step
+    return keys
 
 
 class GameOver(Exception):
@@ -340,25 +357,49 @@ class GameMixin:
         return n
 
     def describe_at(self, pos):
-        """Farlook (';' with autodescribe) at any square: the cursor goes there by single steps, by 8 with
-        the capital keys; next to us this is ";" and one direction key."""
+        """Farlook (';' with autodescribe) at any square. The cursor goes there by direction keys (by 8 with the
+        capital keys; next to us this is ";" and one direction key) -- or, when fewer keys, by 'm' / 'M', which step
+        through the monsters shown on the map nearest first (monster_rank); the cursor read back (tty_cursor) and
+        whatever is left walked with direction keys. The description is the same either way (do_name.c getpos:
+        auto_describe(cx, cy) after every key) -- and the look takes no game time."""
         y, x = self.pos()
-        dy, dx = pos[0] - y, pos[1] - x
         n0 = self.steps
         self.raw_step(ord(";"))
-        while dy or dx:
-            sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
-            n = min(abs(dy), abs(dx)) if sy and sx else max(abs(dy), abs(dx))
-            step = 8 if n >= 8 else 1
-            key = DELTA2KEY[(sy, sx)]
-            self.raw_step(ord(key.upper() if step == 8 else key))
-            dy, dx = dy - sy * step, dx - sx * step
+        keys = cursor_keys(pos[0] - y, pos[1] - x)
+        jump = self.monster_rank(pos)
+        if jump is not None and jump[1] < len(keys):
+            for _ in range(jump[1]):
+                self.raw_step(ord(jump[0]))
+            cy, cx = int(self.obs["tty_cursor"][0]) - 1, int(self.obs["tty_cursor"][1])
+            if (cy, cx) != pos:
+                self.msg_audit["farlook_jump_missed"] += 1
+            keys = cursor_keys(pos[0] - cy, pos[1] - cx)
+        for k in keys:
+            self.raw_step(ord(k))
         desc = self.top_line()
         self.raw_step(27)
         self.kcount["farlook"] += self.steps - n0
         self.kcount["farlook_far" if max(abs(pos[0] - y), abs(pos[1] - x)) > 1 else "farlook_adj"] += 1
         self.settle()
         return desc
+
+    def monster_rank(self, pos):
+        """The cursor keys of a farlook that bring it from us to the monster shown on pos: ('m', k) -- 'm' k times -- or
+        ('M', n - k), whichever is fewer; None if no monster is shown there. do_name.c gather_locs (GLOC_MONS): our
+        square and every square showing a monster glyph (glyph_is_monster: also pets, detected and ridden ones; not
+        the plain long worm tail), sorted by cmp_coord_distu -- Chebyshev distance from us, then y, then x -- our
+        square first; 'm' steps forward through them from it, 'M' backward."""
+        g = self.obs["glyphs"]
+        mon = ((g < nh.GLYPH_INVIS_OFF) | ((g >= nh.GLYPH_DETECT_OFF) & (g < nh.GLYPH_DETECT_OFF + nh.NUMMONS))
+               | ((g >= nh.GLYPH_RIDDEN_OFF) & (g < nh.GLYPH_RIDDEN_OFF + nh.NUMMONS))) & (g != LONG_WORM_TAIL)
+        if not mon[pos]:
+            return None
+        y, x = self.pos()
+        ys, xs = np.nonzero(mon)
+        locs = sorted({(int(a), int(b)) for a, b in zip(ys, xs)} | {(y, x)},
+                      key=lambda p: (max(abs(p[0] - y), abs(p[1] - x)), p[0], p[1]))
+        k = locs.index(pos)
+        return ("m", k) if k <= len(locs) - k else ("M", len(locs) - k)
 
     def on_message(self, msg):
         """Every logged message, parsed once (events.Message), to each domain in this order: the raw-text readers get
