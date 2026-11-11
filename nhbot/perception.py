@@ -167,11 +167,12 @@ class PerceptionMixin:
                 if self.is_actively_dangerous(lv, p)]
 
     def visible_monsters(self):
-        """Squares of the monsters on screen other than us."""
-        g = self.obs["glyphs"]
-        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-        me = self.pos()
-        return [(int(a), int(b)) for a, b in zip(ys, xs) if (a, b) != me]
+        """Squares of the monsters on screen other than us (a tuple, worked out once per observation)."""
+        def find():
+            ys, xs = np.nonzero(G.KIND[self.obs["glyphs"]] == G.MONSTER)
+            me = self.pos()
+            return tuple((a, b) for a, b in zip(ys.tolist(), xs.tolist()) if (a, b) != me)
+        return self.per_obs("visible_monsters", find)
 
     def stationary_avoid(self, lv):
         """The never-melee monsters that never move (molds, lichens' kin: mmove 0) stay where we saw
