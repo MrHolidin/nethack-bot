@@ -56,6 +56,8 @@ class RetreatState:
         self.flight = None           # dict(key, turn, followed, rested): the last flight by the stairs
         self.last_act = None         # turn of the last retreat action (died_after)
         self.wp_cache = (None, None)
+        self.why = ("-", "-")         # why the stairs / Elbereth were not taken this tick (retreat_why)
+        self.why_stats = Counter()
 
 
 class RetreatMixin:
@@ -117,6 +119,7 @@ class RetreatMixin:
             self.retreat.walk = None
             return False
         ch = self.chasers(lv, c.hostiles)
+        self.retreat.why = ("-", "off" if not self.opts.retreat_elb else "-")
         if walking and not losing:
             hp_thr = self.opts.retreat_pp_hp if self.retreat_after_prayer() else self.opts.retreat_hp
             if not ch or not self.hp_below(hp_thr):
@@ -134,6 +137,16 @@ class RetreatMixin:
         if self.retreat_dig(lv):
             return True
         self.retreat.stats["no_exit"] += 1
+        self.retreat.why_stats["stairs:" + self.retreat.why[0]] += 1
+        self.retreat.why_stats["elb:" + self.retreat.why[1]] += 1
+        for _, n in c.hostiles:
+            self.retreat.why_stats["mon:" + n] += 1
+        return False
+
+    def retreat_why(self, why, stairs=True):
+        """Note why an exit was not taken (summary "retreat_why", counted on the ticks no exit was found). False."""
+        w = self.retreat.why
+        self.retreat.why = (why, w[1]) if stairs else (w[0], why)
         return False
 
     def retreat_acted(self, what):
@@ -169,19 +182,19 @@ class RetreatMixin:
         ours = self.our_speed()
         fl = self.retreat.flight
         if fl is not None and fl["followed"] and fl["key"] == lv.key and c.t - fl["turn"] <= self.opts.retreat_cool:
-            return False                                    # a stalker came along last time: no stair dance
+            return self.retreat_why("cool")                 # a stalker came along last time: no stair dance
         pms = [PM_BY_NAME.get(n) for _, n in ch]
         stalkers = [t for t, pm in zip(ch, pms) if pm is not None and pm.mflags2 & M2_STALK or t[1] == "invisible"]
         slower = [t for t, pm in zip(ch, pms) if pm is not None and pm.mmove < ours]
         if ch and len(stalkers) == len(ch) and not slower:
-            return False                                    # every one of them follows us and keeps up: no gain
+            return self.retreat_why("all_stalk")            # every one of them follows us and keeps up: no gain
         mask = self.retreat_stairs_mask(lv)
         if not mask.any():
-            return False
+            return self.retreat_why("no_stairs")
         if mask[y, x]:
             followers = [t for t in c.hostiles if t in stalkers]
             if ch and len(followers) == len(ch):
-                return False                                # all that chase us stand next to us and follow
+                return self.retreat_why("followers")        # all that chase us stand next to us and follow
             self.retreat.flight = {"key": None, "from": lv.key, "turn": c.t, "followed": False,
                                    "rested": 0, "n_follow": len(followers)}
             self.retreat.walk = None
@@ -201,7 +214,7 @@ class RetreatMixin:
         _, prev, reached = self.dijkstra(lv, k_mem, k_live, ok, (y, x), mask, max_cost=limit, want_dist=False)
         step = self.first_step(prev, (y, x), reached) if reached is not None else None
         if step is None:
-            return False
+            return self.retreat_why("far_fast" if fast else "no_path")
         if self.retreat.walk is None or self.retreat.walk["key"] != lv.key:
             self.retreat.walk = {"key": lv.key, "since": c.t}
             self.retreat.stats["walks"] += 1
@@ -245,13 +258,13 @@ class RetreatMixin:
         """Elbereth against monsters that respect it, though a class-C one in view (may carry a missile or a wand)
         keeps step_elbereth from writing (module docstring). True if it acted."""
         if self.elb.state is not None or not self.elb_can_write(lv):
-            return False
+            return self.retreat_why("elb_cant", stairs=False)
         if any(not self.respects(p, n) for p, n in hostiles):
-            return False
+            return self.retreat_why("elb_ignored", stairs=False)
         glyphs, me = self.obs["glyphs"], self.pos()
         pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
         if ELB.blockers(glyphs, me, pp, lv.key[0], optimistic=True):
-            return False
+            return self.retreat_why("elb_blocked", stairs=False)
         self.retreat_acted("elbereth")
         return self.elb_write(lv)
 
@@ -291,4 +304,4 @@ class RetreatMixin:
         out = dict(self.retreat.stats)
         if self.done and not self.truncated and self.retreat.last_act is not None:
             out["died_after"] = int(self.turn() - self.retreat.last_act <= 50)
-        return {"retreat": out}
+        return {"retreat": out, "retreat_why": dict(self.retreat.why_stats)}
