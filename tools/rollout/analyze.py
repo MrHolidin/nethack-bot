@@ -15,10 +15,14 @@ from collections import defaultdict
 import numpy as np
 
 HORIZONS = (20, 50, 100, 300)
+SAME_AS = {"melee": "melee", "elbereth": "elbereth", "pray": "pray", "heal": "quaff"}     # as collect.SAME_AS
 
 
 def load(dirs):
-    """The decision points of every game file under dirs, as dicts (rolls with a crash dropped)."""
+    """The decision points of every game file under dirs, as dicts (rolls with a crash dropped). A record that has
+    its start state (state0) gets every roll's value in the index J (tools/rollout/value.py) as roll["uj"]."""
+    from tools.rollout.value import SCORE0, Value
+    value = Value()
     recs = []
     for d in dirs:
         for f in sorted(glob.glob(os.path.join(d, "[0-9]*.jsonl"))):
@@ -26,6 +30,9 @@ def load(dirs):
                 for line in fh:
                     r = json.loads(line)
                     r["rolls"] = [x for x in r["rolls"] if "crash" not in x]
+                    if "state0" in r:
+                        for x in r["rolls"]:
+                            x["uj"] = value.of_rollout(r, x) + (0 if x["died"] else x["score"] / SCORE0)
                     recs.append(r)
     return recs
 
@@ -45,6 +52,7 @@ def option_stats(rec, h):
                   "hp": np.mean([0.0 if x["died"] else x["hp"] / max(x["maxhp"], 1) for x in xs]),
                   "pray": np.mean([x["prayers"] for x in xs]), "score": np.mean([x["score"] for x in xs]),
                   "mdepth": np.mean([x["max_depth"] for x in xs]),
+                  "uj": np.mean([x.get("uj", np.nan) for x in xs]),
                   "ok": np.mean([x["ok"] for x in xs]), "n": len(xs),
                   "first": xs[0].get("first")}
     return out
@@ -70,11 +78,13 @@ def fmt(m, lo, hi, scale=100):
 
 def paired_table(recs, h, where=None, title=""):
     """Per option: the decision points where it is legal (and where holds), death by h of default and of the
-    option there, and the paired difference with its interval (percentage points; negative: the option saves);
+    option there (not where the scripted step is that very option), and the paired difference with its interval
+    (percentage points; negative: the option saves);
     the differences in prayers used, final HP fraction, score gained and max depth gained over the whole window
     (the horizon the data was collected with) -- an option that only slows the game down saves lives per turn and
-    loses score."""
-    rows = defaultdict(lambda: ([], [], [], [], [], [], []))
+    loses score. J: the difference in the value of the game in the session's index (tools/rollout/value.py), in
+    thousandths, over the decision points that have it."""
+    rows = defaultdict(lambda: ([], [], [], [], [], [], [], []))
     n = 0
     for r in recs:
         if where is not None and not where(r):
@@ -84,20 +94,24 @@ def paired_table(recs, h, where=None, title=""):
             continue
         n += 1
         for o, s in st.items():
-            if o == "default" or s["ok"] < 1:
-                continue
+            if o == "default" or s["ok"] < 1 or SAME_AS.get(st["default"]["first"]) == o:
+                continue                             # (the scripted step's own option: the default itself)
             a = rows[o]
             a[0].append(st["default"]["death"]); a[1].append(s["death"]); a[2].append(r["seed"])
             a[3].append(s["pray"] - st["default"]["pray"]); a[4].append(s["hp"] - st["default"]["hp"])
             a[5].append(s["score"] - st["default"]["score"]); a[6].append(s["mdepth"] - st["default"]["mdepth"])
+            a[7].append(s["uj"] - st["default"]["uj"])
     print(f"\n{title}  ({n} decision points; death within {h} turns, %; diff = option - default)")
     print(f"  {'option':12s} {'n':>6s} {'default':>8s} {'option':>8s}  {'diff [95% CI]':28s} {'prayers':>8s} {'hp_end':>7s} "
-          f"{'score [95% CI]':>24s} {'maxdepth':>9s}")
+          f"{'score [95% CI]':>24s} {'maxdepth':>9s} {'J x1000 [95% CI] (n)':>30s}")
     for o in sorted(rows, key=lambda o: -len(rows[o][0])):
-        d, v, g, pr, hp, sc, md = rows[o]
+        d, v, g, pr, hp, sc, md, uj = rows[o]
         diff = np.array(v) - np.array(d)
+        ok = ~np.isnan(uj)
+        ujs = f"{fmt(*boot_ci(np.array(uj)[ok], np.array(g)[ok]), scale=1000)} ({ok.sum()})" if ok.any() else ""
         print(f"  {o:12s} {len(d):6d} {np.mean(d) * 100:8.2f} {np.mean(v) * 100:8.2f}  {fmt(*boot_ci(diff, g)):28s} "
-              f"{np.mean(pr):+8.3f} {np.mean(hp):+7.3f} {fmt(*boot_ci(sc, g), scale=1):>24s} {np.mean(md):+9.3f}")
+              f"{np.mean(pr):+8.3f} {np.mean(hp):+7.3f} {fmt(*boot_ci(sc, g), scale=1):>24s} {np.mean(md):+9.3f} "
+              f"{ujs:>30s}")
 
 
 def main():

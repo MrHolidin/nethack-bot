@@ -26,7 +26,7 @@ import nle.nethack as nh
 from nhbot.game import GameOver
 from tools.rollout import fork
 
-CHECKPOINTS = (5, 10, 20, 50, 100, 200)
+CHECKPOINTS = (5, 10, 20, 50, 100, 200, 300, 500, 1000, 1500, 2000, 3000)   # HP and score gained at these turns
 DEFAULTS = {
     "horizon": 300,            # game turns a child plays on
     "reps": 2,                 # children per option, each with its own future (the same seeds for every option)
@@ -34,7 +34,8 @@ DEFAULTS = {
     "max_dp": 150,             # decision points at most per game
     "max_secs": 2700,          # ... and wall-clock seconds of rollouts per game
     "options": None,           # the options tried (None: every legal one)
-    "variants": (),            # the policy variants tried (names of VARIANTS; "all")
+    "variants": (),            # the policy variants tried: names of VARIANTS ("all": every one), and
+                               # "model=PATH": the bot with tactic_model = PATH (an absolute path)
     "hp_frac": 0.5,            # trigger: HP below this fraction
     "pdeath": 0.003,           # ... or danger.py's P(death next turn) at least this
     "win_prob": 0.85,          # ... or win_prob at most this
@@ -73,12 +74,19 @@ def key_hash(keys):
     return hashlib.sha256(b"".join(k.to_bytes(4, "little") for k in keys)).hexdigest()[:16]
 
 
+ABSOLUTE = ("hp", "maxhp", "depth", "xl", "god_angry", "ac", "gold", "hunger", "pray_gap")   # the rest: gained
+
+
 def state_of(bot):
+    """The bot's state in numbers (a record's "state0"; a rollout reports ABSOLUTE as is, the others as gains)."""
+    last = bot.surv.last_pray
     return {"hp": bot.bl(nh.NLE_BL_HP), "maxhp": bot.bl(nh.NLE_BL_HPMAX), "depth": bot.bl(nh.NLE_BL_DEPTH),
             "max_depth": bot.max_depth, "xl": bot.bl(nh.NLE_BL_XP), "exp": bot.bl(nh.NLE_BL_EXP),
             "score": bot.reward, "prayers": bot.surv.prayers, "quaffs": bot.surv.quaffs, "zaps": bot.acts.zaps,
             "elb": bot.elb.elbereths, "steps": bot.steps, "kills": bot.combat.kill_count,
-            "god_angry": int(bot.surv.god_angry), "pray_failed": bot.surv.pray_failed}
+            "god_angry": int(bot.surv.god_angry), "pray_failed": bot.surv.pray_failed,
+            "ac": bot.bl(nh.NLE_BL_AC), "gold": bot.bl(nh.NLE_BL_GOLD), "hunger": bot.bl(nh.NLE_BL_HUNGER),
+            "pray_gap": bot.turn() - last if last is not None else bot.turn() + 200}
 
 
 def rollout(bot, c, opt, horizon, record_keys=False):
@@ -97,7 +105,10 @@ def rollout(bot, c, opt, horizon, record_keys=False):
     res = {"opt": opt, "ok": True, "first": None}
     marks, cps = [], list(CHECKPOINTS)
     try:
-        if opt.startswith("v:"):                 # a policy variant: the scripted steps under changed options
+        if opt.startswith("v:model="):           # the learned chooser in the loop from this tick on
+            bot.tactic_load(opt[len("v:model="):])
+            acted = bot.tactic_choose(c)
+        elif opt.startswith("v:"):               # a policy variant: the scripted steps under changed options
             bot.opts._values.update(VARIANTS[opt[2:]][0])
             acted = False
         else:
@@ -112,7 +123,7 @@ def rollout(bot, c, opt, horizon, record_keys=False):
         while True:
             dt = bot.turn() - t0
             while cps and dt >= cps[0]:
-                marks.append((cps.pop(0), bot.bl(nh.NLE_BL_HP)))
+                marks.append((cps.pop(0), bot.bl(nh.NLE_BL_HP), bot.reward - s0["score"]))
             if dt >= horizon:
                 break
             bot.play_tick()
@@ -120,7 +131,7 @@ def rollout(bot, c, opt, horizon, record_keys=False):
         pass
     s1 = state_of(bot)
     res.update(died=int(bot.done and not bot.truncated), dt=bot.turn() - t0, marks=marks,
-               **{k: s1[k] - s0[k] if k not in ("hp", "maxhp", "depth", "xl", "god_angry") else s1[k] for k in s1})
+               **{k: s1[k] if k in ABSOLUTE else s1[k] - s0[k] for k in s1})
     if res["died"]:
         res["death"] = (bot.death_msgs or [m for _, m in list(bot.messages)[-3:]])[-3:]
     if keys is not None:
@@ -172,7 +183,9 @@ class Collector:
         legal = bot.tactic_legal(c, hostiles)
         opts = [o for o in legal if cfg["options"] is None or o in cfg["options"]]
         names = VARIANTS if cfg["variants"] == "all" else cfg["variants"]
-        opts += ["v:" + v for v in names if VARIANTS[v][1](feat)]
+        opts += ["v:" + v for v in names if v.startswith("model=") or VARIANTS[v][1](feat)]
+        if len(opts) < 2:
+            return                                   # nothing to compare the default with here
         t = time.monotonic()
         rolls = []
         for rep in range(cfg["reps"]):
@@ -189,7 +202,7 @@ class Collector:
                 r["rep"] = rep
                 rolls.append(r)
         self.secs += time.monotonic() - t
-        rec = {"seed": bot.seed, "dp": self.n_dp, "t": c.t, "feat": feat, "legal": legal,
+        rec = {"seed": bot.seed, "dp": self.n_dp, "t": c.t, "feat": feat, "legal": legal, "state0": state_of(bot),
                "adj": [(n, p[0] - c.y, p[1] - c.x) for p, n in hostiles],
                "vis": [(n, p[0] - c.y, p[1] - c.x) for p, n in c.vis][:16],
                "wands": [k for _, k in bot.attack_wands()], "rolls": rolls, "secs": round(time.monotonic() - t, 1)}
@@ -230,13 +243,14 @@ class Collector:
 
 # ---------------------------------------------------------------------------------------------- command line
 def play(args):
-    seed, out_dir, cfg = args
+    seed, out_dir, cfg, bot_kw = args
     from nhbot import Bot
     t = time.monotonic()
     out = os.path.join(out_dir, f"{seed}.jsonl")
     if os.path.exists(out):
         os.remove(out)
-    bot = Bot(seed=seed, character="val", rollout={"out": out_dir, **cfg})     # nhbot.tactic installs the Collector
+    # nhbot.tactic installs the Collector (option 'rollout')
+    bot = Bot(seed=seed, character="val", rollout={"out": out_dir, **cfg}, **bot_kw)
     try:
         s = bot.run()
         col = bot.tac.hook.__self__
@@ -268,6 +282,8 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("-j", type=int, default=1, help="games in parallel (the children of a game run one at a time)")
     ap.add_argument("--cfg", default="{}", help="Collector settings as JSON (collect.DEFAULTS)")
+    ap.add_argument("--bot-kw", default="{}", help="bot options as JSON, e.g. the chooser in the loop: "
+                    "'{\"tactic_model\": \"data/tactic_v1.json\"}' (the rollouts then continue under it too)")
     ap.add_argument("--selftest", action="store_true", help="the isolation and determinism checks (selftest.py)")
     a = ap.parse_args()
     pinned_clock()
@@ -279,7 +295,8 @@ def main():
     import multiprocessing as mp
     cfg = json.loads(a.cfg)
     with mp.Pool(a.j) as pool:
-        for info in pool.imap_unordered(play, [(s, a.out, cfg) for s in range(lo, hi)], chunksize=1):
+        jobs = [(s, a.out, cfg, json.loads(a.bot_kw)) for s in range(lo, hi)]
+        for info in pool.imap_unordered(play, jobs, chunksize=1):
             print(json.dumps(info), flush=True)
 
 

@@ -40,10 +40,16 @@ def value(x, h, hp_w):
     return alive + x["score"] / SCORE_C + (hp_w * x["hp"] / max(x["maxhp"], 1) if alive and hp_w else 0.0)
 
 
-def table(recs, h, hp_w, min_ok=1):
+def table(recs, h, hp_w, mode="alive"):
     """Per decision point: features, and per option the mean value over its replicates and the paired differences
-    to the default, replicate by replicate."""
+    to the default, replicate by replicate. mode "alive": value(); "vj": the game's value in the index J
+    (tools/rollout/value.py, roll["uj"] -- only the records that have it)."""
     rows = []
+    if mode == "vj":
+        recs = [r for r in recs if "state0" in r]
+        value_of = lambda x, h, hp_w: x["uj"]                      # noqa: E731
+    else:
+        value_of = value
     for r in recs:
         by = {}
         for x in r["rolls"]:
@@ -56,8 +62,8 @@ def table(recs, h, hp_w, min_ok=1):
             reps = [k for k in xs if k in d and (o == "default" or xs[k]["ok"])]
             if not reps:
                 continue
-            v = [value(xs[k], h, hp_w) for k in reps]
-            dv = [value(xs[k], h, hp_w) - value(d[k], h, hp_w) for k in reps]
+            v = [value_of(xs[k], h, hp_w) for k in reps]
+            dv = [value_of(xs[k], h, hp_w) - value_of(d[k], h, hp_w) for k in reps]
             opts[o] = (float(np.mean(v)), dv)
         rows.append({"seed": r["seed"], "feat": r["feat"], "opts": opts, "legal": r["legal"]})
     return rows
@@ -152,12 +158,13 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--h", type=int, default=300)
     ap.add_argument("--hp-w", type=float, default=0.0)
+    ap.add_argument("--value", default="alive", choices=("alive", "vj"), help="the rollout's value (table)")
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--options", default="melee,elbereth,zap,quaff,pray,up,down,retreat")
     ap.add_argument("--trigger", default='{"hp_frac": 0.5, "pdeath": 0.003, "win_prob": 0.85}')
     a = ap.parse_args()
     recs = load(a.dirs)
-    rows = table(recs, a.h, a.hp_w)
+    rows = table(recs, a.h, a.hp_w, a.value)
     feats = [k for k in sorted(rows[0]["feat"]) if k not in EXCLUDE]
     options = [o for o in a.options.split(",") if sum(1 for r in rows if o in r["opts"]) >= 200]
     seeds = np.array([r["seed"] for r in rows])
