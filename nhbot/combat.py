@@ -196,7 +196,7 @@ class CombatMixin:
             for p in ray:
                 if G.KIND[g[p]] == G.OBJECT and nh.glyph_is_object(int(g[p])) and \
                         ord(nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class) in (nh.WEAPON_CLASS, nh.GEM_CLASS) \
-                        and p not in out:
+                        and p not in out and (lv.key, p) not in self.pick.no_reach:
                     out.append(p)
         return out
 

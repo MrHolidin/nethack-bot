@@ -102,7 +102,8 @@ class PickupState:
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
         self.food_picked = 0           # food stacks taken from piles (armor_pickup_here)
-        self.look_at, self.look_names = -1, ()      # look_here: keys sent when the last look ended, its answer
+        self.look_at, self.look_names = -1, ()
+        self.no_reach = set()          # (level, square) whose items a pick-up could not reach (pickup)      # look_here: keys sent when the last look ended, its answer
 
 
 class PickupMixin:
@@ -330,6 +331,10 @@ class PickupMixin:
         if "Pick up what?" not in tty:
             self.settle()
             self.pick.lift_want = None
+            if "cannot reach the" in self.text_since(seq0):
+                # "You cannot reach the bottom of the pit." (hack.c:2644 could_reach_floor, no time): ammo_here / retrieve came
+                # back for it every tick till the loop guard (300297, 301976) -- not from here again
+                self.pick.no_reach.add((self.cur_key, self.pos()))
             for t in self.msgs_since(seq0):
                 mm = re.match(r"^[a-zA-Z] - (.+?)\.?$", t)
                 if mm and not want(mm.group(1)):
