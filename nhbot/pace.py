@@ -94,12 +94,23 @@ class PaceMixin:
             self.pace.opened.add(lv.key)
             self.pace.stats["valve_time"] += 1
             return self.pace_hold_end("time")
-        if self.bl(nh.NLE_BL_HUNGER) >= WEAK or self.surv.nutrition < self.opts.pace_food:
+        if self.bl(nh.NLE_BL_HUNGER) >= WEAK or (self.surv.nutrition < self.opts.pace_food
+                                                 and not self.pace_prayer_ahead()):
             self.pace.stats["valve_food"] += 1
             return self.pace_hold_end("food")
         if self.pace.hold is None:
             self.pace.hold = dict(key=list(lv.key), depth=int(self.bl(nh.NLE_BL_DEPTH)), start=self.pace_now())
         return True
+
+    def pace_prayer_ahead(self):
+        """pace_pray: the prayer we will say when Weak (step_pray) comes at least pace_pray turns after the last one
+        -- late enough to be safe (pray.c can_pray: major trouble is helped while u.ublesscnt <= 200, set to
+        rnz(350) by the last prayer: above 1700 for 1.5 % of them, above 2200 for 0.4 %), so the gate may stay
+        closed on an emptying stomach. The first prayer of a game: its timeout began at 300."""
+        if not self.opts.pace_pray or self.surv.god_angry:
+            return False
+        weak_at = self.turn() + max(0, self.surv.nutrition - 49)       # eat.c newuhs: Weak below 50
+        return weak_at - (self.surv.last_pray or 0) >= self.opts.pace_pray
 
     def pace_now(self):
         """[turn, XL, experience points, kills, estimated nutrition, max HP, prayers, keys] now (the hold log)."""
