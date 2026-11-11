@@ -102,3 +102,22 @@ do). `rl_elbexit100_s` cancelled.
 - A learned chooser over the same states (stage 3) only if it beats R1 + R2 on held-out games.
 - The harness can screen any tactical option of another branch the same way in under an hour (merge the branch
   into an evaluation checkout, add a line to `collect.VARIANTS`).
+
+## 6. Whole game, 23:21 UTC: `rl_r12c_s` (R1 + R2, 500 games of D1, commit a7475f2) against `base_d1`
+
+```
+A base_d1                  n 500  score mean 26179 median 9410  depth mean 10.95  crashes 0  truncated 7  turns 10335  steps 20134  secs/game 86
+B rl_r12c_s                n 500  score mean 27999 median 9630  depth mean 11.35  crashes 0  truncated 5  turns 10599  steps 20968  secs/game 42
+  score  diff +1820  80% CI [+390, +3267]  95% CI [-358, +4040]  <-- WIN
+  depth  diff +0.398  80% CI [+0.196, +0.594]  95% CI [+0.082, +0.702]  <-- WIN
+  J      diff +0.104  80% CI [+0.035, +0.173]  95% CI [-0.000, +0.208]  <-- WIN
+  log10  diff +0.039  80% CI [+0.018, +0.058]  95% CI [+0.008, +0.069]  <-- WIN
+  games changed: 245 of 500
+```
+
+- R1 acted in 225 games (1.11 times a game), R2 in 77 games (0.19 times a game).
+- R2's cost shows: prayers a game 3.16 → 3.37, unheard prayers a game 0.058 → 0.080, games ending with an
+  angered god 48 → 64, starvation deaths 36 → 40. This run cannot split the net of R2 from R1's: run
+  `data/rule_r1.json` and `data/rule_r2.json` apart before taking R2.
+- The calibration run `rl_elb70_s` (elb_hp 0.7): score −1478 80 % CI [−4573, +1475], depth −0.010, J −0.056
+  [−0.207, +0.086], median 9410 → 7980: as the 3000-turn rollouts said, not as the 300-turn deaths said.
