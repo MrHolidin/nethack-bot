@@ -27,12 +27,16 @@ first stairs we find: a truncated game cannot die, each new level is 50 points (
 """
 from collections import Counter
 
+import numpy as np
 import nle.nethack as nh
 
+from nhbot import glyphs as G
 from nhbot.consts import WEAK
 
 WAIT_COUNT = 20             # turns of one counted search at the gate with nothing in view (3 keys)
 WAIT_COUNT_SEEN = 5         # ... with a hostile in view that no step went for (2 keys)
+PATROL_HP = 0.8             # a patrol trip only from this fraction of max HP on
+PATROL_MAX = 150            # path cost at most to a patrol goal; turns at most on the way out
 
 
 class PaceState:
@@ -46,6 +50,10 @@ class PaceState:
         self.dive_from = None            # (turn, depth) the final dive began at
         self.hold = None                 # the hold in progress: level key, depth, pace_now() at its start
         self.log = []                    # holds over: ... and pace_now() at the end, how it ended
+        # pace_patrol: the level patrolled, the square we walk to (None: waiting on the stairs), the turn the
+        # next trip starts / this one is given up, the last goals (the next one lies away from them)
+        self.patrol_key, self.patrol_goal, self.patrol_next, self.patrol_until = None, None, 0, 0
+        self.patrol_seen = []
 
 
 class PaceMixin:
@@ -94,9 +102,10 @@ class PaceMixin:
         return True
 
     def pace_now(self):
-        """[turn, XL, experience points, kills, estimated nutrition, max HP, prayers] now (the hold log)."""
+        """[turn, XL, experience points, kills, estimated nutrition, max HP, prayers, keys] now (the hold log)."""
         return [int(self.bl(f)) for f in (nh.NLE_BL_TIME, nh.NLE_BL_XP, nh.NLE_BL_EXP)] + \
-            [self.combat.kill_count, self.surv.nutrition, int(self.bl(nh.NLE_BL_HPMAX)), self.surv.prayers]
+            [self.combat.kill_count, self.surv.nutrition, int(self.bl(nh.NLE_BL_HPMAX)), self.surv.prayers,
+             self.steps]
 
     def pace_hold_end(self, how):
         """The gate lets us through (how: "xl", "time", "food", "dive"; "end": the game is over): the hold in
@@ -117,6 +126,50 @@ class PaceMixin:
         self.pace.turns += self.turn() - t0
         self.pace.keys += self.steps - k0
         return True
+
+    def pace_patrol_step(self, lv, grids):
+        """pace_patrol, gated: every pace_patrol turns a trip to a far square of the level and back -- the monsters
+        the game makes come for us along the straight line (monmove.c m_move: the neighbour square nearest to
+        us) and stand behind a wall until we move; a walk brings them out (kills are experience and food).
+        Not with a hostile in view or below PATROL_HP. The way back is go_down's. True if it stepped."""
+        p, t = self.pace, self.turn()
+        if not self.opts.pace_patrol or self.visible_hostiles(lv) or self.hp_below(PATROL_HP):
+            return False
+        if p.patrol_key != lv.key:
+            p.patrol_key, p.patrol_goal, p.patrol_next, p.patrol_seen = lv.key, None, t + self.opts.pace_patrol, []
+        if p.patrol_goal is None:
+            if t < p.patrol_next:
+                return False
+            p.patrol_goal, p.patrol_until = self.pace_patrol_goal(lv, grids), t + PATROL_MAX
+            p.stats["patrols"] += p.patrol_goal is not None
+        if p.patrol_goal is not None and t < p.patrol_until:
+            mask = np.zeros_like(grids[2])
+            mask[p.patrol_goal] = True
+            if self.walk_to(lv, mask, act="pace", grids=grids)[0] == "moved":
+                lv.progress_here, lv.last_progress = lv.turns_here, t      # no stall (pace_wait)
+                p.stats["patrol_turns"] += self.turn() - t
+                return True
+        # there, out of reach or too long on the way: back to the stairs, the next trip pace_patrol turns from now
+        if p.patrol_goal is not None:
+            p.patrol_seen = (p.patrol_seen + [p.patrol_goal])[-3:]
+        p.patrol_goal, p.patrol_next = None, t + self.opts.pace_patrol
+        return False
+
+    def pace_patrol_goal(self, lv, grids):
+        """The square a patrol trip walks to: far from us by path (within PATROL_MAX) and away from the last
+        goals -- so the trips go round the level; plain floor or corridor outside shops. None: nowhere to go."""
+        k_mem, k_live, passable = grids
+        dist, _, _ = self.dijkstra(lv, k_mem, k_live, passable, self.pos(), None, max_cost=PATROL_MAX)
+        ok = passable & (dist <= PATROL_MAX) & (k_mem == G.FLOOR) & ~lv.shop
+        if not ok.any():
+            return None
+        score = dist.astype(np.int64)
+        ys, xs = np.indices(score.shape)
+        for gy, gx in self.pace.patrol_seen:
+            score = np.minimum(score, 3 * np.maximum(abs(ys - gy), abs(xs - gx)))
+        score = np.where(ok, score, -1)
+        best = np.unravel_index(np.argmax(score), score.shape)
+        return (int(best[0]), int(best[1])) if score[best] > 5 else None
 
     def pace_summary(self):
         if not self.opts.pace and not self.opts.pace_dive:

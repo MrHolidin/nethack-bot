@@ -170,8 +170,11 @@ class ExploreMixin:
         pace: not strong enough yet for the next depth (pace_gate) -- wait on it; known: the way to a level we
         have been on (level_travel_step), no gate."""
         start = self.pos()
+        gated = not known and self.pace_gate(lv)
+        if gated and self.pace_patrol_step(lv, grids):
+            return True
         if downstairs[start]:
-            if not known and self.pace_gate(lv):
+            if gated:
                 return self.pace_wait(lv)
             if not self.pace_diving() and self.pet_wait_before_stairs():
                 self.press("s")
