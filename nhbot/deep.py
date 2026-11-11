@@ -33,7 +33,8 @@ With no way up we may take (the Castle right below Medusa's level) the patrol is
 next to water (castle.des puts giant eels and sharks in the moat).
   patrol_rise: the patrol that many levels higher. patrol_hp: it rests while hurt. With dead_end_patrol on,
   medusa_dig does not act (dig_now): the patrol is for the rest of the game. (dead_end_dive -- the patrol ended with
-  so many keys of the evaluation's budget left -- was removed: no play may read the key budget, owner's rule.)
+  so many keys of the evaluation's budget left -- and the farm_dlvl / farm_keys probe, a level held until so many
+  keys were sent, were removed: no play may read the key budget, owner's rule.)
 
 The steps hang on methods explore calls, overridden here (the mixin comes first in Bot): explore itself, search_mode
 -- the dead end is told where explore has nothing left but walls to search --, stairs_mask, passable_grid,
@@ -139,15 +140,6 @@ class DeepMixin:
         """explore.explore; first, on a deep level of the main dungeon: is this Medusa's level (told as soon as its
         water shows: the stairs up from below are closed at once), are we past it (summary)."""
         st = self.deep
-        if self.opts.farm_dlvl and lv.key == (0, self.opts.farm_dlvl):
-            # farm_dlvl (a probe): this level is held, by the patrol, until farm_keys keys are spent
-            if self.steps < self.opts.farm_keys:
-                if st.above != lv.key:
-                    st.above = lv.key
-                    self.deep_mark("farm")
-            elif st.above == lv.key:
-                st.above = None
-                self.deep_mark("farm_end")
         if st.rise_to is not None and self.rise_step(lv):
             return
         if self.deep_on() and lv.key[0] == 0 and lv.key[1] >= MEDUSA_MIN:
@@ -276,7 +268,7 @@ class DeepMixin:
         if st.above == lv.key:
             if self.dig_now() and self.shaft_step(lv, grids):
                 return True
-            if self.opts.dead_end_patrol or self.opts.farm_dlvl:
+            if self.opts.dead_end_patrol:
                 return self.patrol_step(lv, grids)
             st.above = None                           # no shaft to take: as before (down again, the walls searched)
             return False

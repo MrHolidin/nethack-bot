@@ -61,9 +61,6 @@ DEFAULTS = {
                                #      this many turns (0 / 1: every tick, as elsewhere)
     "patrol_hp": 0.0,          # with dead_end_patrol: below this share of max HP, nothing in view, the patrol rests
                                #      (0: only step_rest's rest_frac)
-    "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol
-                               #      of dead_end_patrol) until farm_keys keys are sent; 0: off (nhbot.deep)
-    "farm_keys": 150_000,
     "dip_pray": 500,           # A/B: dip into a fountain (any reason) only this many turns after the last prayer (none
                                #      yet: from turn 100) and with the god not angry -- the prayer is the rescue from
                                #      the water demon (excalibur.dip_prayer_ok); 0: off. 500 = survival.can_pray's gap;
