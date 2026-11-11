@@ -67,7 +67,7 @@ def main():
           f"{'J x1000 [95% CI] (n)':28s} {'score':>6s}")
     line("all", ps)
     if a.by:
-        feat, edges = a.by.split(":")
+        feat, edges = a.by.rsplit(":", 1)
         edges = [float(e) for e in edges.split(",")]
         for lo, hi in zip(edges, edges[1:]):
             line(f"{feat} in [{lo:g}, {hi:g})", [p for p in ps if lo <= p[0]["feat"][feat] < hi])
