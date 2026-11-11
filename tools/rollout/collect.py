@@ -29,6 +29,9 @@ from tools.rollout import fork
 CHECKPOINTS = (5, 10, 20, 50, 100, 200, 300, 500, 1000, 1500, 2000, 3000)   # HP and score gained at these turns
 DEFAULTS = {
     "horizon": 300,            # game turns a child plays on
+    "settle": 0,               # ... and up to this many more until the fight is over (calm): no hostile in view, not
+                               # on an Elbereth of ours, HP at least rest_frac -- a window that ends with the monster
+                               # still there (the option was to sit on Elbereth) says nothing of how that fight ends
     "reps": 2,                 # children per option, each with its own future (the same seeds for every option)
     "gap": 8,                  # game turns at least between two decision points
     "max_dp": 150,             # decision points at most per game
@@ -74,11 +77,14 @@ def key_hash(keys):
     return hashlib.sha256(b"".join(k.to_bytes(4, "little") for k in keys)).hexdigest()[:16]
 
 
-ABSOLUTE = ("hp", "maxhp", "depth", "xl", "god_angry", "ac", "gold", "hunger", "pray_gap")   # the rest: gained
+ABSOLUTE = ("hp", "maxhp", "depth", "xl", "god_angry", "ac", "gold", "hunger", "pray_gap", "vis", "on_elb")
+#           the rest: gained since the decision
 
 
-def state_of(bot):
-    """The bot's state in numbers (a record's "state0"; a rollout reports ABSOLUTE as is, the others as gains)."""
+def state_of(bot, local=True):
+    """The bot's state in numbers (a record's "state0"; a rollout reports ABSOLUTE as is, the others as gains).
+    local: with the hostiles in view (looking may send a free key: not before a child's first action, which the
+    determinism check compares key for key)."""
     last = bot.surv.last_pray
     return {"hp": bot.bl(nh.NLE_BL_HP), "maxhp": bot.bl(nh.NLE_BL_HPMAX), "depth": bot.bl(nh.NLE_BL_DEPTH),
             "max_depth": bot.max_depth, "xl": bot.bl(nh.NLE_BL_XP), "exp": bot.bl(nh.NLE_BL_EXP),
@@ -86,12 +92,23 @@ def state_of(bot):
             "elb": bot.elb.elbereths, "steps": bot.steps, "kills": bot.combat.kill_count,
             "god_angry": int(bot.surv.god_angry), "pray_failed": bot.surv.pray_failed,
             "ac": bot.bl(nh.NLE_BL_AC), "gold": bot.bl(nh.NLE_BL_GOLD), "hunger": bot.bl(nh.NLE_BL_HUNGER),
-            "pray_gap": bot.turn() - last if last is not None else bot.turn() + 200}
+            "pray_gap": bot.turn() - last if last is not None else bot.turn() + 200,
+            "vis": len(hostiles_in_view(bot)) if local else 0, "on_elb": int(bot.elb.state is not None)}
 
 
-def rollout(bot, c, opt, horizon, record_keys=False):
-    """In a child: force `opt` at this tick, play on for `horizon` turns; the outcome as a dict. record_keys: also
-    the number and a hash of the keys sent (the determinism check)."""
+def hostiles_in_view(bot):
+    lv = bot.levels.get(bot.cur_key) if bot.cur_key else None
+    return bot.visible_hostiles(lv) if lv is not None and not bot.done else []
+
+
+def calm(bot):
+    """The fight is over: no hostile in view, not standing on an Elbereth of ours, HP at least rest_frac."""
+    return bot.elb.state is None and not bot.hp_below(bot.opts.rest_frac) and not hostiles_in_view(bot)
+
+
+def rollout(bot, c, opt, horizon, record_keys=False, settle=0):
+    """In a child: force `opt` at this tick, play on for `horizon` turns (and up to `settle` more until calm); the
+    outcome as a dict. record_keys: also the number and a hash of the keys sent (the determinism check)."""
     keys = None
     if record_keys:
         keys, orig = [], bot.raw_step
@@ -101,7 +118,7 @@ def rollout(bot, c, opt, horizon, record_keys=False):
             return orig(code)
         bot.raw_step = raw_step
     bot.tac.hook = None
-    t0, s0 = c.t, state_of(bot)
+    t0, s0 = c.t, state_of(bot, local=False)
     res = {"opt": opt, "ok": True, "first": None}
     marks, cps = [], list(CHECKPOINTS)
     try:
@@ -128,7 +145,7 @@ def rollout(bot, c, opt, horizon, record_keys=False):
                     # a long rollout: its state where a standard one ends (absolute values) -- horizon.py
                     # compares what the 300-turn label says with what the long run shows, pair by pair
                     res["s300"] = dict(state_of(bot), dt=dt)
-            if dt >= horizon:
+            if dt >= horizon + settle or (dt >= horizon and calm(bot)):
                 break
             bot.play_tick()
     except GameOver:
@@ -224,7 +241,7 @@ class Collector:
         def child_main(bot):
             if seed is not None:
                 fork.reseed(bot, seed, lgen=seed)
-            return json.dumps(rollout(bot, c, opt, self.cfg["horizon"], record_keys)).encode()
+            return json.dumps(rollout(bot, c, opt, self.cfg["horizon"], record_keys, self.cfg["settle"])).encode()
 
         raw = fork.fork_child(bot, child_main, root=self.root)
         for name in os.listdir(self.root):               # a killed child's directory
