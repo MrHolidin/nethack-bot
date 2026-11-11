@@ -34,6 +34,8 @@ DEFAULTS = {
                                #      (nhbot.deep)
     "patrol_rise": 0,          # with dead_end_patrol: the patrol is this many levels above the level over the dead
                                #      end (weaker random monsters: makemon.c rndmonst, (depth + XL) / 2)
+    "patrol_hp": 0.0,          # with dead_end_patrol: below this share of max HP, nothing in view, the patrol rests
+                               #      (0: only step_rest's rest_frac)
     "dead_end_dive": 0,        # with dead_end_patrol: with this many keys of the budget left the patrol ends and we go
                                #      down again -- with medusa_dig through the floor, past Medusa to the Castle
     "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol

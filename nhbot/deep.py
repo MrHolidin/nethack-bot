@@ -496,6 +496,11 @@ class DeepMixin:
         y, x = self.pos()
         near_at[max(0, y - PATROL_R):y + PATROL_R + 1, max(0, x - PATROL_R):x + PATROL_R + 1] = t
         lv.progress_here = lv.turns_here              # walking about is no stall: no desperation (step_progress)
+        if self.opts.patrol_hp and self.hp_below(self.opts.patrol_hp) and not self.visible_hostiles(lv) \
+                and self.bl(nh.NLE_BL_HUNGER) < WEAK:
+            self.cur_act = "rest"                     # patrol_hp: not on to the next stranger while hurt
+            self.search_turns(20)
+            return True
         stale = passable & ((near_at == 0) | (t - near_at > PATROL_STALE)) & (k_mem != G.TRAP) \
             & ~dilate(k_mem == G.LIQUID)
         self.cur_act = "patrol"
