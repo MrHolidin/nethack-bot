@@ -48,6 +48,7 @@ class VaultState:
         self.out = None                # vault_exit: (level key, square) where the tunnel into the vault we are in begins
         self.shut = {}                 # vault_clear: level key -> the squares (floor, wall) of a vault we are leaving
         self.tries = Counter()         # vault_find: tries at digging each square of the plan
+        self.stone = set()             # (level, square) of the plan a step into said "It's solid stone.": dig it
         self.loc_at = {}               # vault_find: level key -> (lv.under bytes hash, located interior or None)
         self.wait = {}                 # vault_find: level key -> turn before which no tunnel is planned again
 
@@ -348,9 +349,15 @@ class VaultMixin:
                 return False                          # inside: vault_rob from here
             nxt = path[i]
             d = (nxt[0] - here[0], nxt[1] - here[1])
-            if G.KIND[self.obs["glyphs"][nxt]] not in (G.UNKNOWN, G.WALL):
+            if G.KIND[self.obs["glyphs"][nxt]] not in (G.UNKNOWN, G.WALL) and (lv.key, nxt) not in self.vault.stone:
                 self.cur_act = "vault_tunnel"
+                seq0 = self.msg_seq
                 self.press(DELTA2KEY[d])              # dug: step in
+                if "It's solid stone" in self.text_since(seq0):
+                    # an object shown in the rock (gold a detection found: mklev.c mineralize) is no dug square -- the
+                    # step, no game time, came again every tick till the loop guard (300493: 175 000 keys): dig it
+                    self.vault.stone.add((lv.key, nxt))
+                    self.vault.stats["stone_step"] += 1
                 return True
             self.vault.tries[(lv.key, nxt)] += 1
             if self.vault.tries[(lv.key, nxt)] > DIG_TRIES:
@@ -359,6 +366,7 @@ class VaultMixin:
                 self.vault.stats["stuck"] += 1
                 return self.dig_unwield()
             self.cur_act = "vault_tunnel"
+            self.vault.stone.discard((lv.key, nxt))   # dug now: a step in is tried again next (tries bound it)
             kind, it = means
             if kind == "wand":
                 self.vault.stats["tunnel_zap"] += 1

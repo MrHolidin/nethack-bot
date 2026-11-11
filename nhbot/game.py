@@ -119,9 +119,10 @@ class GameMixin:
                 self.kcount["more"] += 1
                 self.raw_step(13)
                 continue
-            if self.opts.tele_esc and "want to be teleported?" in flat:
-                # teleport control (teleport.c:519 tele): the cursor prompt took the keys of the next ticks as cursor
-                # moves till the loop guard's ESC; ESC aborts the teleport -- we stay
+            if "want to be teleported?" in flat:
+                # teleport control (teleport.c:519 tele): left open, the cursor prompt took the keys of the next ticks
+                # as cursor moves (failed steps marking squares blocked) till the loop guard's ESC (300008: 68 times);
+                # ESC aborts the teleport (teleport.c:522) -- we stay
                 self.msg_audit["tele_prompt_esc"] += 1
                 self.raw_step(27)
                 continue

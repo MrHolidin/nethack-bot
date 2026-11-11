@@ -32,10 +32,8 @@ DEFAULTS = {
     "elb_rest_count": 0,       # A/B: resting on our Elbereth with nothing in view, search this many turns at once
                                #      ("20s"; the game stops it for a monster that ignores Elbereth) instead of one a tick
                                #      with a ':' read every 4 (0: off)
-    "tele_esc": False,         # A/B: the teleport-control prompt "Where do you want to be teleported?" answered ESC (stay)
-                               #      by game.settle -- unanswered, the next ticks' keys went in as cursor moves
-    "farlook_jump": False,     # A/B: a farlook's cursor jumps to the monster with 'm' / 'M' when that takes fewer keys
-                               #      (game.describe_at, monster_rank); not neutral: other squares are described on the way
+    "peace_wait_max": 0,       # A/B: a peaceful monster in our way waited for this many turns in a row -- its square
+                               #      shut (Level.blocked) and the path goes round (nav.move; 0: wait for ever)
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified

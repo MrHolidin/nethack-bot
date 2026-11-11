@@ -69,6 +69,8 @@ class NavState:
         self.last_move_target = None     # the square our last step went for (msg_map reads what it said)
         self.peaceful_waits = 0          # turns waited for a peaceful monster in our way
         self.peaceful_wait_by = Counter()   # ... by species
+        self.peace_wait = None           # peace_wait_max: (level, square, turns in a row, last turn) of the wait
+        self.peace_wait_blocks = 0       # ... squares given up
         self.shop_kicks_avoided = 0
         self.trapped = None              # (kind, level key, square) while a bear trap / pit / web holds us (msg_map)
         self.trap_stats = Counter()
@@ -227,6 +229,19 @@ class NavMixin:
             lv.fail[ty, tx] += 1
             self.nav.peaceful_waits += 1
             self.nav.peaceful_wait_by[G.monster_name(int(self.obs["glyphs"][target]))] += 1
+            if self.opts.peace_wait_max:
+                # peace_wait_max: waited that many turns in a row for this square -- it stays shut (Level.blocked,
+                # forgotten with the other obstacles on a stalled level): the path goes round, or another goal is
+                # taken (300029 waited 12 507 turns for one gnome; a peaceful can't be displaced: hack.c domove swaps
+                # only with a pet)
+                w = self.nav.peace_wait
+                n = w[2] + 1 if w is not None and w[:2] == (lv.key, target) and w[3] >= self.turn() - 2 else 1
+                self.nav.peace_wait = (lv.key, target, n, self.turn())
+                if n > self.opts.peace_wait_max:
+                    lv.blocked[ty, tx] = True
+                    self.nav.peace_wait = None
+                    self.nav.peace_wait_blocks += 1
+                    return
             self.press("s")
             return
         seq0 = self.msg_seq
