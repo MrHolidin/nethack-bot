@@ -38,8 +38,11 @@ def both(self, pos):
 
 
 def twice(self, pos):
-    old(self, pos)
-    diffs[1] += 1
+    y, x = self.pos()
+    far = max(abs(pos[0] - y), abs(pos[1] - x)) > 1
+    if os.environ.get("ONLY", "") != ("near" if far else "far"):
+        old(self, pos)
+        diffs[1] += 1
     return old(self, pos)[0]
 
 
