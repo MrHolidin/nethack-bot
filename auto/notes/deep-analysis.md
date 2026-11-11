@@ -77,3 +77,24 @@ picture. Scripts: `/workspace/agents/deep/an2.py`, `an3.py`, `an4.py` on the mac
 3. Never climb onto Medusa's level from below (revisit_up to a level never seen at Dlvl 21-28, or the level we
    dug out of).
 4. Not searching walls at Medusa / the Castle saves keys only; the 11 deep truncated games gain little from it.
+
+## What was built (nhbot/deep.py) and first results
+
+- `dead_end_patrol`: at Medusa's level (told by its lake, >= 100 water squares, or medusa-2's building) and at the
+  Castle (water + the drawbridge) no wall searching: back up the stairs, and a walk round the ordinary level above
+  for the rest of the game (to the nearest square not within 2 squares of us for 400 turns; its down stairs hidden;
+  explore still takes items). Screen on the D1 seeds that end at Medusa / the Castle in base_d1 (v1, 77c993b, 29 of
+  74 games played): score 131 358 -> 172 349, **+40 990 a game** (80 % CI [+23 794, +58 275]), depth +0.24,
+  truncated 2 -> 5. On patrol: 14 861 turns a game, +84 011 points, 7.0 kills / 500 turns, 5.65 points / turn --
+  against 0.3 kills / 500 turns on the island. Income holds for 25 000 turns (3 500 -> 2 000 points per 500 turns).
+  Ends: 16 died on the patrol level (soldiers in groups, winged gargoyles, Olog-hai, giants, a purple worm, a wand
+  of death -- no single cause), 5 below Medusa after a trap door of the patrol level (3 minotaurs), 5 truncated.
+- Patrol games spend their keys on looks at peaceful monsters, which pile up on the level (farlooks a game 3.7 k ->
+  18 k): 2-5 keys a turn, up to 14 late in a long patrol.
+- `medusa_dig`: a hole past Medusa (on a square of her island with no water around it; else a hole dug on the level
+  above and taken until the fall goes two levels: trap.c fall_through, 1 in 4). Works (13 games: 9 past Medusa),
+  but the levels below are mazes four times in five (mklev.c makelevel) with minotaurs (mkmaze.c), which kill an
+  XL 11-13 Valkyrie in 2-3 turns: depth +1.1, score +-0. `medusa_dive` (the next hole at once, to the Castle):
+  depth +1.25, score -12 k on 12 games. Next to the patrol (+41 k) neither pays; kept for a last dive when the keys
+  run out (`dead_end_dive`).
+- A fountain that overflows (the bot quaffs for wishes) makes a dozen pools: water at Dlvl 21+ is not yet Medusa.
