@@ -366,13 +366,15 @@ class GameMixin:
         """Farlook (';' with autodescribe) at any square. The cursor goes there by direction keys (by 8 with the
         capital keys; next to us this is ";" and one direction key) -- or, when fewer keys, by 'm' / 'M', which step
         through the monsters shown on the map nearest first (monster_rank); the cursor read back (tty_cursor) and
-        whatever is left walked with direction keys. The description is the same either way (do_name.c getpos:
-        auto_describe(cx, cy) after every key) -- and the look takes no game time."""
+        whatever is left walked with direction keys (farlook_jump). The description is the same either way
+        (do_name.c getpos: auto_describe(cx, cy) after every key), and the look takes no game time -- but it is not
+        free of effects: describing a square on the way that shows an object no longer there makes a stand-in object
+        (pager.c:190 object_from_map -> mksobj; mkobj.c:783 o_id = context.ident++), so another path changes the game."""
         y, x = self.pos()
         n0 = self.steps
         self.raw_step(ord(";"))
         keys = cursor_keys(pos[0] - y, pos[1] - x)
-        jump = self.monster_rank(pos)
+        jump = self.monster_rank(pos) if self.opts.farlook_jump else None
         if jump is not None and jump[1] < len(keys):
             for _ in range(jump[1]):
                 self.raw_step(ord(jump[0]))
