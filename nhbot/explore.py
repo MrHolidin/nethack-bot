@@ -78,6 +78,13 @@ class ExploreMixin:
             self.mines_return_start(lv, "no_town")
             if self.mines_return_step(lv, grids):
                 return
+        if want_down and lv.key[0] == 2 and self.mines.minetown_seen and not self.mines.return_on \
+                and self.bl(nh.NLE_BL_XP) < self.opts.mines_end_xl:
+            # mines_end_xl: Minetown seen, done here, and not strong enough for the levels below it (base_d1: 37 %
+            # of the games that go below Minetown die there, 16 % of all games) -- back to the main dungeon
+            self.mines_return_start(lv, "weak")
+            if self.mines_return_step(lv, grids):
+                return
         if want_down and not diving \
                 and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
