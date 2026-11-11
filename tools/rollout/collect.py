@@ -124,6 +124,10 @@ def rollout(bot, c, opt, horizon, record_keys=False):
             dt = bot.turn() - t0
             while cps and dt >= cps[0]:
                 marks.append((cps.pop(0), bot.bl(nh.NLE_BL_HP), bot.reward - s0["score"]))
+                if marks[-1][0] == 300 and horizon > 300:
+                    # a long rollout: its state where a standard one ends (absolute values) -- horizon.py
+                    # compares what the 300-turn label says with what the long run shows, pair by pair
+                    res["s300"] = dict(state_of(bot), dt=dt)
             if dt >= horizon:
                 break
             bot.play_tick()

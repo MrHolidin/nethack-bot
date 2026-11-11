@@ -14,6 +14,7 @@ from collections import defaultdict
 import numpy as np
 
 from tools.rollout.analyze import boot_ci, load
+from tools.rollout.value import Value
 
 HS = (50, 100, 300, 500, 1000, 1500, 2000, 3000)
 
@@ -33,8 +34,12 @@ def main():
     longest = max(x["dt"] for r in recs for x in r["rolls"])
     hs = [h for h in HS if h <= longest + 5]
     pairs = defaultdict(list)                    # option -> [(seed, default roll, option roll)]
+    value = Value()
     for r in recs:
         d = {x["rep"]: x for x in r["rolls"] if x["opt"] == "default"}
+        for x in r["rolls"]:
+            if "state0" in r and "u300" not in x:
+                x["u300"] = value.at_300(r, x)
         for x in r["rolls"]:
             if x["opt"] != "default" and x["rep"] in d and x.get("ok", True) and not x.get("alias"):
                 pairs[x["opt"]].append((r["seed"], d[x["rep"]], x))
@@ -51,6 +56,15 @@ def main():
             print(f"  {h:5d} {np.mean([v[0] for v in dd]) * 100:15.2f} "
                   f"{death[0] * 100:+10.2f} [{death[1] * 100:+7.2f}, {death[2] * 100:+7.2f}] "
                   f"{np.mean([v[1] for v in dd]):14.0f} {score[0]:+12.0f} [{score[1]:+8.0f}, {score[2]:+8.0f}]")
+        # the label check: what a 300-turn rollout would have said (u300) against the whole long window (uj)
+        both = [(p[0], p[2]["u300"] - p[1]["u300"], p[2]["uj"] - p[1]["uj"]) for p in ps
+                if p[1].get("u300") is not None and p[2].get("u300") is not None and "uj" in p[1] and "uj" in p[2]]
+        if both:
+            gg = [b[0] for b in both]
+            a300, along = boot_ci([b[1] for b in both], gg), boot_ci([b[2] for b in both], gg)
+            print(f"  value in J x1000 ({len(both)} pairs): the 300-turn label {a300[0] * 1000:+.0f} "
+                  f"[{a300[1] * 1000:+.0f}, {a300[2] * 1000:+.0f}]   the whole window {along[0] * 1000:+.0f} "
+                  f"[{along[1] * 1000:+.0f}, {along[2] * 1000:+.0f}]")
 
 
 if __name__ == "__main__":

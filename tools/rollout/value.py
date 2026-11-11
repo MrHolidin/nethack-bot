@@ -53,6 +53,24 @@ class Value:
             total += v[i]
         return total
 
+    def of_state(self, t, st):
+        """V of an absolute state (collect.state_of) at turn t."""
+        return self(vector(t, st["depth"], st["max_depth"], st["xl"], st["hp"], st["maxhp"], st["ac"], st["gold"],
+                           st["prayers"], st["kills"]))
+
+    def at_300(self, rec, x):
+        """The value a standard 300-turn rollout would have given this long one (its "s300"), in J: banked if it
+        died before turn 300, else V(state at 300) + the score gained by then. None if the roll has no s300 and
+        did not die before it."""
+        s0 = rec["state0"]
+        if "s300" not in x:
+            if not x["died"]:
+                return None
+            return j_index(s0["score"] + x["score"], s0["max_depth"] + x["max_depth"])
+        st = x["s300"]
+        banked = j_index(st["score"], st["max_depth"])
+        return max(self.of_state(rec["t"] + st["dt"], st), banked) + (st["score"] - s0["score"]) / SCORE0
+
     def of_rollout(self, rec, x):
         """J of the game a rollout stands for: banked at its death, V at the window's end if alive.
         rec: the decision point's record (with state0), x: one of its rolls."""
