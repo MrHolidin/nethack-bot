@@ -45,6 +45,8 @@ DEFAULTS = {
                                #      (0: never) -- it brings out the monsters that stand behind walls
     "pace_spot": False,        # with pace: the hold is on a corridor square / in an open door by the stairs, where
                                #      at most two monsters reach us at once, not on the staircase in the open
+    "pace_retreat": 0,         # A/B: from this depth on, a level with no way down found (Medusa's island) is left by
+                               #      the stairs up after 200 turns of searching: we hold for good on the level above
     "pace_peek": False,        # with pace: before the wait at a gate, down the stairs once and straight back up --
                                #      the depth is reached whatever becomes of the hold
     "pace_dive": 0,           # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,

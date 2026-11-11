@@ -151,6 +151,8 @@ class ExploreMixin:
         # nothing left: map the level if we can, else search for hidden passages
         if self.magic_map_step(lv):
             return
+        if self.pace_retreat_step(lv, grids):
+            return
         self.search_mode(lv, grids)
 
     def revisit_up(self, lv, grids):

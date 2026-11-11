@@ -47,6 +47,7 @@ from nhbot.consts import COLS, CORRIDOR_GLYPHS, FLOOR_GLYPH, NEIGH, ROWS, WEAK
 
 WAIT_COUNT = 20             # turns of one counted search at the gate with nothing in view (3 keys)
 WAIT_COUNT_SEEN = 5         # ... with a hostile in view that no step went for (2 keys)
+RETREAT_AFTER = 200         # pace_retreat: turns searched on a level with no way on before we leave it
 SPOT_MAX = 25               # pace_spot: path cost at most from the stairs to the square we hold on
 SPOT_EVERY = 500            # ... chosen again after this many turns (the map may have grown)
 PATROL_HP = 0.8             # a patrol trip only from this fraction of max HP on
@@ -68,6 +69,7 @@ class PaceState:
         # next trip starts / this one is given up, the last goals (the next one lies away from them)
         self.patrol_key, self.patrol_goal, self.patrol_next, self.patrol_until = None, None, 0, 0
         self.patrol_seen = []
+        self.forever = set()             # pace_retreat: levels we hold on for good (the one below has no way on)
         self.spot = (None, 0, None)      # pace_spot: (level key, turn chosen, the square we hold on or None)
         # pace_peek: the levels we looked below from, the one we are looking below from now (None: not), and
         # whether the stairs back up were taken
@@ -100,6 +102,12 @@ class PaceMixin:
         """The gate of this level's stairs down is closed: we are below the XL asked for the next depth, no valve
         is open (pace_wait turns here since it first closed; Weak or worse -- step_pray had no prayer) and the
         final dive is not on."""
+        if lv.key in self.pace.forever and not self.pace_diving():
+            # pace_retreat: the level below has no way on -- nothing opens this gate, hunger neither (there is
+            # no food for us down there)
+            if self.pace.hold is None:
+                self.pace.hold = dict(key=list(lv.key), depth=int(self.bl(nh.NLE_BL_DEPTH)), start=self.pace_now())
+            return True
         if not self.opts.pace or lv.key in self.pace.opened:
             return False
         if self.pace_diving():
@@ -262,6 +270,26 @@ class PaceMixin:
                 best = ((n, int(dist[sy, sx])), (sy, sx))
         return best[1] if best is not None and best[0][0] <= 2 else None
 
+    def pace_retreat_step(self, lv, grids):
+        """pace_retreat: a main-dungeon level at that depth or below with nothing left to explore, no way down and
+        RETREAT_AFTER turns of searching behind us (Medusa's island: the way on is across the water) -- back up
+        the stairs, to hold for good on the level above: its depth is ours already, and a hold on a staircase
+        of an ordinary level is where the monsters come to us (on the island they cannot) at a third of the
+        deaths per turn (base_d1 at Dlvl 21+: 0.15 per 1000 turns; holds at Dlvl 17-20: 0.04). True if it acted."""
+        if not self.opts.pace_retreat or lv.key[0] != 0 or self.bl(nh.NLE_BL_DEPTH) < self.opts.pace_retreat \
+                or lv.search_turns < RETREAT_AFTER or self.pace_diving():
+            return False
+        up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
+        if not up.any():
+            return False
+        self.cur_act = "pace"
+        if up[self.pos()]:
+            self.pace.forever.add((lv.key[0], lv.key[1] - 1))
+            self.pace.stats["retreats"] += 1
+            self.take_stairs("<")
+            return True
+        return self.walk_to(lv, up, act="pace", grids=grids)[0] == "moved"
+
     def pace_peek(self, lv, pos):
         """pace_peek, gated on a staircase never taken: one look at the level below before the wait -- down and
         straight back up (pace_peek_back). A game that ends in the hold has reached that depth (50 points and the
@@ -296,7 +324,7 @@ class PaceMixin:
         return False
 
     def pace_summary(self):
-        if not self.opts.pace and not self.opts.pace_dive:
+        if not self.opts.pace and not self.opts.pace_dive and not self.opts.pace_retreat:
             return {}
         self.pace_hold_end("end")
         return {"pace": dict(self.pace.stats, turns=self.pace.turns, keys=self.pace.keys,
