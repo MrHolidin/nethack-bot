@@ -55,6 +55,7 @@ from nhbot.rockdig import RockDigMixin
 from nhbot.locktools import LockToolMixin
 from nhbot.luckstone import LuckstoneMixin
 from nhbot.retreat import RetreatMixin
+from nhbot.tactic import TacticMixin
 
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
@@ -64,7 +65,7 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
-          LuckstoneMixin, RetreatMixin, PaceMixin):
+          LuckstoneMixin, RetreatMixin, PaceMixin, TacticMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc",
                 "tty_cursor")
 
@@ -143,6 +144,7 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
         self.box_init()
         self.wishing_init()
         self.value_init()
+        self.tactic_init()
         self.policy_init()
         self.goals_init()
         self.pickup_init()
@@ -161,32 +163,41 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
             self.start_ac = self.bl(nh.NLE_BL_AC)
             self.gift_apply()
             while True:
-                t0 = self.turn()
-                self.prev_act, self.cur_act = self.cur_act, "other"
-                self.tick()
-                dt = self.turn() - t0
-                if self.klog is not None:
-                    self.key_stats_tick(dt)
-                if dt > 0:
-                    # time per activity: the label an action set (fight, rest, explore, search, ...), else the
-                    # policy step that acted
-                    act = self.cur_act if self.cur_act != "other" else (self.pol.last_step or "other")
-                    self.time_by[act] = self.time_by.get(act, 0) + dt
-                    if self.goals.chasing:
-                        self.goals.stats[self.goals.chasing]["chase_turns"] += dt
-                    lvc = self.levels.get(self.cur_key)
-                    if lvc is not None:
-                        lvc.turns_here += dt
-                        if self.cur_act == "search":
-                            lvc.search_turns += dt
-                if self.gift.stats and self.turn() // 50 != t0 // 50:
-                    self.gift_check()
-                while self.turn() >= self.next_snap:
-                    self.snaps.append(self.snapshot())
-                    self.next_snap += SNAP_EVERY
+                self.play_tick()
         except GameOver:
             pass
         return self.summary()
+
+    def play_tick(self):
+        """One tick of the game loop: the policy's tick, then its bookkeeping (after_tick)."""
+        t0 = self.turn()
+        self.prev_act, self.cur_act = self.cur_act, "other"
+        self.tick()
+        self.after_tick(t0)
+
+    def after_tick(self, t0):
+        """The loop's bookkeeping after a tick that began at turn t0: time per activity, the level's clocks, the gift
+        check, the snapshots. (tools/rollout finishes a tick it took over by hand, then calls this.)"""
+        dt = self.turn() - t0
+        if self.klog is not None:
+            self.key_stats_tick(dt)
+        if dt > 0:
+            # time per activity: the label an action set (fight, rest, explore, search, ...), else the
+            # policy step that acted
+            act = self.cur_act if self.cur_act != "other" else (self.pol.last_step or "other")
+            self.time_by[act] = self.time_by.get(act, 0) + dt
+            if self.goals.chasing:
+                self.goals.stats[self.goals.chasing]["chase_turns"] += dt
+            lvc = self.levels.get(self.cur_key)
+            if lvc is not None:
+                lvc.turns_here += dt
+                if self.cur_act == "search":
+                    lvc.search_turns += dt
+        if self.gift.stats and self.turn() // 50 != t0 // 50:
+            self.gift_check()
+        while self.turn() >= self.next_snap:
+            self.snaps.append(self.snapshot())
+            self.next_snap += SNAP_EVERY
 
     def key_stats_tick(self, dt):
         """key_stats: the keys of the tick just played, by activity (the time_by label), free (no turn passed) or
@@ -336,6 +347,8 @@ class Bot(DeepMixin, PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin,
             "resets": self.pol.resets,
             "god_angry": self.surv.god_angry,
             "truncated": self.truncated,
+            "tactic": dict(self.tac.stats),      # tactic_model: option -> times the chooser took it ("default": left
+                                                 # the tick to the script)
             "role": self.role,
             "race": self.race,
             "dnum": self.bl(nh.NLE_BL_DNUM),

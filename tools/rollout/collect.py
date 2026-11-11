@@ -1,0 +1,364 @@
+"""Counterfactual rollouts at the decision points of a live game (see README.md).
+
+A Collector is installed as the bot's tactic hook (nhbot.tactic.TacticState.hook). At a decision point -- a
+hostile next to us and the fight matters (`trigger`) -- it forks the game once per (legal option, replicate); each
+child forces its option for this tick (a macro option for its ticks), plays on as the scripted bot for `horizon`
+game turns under a fresh RNG seed, and reports what happened. The parent then plays on, untouched.
+
+    python -m tools.rollout.collect --seeds 400000:400016 -j 16 --out /dev/shm/rl/d0
+    python -m tools.rollout.collect --selftest --seeds 400000:400004
+
+Output: one jsonl per game, a line per decision point:
+    {"seed", "dp", "t", "feat": {...}, "legal": [...], "rolls": [{"opt", "rep", "ok", "first", "died", ...}]}
+"""
+import argparse
+import atexit
+import hashlib
+import json
+import os
+import shutil
+import sys
+import tempfile
+import time
+
+import nle.nethack as nh
+
+from nhbot.game import GameOver
+from tools.rollout import fork
+
+CHECKPOINTS = (5, 10, 20, 50, 100, 200, 300, 500, 1000, 1500, 2000, 3000)   # HP and score gained at these turns
+DEFAULTS = {
+    "horizon": 300,            # game turns a child plays on
+    "settle": 0,               # ... and up to this many more until the fight is over (calm): no hostile in view, not
+                               # on an Elbereth of ours, HP at least rest_frac -- a window that ends with the monster
+                               # still there (the option was to sit on Elbereth) says nothing of how that fight ends
+    "reps": 2,                 # children per option, each with its own future (the same seeds for every option)
+    "gap": 8,                  # game turns at least between two decision points
+    "max_dp": 150,             # decision points at most per game
+    "max_secs": 2700,          # ... and wall-clock seconds of rollouts per game
+    "options": None,           # the options tried (None: every legal one)
+    "variants": (),            # the policy variants tried: names of VARIANTS ("all": every one); "model=PATH":
+                               # the bot with tactic_model = PATH (an absolute path), rolled out where the chooser
+                               # acts at once; {"name": N, "opts": {...}}: the bot under any options, rolled out at
+                               # every decision point
+    "hp_frac": 0.5,            # trigger: HP below this fraction
+    "pdeath": 0.003,           # ... or danger.py's P(death next turn) at least this
+    "win_prob": 0.85,          # ... or win_prob at most this
+    "keep": 1.0,               # the fraction of triggered ticks rolled out (drawn from the game seed)
+    "max_turn": None,          # stop the parent game at this turn
+}
+
+
+# Policy variants: a child plays on as the scripted bot with these options changed (a sustained change of the
+# policy, not a forced first action) -- name: (option overrides, where it can matter: a test on the features)
+VARIANTS = {
+    "elb70": ({"elb_hp": 0.7}, lambda f: f["elb_can"] and 0.4 <= f["hp_frac"] < 0.85),
+    "elb35": ({"elb_hp": 0.35}, lambda f: f["elb_can"] and f["hp_frac"] < 0.6),
+    "elbexit70": ({"elb_exit": 0.7}, lambda f: f["elb_can"] and f["hp_frac"] < 0.7),
+    "elbexit100": ({"elb_exit": 1.0, "elb_early": 0.85}, lambda f: f["elb_can"] and f["hp_frac"] < 0.85),
+    "rest70": ({"rest_frac": 0.7}, lambda f: f["hp_frac"] < 0.7),
+    "rest90": ({"rest_frac": 0.9}, lambda f: f["hp_frac"] < 0.9),
+    "pray300": ({"pray_gap": 300}, lambda f: f["prayers"] > 0 and 250 < f["pray_gap"] <= 520 and f["hp_frac"] < 0.4),
+    "pray150": ({"pray_gap": 150}, lambda f: f["prayers"] > 0 and 100 < f["pray_gap"] <= 520 and f["hp_frac"] < 0.4),
+    "pray800": ({"pray_gap": 800}, lambda f: f["prayers"] > 0 and 480 < f["pray_gap"] <= 800 and f["hp_frac"] < 0.4),
+    "heal50": ({"heal_hp": 0.5}, lambda f: f["n_heal"] > 0 and f["hp_frac"] < 0.6),
+}
+
+
+# the scripted step that is the same action as a forced option: no child needed, the default's outcome is its outcome
+SAME_AS = {"melee": "melee", "elbereth": "elbereth", "pray": "pray", "heal": "quaff"}
+
+
+def child_seed(seed, dp, rep):
+    """The RNG seed of replicate `rep` at decision point `dp` of game `seed`: the same for every option (common
+    random numbers: an option that does what the default does gets the default's outcome)."""
+    h = hashlib.sha256(f"{seed}/{dp}/{rep}".encode()).digest()
+    return int.from_bytes(h[:4], "little") & 0x7FFFFFFF
+
+
+def key_hash(keys):
+    return hashlib.sha256(b"".join(k.to_bytes(4, "little") for k in keys)).hexdigest()[:16]
+
+
+ABSOLUTE = ("hp", "maxhp", "depth", "xl", "god_angry", "ac", "gold", "hunger", "pray_gap", "vis", "on_elb")
+#           the rest: gained since the decision
+
+
+def state_of(bot, local=True):
+    """The bot's state in numbers (a record's "state0"; a rollout reports ABSOLUTE as is, the others as gains).
+    local: with the hostiles in view (looking may send a free key: not before a child's first action, which the
+    determinism check compares key for key)."""
+    last = bot.surv.last_pray
+    return {"hp": bot.bl(nh.NLE_BL_HP), "maxhp": bot.bl(nh.NLE_BL_HPMAX), "depth": bot.bl(nh.NLE_BL_DEPTH),
+            "max_depth": bot.max_depth, "xl": bot.bl(nh.NLE_BL_XP), "exp": bot.bl(nh.NLE_BL_EXP),
+            "score": bot.reward, "prayers": bot.surv.prayers, "quaffs": bot.surv.quaffs, "zaps": bot.acts.zaps,
+            "elb": bot.elb.elbereths, "steps": bot.steps, "kills": bot.combat.kill_count,
+            "god_angry": int(bot.surv.god_angry), "pray_failed": bot.surv.pray_failed,
+            "ac": bot.bl(nh.NLE_BL_AC), "gold": bot.bl(nh.NLE_BL_GOLD), "hunger": bot.bl(nh.NLE_BL_HUNGER),
+            "pray_gap": bot.turn() - last if last is not None else bot.turn() + 200,
+            "vis": len(hostiles_in_view(bot)) if local else 0, "on_elb": int(bot.elb.state is not None)}
+
+
+def hostiles_in_view(bot):
+    lv = bot.levels.get(bot.cur_key) if bot.cur_key else None
+    return bot.visible_hostiles(lv) if lv is not None and not bot.done else []
+
+
+def calm(bot):
+    """The fight is over: no hostile in view, not standing on an Elbereth of ours, HP at least rest_frac."""
+    return bot.elb.state is None and not bot.hp_below(bot.opts.rest_frac) and not hostiles_in_view(bot)
+
+
+def rollout(bot, c, opt, horizon, record_keys=False, settle=0, overrides=None):
+    """In a child: force `opt` at this tick, play on for `horizon` turns (and up to `settle` more until calm); the
+    outcome as a dict. record_keys: also the number and a hash of the keys sent (the determinism check).
+    overrides: `opt` is a policy variant -- these bot options instead of a forced action."""
+    keys = None
+    if record_keys:
+        keys, orig = [], bot.raw_step
+
+        def raw_step(code):
+            keys.append(code)
+            return orig(code)
+        bot.raw_step = raw_step
+    bot.tac.hook = None
+    t0, s0 = c.t, state_of(bot, local=False)
+    res = {"opt": opt, "ok": True, "first": None}
+    marks, cps = [], list(CHECKPOINTS)
+    try:
+        if overrides is not None:
+            # a policy variant: the bot under changed options from this tick on; with a tactic_model among them the
+            # chooser is in the loop (and has its say at this tick, which is already past the tactic step's check)
+            bot.opts._values.update(overrides)
+            acted = False
+            if overrides.get("tactic_model"):
+                bot.tactic_load(overrides["tactic_model"])
+                acted = bot.tactic_choose(c)
+        else:
+            acted = opt != "default" and bot.tactic_start(opt, c)
+            res["ok"] = acted or opt == "default"
+        if not acted:
+            bot.run_steps(c, after="tactic")
+        elif opt != "melee":                     # (melee: the scripted step that acted is already in last_step)
+            bot.pol.last_step = "tactic"
+        res["first"] = bot.pol.last_step
+        bot.after_tick(t0)
+        while True:
+            dt = bot.turn() - t0
+            while cps and dt >= cps[0]:
+                marks.append((cps.pop(0), bot.bl(nh.NLE_BL_HP), bot.reward - s0["score"]))
+                if marks[-1][0] == 300 and horizon > 300:
+                    # a long rollout: its state where a standard one ends (absolute values) -- horizon.py
+                    # compares what the 300-turn label says with what the long run shows, pair by pair
+                    res["s300"] = dict(state_of(bot), dt=dt)
+            if dt >= horizon + settle or (dt >= horizon and calm(bot)):
+                break
+            bot.play_tick()
+    except GameOver:
+        pass
+    s1 = state_of(bot)
+    res.update(died=int(bot.done and not bot.truncated), dt=bot.turn() - t0, marks=marks,
+               **{k: s1[k] if k in ABSOLUTE else s1[k] - s0[k] for k in s1})
+    if res["died"]:
+        res["death"] = (bot.death_msgs or [m for _, m in list(bot.messages)[-3:]])[-3:]
+    if keys is not None:
+        res.update(nkeys=len(keys), keyhash=key_hash(keys))
+    return res
+
+
+class Collector:
+    """The tactic hook of one game: finds the decision points, forks the rollouts, writes the records."""
+
+    def __init__(self, bot, out=None, **cfg):
+        unknown = set(cfg) - set(DEFAULTS)
+        if unknown:
+            raise ValueError(f"unknown rollout setting(s): {sorted(unknown)}")
+        self.cfg = {**DEFAULTS, **cfg}
+        self.bot, self.out = bot, out
+        self.n_dp, self.last_t, self.secs, self.triggered = 0, -10 ** 9, 0.0, 0
+        self.root = None
+        self.records = []
+        self.models = {}
+        bot.tac.hook = self.hook
+        atexit.register(self.close)              # the parent's exit only: a child leaves by os._exit
+
+    def model(self, path):
+        """The chooser of a "model=PATH" variant, loaded once (to know where it would act)."""
+        if path not in self.models:
+            from nhbot.tacticmodel import TacticModel
+            with open(path) as fh:
+                self.models[path] = TacticModel(json.load(fh))
+        return self.models[path]
+
+    def overrides(self, opt):
+        """The bot options of the policy variant `opt` ("v:..."), None for a forced action."""
+        if not opt.startswith("v:"):
+            return None
+        name = opt[2:]
+        if name.startswith("model="):
+            return {"tactic_model": name[6:]}
+        for v in self.cfg["variants"] if self.cfg["variants"] != "all" else ():
+            if isinstance(v, dict) and v["name"] == name:
+                return dict(v["opts"])
+        return dict(VARIANTS[name][0])
+
+    def trigger(self, f):
+        """A decision point: a hostile next to us and we are hurt, or danger.py says the fight is a risk; or hurt
+        with a hostile within 3 squares."""
+        cfg = self.cfg
+        if f["n_adj"] == 0:
+            return f["far_within3"] > 0 and f["hp_frac"] < cfg["hp_frac"]
+        return f["hp_frac"] < cfg["hp_frac"] or f["pdeath1"] >= cfg["pdeath"] or f["win_prob"] <= cfg["win_prob"]
+
+    def hook(self, bot, c):
+        cfg = self.cfg
+        if cfg["max_turn"] and c.t >= cfg["max_turn"]:
+            bot.truncated = True
+            raise GameOver()
+        if self.n_dp >= cfg["max_dp"] or self.secs >= cfg["max_secs"] or c.t - self.last_t < cfg["gap"]:
+            return
+        hostiles = bot.tactic_hostiles(c)
+        if not hostiles and (c.hp >= c.maxhp * cfg["hp_frac"] or not c.vis):
+            return
+        feat = bot.tactic_features(c, hostiles)
+        if not self.trigger(feat):
+            return
+        self.triggered += 1
+        if cfg["keep"] < 1.0:
+            h = hashlib.sha256(f"{bot.seed}/keep/{c.t}".encode()).digest()
+            if int.from_bytes(h[:4], "little") / 2 ** 32 >= cfg["keep"]:
+                return
+        legal = bot.tactic_legal(c, hostiles)
+        opts = [o for o in legal if cfg["options"] is None or o in cfg["options"]]
+        names = VARIANTS if cfg["variants"] == "all" else cfg["variants"]
+        for v in names:
+            if isinstance(v, dict):
+                opts.append("v:" + v["name"])            # {"name", "opts"}: rolled out at every decision point
+            elif v.startswith("model="):
+                # a chooser in the loop: rolled out where it would act otherwise than the script right now (its
+                # pick is recorded); elsewhere its child would only repeat the default
+                pick = self.model(v[6:]).choose(feat, legal) if self.model(v[6:]).wants(feat) else "default"
+                if pick != "default":
+                    opts.append("v:" + v)
+                    feat = dict(feat, **{"pick:" + os.path.basename(v[6:]): legal.index(pick)})
+            elif VARIANTS[v][1](feat):
+                opts.append("v:" + v)
+        if len(opts) < 2:
+            return                                   # nothing to compare the default with here
+        t = time.monotonic()
+        rolls = []
+        for rep in range(cfg["reps"]):
+            seed = child_seed(bot.seed, self.n_dp, rep)
+            first = None
+            for opt in opts:                         # 'default' comes first (tactic_legal)
+                if opt == SAME_AS.get(first):
+                    # the scripted step is this very option: the default's rollout stands for it (same seed)
+                    r = dict(default_roll, opt=opt, alias=1)
+                else:
+                    r = self.spawn(c, opt, seed)
+                if opt == "default":
+                    first, default_roll = r.get("first"), r
+                r["rep"] = rep
+                rolls.append(r)
+        self.secs += time.monotonic() - t
+        rec = {"seed": bot.seed, "dp": self.n_dp, "t": c.t, "feat": feat, "legal": legal, "state0": state_of(bot),
+               "adj": [(n, p[0] - c.y, p[1] - c.x) for p, n in hostiles],
+               "vis": [(n, p[0] - c.y, p[1] - c.x) for p, n in c.vis][:16],
+               "wands": [k for _, k in bot.attack_wands()], "rolls": rolls, "secs": round(time.monotonic() - t, 1)}
+        self.n_dp += 1
+        self.last_t = c.t
+        self.write(rec)
+
+    def spawn(self, c, opt, seed, record_keys=False):
+        """One child: `opt` forced under RNG seed `seed` (None: the parent's RNG state, untouched)."""
+        if self.root is None:
+            base = "/dev/shm" if os.path.isdir("/dev/shm") else None
+            self.root = tempfile.mkdtemp(prefix="rollout", dir=base)
+        bot = self.bot
+
+        def child_main(bot):
+            if seed is not None:
+                fork.reseed(bot, seed, lgen=seed)
+            return json.dumps(rollout(bot, c, opt, self.cfg["horizon"], record_keys, self.cfg["settle"],
+                                      self.overrides(opt))).encode()
+
+        raw = fork.fork_child(bot, child_main, root=self.root)
+        for name in os.listdir(self.root):               # a killed child's directory
+            shutil.rmtree(os.path.join(self.root, name), ignore_errors=True)
+        if not raw or raw.startswith(b"CRASH"):
+            return {"opt": opt, "crash": raw.decode(errors="replace")[-1500:] or "no answer (killed or died)"}
+        return json.loads(raw)
+
+    def write(self, rec):
+        if self.out is None:
+            self.records.append(rec)
+            return
+        with open(self.out, "a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+
+    def close(self):
+        if self.root is not None:
+            shutil.rmtree(self.root, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------------------------- command line
+def play(args):
+    seed, out_dir, cfg, bot_kw = args
+    from nhbot import Bot
+    t = time.monotonic()
+    out = os.path.join(out_dir, f"{seed}.jsonl")
+    if os.path.exists(out):
+        os.remove(out)
+    # nhbot.tactic installs the Collector (option 'rollout')
+    bot = Bot(seed=seed, character="val", rollout={"out": out_dir, **cfg}, **bot_kw)
+    try:
+        s = bot.run()
+        col = bot.tac.hook.__self__
+        info = {"seed": seed, "score": s["score"], "max_depth": s["max_depth"], "turns": s["turns"],
+                "dp": col.n_dp, "triggered": col.triggered, "roll_secs": round(col.secs),
+                "secs": round(time.monotonic() - t)}
+    except Exception:
+        import traceback
+        info = {"seed": seed, "crash": traceback.format_exc()[-1500:]}
+    with open(os.path.join(out_dir, "games.jsonl"), "a") as fh:
+        fh.write(json.dumps(info) + "\n")
+    return info
+
+
+def pinned_clock():
+    """Re-exec under libfaketime with regress.py's clock (NetHack reads the clock: night, moon phase, Friday 13th)."""
+    sys.path.insert(0, os.getcwd())
+    import regress
+    if os.environ.get("FAKETIME") == regress.CLOCK:
+        return
+    env = dict(os.environ, FAKETIME=regress.CLOCK, TZ="UTC", LD_PRELOAD=regress.FAKETIME_LIB, DONT_FAKE_MONOTONIC="1",
+               OMP_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+    os.execvpe(sys.executable, [sys.executable, "-m", "tools.rollout.collect"] + sys.argv[1:], env)
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--seeds", required=True, help="A:B (B exclusive)")
+    ap.add_argument("--out", default=None)
+    ap.add_argument("-j", type=int, default=1, help="games in parallel (the children of a game run one at a time)")
+    ap.add_argument("--cfg", default="{}", help="Collector settings as JSON (collect.DEFAULTS)")
+    ap.add_argument("--bot-kw", default="{}", help="bot options as JSON, e.g. the chooser in the loop: "
+                    "'{\"tactic_model\": \"data/tactic_v1.json\"}' (the rollouts then continue under it too)")
+    ap.add_argument("--selftest", action="store_true", help="the isolation and determinism checks (selftest.py)")
+    a = ap.parse_args()
+    pinned_clock()
+    lo, hi = (int(v) for v in a.seeds.split(":"))
+    if a.selftest:
+        from tools.rollout import selftest
+        sys.exit(selftest.main(range(lo, hi), a.j))
+    os.makedirs(a.out, exist_ok=True)
+    import multiprocessing as mp
+    cfg = json.loads(a.cfg)
+    with mp.Pool(a.j) as pool:
+        jobs = [(s, a.out, cfg, json.loads(a.bot_kw)) for s in range(lo, hi)]
+        for info in pool.imap_unordered(play, jobs, chunksize=1):
+            print(json.dumps(info), flush=True)
+
+
+if __name__ == "__main__":
+    main()

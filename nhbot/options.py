@@ -110,6 +110,11 @@ DEFAULTS = {
     "retreat_elb": True,       # Elbereth when only class-C monsters (may carry missiles / wands) block it
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
+    "tactic_model": None,      # A/B: the fight's tactical option (melee / pray / Elbereth / potion / wand / stairs /
+                               #      retreat) chosen by a model trained on counterfactual rollouts (nhbot.tactic,
+                               #      tools/rollout): the path of its weights file, relative to nhbot/
+    "rollout": None,           # experiments: counterfactual rollouts by fork at the fight's decision points, written to
+                               #      <out>/<seed>.jsonl (tools/rollout): {"out": DIR, ...collect.DEFAULTS}
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
     "rest_frac": 0.7,          # rest (search 20) below this with nothing in view; rest on our Elbereth below it too
                                #      (accepted 2026-11-11, 0.5 -> 0.7, orc_rest70_s vs base_d1, 500 games: score +3487
