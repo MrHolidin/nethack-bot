@@ -24,6 +24,29 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "corpse_names": False,     # A/B: the corpse we stand on is known by its kind's own name -- "uruk-hai" read from
+                               #      the lowercased question was no kind: Uruk-hai, Mordor orcs, elves never eaten
+    "max_food": 0,             # A/B: pieces of food kept in the pack and fetched from the floor (0: pickup.MAX_FOOD,
+                               #      6) -- food is what a hold at the pace gate lives on
+    "mines_end_xl": 0,         # A/B: below this XL no descent below Minetown: done there, we climb out of the Mines
+                               #      (mines_return "weak"; they are finished then) -- 99: never to Mines' End
+    "pace": None,              # A/B: the strength gate on the stairs down (nhbot.pace): a list of [depth, XL] -- no
+                               #      descent to that depth or deeper below that experience level; we wait on the
+                               #      staircase instead (counted searches), e.g. [[5, 6], [8, 8], [11, 10]]
+    "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens);
+                               #      an entry [depth, XL, turns] of the schedule has its own
+    "pace_food": 0,            # with pace: the gate is open while our estimated nutrition is below this (0: only when
+                               #      Weak) -- 200 leaves before Hungry, the food we carry uneaten
+    "pace_ac": 0.0,            # with pace: the gate compares XL - pace_ac * AC with the schedule (0.5: two points of
+                               #      AC below zero count as an experience level)
+    "pace_pray": 0,           # with pace_food: ... unless the prayer for hunger we then come to will be at least this
+                               #      many turns after the last one (0: never count on a prayer)
+    "pace_patrol": 0,         # with pace: gated, a walk to a far square of the level and back every this many turns
+                               #      (0: never) -- it brings out the monsters that stand behind walls
+    "pace_spot": False,        # with pace: the hold is on a corridor square / in an open door by the stairs, where
+                               #      at most two monsters reach us at once, not on the staircase in the open
+    "pace_retreat": 0,         # A/B: from this depth on, a level with no way down found (Medusa's island) is left by
+                               #      the stairs up after 200 turns of searching: we hold for good on the level above
     "loop_ticks": 20,          # A/B: the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
                                #      too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn;
                                #      accepted 2026-11-11, keys_all4_s vs base_d1, 500 games: keys/game 20134 -> 12753,

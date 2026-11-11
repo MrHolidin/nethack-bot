@@ -57,6 +57,7 @@ PM_INDICES = {}
 for _i in range(nh.NUMMONS):
     PM_INDICES.setdefault(nh.permonst(_i).mname, []).append(_i)
 PM_BY_NAME = {name: nh.permonst(i) for name, i in PM_INDEX.items()}
+PM_LOWER = {name.lower(): name for name in PM_BY_NAME}      # a name read from a lowercased message -> the kind's
 
 S_HUMAN, S_ANGEL = PM_BY_NAME["human"].mlet, PM_BY_NAME["Angel"].mlet      # monster classes '@' and 'A'
 
