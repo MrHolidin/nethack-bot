@@ -24,6 +24,12 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "medusa_dig": False,       # A/B: on Medusa's level (water, Dlvl 21-28, no way down) a hole dug through the floor on a
+                               #      square with no water around it (pick-axe, mattock, wand of digging), past her
+                               #      island; the stairs back up to her level never taken (nhbot.deep)
+    "dead_end_patrol": False,  # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
+                               #      back up the stairs and a patrol of the level above for the rest of the game
+                               #      (nhbot.deep)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
