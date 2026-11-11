@@ -62,6 +62,24 @@ INTRINSIC_FAST_XL = {"Archeologist": 1, "Monk": 1, "Samurai": 1, "Barbarian": 7,
 STOMACH_CONTENT_RE = re.compile(r"\bYour [a-z ]+ feels content\.")     # pray.c:368-370 fix_worst_trouble
 
 
+
+def offered_letters(prompt):
+    """The inventory letters an item prompt offers ("What do you want to eat? [a-cX or ?*]"), as a set; None if the
+    prompt shows no list."""
+    m = re.search(r"\[([^\]]*?)(?: or \?\*)?\]", prompt)
+    if not m or "?" in m.group(1) and " or " not in prompt:
+        return None
+    out, spec = set(), m.group(1).split(" or ")[0]
+    i = 0
+    while i < len(spec):
+        if i + 2 < len(spec) and spec[i + 1] == "-":
+            out.update(chr(c) for c in range(ord(spec[i]), ord(spec[i + 2]) + 1))
+            i += 3
+        else:
+            out.add(spec[i])
+            i += 1
+    return out
+
 class SurvivalState:
     """State of eating, praying, the vault guard protocol, hunger and unicorn horns (SurvivalMixin)."""
     def __init__(self):
@@ -176,7 +194,8 @@ class SurvivalMixin:
         """'e', declining the food lying here ("There is a jackal corpse here; eat it?", eat.c floorfood): True if
         the inventory prompt "What do you want to eat?" is open."""
         self.press("e", expect_prompt=True)
-        for _ in range(3):
+        for _ in range(40):                  # one question per food item lying here (a pile of rations asked 6+: the
+                                             # 4th was left open -- no time, every tick, till the loop guard: 301203)
             m = self.message().lower()
             if self.obs["misc"][0] and "eat" in m and "here" in m:
                 self.press("n", expect_prompt=True)
@@ -189,6 +208,15 @@ class SurvivalMixin:
             if ocls != nh.FOOD_CLASS or not self.edible_now(s):
                 continue
             if self.eat_prompt():
+                offered = offered_letters(self.message())
+                if offered is not None and letter not in offered:
+                    # the game does not offer it ("What do you want to eat? [X or ?*]"): the letter was "Never mind."
+                    # (no time), every tick till the loop guard (300314, 301003) -- not now
+                    self.msg_audit["eat_not_offered"] += 1
+                    self.raw_step(27)
+                    self.settle()
+                    self.surv.no_eat_until = self.turn() + 20
+                    return True
                 self.press(letter)
                 # one piece of a stack: "2 food rations" -> food ration, 800 (was 200)
                 # (name_parse, accepted without A/B by the user -- see carry.describe)

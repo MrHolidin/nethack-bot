@@ -115,8 +115,9 @@ class CombatMixin:
         self.combat = CombatState()
 
     def throwables(self):
-        if self.handless():
-            return []                        # "You can't throw or shoot without hands."
+        if self.handless() or self.turn() - self.acts.no_throw_turn < 50:
+            return []                        # "You can't throw or shoot without hands."; a form "physically incapable
+                                             # of throwing" (actions.throw): the throw, no time, came every tick
         out = []
         for it in self.items():
             if it.held or it.cursed:
@@ -195,7 +196,7 @@ class CombatMixin:
             for p in ray:
                 if G.KIND[g[p]] == G.OBJECT and nh.glyph_is_object(int(g[p])) and \
                         ord(nh.objclass(nh.glyph_to_obj(int(g[p]))).oc_class) in (nh.WEAPON_CLASS, nh.GEM_CLASS) \
-                        and p not in out:
+                        and p not in out and (lv.key, p) not in self.pick.no_reach:
                     out.append(p)
         return out
 

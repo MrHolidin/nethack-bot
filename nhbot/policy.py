@@ -404,6 +404,7 @@ class PolicyMixin:
         # the pile window lists what "Things that are here" leaves out
         txt = (sh[2] if sh else "") + (" | " + hw[2] if hw and sh and hw[:2] == sh[:2] else "")
         if sh and sh[0] == self.turn() and sh[1] == (y, x) and self.acts.throws and not c.lv.shop[y, x] \
+                and (c.lv.key, (y, x)) not in self.pick.no_reach \
                 and any(floor_kind(t)[1] in MISSILE_TYPES and "for sale" not in t and not CURSED_RE.search(t)
                         # (A/B ammo_one -- stop for what take_ammo takes, stones too: -3134 [-4643, -1533], 6747)
                         for t in re.split(r" \| |You see here |\.$", txt) if t.strip()):

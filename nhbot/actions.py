@@ -17,6 +17,8 @@ class ActionsState:
         self.throws = 0
         self.zaps = 0
         self.own_zap_turn = -99          # a bouncing ray of ours is not an enemy shooter
+        self.grid_bug_waits = 0          # attack: a diagonal blow we can't strike as a grid bug -- waited instead
+        self.no_throw_turn = -99         # throw: "You are physically incapable of throwing" (this form) last said
 
 
 class ActionsMixin:
@@ -31,6 +33,12 @@ class ActionsMixin:
             self.press("s")
             return
         key = DELTA2KEY[(target[0] - y, target[1] - x)]
+        if target[0] != y and target[1] != x and self.poly_form() == "grid bug":
+            # a grid bug moves and fights orthogonally only: "You can't get there from here..." (cmd.c:4880, no
+            # time) -- again every tick till the loop guard (301304: 200 000 keys); wait for it to come square
+            self.acts.grid_bug_waits += 1
+            self.press("s")
+            return
         self.acts.last_attack_target = target
         self.acts.attack_turn = self.turn()             # danger: the monster we hit first may not act
         self.not_stepping()
@@ -69,6 +77,8 @@ class ActionsMixin:
     def throw(self, letter, key, ray):
         """Throw the item letter in direction key; ray: the squares it may land on (picked up again later)."""
         if not self.ask("t", "throw"):
+            if "physically incapable" in self.asked:      # dothrow.c:246 notake form -- no throwables meanwhile
+                self.acts.no_throw_turn = self.turn()
             return
         self.press(letter, expect_prompt=True)
         if "direction" not in self.message().lower() and self.obs["misc"][0] == 0:
@@ -139,5 +149,7 @@ class ActionsMixin:
             for c in str(n):
                 self.raw_step(ord(c))
         self.press(letter)
-        if any("cannot drop" in t for t in self.msgs_since(seq0)) and item is not None:
-            self.drop_refused(item)                 # "For some reason, you cannot drop the stone!"
+        if any("cannot drop" in t or "welded to your" in t for t in self.msgs_since(seq0)) and item is not None:
+            # "For some reason, you cannot drop the stone!"; a cursed weapon "welded to your claw!" (wield.c:875) --
+            # its drop, no time, came again every tick till the loop guard (301399)
+            self.drop_refused(item)
