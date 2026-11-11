@@ -44,10 +44,10 @@ from nhbot import glyphs as G
 from nhbot.consts import COLS, CORRIDOR_GLYPHS, FLOOR_GLYPH, ROWS, WEAK
 
 MEDUSA_MIN, MEDUSA_MAX = 21, 28      # dungeon.def: medusa @ (-5, 4) of 25-29 levels
-CASTLE_MIN = 25                      # ... castle @ (-1)
-LAKE_MIN = 60                        # liquid squares known: Medusa's lake, not the Castle's moat seen from outside
-WATER_MIN = 3                        # liquid squares known on a level of that depth: Medusa's or the Castle -- no
-                                     # ordinary level is made with pools (mklev.c), medusa-2's building holds 3
+LAKE_MIN = 100                       # liquid squares known: Medusa's lake (its lit variants show several hundred from
+                                     # the arrival island) -- not the pools of an overflowing fountain (fountain.c
+                                     # dogushforth, a dozen), not the Castle's moat seen from the maze around it
+MOAT_MIN = 3                         # ... with the drawbridge in our map: the Castle
 DBRIDGE_GLYPHS = tuple(nh.GLYPH_CMAP_OFF + i for i in (35, 36, 37, 38))    # S_vodbridge .. S_hcdbridge: the Castle
 SHAFT_GLYPHS = (nh.GLYPH_CMAP_OFF + 54, nh.GLYPH_CMAP_OFF + 55)            # S_hole, S_trap_door
 BARE_FLOOR = (FLOOR_GLYPH, nh.GLYPH_CMAP_OFF + 20) + tuple(CORRIDOR_GLYPHS)   # S_room, S_darkroom, corridors
@@ -87,7 +87,6 @@ class DeepState:
         self.shaft = {}                # ... level key -> the square of the hole we dug there
         self.jumps = Counter()         # ... level key -> steps onto its hole / trap door
         self.no_up = set()             # level keys whose up stairs lead onto Medusa's island: never taken
-        self.sure = set()              # level keys that are Medusa's beyond doubt (water_dead_end)
         self.above = None              # the level key above a dead end we went back up to: its down stairs are
                                        # hidden; the shaft (medusa_dig), the patrol (dead_end_patrol) are there
         self.near_at = {}              # dead_end_patrol: level key -> the turn each square was last within
@@ -135,9 +134,11 @@ class DeepMixin:
             st = self.deep
             if lv.key not in st.kind:
                 self.water_dead_end(lv, self.grids(lv)[0])
-            if "past_medusa_at" not in st.mark and any(k == "medusa" and key[1] < lv.key[1]
-                                                       for key, k in st.kind.items()):
+            past = any(k == "medusa" and key[1] < lv.key[1] for key, k in st.kind.items())
+            if past and "past_medusa_at" not in st.mark:
                 self.deep_mark("past_medusa")
+            if past and self.opts.medusa_dive and self.dive_step(lv):
+                return
         super().explore(lv)
 
     def search_mode(self, lv, grids):
@@ -177,35 +178,29 @@ class DeepMixin:
 
     # ------------------------------------------------------------------ which level this is
     def water_dead_end(self, lv, k_mem):
-        """"medusa" / "castle" if this level of the main dungeon, Dlvl 21+, shows water (WATER_MIN squares): the
-        Castle below Medusa's range, where the drawbridge is in our map, or where the floor would not be dug;
-        Medusa's level else -- the up stairs of the level below it are closed from now on. None: neither, as far
-        as we see."""
+        """"medusa" if this level of the main dungeon, Dlvl 21-28, shows a lake (LAKE_MIN squares of water) or
+        medusa-2's arrival building (medusa2_square) -- the up stairs of the level below it are closed from now on;
+        "castle" if it shows water and the drawbridge, or water where the floor would not be dug, or water below
+        Medusa's range. None: neither, as far as we see."""
         if lv.key[0] != 0 or lv.key[1] < MEDUSA_MIN:
             return None
         st = self.deep
         kind = st.kind.get(lv.key)
-        if kind == "castle":
+        if kind is not None:
             return kind
         water = int((k_mem == G.LIQUID).sum())
-        if kind is None and water < WATER_MIN:
+        if water < MOAT_MIN:
             return None
         if lv.key[1] > MEDUSA_MAX or lv.key in self.digging.refused or np.isin(lv.terrain, DBRIDGE_GLYPHS).any():
             kind = "castle"
-            st.no_up.discard((lv.key[0], lv.key[1] + 1))
-            st.sure.discard(lv.key)
-        else:
+        elif water >= LAKE_MIN or self.medusa2_square(k_mem, np.ones((ROWS, COLS), dtype=bool)) is not None:
             kind = "medusa"
             st.no_up.add((lv.key[0], lv.key[1] + 1))
             lv.unexplored = False
-            # above the Castle's range, a lake in view, or medusa-2's building: no doubt (from the maze west of the
-            # Castle we see a few squares of its moat)
-            if lv.key[1] < CASTLE_MIN or water >= LAKE_MIN \
-                    or self.medusa2_square(k_mem, np.ones((ROWS, COLS), dtype=bool)) is not None:
-                st.sure.add(lv.key)
-        if st.kind.get(lv.key) != kind:
-            st.kind[lv.key] = kind
-            st.stats[kind] += 1
+        else:
+            return None
+        st.kind[lv.key] = kind
+        st.stats[kind] += 1
         return kind
 
     def dead_end_step(self, lv, grids):
@@ -332,6 +327,27 @@ class DeepMixin:
                         return q
         return None
 
+    def dive_step(self, lv):
+        """medusa_dive: below Medusa's level (mazes four times in five -- mklev.c:1008 makelevel -- with their
+        minotaurs, mkmaze.c) the next hole at once, where we stand or on the nearest bare floor, until the floor
+        refuses: the Castle. True if it used the turn."""
+        st = self.deep
+        if st.dig is not None and st.dig[0] != lv.key:
+            st.dig = None
+        means = self.dig_means()
+        if means is None or lv.key in self.digging.refused or st.applies[lv.key] >= DIG_APPLIES \
+                or st.kind.get(lv.key) == "castle":
+            st.dig = None
+            return False
+        grids = self.grids(lv)
+        if st.dig is None:
+            sq = self.nearest(lv, grids, self.bare_floor(lv, grids[2]) & ~dilate(grids[0] == G.LIQUID))
+            if sq is None:
+                return False
+            st.dig = (lv.key, sq)
+            self.deep_once("dive", lv)
+        return self.hole_step(lv, grids, means)
+
     # ------------------------------------------------------------------ medusa_dig: the shaft from the level above
     def shaft_hope(self, lv):
         """On Medusa's level with no dry square: a fall from the level above may carry us past -- a digger for a
@@ -377,7 +393,7 @@ class DeepMixin:
             st.dig = None
             return False
         if st.dig is None:
-            sq = self.nearest(lv, grids, self.bare_floor(lv, passable) & ~dilate(k_mem == G.UNKNOWN))
+            sq = self.nearest(lv, grids, self.bare_floor(lv, passable) & ~dilate(k_mem == G.LIQUID))
             if sq is None:
                 return False
             st.dig = (lv.key, sq)
@@ -387,12 +403,13 @@ class DeepMixin:
     # ------------------------------------------------------------------ dead_end_patrol
     def dead_end_leave_step(self, lv, grids):
         """At a dead end with no hole to dig here: to the up stairs and up them -- the level above is where the
-        shaft or the patrol is -- unless that level may be Medusa's (we never saw it: we fell past it, and this is
-        not her level beyond doubt); with dead_end_patrol the patrol is here then. True if it used the turn."""
+        shaft or the patrol is -- unless that level may be Medusa's (the Castle reached by a fall past levels we
+        never saw); with dead_end_patrol the patrol is here then. True if it used the turn."""
         st = self.deep
         above = (lv.key[0], lv.key[1] - 1)
         up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
-        if up.any() and st.kind.get(above) != "medusa" and (above in self.levels or lv.key in st.sure):
+        if up.any() and st.kind.get(above) != "medusa" \
+                and (above in self.levels or st.kind.get(lv.key) == "medusa"):
             if up[self.pos()]:
                 st.above = above
                 self.deep_mark("back_up")

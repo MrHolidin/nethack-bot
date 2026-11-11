@@ -27,6 +27,8 @@ DEFAULTS = {
     "medusa_dig": False,       # A/B: on Medusa's level (water, Dlvl 21-28, no way down) a hole dug through the floor on a
                                #      square with no water around it (pick-axe, mattock, wand of digging), past her
                                #      island; the stairs back up to her level never taken (nhbot.deep)
+    "medusa_dive": False,      # A/B, with medusa_dig: below Medusa's level no exploring (mazes, minotaurs) -- the next
+                               #      hole at once, down to the Castle
     "dead_end_patrol": False,  # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
                                #      back up the stairs and a patrol of the level above for the rest of the game
                                #      (nhbot.deep)
