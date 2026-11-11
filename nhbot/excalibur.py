@@ -322,7 +322,12 @@ class ExcaliburMixin:
         """Fountains of this level we may use: not a shop's, not in the Mines (Minetown's watch), not on a
         level we gave up reaching them on."""
         fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
-        if lv.key[0] == 2 or lv.key in self.excal.skip:
+        if lv.key in self.excal.skip:
+            return fmask & False
+        if lv.key[0] == 2 and not (self.opts.dip_mines and (self.is_orctown(lv) or not self.is_minetown(lv))):
+            # dip_mines: Mines' End's fountains (minend-2 one, minend-3 two) and Orcish Town's (its watch lies dead) are
+            # no town's or watched; a watched Minetown's stay out -- Excalibur made there angers the watch
+            # (fountain.c dipfountain: in_town -> angry_guards), the 1-in-3 dryup only warns the first time
             return fmask & False
         return fmask & ~lv.shop if lv.shop.any() else fmask
 

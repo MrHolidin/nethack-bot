@@ -30,7 +30,9 @@ DEFAULTS = {
     "dip_elb": 0.0,            # A/B: a dip let out water moccasins, or a water demon we beat with P below this
                                #      (danger.win_prob): off the fountain, Elbereth, hold it while they are in view
                                #      (excalibur.step_fountain_trouble); 0: off, 1.01: against every demon
-    "dip_hold": 200,           # with dip_elb: turns at most holding that Elbereth
+    "dip_mines": False,        # A/B: the Mines' fountains that no watch minds -- Mines' End's, Orcish Town's -- used too
+                               #      (excalibur.fountains); a watched Minetown's never (Excalibur there angers the watch)
+    "dip_hold": 200,          # with dip_elb: turns at most holding that Elbereth
     "gift": None,             # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
