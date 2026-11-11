@@ -46,7 +46,10 @@ def checkout(ref):
         ar = subprocess.Popen(["git", "--git-dir", GIT, "archive", sha], stdout=subprocess.PIPE)
         subprocess.check_call(["tar", "-x", "-C", tmp], stdin=ar.stdout)
         ar.wait()
-        os.rename(tmp, path)
+        try:
+            os.rename(tmp, path)
+        except OSError:                              # another nhq exported the same commit meanwhile
+            shutil.rmtree(tmp, ignore_errors=True)
     return sha, path
 
 
