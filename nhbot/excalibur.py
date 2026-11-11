@@ -1,9 +1,12 @@
 """Excalibur (wiki "Excalibur"): lawful, XL >= 5, dip an unnamed long sword into a fountain;
 1/6 per dip, the fountain disappears on success."""
+import collections
 import re
 
 import nle.nethack as nh
 
+from nhbot import elb_rules as ELB
+from nhbot import glyphs as G
 from nhbot.consts import FLOOR_GLYPH, FOUNTAIN_GLYPH
 from nhbot.equipment import CLOAK, GLOVES, SHIRT, SUIT
 from nhbot.items import base_name
@@ -15,6 +18,15 @@ FOUNTAIN_DIP_DEPTH = 20     # dips for a wish on dungeon levels above this only
 # artilist.h: the long-sword artifacts besides Excalibur (a long sword named so is one: oname makes it the artifact)
 LONG_SWORD_ARTIFACT_RE = re.compile(r"\bnamed (?:Frost Brand|Fire Brand|Demonbane|Giantslayer|Vorpal Blade|Sunsword)\b")
 DEMON_WIN = 0.7      # dip for a wish only while P(we beat a water demon) is above this
+# fountain.c dipfountain rnd(30): 21 dowaterdemon ("You unleash a water demon!" / blind "You feel the presence of
+# evil."; a wish 1 in ~5 -- rnd(100) > 80 + level_difficulty), 22 dowaternymph ("You attract a water nymph!" / "You
+# hear a seductive voice."), 23 dowatersnakes: rn1(5, 2) water moccasins ("An endless stream of snakes pours forth!" /
+# "You hear something hissing!")
+SNAKES_MSGS = ("stream of snakes", "something hissing")
+DEMON_MSGS = ("water demon", "presence of evil")
+NYMPH_MSGS = ("water nymph", "seductive voice")
+FOUNTAIN_FOES = ("water demon", "water moccasin")
+STEP_OFF_CMAP = {19, 20, 21, 22}         # S_room, S_darkroom, S_corr, S_litcorr: no door (no diagonal), can engrave
 
 
 class ExcaliburState:
@@ -28,6 +40,8 @@ class ExcaliburState:
         self.trips = 0
         self.skip = set()
         self.demon_win = (None, 0.0)     # (state key, P(we beat a water demon))
+        self.trouble = None              # dip_elb: dict(key, until, seen, hp, writes) while the fountain's foes are about
+        self.trouble_stats = collections.Counter()
 
 
 class ExcaliburMixin:
@@ -37,7 +51,8 @@ class ExcaliburMixin:
     def excal_summary(self):
         """Game summary entries."""
         return {"excalibur": self.excal.turn, "dips": self.excal.dips, "excal_trips": self.excal.trips,
-                "dip_events": self.excal.dip_events, "fountain_levels": len(self.excal.fountain_levels)}
+                "dip_events": self.excal.dip_events, "fountain_levels": len(self.excal.fountain_levels),
+                "dip_trouble": dict(self.excal.trouble_stats)}
 
     def long_sword(self):
         """(letter, text) of a long sword of ours to dip for Excalibur, or None. fountain.c:371-373 dipfountain
@@ -59,9 +74,23 @@ class ExcaliburMixin:
         if self.bl(nh.NLE_BL_XP) < self.opts.excal_xl:
             return False
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp < maxhp * self.opts.excal_hp:
+        if hp < maxhp * self.opts.excal_hp or not self.dip_prayer_ok():
             return False
         return self.long_sword() is not None
+
+    def dip_prayer_ok(self):
+        """dip_pray: a prayer would save us now -- dip_pray turns since the last one (none yet: from turn 100, the
+        start timeout 300 is <= 200 then -- pray.c can_pray: in major trouble the timeout must be <= 200), the god
+        not angry. The true timeout is hidden: rnz(350) after a prayer (pray.c:1220), which is <= gap + 200 for
+        gap 500 in ~88 % of draws, for gap 1000 in ~95 % (rnz: half the draws 350 * U(1, 2) * rne(4)); Luck < 0 or a
+        negative alignment fail it anyway (p_type 1). True when the option is off."""
+        n = self.opts.dip_pray
+        if not n:
+            return True
+        if self.surv.god_angry:
+            return False
+        lp = self.surv.last_pray
+        return self.turn() > 100 if lp is None else self.turn() - lp > n
 
     def excal_step(self, lv):
         fmask = self.terrain_glyphs(lv) == FOUNTAIN_GLYPH
@@ -163,11 +192,118 @@ class ExcaliburMixin:
             return None
         self.excal.dips += 1
         recent = self.text_since(seq0)
-        if "water demon" in recent:              # fountain.c dipfountain case 21, either reason to dip
-            self.excal.dip_events.append((self.turn(), "wish" if "grants you a wish" in recent else "demon"))
+        if any(m in recent for m in DEMON_MSGS):             # fountain.c dipfountain case 21, either reason to dip
+            wish = "grants you a wish" in recent
+            self.excal.dip_events.append((self.turn(), "wish" if wish else "demon"))
+            if not wish:
+                self.dip_trouble(lv, "demon")
+        elif any(m in recent for m in SNAKES_MSGS):          # case 23
+            self.excal.dip_events.append((self.turn(), "snakes"))
+            self.dip_trouble(lv, "snakes")
+        elif any(m in recent for m in NYMPH_MSGS):           # case 22
+            self.excal.dip_events.append((self.turn(), "nymph"))
         if "glows for a moment" in recent:       # cases 17..20: the dipped item was cursed and is not now
             self.excal.dip_events.append((self.turn(), "uncursed"))
         return recent
+
+    # ------------------------------------------------------------------ when a dip goes wrong (dip_elb)
+    def dip_trouble(self, lv, what):
+        """A dip let out moccasins or a hostile water demon: with dip_elb, the moccasins always (2..6 of them, speed
+        15, a poisonous bite: 1/8 of bites poison, of those 24/30 take 6..15 HP more and 1/30 kill -- mhitu.c AD_DRST,
+        attrib.c poisoned), the demon when we beat it with P below dip_elb (demon_win_prob). Both respect Elbereth
+        (monmove.c onscary: only @, minotaurs, shopkeepers / guards / priests, the Riders, lawful minions and Angels
+        ignore it; a water demon is an &)."""
+        self.excal.trouble_stats[what] += 1
+        if not self.opts.dip_elb or (what == "demon" and self.demon_win_prob() >= self.opts.dip_elb):
+            return
+        t = self.turn()
+        self.excal.trouble = {"key": lv.key, "until": t + self.opts.dip_hold, "seen": t, "hp": [], "writes": 0}
+        self.excal.trouble_stats["respond"] += 1
+
+    def dip_trouble_end(self, why):
+        self.excal.trouble = None
+        self.excal.trouble_stats["end_" + why] += 1
+
+    def step_fountain_trouble(self, c):
+        """dip_elb, the fountain's foes (FOUNTAIN_FOES) in view: off the fountain -- nothing can be written on one
+        (engrave.c doengrave) -- to a free square next to it, Elbereth there (elbereth.elb_write: read back, rewritten
+        when misspelled), then hold it -- searching, read back every 3 turns -- while they are in view, up to dip_hold
+        turns. A scared monster next to us does not attack (monmove.c dochug: no mattacku while scared); one shooting
+        from afar does: HP falling on the square ends the hold, as do other monsters in view that Elbereth won't stop
+        (elb_rules.blockers; the water demon counts as maybe armed -- makemon.c m_initweap gives 4 in 12 of them
+        missiles). Ended, the usual steps take over (elbereth.elb_step keeps the square while hurt)."""
+        tr = self.excal.trouble
+        if tr is None:
+            return False
+        lv, t = c.lv, self.turn()
+        if lv.key != tr["key"] or t > tr["until"]:
+            self.dip_trouble_end("time" if lv.key == tr["key"] else "level")
+            return False
+        foes = [(p, n) for p, n in self.visible_hostiles(lv) if n in FOUNTAIN_FOES]
+        if not foes:
+            if t - tr["seen"] > 20:
+                self.dip_trouble_end("gone")
+            return False
+        tr["seen"] = t
+        pp = {p for p in self.visible_monsters() if self.peaceful_now(lv, p, look=False)}
+        if ELB.blockers(self.obs["glyphs"], self.pos(), pp, lv.key[0], optimistic=True):
+            self.dip_trouble_end("blocked")
+            return False
+        pos = (c.y, c.x)
+        if pos in lv.elbereth:
+            tr["hp"].append(c.hp)
+            if len(tr["hp"]) > 4 and tr["hp"][-1] < tr["hp"][-5] - max(2, c.maxhp // 10):
+                self.dip_trouble_end("hurt")          # hit through it: shot at, or it is gone
+                return False
+            if len(tr["hp"]) % 3 == 0 and not self.elb_confirm(lv):
+                return self.dip_write(lv, tr)
+            self.excal.trouble_stats["hold"] += 1
+            self.cur_act = "rest"
+            self.press("s")
+            return True
+        if not self.can_engrave_here(lv):
+            return self.dip_step_off(lv, foes)
+        if not self.elb_can_write(lv):
+            self.dip_trouble_end("cant_write")
+            return False
+        return self.dip_write(lv, tr)
+
+    def dip_write(self, lv, tr):
+        """Elbereth for the hold, 4 tries at most in all (each up to 3 engravings, elb_write)."""
+        tr["writes"] += 1
+        tr["hp"] = []
+        if tr["writes"] > 4:
+            self.dip_trouble_end("writes")
+            return False
+        self.excal.trouble_stats["write"] += 1
+        return self.elb_write(lv)
+
+    def dip_step_off(self, lv, foes):
+        """A step from the fountain to the free square next to the fewest foes where Elbereth can be written (room
+        floor or corridor as remembered, or an item on one; no monster, boulder or trap shown there)."""
+        y, x = self.pos()
+        terr, live = self.terrain_glyphs(lv), self.obs["glyphs"]
+        rows, cols = live.shape
+        best = None
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                ny, nx = y + dy, x + dx
+                if (dy, dx) == (0, 0) or not (0 <= ny < rows and 0 <= nx < cols):
+                    continue
+                g = int(terr[ny, nx])
+                ok = (nh.glyph_is_cmap(g) and nh.glyph_to_cmap(g) in STEP_OFF_CMAP) or G.KIND[g] in G.COVERED_KINDS
+                if not ok or G.KIND[int(live[ny, nx])] not in (G.FLOOR, G.OBJECT, G.CORPSE, G.GOLD):
+                    continue
+                near = sum(1 for (fy, fx), _ in foes if max(abs(fy - ny), abs(fx - nx)) <= 1)
+                if best is None or near < best[0]:
+                    best = (near, (ny, nx))
+        if best is None:
+            self.dip_trouble_end("no_square")
+            return False
+        self.excal.trouble_stats["step_off"] += 1
+        self.cur_act = "dipflee"
+        self.move(best[1])
+        return True
 
     def demon_win_prob(self):
         """P(we win a fight with a water demon next to us, from full HP) -- danger.win_prob, cached while what it
@@ -223,7 +359,7 @@ class ExcaliburMixin:
         if not fmask.any():
             return False
         hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-        if hp < maxhp * self.opts.excal_hp:
+        if hp < maxhp * self.opts.excal_hp or not self.dip_prayer_ok():
             return False
         it = self.uncurse_target(lawful)
         if it is not None:
