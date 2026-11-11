@@ -143,3 +143,16 @@ again).
   424000+): at every decision point with win_prob <= 0.5, four hands of the same futures — script, `retreat`
   on, R1 on, both on — 1000 turns and on until calm, 2 futures. The variants are plain option sets now
   (`{"name": ..., "opts": {...}}` in `--cfg`), so any branch's option can be screened this way.
+
+### 22:48 — stopped by the orchestrator (token budget halved): stages 3 and 4 cancelled
+
+All collection stopped, the 16 cores are free. Left running: `rl_r12c_s` only (`rl_elb70_s` had 2 games to go).
+Unfinished, for whoever picks it up:
+- `e1` (script / flee's `retreat` / R1 / both on the same futures, tree `a/rl-eval`): 36 decision points of 15
+  games when stopped — too few to say anything; rerun the command in this file's 22:45 entry for ~1 h.
+- The rule search in J on the settled data (x1 + d9) finds the same variable on its own: Elbereth when two or
+  more monsters next to us respect it — odd seeds (not searched) +0.166 J [+0.014, +0.397] per point, 120 points;
+  over all sets (700 pairs, 178 games) dead within 300 turns −5.4 [−9.9, −1.0], J +155 [+51, +269] ×10⁻³, also
+  at win_prob 0.6–0.85 (+154 [+33, +273]). R1's win_prob <= 0.3 bound may be tighter than it need be: untested
+  as a sustained rule.
+- Data on the box: /dev/shm/rl/{d1..d9, x1, x3, c1..c4, m1, m2, e1} (27 MB, lost on reboot).

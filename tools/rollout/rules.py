@@ -67,10 +67,12 @@ def main():
     ap.add_argument("dirs", nargs="+")
     ap.add_argument("--h", type=int, default=300)
     ap.add_argument("--min-n", type=int, default=150)
+    ap.add_argument("--value", default="alive", choices=("alive", "vj"),
+                    help="what is summed: alive after h turns (+ score / 30000), or the game's value J (value.py)")
     ap.add_argument("--options", default="melee,elbereth,zap,quaff,pray,up,down,retreat")
     a = ap.parse_args()
-    rows = table(load(a.dirs), a.h, 0.0)
-    feats = [k for k in sorted(rows[0]["feat"]) if k != "turn"]
+    rows = table(load(a.dirs), a.h, 0.0, a.value)
+    feats = [k for k in sorted(rows[0]["feat"]) if k != "turn" and not k.startswith("pick:")]
     n_games = len({r["seed"] for r in rows})
     print(f"{len(rows)} decision points of {n_games} games; gain = deaths within {a.h} turns avoided per 100 decision "
           f"points of the rule (option instead of default); disc = even seeds (searched), conf = odd seeds (honest)")
