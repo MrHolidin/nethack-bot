@@ -47,10 +47,6 @@ DEFAULTS = {
                                #      at most two monsters reach us at once, not on the staircase in the open
     "pace_retreat": 0,         # A/B: from this depth on, a level with no way down found (Medusa's island) is left by
                                #      the stairs up after 200 turns of searching: we hold for good on the level above
-    "pace_peek": False,        # with pace: before the wait at a gate, down the stairs once and straight back up --
-                               #      the depth is reached whatever becomes of the hold
-    "pace_dive": 0,           # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,
-                               #      down the first stairs found, nothing optional (0: never)
     "loop_ticks": 0,           # A/B: the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
                                #      too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn
     "peace_cache": 0,          # A/B: a look (';') telling a monster peaceful or not holds this many turns (0: the turn

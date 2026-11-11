@@ -36,8 +36,6 @@ class ExploreMixin:
         k_mem, k_live, passable = grids = self.grids(lv)
         start = self.pos()
         y, x = start
-        if self.pace.peek_from is not None and self.pace_peek_back(lv, grids):
-            return
 
         unknown = (k_mem == G.UNKNOWN) & ~lv.near
         dil = np.zeros_like(unknown)
@@ -48,8 +46,7 @@ class ExploreMixin:
         lv.explored = not frontier.any()
         if self.mines.return_on and lv.key[0] == 2 and self.mines_return_step(lv, grids):
             return
-        diving = self.pace_diving()              # pace_dive: the key budget nearly spent -- nothing optional
-        if not diving and self.mines_trip_step(lv, grids):
+        if self.mines_trip_step(lv, grids):
             return
         gold = (G.KIND[lv.under] == G.GOLD) & passable    # an item: the top glyph, not the terrain under it
         for p in self.goal_closed_set("gold", lv.key):
@@ -87,7 +84,7 @@ class ExploreMixin:
             self.mines_return_start(lv, "weak")
             if self.mines_return_step(lv, grids):
                 return
-        if want_down and not diving \
+        if want_down \
                 and (on_level <= self.opts.descend_after or self.pace_holding(lv)):
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
@@ -105,7 +102,7 @@ class ExploreMixin:
 
         if self.sokoban_trip_step(lv, grids, want_down or lv.explored):
             return
-        if want_down and not diving and self.revisit_up(lv, grids):
+        if want_down and self.revisit_up(lv, grids):
             return
         if want_down and self.go_down(lv, grids, downstairs):
             return
@@ -187,8 +184,8 @@ class ExploreMixin:
             return True
         if downstairs[start]:
             if gated:
-                return self.pace_peek(lv, start) or self.pace_wait(lv)
-            if not self.pace_diving() and self.pet_wait_before_stairs():
+                return self.pace_wait(lv)
+            if self.pet_wait_before_stairs():
                 self.press("s")
                 return True
             if self.rest_before_descent(lv):
@@ -213,9 +210,8 @@ class ExploreMixin:
         return True
 
     def should_descend(self, lv, frontier, on_level):
-        """Explored (no frontier left) or on this level for longer than descend_after turns -- or the final dive
-        is on (pace_dive)."""
-        return not frontier.any() or on_level > self.opts.descend_after or self.pace_diving()
+        """Explored (no frontier left) or on this level for longer than descend_after turns."""
+        return not frontier.any() or on_level > self.opts.descend_after
 
     def search_mode(self, lv, grids):
         k_mem, k_live, passable = grids

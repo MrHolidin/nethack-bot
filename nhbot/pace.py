@@ -11,9 +11,8 @@ Dlvl 10-12 is where exploring is deadliest: 0.24 deaths per 1000 turns, 0.31-0.4
 What. A strength gate on the stairs down (pace_gate, asked by explore.go_down): no descent to depth d below the
 strength the schedule `pace` asks for d -- XL, or XL - pace_ac * AC. Gated, we hold: wait on the staircase
 (pace_wait: a counted search, 3 keys for 20 turns; the fight, food, prayer and Elbereth steps before explore go on
-as ever, the drops of our kills are fetched) -- or by it where at most two can reach us (pace_spot) --, after one
-look at the level below (pace_peek: its depth is ours whatever becomes of the hold). The hold ends with the
-strength reached, after the entry's cap of turns on the level, or by hunger.
+as ever, the drops of our kills are fetched) -- or by it where at most two can reach us (pace_spot). The hold
+ends with the strength reached, after the entry's cap of turns on the level, or by hunger.
 
 What a hold is (500-game screens against base_d1, hold logs):
   * the monsters come to us: 8-18 kills per 1000 turns standing on the stairs of an ordinary level, the game's
@@ -32,10 +31,6 @@ What a hold is (500-game screens against base_d1, hold logs):
   * pace=[[10,10],[13,11],[18,12],[21,13]], 5000 turns a level (pace_late_s): score +9255 [+6331, +12316], depth
     -0.43 [-0.70, -0.15], J +0.304 [+0.174, +0.440]. The gain is the weak half of the arrivals on Dlvl 9
     (XL - AC/2 <= 9: 30-43 k -> 41-73 k); the depth is lost in the holds on Dlvl 17 and 20.
-
-The final dive (pace_dive): with that many keys left of the budget, everything optional stops and we go down the
-first stairs we find: a truncated game cannot die, each new level is 50 points (1000 below Dlvl 20) and depth.
-Holds cost so few keys that it almost never fires.
 """
 from collections import Counter
 
@@ -58,14 +53,13 @@ PATROL_MAX = 150            # path cost at most to a patrol goal; turns at most 
 
 
 class PaceState:
-    """State of the strength gate and the final dive (PaceMixin)."""
+    """State of the strength gate (PaceMixin)."""
     def __init__(self):
         self.since = {}                  # level key -> Level.turns_here when its gate first closed
         self.opened = set()              # level keys whose gate a valve opened for good
         self.turns = 0                   # turns waited at the gate (summary 'pace')
         self.keys = 0                    # keys sent for them
-        self.stats = Counter()           # holds (levels gated), valve_time, valve_food (ticks), dive (levels)
-        self.dive_from = None            # (turn, depth) the final dive began at
+        self.stats = Counter()           # holds (levels gated), valve_time, valve_food (ticks), patrols, retreats
         self.hold = None                 # the hold in progress: level key, depth, pace_now() at its start
         self.log = []                    # holds over: ... and pace_now() at the end, how it ended
         # pace_patrol: the level patrolled, the square we walk to (None: waiting on the stairs), the turn the
@@ -74,9 +68,6 @@ class PaceState:
         self.patrol_seen = []
         self.forever = set()             # pace_retreat: levels we hold on for good (the one below has no way on)
         self.spot = (None, 0, None)      # pace_spot: (level key, turn chosen, the square we hold on or None)
-        # pace_peek: the levels we looked below from, the one we are looking below from now (None: not), and
-        # whether the stairs back up were taken
-        self.peeked, self.peek_from, self.peek_up = set(), None, False
 
 
 class PaceMixin:
@@ -93,19 +84,10 @@ class PaceMixin:
                 need, wait = xl, cap[0] if cap else self.opts.pace_wait
         return need, wait
 
-    def pace_diving(self):
-        """The final dive is on: fewer than pace_dive keys of the budget are left."""
-        if not self.opts.pace_dive or self.steps < self.max_steps - self.opts.pace_dive:
-            return False
-        if self.pace.dive_from is None:
-            self.pace.dive_from = (self.turn(), self.bl(nh.NLE_BL_DEPTH))
-        return True
-
     def pace_gate(self, lv):
         """The gate of this level's stairs down is closed: we are below the XL asked for the next depth, no valve
-        is open (pace_wait turns here since it first closed; Weak or worse -- step_pray had no prayer) and the
-        final dive is not on."""
-        if lv.key in self.pace.forever and not self.pace_diving():
+        is open (pace_wait turns here since it first closed; Weak or worse -- step_pray had no prayer)."""
+        if lv.key in self.pace.forever:
             # pace_retreat: the level below has no way on -- nothing opens this gate, hunger neither (there is
             # no food for us down there)
             if self.pace.hold is None:
@@ -113,8 +95,6 @@ class PaceMixin:
             return True
         if not self.opts.pace or lv.key in self.pace.opened:
             return False
-        if self.pace_diving():
-            return self.pace_hold_end("dive")
         # pace_ac: armor counts as strength too -- base_d1, Dlvl 9-12 at XL 10-11: 2.8 % die on a level at AC -7 or
         # better, 7 % at -6..-4, 14 % at -3..0; XL 8-9 at AC <= -7 does as well as XL 10-11 at -6..-4
         strength = self.bl(nh.NLE_BL_XP) - self.opts.pace_ac * self.bl(nh.NLE_BL_AC)
@@ -157,7 +137,7 @@ class PaceMixin:
              self.steps]
 
     def pace_hold_end(self, how):
-        """The gate lets us through (how: "xl", "time", "food", "dive"; "end": the game is over): the hold in
+        """The gate lets us through (how: "xl", "time", "food"; "end": the game is over): the hold in
         progress goes to the log (summary 'pace'). False."""
         if self.pace.hold is not None:
             self.pace.log.append(dict(self.pace.hold, end=self.pace_now(), how=how))
@@ -223,12 +203,9 @@ class PaceMixin:
     def pace_spot_step(self, lv, grids, downstairs):
         """pace_spot, gated: hold where at most two can come at us at once -- a corridor square or an open door
         (no diagonal step through a door: hack.c test_move) within SPOT_MAX of the stairs -- not on the staircase
-        in the open, where a pack stands all round us (the holds lost at Dlvl 9: four hill orcs, ants). The look
-        below (pace_peek) comes first, from the stairs. True if it used the turn."""
+        in the open, where a pack stands all round us (the holds lost at Dlvl 9: four hill orcs, ants). True if
+        it used the turn."""
         if not self.opts.pace_spot:
-            return False
-        if self.opts.pace_peek and lv.key not in self.pace.peeked \
-                and any(p not in lv.stairs_to for p in zip(*map(lambda a: a.tolist(), np.nonzero(downstairs)))):
             return False
         key, t, spot = self.pace.spot
         if key != lv.key or self.turn() - t >= SPOT_EVERY:
@@ -281,7 +258,7 @@ class PaceMixin:
         of an ordinary level is where the monsters come to us (on the island they cannot) at a third of the
         deaths per turn (base_d1 at Dlvl 21+: 0.15 per 1000 turns; holds at Dlvl 17-20: 0.04). True if it acted."""
         if not self.opts.pace_retreat or lv.key[0] != 0 or self.bl(nh.NLE_BL_DEPTH) < self.opts.pace_retreat \
-                or lv.search_turns < RETREAT_AFTER or self.pace_diving():
+                or lv.search_turns < RETREAT_AFTER:
             return False
         if lv.search_turns < RETREAT_SLOW and int((grids[0] == G.LIQUID).sum()) < RETREAT_WATER:
             return False
@@ -296,42 +273,8 @@ class PaceMixin:
             return True
         return self.walk_to(lv, up, act="pace", grids=grids)[0] == "moved"
 
-    def pace_peek(self, lv, pos):
-        """pace_peek, gated on a staircase never taken: one look at the level below before the wait -- down and
-        straight back up (pace_peek_back). A game that ends in the hold has reached that depth (50 points and the
-        depth objective), and the level below is made now, for the weaker hero we still are (makemon.c: monster
-        difficulty by our XL at creation). Once a level, at descend_rest_hp of max HP with no hostile in view."""
-        if not self.opts.pace_peek or lv.key in self.pace.peeked or pos in lv.stairs_to \
-                or self.hp_below(self.opts.descend_rest_hp) or self.visible_hostiles(lv):
-            return False
-        self.pace.peeked.add(lv.key)
-        self.pace.peek_from, self.pace.peek_up = lv.key, False
-        self.pace.stats["peeks"] += 1
-        self.cur_act = "pace"
-        self.take_stairs(">")
-        return True
-
-    def pace_peek_back(self, lv, grids):
-        """The look below (pace_peek) is over: back up the staircase we arrived on (or next to: a monster stood
-        on it). Out of reach, or the stairs led elsewhere: we stay where we are. True if it used the turn."""
-        if lv.key == self.pace.peek_from or self.pace.peek_up:
-            self.pace.peek_from = None
-            return False
-        up = self.stairs_mask(lv, G.UPSTAIR, grids[0])
-        self.cur_act = "pace"
-        if up[self.pos()]:
-            self.pace.peek_up = True
-            self.take_stairs("<")
-            return True
-        if up.any() and self.walk_to(lv, up, grids=grids, max_cost=20)[0] == "moved":
-            return True
-        self.pace.peek_from = None
-        self.pace.stats["peek_stuck"] += 1
-        return False
-
     def pace_summary(self):
-        if not self.opts.pace and not self.opts.pace_dive and not self.opts.pace_retreat:
+        if not self.opts.pace and not self.opts.pace_retreat:
             return {}
         self.pace_hold_end("end")
-        return {"pace": dict(self.pace.stats, turns=self.pace.turns, keys=self.pace.keys,
-                             dive_from=self.pace.dive_from, log=self.pace.log)}
+        return {"pace": dict(self.pace.stats, turns=self.pace.turns, keys=self.pace.keys, log=self.pace.log)}
