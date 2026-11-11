@@ -13,7 +13,14 @@ What. A strength gate on the stairs down (pace_gate, asked by explore.go_down as
 depth d below the experience level the schedule `pace` asks for d. Gated, we wait on the staircase (pace_wait: a
 counted search -- the fight, food, prayer and Elbereth steps before explore go on as ever; NetHack 3.6 lets us
 engrave on stairs, consts.NO_ENGRAVE_CMAP). Valves: pace_wait turns on a level since its gate first closed, and
-hunger -- Weak with no prayer to be had (step_pray acts before us) the level has nothing more for us.
+hunger -- Weak with no prayer to be had (step_pray acts before us) the level has nothing more for us; pace_food
+opens it earlier, below that much nutrition (survival.nutrition_tick's estimate).
+
+Food is what waiting costs: a turn burns a point of nutrition, and a prayer for hunger is no free meal -- one
+said less than rnz(350) - 200 turns after the last angers the god (pray.c can_pray: u.ublesscnt > 200 in major
+trouble; ~8 % of prayers 850 turns apart), and an angry god never helps again. First screens (500 games, valve
+at Weak only): prayers a game 2.4 -> 5-9, games with an angry god 4 % -> 30-40 %, deaths by starvation x 3-5.
+So the gate may only hold us where the kills feed us: pace_food.
 
 The final dive (pace_dive): with that many keys left of the budget, everything optional stops and we go down the
 first stairs we find: a truncated game cannot die, each new level is 50 points (1000 below Dlvl 20) and depth.
@@ -79,7 +86,7 @@ class PaceMixin:
             self.pace.opened.add(lv.key)
             self.pace.stats["valve_time"] += 1
             return self.pace_hold_end("time")
-        if self.bl(nh.NLE_BL_HUNGER) >= WEAK:
+        if self.bl(nh.NLE_BL_HUNGER) >= WEAK or self.surv.nutrition < self.opts.pace_food:
             self.pace.stats["valve_food"] += 1
             return self.pace_hold_end("food")
         if self.pace.hold is None:

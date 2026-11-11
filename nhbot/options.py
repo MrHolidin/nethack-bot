@@ -28,7 +28,9 @@ DEFAULTS = {
                                #      descent to that depth or deeper below that experience level; we wait on the
                                #      staircase instead (counted searches), e.g. [[5, 6], [8, 8], [11, 10]]
     "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens)
-    "pace_dive": 0,            # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,
+    "pace_food": 0,            # with pace: the gate is open while our estimated nutrition is below this (0: only when
+                               #      Weak) -- 200 leaves before Hungry, the food we carry uneaten
+    "pace_dive": 0,           # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,
                                #      down the first stairs found, nothing optional (0: never)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
