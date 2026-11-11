@@ -28,9 +28,16 @@ ROUNDS = 120
 MARGINS = (0.0, 0.01, 0.02, 0.03, 0.05, 0.08)
 
 
+SCORE_C = 30000.0                         # expected score still to come for a hero alive (base_d1 + base_d2: 27k at
+                                          # depth 1-5, 35-55k at depth 8-21): score gained now counts 1 / SCORE_C
+
+
 def value(x, h, hp_w):
+    """The rollout's value: alive after h turns, plus the score it gained in the window over SCORE_C (so that an
+    option which only slows the game down -- fewer deaths per turn, less progress -- is not a gain), plus
+    hp_w x the final HP fraction."""
     alive = 1 - died_by(x, h)
-    return alive + (hp_w * x["hp"] / max(x["maxhp"], 1) if alive and hp_w else 0.0)
+    return alive + x["score"] / SCORE_C + (hp_w * x["hp"] / max(x["maxhp"], 1) if alive and hp_w else 0.0)
 
 
 def table(recs, h, hp_w, min_ok=1):

@@ -58,6 +58,10 @@ VARIANTS = {
 }
 
 
+# the scripted step that is the same action as a forced option: no child needed, the default's outcome is its outcome
+SAME_AS = {"melee": "melee", "elbereth": "elbereth", "pray": "pray", "heal": "quaff"}
+
+
 def child_seed(seed, dp, rep):
     """The RNG seed of replicate `rep` at decision point `dp` of game `seed`: the same for every option (common
     random numbers: an option that does what the default does gets the default's outcome)."""
@@ -99,10 +103,10 @@ def rollout(bot, c, opt, horizon, record_keys=False):
         else:
             acted = opt != "default" and bot.tactic_start(opt, c)
             res["ok"] = acted or opt == "default"
-        if acted:
-            bot.pol.last_step = "tactic"
-        else:
+        if not acted:
             bot.run_steps(c, after="tactic")
+        elif opt != "melee":                     # (melee: the scripted step that acted is already in last_step)
+            bot.pol.last_step = "tactic"
         res["first"] = bot.pol.last_step
         bot.after_tick(t0)
         while True:
@@ -173,8 +177,15 @@ class Collector:
         rolls = []
         for rep in range(cfg["reps"]):
             seed = child_seed(bot.seed, self.n_dp, rep)
-            for opt in opts:
-                r = self.spawn(c, opt, seed)
+            first = None
+            for opt in opts:                         # 'default' comes first (tactic_legal)
+                if opt == SAME_AS.get(first):
+                    # the scripted step is this very option: the default's rollout stands for it (same seed)
+                    r = dict(default_roll, opt=opt, alias=1)
+                else:
+                    r = self.spawn(c, opt, seed)
+                if opt == "default":
+                    first, default_roll = r.get("first"), r
                 r["rep"] = rep
                 rolls.append(r)
         self.secs += time.monotonic() - t

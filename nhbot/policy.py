@@ -164,14 +164,15 @@ class PolicyMixin:
                  maxhp=self.bl(nh.NLE_BL_HPMAX), hunger=self.bl(nh.NLE_BL_HUNGER))
         self.run_steps(c)
 
-    def run_steps(self, c, after=None):
-        """The steps in order until one acts (its name: pol.last_step); after: only the steps that follow this one
-        (nhbot.tactic: the rest of a tick the tactic step began). True if one acted."""
+    def run_steps(self, c, after=None, skip=()):
+        """The steps in order until one acts (its name: pol.last_step); after: only the steps that follow this one,
+        skip: without these (nhbot.tactic: the rest of a tick the tactic step began; a forced 'melee' is the scripted
+        steps without the alternatives to it). True if one acted."""
         steps = self.steps_by_name
         if after is not None:
             steps = steps[next(i for i, (n, _) in enumerate(steps) if n == after) + 1:]
         for name, step in steps:
-            if step(c):
+            if name not in skip and step(c):
                 self.pol.last_step = name
                 return True
         return False

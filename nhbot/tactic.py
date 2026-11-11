@@ -33,6 +33,7 @@ from nhbot.monsters import PM_BY_NAME
 
 OPTIONS = ("default", "melee", "pray", "elbereth", "quaff", "zap", "up", "down", "retreat")
 MACROS = ("up", "down")
+MELEE_SKIPS = ("pray", "heal", "elbereth", "wands")      # the scripted alternatives to hitting the monster next to us
 STAIR_TICKS = 10           # ticks at most a forced walk to a staircase lasts
 STAIR_COST = 15            # ... and the path cost at most at which a staircase is an option
 WIN_SIMS = 100             # sampled fights of the win_prob feature (its own generator: never danger.win_rng)
@@ -101,8 +102,10 @@ class TacticMixin:
         return False
 
     def tactic_do_melee(self, c):
-        self.step_perceive(c)
-        return self.step_melee(c)
+        """Fight on: the scripted steps of this tick without the alternatives to a blow (MELEE_SKIPS) -- whatever
+        else comes before the melee step (a stunned wait, the vault guard, a thief, the weapon back in hand) still
+        does."""
+        return self.run_steps(c, after="tactic", skip=MELEE_SKIPS)
 
     def tactic_do_pray(self, c):
         self.pray()

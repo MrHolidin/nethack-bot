@@ -44,6 +44,7 @@ def option_stats(rec, h):
         out[o] = {"death": np.mean([died_by(x, h) for x in xs]),
                   "hp": np.mean([0.0 if x["died"] else x["hp"] / max(x["maxhp"], 1) for x in xs]),
                   "pray": np.mean([x["prayers"] for x in xs]), "score": np.mean([x["score"] for x in xs]),
+                  "mdepth": np.mean([x["max_depth"] for x in xs]),
                   "ok": np.mean([x["ok"] for x in xs]), "n": len(xs),
                   "first": xs[0].get("first")}
     return out
@@ -69,8 +70,11 @@ def fmt(m, lo, hi, scale=100):
 
 def paired_table(recs, h, where=None, title=""):
     """Per option: the decision points where it is legal (and where holds), death by h of default and of the
-    option there, and the paired difference with its interval (percentage points; negative: the option saves)."""
-    rows = defaultdict(lambda: ([], [], [], [], []))
+    option there, and the paired difference with its interval (percentage points; negative: the option saves);
+    the differences in prayers used, final HP fraction, score gained and max depth gained over the whole window
+    (the horizon the data was collected with) -- an option that only slows the game down saves lives per turn and
+    loses score."""
+    rows = defaultdict(lambda: ([], [], [], [], [], [], []))
     n = 0
     for r in recs:
         if where is not None and not where(r):
@@ -85,13 +89,15 @@ def paired_table(recs, h, where=None, title=""):
             a = rows[o]
             a[0].append(st["default"]["death"]); a[1].append(s["death"]); a[2].append(r["seed"])
             a[3].append(s["pray"] - st["default"]["pray"]); a[4].append(s["hp"] - st["default"]["hp"])
+            a[5].append(s["score"] - st["default"]["score"]); a[6].append(s["mdepth"] - st["default"]["mdepth"])
     print(f"\n{title}  ({n} decision points; death within {h} turns, %; diff = option - default)")
-    print(f"  {'option':9s} {'n':>6s} {'default':>8s} {'option':>8s}  {'diff [95% CI]':28s} {'prayers':>8s} {'hp_end':>7s}")
+    print(f"  {'option':12s} {'n':>6s} {'default':>8s} {'option':>8s}  {'diff [95% CI]':28s} {'prayers':>8s} {'hp_end':>7s} "
+          f"{'score [95% CI]':>24s} {'maxdepth':>9s}")
     for o in sorted(rows, key=lambda o: -len(rows[o][0])):
-        d, v, g, pr, hp = rows[o]
+        d, v, g, pr, hp, sc, md = rows[o]
         diff = np.array(v) - np.array(d)
-        print(f"  {o:9s} {len(d):6d} {np.mean(d) * 100:8.2f} {np.mean(v) * 100:8.2f}  {fmt(*boot_ci(diff, g)):28s} "
-              f"{np.mean(pr):+8.3f} {np.mean(hp):+7.3f}")
+        print(f"  {o:12s} {len(d):6d} {np.mean(d) * 100:8.2f} {np.mean(v) * 100:8.2f}  {fmt(*boot_ci(diff, g)):28s} "
+              f"{np.mean(pr):+8.3f} {np.mean(hp):+7.3f} {fmt(*boot_ci(sc, g), scale=1):>24s} {np.mean(md):+9.3f}")
 
 
 def main():
