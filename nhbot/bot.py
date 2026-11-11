@@ -304,6 +304,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             "resets": self.pol.resets,
             "god_angry": self.surv.god_angry,
             "truncated": self.truncated,
+            "tactic": dict(self.tac.stats),      # tactic_model: option -> times the chooser took it ("default": left
+                                                 # the tick to the script)
             "role": self.role,
             "race": self.race,
             "dnum": self.bl(nh.NLE_BL_DNUM),
