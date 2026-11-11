@@ -138,6 +138,8 @@ class BagStoreMixin:
             return False
         bag = self.store_bag()
         if bag is None:
+            if self.altar.dropped is not None:
+                return False                      # on the altar being BUC-tested: altar_pick_back brings it back
             self.bstore.held = []                 # the bag is gone (stolen, cursed found): nothing left to take out
             self.bstore.stats["bag_lost"] += 1
             return False
@@ -150,7 +152,8 @@ class BagStoreMixin:
     def bag_in_step(self, lv):
         """Housekeeping, late: the storable potions and scrolls put in the bag -- not where they'd come out at once.
         True if it used the turn."""
-        if not self.opts.bag_store or self.hands_busy() or self.turn() - self.bstore.unloaded < UNLOAD_HOLD:
+        if not self.opts.bag_store or self.hands_busy() or self.turn() - self.bstore.unloaded < UNLOAD_HOLD \
+                or self.altar.dropped is not None:        # an altar test under way (its next drop may be the bag)
             return False
         bag = self.store_bag()
         if bag is None:
