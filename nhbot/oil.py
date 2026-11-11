@@ -2,7 +2,9 @@
 Test: with nothing hostile in view (a housekeeping job), every unidentified potion of ours of a look not yet tried is
 applied -- only oil can be (apply.c doapply: any other potion is "Sorry, I don't know how to use that.", no time
 taken); oil lights ("You light ... potion", the type made known: apply.c light_cocktail) and is snuffed at once by a
-second apply (a stack lights one potion split off: the lit one is the one snuffed).
+second apply (a stack lights one potion split off: the lit one is the one snuffed). Oil known already -- a Valkyrie
+starting with an oil lamp knows it (u_init.c ini_inv) -- the game won't offer any other potion ("That is a silly
+thing to use or apply.", apply.c setapplyclasses): the test is over (81190 looped on it 99338 times).
 Rust: the weapon in our hands rusty or corroded, a potion of oil not known cursed -- #dip the weapon into it, one
 level of rust and one of corrosion off a dip (potion.c dodip; not burnt, not ammo; a cursed potion spills instead:
 slippery fingers, d(2,10) turns); again while some is left."""
@@ -23,6 +25,7 @@ class OilState:
     """State of the oil test and rust repair (OilMixin)."""
     def __init__(self):
         self.tried = set()                # potion looks applied that would not light
+        self.known = False                # oil known by name: no potion of another look can be oil
         self.stats = Counter()
 
 
@@ -36,7 +39,7 @@ class OilMixin:
 
     def oil_test_step(self):
         """Housekeeping: apply the untried unidentified potions (module notes). True if it used game time."""
-        if not self.opts.oil:
+        if not self.opts.oil or self.oil.known:
             return False
         for it in self.items():
             if it.ocls != nh.POTION_CLASS or it.unpaid:
@@ -50,16 +53,17 @@ class OilMixin:
                 return False
             self.press(it.letter)
             said = self.text_since(seq0)
-            if "know how to use" in said:
-                self.oil.tried.add(look[1])
-                self.oil.stats["not_oil"] += 1
-                continue                          # no time taken: the next one
             if "You light" in said:
                 self.oil.stats["oil_found"] += 1
                 self.oil_snuff()
                 return True
-            self.oil.stats["unclear"] += 1        # (no elbow room, ...): tried again later
-            return True
+            self.settle()
+            if "silly thing" in said:
+                self.oil.known = True             # oil known: no other potion is offered
+                self.oil.stats["oil_known"] += 1
+                return False
+            self.oil.tried.add(look[1])           # "don't know how to use that" -- or anything else: not again
+            self.oil.stats["not_oil" if "know how to use" in said else "unclear"] += 1
         return False
 
     def oil_snuff(self):
