@@ -37,6 +37,12 @@ def both(self, pos):
     return d1
 
 
-Bot.describe_at = both
+def twice(self, pos):
+    old(self, pos)
+    diffs[1] += 1
+    return old(self, pos)[0]
+
+
+Bot.describe_at = twice if os.environ.get("MODE") == "twice" else both
 s = Bot(seed=seed, character="val", max_turns=max_turns).run()
 print("looks", diffs[1], "diffs", diffs[0], s["turns"], s["msg_audit"])
