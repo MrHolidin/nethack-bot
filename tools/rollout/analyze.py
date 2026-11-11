@@ -122,6 +122,35 @@ def main():
     for lo, hi in ((0, 0.3), (0.3, 0.6), (0.6, 0.85), (0.85, 1.01)):
         paired_table(recs, a.h, lambda r, lo=lo, hi=hi: lo <= r["feat"]["win_prob"] < hi and r["feat"]["n_adj"] > 0,
                      f"adjacent, win_prob in [{lo}, {hi})")
+    fatal_report(recs, a.dirs, a.h)
+
+
+def fatal_report(recs, dirs, h, within=25):
+    """The fights the collecting games died in: each game's last decision point when the game ended within
+    `within` turns of it. These states are chosen by their outcome under the parent's own seed, so the default's
+    death rate here is high by selection -- but every option, the default too, is re-rolled with fresh seeds, and
+    the table says what share of such deaths an option averts."""
+    turns = {}
+    for d in dirs:
+        path = os.path.join(d, "games.jsonl")
+        if os.path.exists(path):
+            with open(path) as fh:
+                for line in fh:
+                    g = json.loads(line)
+                    if "turns" in g:
+                        turns[g["seed"]] = g
+    last = {}
+    for r in recs:
+        if r["seed"] in turns and (r["seed"] not in last or r["t"] > last[r["seed"]]["t"]):
+            last[r["seed"]] = r
+    fatal = [r for s, r in last.items() if turns[s]["turns"] - r["t"] <= within]
+    print(f"\n{len(turns)} finished games, {len(last)} with a decision point, {len(fatal)} died within {within} turns "
+          f"of their last one ({sum(turns[r['seed']]['score'] for r in fatal) / max(1, sum(g['score'] for g in turns.values())) * 100:.0f} % "
+          f"of the total score is in those games)")
+    for hh in (50, h):
+        paired_table(fatal, hh, title="FATAL FIGHTS (the last decision point before the game's death)")
+    ids = {id(r) for r in fatal}
+    paired_table([r for r in recs if id(r) not in ids], h, title="all other decision points")
 
 
 if __name__ == "__main__":

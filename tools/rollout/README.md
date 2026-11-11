@@ -17,8 +17,9 @@ afterwards. Acting greedily on it is one step of policy improvement.
 | `fork.py` | forking a live NLE game safely: the game directory, file descriptions, reseeding (read its docstring) |
 | `collect.py` | `Collector` (the bot's tactic hook: trigger, fork, record), `rollout()` (what a child does), the CLI |
 | `selftest.py` | isolation / determinism / reseed checks |
-| `analyze.py` | the dataset's first reading: how often the scripted choice is wrong, which option wins where |
-| `train.py` | fits the chooser (`nhbot/tacticmodel.py` reads its json) |
+| `analyze.py` | the dataset's first reading: every option against the default, paired, by scripted step / HP / win_prob; the fatal fights |
+| `rules.py` | simple rules "when <condition>, do <option>": searched on half of the games, measured on the other half |
+| `train.py` | fits the chooser (`nhbot/tacticmodel.py` reads its json) and scores it on held-out games |
 
 ## Use
 
@@ -39,6 +40,13 @@ of one game run one at a time (a game with rollouts uses one core), so the farm 
 Settings (`--cfg`, `collect.DEFAULTS`): `horizon`, `reps`, `gap` (turns between decision points), `max_dp`,
 `max_secs` (rollout budget per game), `options` (subset), the trigger thresholds `hp_frac`, `pdeath`, `win_prob`,
 `keep` (thinning), `max_turn`.
+
+## Policy variants (`collect.VARIANTS`)
+
+Besides forcing one action, a child can play on under **changed bot options** (`"variants": "all"` or a list of
+names): `v:elb70` is the scripted bot with `elb_hp = 0.7` from this tick on. That is a paired micro-A/B of a
+parameter of the scripted policy at the states where it can matter (each variant has a test on the features);
+add a line to `VARIANTS` to screen another one. In the records and tables a variant is an option named `v:<name>`.
 
 ## A decision point (`Collector.trigger`)
 

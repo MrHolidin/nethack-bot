@@ -34,11 +34,24 @@ DEFAULTS = {
     "max_dp": 150,             # decision points at most per game
     "max_secs": 2700,          # ... and wall-clock seconds of rollouts per game
     "options": None,           # the options tried (None: every legal one)
+    "variants": (),            # the policy variants tried (names of VARIANTS; "all")
     "hp_frac": 0.5,            # trigger: HP below this fraction
     "pdeath": 0.003,           # ... or danger.py's P(death next turn) at least this
     "win_prob": 0.85,          # ... or win_prob at most this
     "keep": 1.0,               # the fraction of triggered ticks rolled out (drawn from the game seed)
     "max_turn": None,          # stop the parent game at this turn
+}
+
+
+# Policy variants: a child plays on as the scripted bot with these options changed (a sustained change of the
+# policy, not a forced first action) -- name: (option overrides, where it can matter: a test on the features)
+VARIANTS = {
+    "elb70": ({"elb_hp": 0.7}, lambda f: f["elb_can"] and 0.4 <= f["hp_frac"] < 0.85),
+    "elb35": ({"elb_hp": 0.35}, lambda f: f["elb_can"] and f["hp_frac"] < 0.6),
+    "elbexit70": ({"elb_exit": 0.7}, lambda f: f["elb_can"] and f["hp_frac"] < 0.7),
+    "pray300": ({"pray_gap": 300}, lambda f: f["prayers"] > 0 and 250 < f["pray_gap"] <= 520 and f["hp_frac"] < 0.4),
+    "pray800": ({"pray_gap": 800}, lambda f: f["prayers"] > 0 and 480 < f["pray_gap"] <= 800 and f["hp_frac"] < 0.4),
+    "heal50": ({"heal_hp": 0.5}, lambda f: f["n_heal"] > 0 and f["hp_frac"] < 0.6),
 }
 
 
@@ -77,8 +90,12 @@ def rollout(bot, c, opt, horizon, record_keys=False):
     res = {"opt": opt, "ok": True, "first": None}
     marks, cps = [], list(CHECKPOINTS)
     try:
-        acted = opt != "default" and bot.tactic_start(opt, c)
-        res["ok"] = acted or opt == "default"
+        if opt.startswith("v:"):                 # a policy variant: the scripted steps under changed options
+            bot.opts._values.update(VARIANTS[opt[2:]][0])
+            acted = False
+        else:
+            acted = opt != "default" and bot.tactic_start(opt, c)
+            res["ok"] = acted or opt == "default"
         if acted:
             bot.pol.last_step = "tactic"
         else:
@@ -147,6 +164,8 @@ class Collector:
                 return
         legal = bot.tactic_legal(c, hostiles)
         opts = [o for o in legal if cfg["options"] is None or o in cfg["options"]]
+        names = VARIANTS if cfg["variants"] == "all" else cfg["variants"]
+        opts += ["v:" + v for v in names if VARIANTS[v][1](feat)]
         t = time.monotonic()
         rolls = []
         for rep in range(cfg["reps"]):
