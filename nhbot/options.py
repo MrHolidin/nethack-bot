@@ -32,6 +32,8 @@ DEFAULTS = {
     "elb_rest_count": 0,       # A/B: resting on our Elbereth with nothing in view, search this many turns at once
                                #      ("20s"; the game stops it for a monster that ignores Elbereth) instead of one a tick
                                #      with a ':' read every 4 (0: off)
+    "tele_esc": False,         # A/B: the teleport-control prompt "Where do you want to be teleported?" answered ESC (stay)
+                               #      by game.settle -- unanswered, the next ticks' keys went in as cursor moves
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
