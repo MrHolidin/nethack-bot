@@ -269,10 +269,11 @@ class ExcaliburMixin:
         return self.dip_write(lv, tr)
 
     def dip_write(self, lv, tr):
-        """Elbereth for the hold, 4 tries at most in all (each up to 3 engravings, elb_write)."""
+        """Elbereth for the hold, 10 tries at most in all (each up to 3 engravings, elb_write; a dust Elbereth also
+        smudges on its own: allmain.c u_wipe_engr 1 in 40 + 3 Dex a turn)."""
         tr["writes"] += 1
         tr["hp"] = []
-        if tr["writes"] > 4:
+        if tr["writes"] > 10:
             self.dip_trouble_end("writes")
             return False
         self.excal.trouble_stats["write"] += 1
