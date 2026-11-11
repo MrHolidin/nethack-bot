@@ -167,11 +167,12 @@ class PerceptionMixin:
                 if self.is_actively_dangerous(lv, p)]
 
     def visible_monsters(self):
-        """Squares of the monsters on screen other than us."""
-        g = self.obs["glyphs"]
-        ys, xs = np.nonzero(G.KIND[g] == G.MONSTER)
-        me = self.pos()
-        return [(int(a), int(b)) for a, b in zip(ys, xs) if (a, b) != me]
+        """Squares of the monsters on screen other than us (a tuple, worked out once per observation)."""
+        def find():
+            ys, xs = np.nonzero(G.KIND[self.obs["glyphs"]] == G.MONSTER)
+            me = self.pos()
+            return tuple((a, b) for a, b in zip(ys.tolist(), xs.tolist()) if (a, b) != me)
+        return self.per_obs("visible_monsters", find)
 
     def stationary_avoid(self, lv):
         """The never-melee monsters that never move (molds, lichens' kin: mmove 0) stay where we saw
@@ -206,16 +207,16 @@ class PerceptionMixin:
         g = self.obs["glyphs"]
         out = []
         self.perc.avoid_cells = []
-        for yy in range(max(0, y - 7), min(ROWS, y + 8)):
-            for xx in range(max(0, x - 7), min(COLS, x + 8)):
-                k = G.KIND[g[yy, xx]]
-                if k == G.MONSTER:
-                    name = G.monster_name(g[yy, xx])
-                    if not self.may_melee(lv, name):
-                        self.perc.avoid_cells.append((yy, xx))
-                    if self.never_melee(name) and name in PM_BY_NAME \
-                            and PM_BY_NAME[name].mmove == 0:
-                        lv.stationary[(yy, xx)] = name
+        y0, x0 = max(0, y - 7), max(0, x - 7)
+        window = g[y0:min(ROWS, y + 8), x0:min(COLS, x + 8)]
+        for a, b in zip(*(v.tolist() for v in np.nonzero(G.KIND[window] == G.MONSTER))):    # row by row
+            yy, xx = y0 + a, x0 + b
+            name = G.monster_name(int(g[yy, xx]))
+            if not self.may_melee(lv, name):
+                self.perc.avoid_cells.append((yy, xx))
+            if self.never_melee(name) and name in PM_BY_NAME \
+                    and PM_BY_NAME[name].mmove == 0:
+                lv.stationary[(yy, xx)] = name
         self.stationary_avoid(lv)
         for dy, dx in NEIGH:
             ny, nx = y + dy, x + dx

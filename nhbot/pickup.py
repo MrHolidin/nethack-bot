@@ -54,6 +54,7 @@ for _g in range(nh.MAX_GLYPH):
         _wc = OBJ_INFO.get((nh.WEAPON_CLASS, _n))
         WANTED_WEAPON_GLYPH[_g] = _n not in AMMO_TYPES and (_n in MISSILE_TYPES or _n in WIELD_TYPES
                                                           or bool(_wc and _wc[1] >= _wc[0]))
+PILE_GLYPH = G.ARMOR_GLYPH | CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH    # pile_mask, always
 
 
 def floor_kind(text):
@@ -186,7 +187,7 @@ class PickupMixin:
         and the goal statistics count (goals.goal_raw): '[' piles, '%' food while we carry less than MAX_FOOD
         pieces, what carry goes for, the corpses on what our kills carried; not in a shop, not looked at yet.
         (A/B pile_one: -494 [-980, +4], median 7726 -> 7726, 67 of 1000 changed)"""
-        mask = G.ARMOR_GLYPH[lv.under] | (CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH)[lv.under]
+        mask = PILE_GLYPH[lv.under]
         if self.food_count() < (self.opts.max_food or MAX_FOOD):
             mask |= G.FOOD_GLYPH[lv.under]
         for p in self.corpse_piles(lv):

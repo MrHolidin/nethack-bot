@@ -13,6 +13,7 @@ Policy (from NetHack wiki guidance):
   * no shield while wielding a two-handed weapon ("weapon in hands").
 """
 import re
+from functools import lru_cache
 
 import nle.nethack as nh
 
@@ -84,7 +85,14 @@ UNKNOWN_ENCH = -0.15
 
 
 def parse_armor(s):
-    """Inventory/floor text -> dict(slot, ac, ench, worn, cursed, name) or None."""
+    """Inventory/floor text -> dict(slot, ac, ench, worn, cursed, name) or None: a fresh dict (callers add to it) of
+    the cached reading (a function of the text alone, the same texts every tick)."""
+    a = _parse_armor(s)
+    return None if a is None else dict(a)
+
+
+@lru_cache(maxsize=1 << 14)
+def _parse_armor(s):
     it = parse_item(None, nh.ARMOR_CLASS, s)
     worn, cursed = it.worn, it.cursed
     _, ench, t = base_name(s)
