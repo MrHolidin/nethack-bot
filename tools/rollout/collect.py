@@ -57,6 +57,7 @@ VARIANTS = {
     "rest70": ({"rest_frac": 0.7}, lambda f: f["hp_frac"] < 0.7),
     "rest90": ({"rest_frac": 0.9}, lambda f: f["hp_frac"] < 0.9),
     "pray300": ({"pray_gap": 300}, lambda f: f["prayers"] > 0 and 250 < f["pray_gap"] <= 520 and f["hp_frac"] < 0.4),
+    "pray150": ({"pray_gap": 150}, lambda f: f["prayers"] > 0 and 100 < f["pray_gap"] <= 520 and f["hp_frac"] < 0.4),
     "pray800": ({"pray_gap": 800}, lambda f: f["prayers"] > 0 and 480 < f["pray_gap"] <= 800 and f["hp_frac"] < 0.4),
     "heal50": ({"heal_hp": 0.5}, lambda f: f["n_heal"] > 0 and f["hp_frac"] < 0.6),
 }
