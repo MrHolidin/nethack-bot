@@ -34,6 +34,8 @@ DEFAULTS = {
                                #      with a ':' read every 4 (0: off)
     "peace_wait_max": 0,       # A/B: a peaceful monster in our way waited for this many turns in a row -- its square
                                #      shut (Level.blocked) and the path goes round (nav.move; 0: wait for ever)
+    "farlook_jump": False,     # A/B: a farlook's cursor jumps to the monster with 'm' / 'M' when that takes fewer keys
+                               #      (game.describe_at, monster_rank); not neutral: other squares are described on the way
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
