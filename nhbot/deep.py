@@ -36,8 +36,8 @@ next to water (castle.des puts giant eels and sharks in the moat).
 
 The steps hang on methods explore calls, overridden here (the mixin comes first in Bot): explore itself, search_mode
 -- the dead end is told where explore has nothing left but walls to search --, stairs_mask, passable_grid,
-revisit_up; and weapons.swap_back (the digger stays in our hands while the only hostiles in view are far). With the
-options off each override is the method it replaces.
+revisit_up, perception.peaceful_now (patrol_look) and weapons.swap_back (the digger stays in our hands while the
+only hostiles in view are far). With the options off each override is the method it replaces.
 """
 from collections import Counter
 
@@ -209,6 +209,21 @@ class DeepMixin:
         if lv.key == self.deep.above and not self.dig_now():
             p[np.isin(lv.terrain, WAY_OUT_GLYPHS)] = False
         return p
+
+    def peaceful_now(self, lv, pos, look=True, slack=0, far=False):
+        """perception.peaceful_now -- patrol_look: on the level we patrol a look from afar (prey, a ranged target)
+        only every patrol_look-th turn; between them a far monster of a kind made either way counts as peaceful (no
+        prey, no target) unless a look this turn or its attack said otherwise. Peaceful monsters pile up on a
+        level we stay on: one patrol game spent 149 000 of its 200 000 keys on such looks, each tick again."""
+        n = self.opts.patrol_look
+        if far and look and n > 1 and lv.key == self.deep.above and self.turn() % n:
+            y, x = self.pos()
+            g = int(self.obs["glyphs"][pos])
+            if max(abs(pos[0] - y), abs(pos[1] - x)) > 1 and G.KIND[g] == G.MONSTER \
+                    and self.peace_class(nh.glyph_to_mon(g)) == 0 and pos not in self.track_hostile_marks(lv):
+                seen = self.perc.peace_seen.get((lv.key, g, pos))
+                return seen[1] if seen is not None and seen[0] >= self.turn() - slack else True
+        return super().peaceful_now(lv, pos, look, slack, far)
 
     def revisit_up(self, lv, grids):
         """explore.revisit_up -- never to Medusa's level: the stairs up to it end on her island."""

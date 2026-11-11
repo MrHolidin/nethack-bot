@@ -36,6 +36,8 @@ DEFAULTS = {
                                #      end (weaker random monsters: makemon.c rndmonst, (depth + XL) / 2)
     "patrol_stale": 400,       # with dead_end_patrol: a square not within 2 squares of us for this many turns is
                                #      walked to again; nothing that old in reach: a counted search
+    "patrol_look": 0,          # with dead_end_patrol: on the patrol level a look (';') at a far monster only every
+                               #      this many turns (0 / 1: every tick, as elsewhere)
     "patrol_hp": 0.0,          # with dead_end_patrol: below this share of max HP, nothing in view, the patrol rests
                                #      (0: only step_rest's rest_frac)
     "dead_end_dive": 0,        # with dead_end_patrol: with this many keys of the budget left the patrol ends and we go
