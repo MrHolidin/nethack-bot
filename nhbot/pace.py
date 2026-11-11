@@ -67,13 +67,14 @@ class PaceMixin:
         self.pace = PaceState()
 
     def pace_need(self, depth):
-        """The experience level the schedule asks for before going down to depth: `pace` is a list of
-        [depth, XL] -- from that depth on, at least that XL (the last entry at or above depth counts)."""
-        need = 0
-        for d, xl in self.opts.pace or ():
+        """(the experience level the schedule asks for before going down to depth, the turns at most a hold for
+        it lasts on one level): `pace` is a list of [depth, XL] or [depth, XL, turns] -- from that depth on, at
+        least that XL (the last entry at or above depth counts); turns: pace_wait unless the entry has its own."""
+        need, wait = 0, self.opts.pace_wait
+        for d, xl, *cap in self.opts.pace or ():
             if depth >= d:
-                need = xl
-        return need
+                need, wait = xl, cap[0] if cap else self.opts.pace_wait
+        return need, wait
 
     def pace_diving(self):
         """The final dive is on: fewer than pace_dive keys of the budget are left."""
@@ -94,12 +95,13 @@ class PaceMixin:
         # pace_ac: armor counts as strength too -- base_d1, Dlvl 9-12 at XL 10-11: 2.8 % die on a level at AC -7 or
         # better, 7 % at -6..-4, 14 % at -3..0; XL 8-9 at AC <= -7 does as well as XL 10-11 at -6..-4
         strength = self.bl(nh.NLE_BL_XP) - self.opts.pace_ac * self.bl(nh.NLE_BL_AC)
-        if strength >= self.pace_need(self.bl(nh.NLE_BL_DEPTH) + 1):
+        need, wait = self.pace_need(self.bl(nh.NLE_BL_DEPTH) + 1)
+        if strength >= need:
             return self.pace_hold_end("xl")
         if lv.key not in self.pace.since:
             self.pace.since[lv.key] = lv.turns_here
             self.pace.stats["holds"] += 1
-        if lv.turns_here - self.pace.since[lv.key] >= self.opts.pace_wait:
+        if lv.turns_here - self.pace.since[lv.key] >= wait:
             self.pace.opened.add(lv.key)
             self.pace.stats["valve_time"] += 1
             return self.pace_hold_end("time")

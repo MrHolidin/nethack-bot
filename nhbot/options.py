@@ -33,7 +33,8 @@ DEFAULTS = {
     "pace": None,              # A/B: the strength gate on the stairs down (nhbot.pace): a list of [depth, XL] -- no
                                #      descent to that depth or deeper below that experience level; we wait on the
                                #      staircase instead (counted searches), e.g. [[5, 6], [8, 8], [11, 10]]
-    "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens)
+    "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens);
+                               #      an entry [depth, XL, turns] of the schedule has its own
     "pace_food": 0,            # with pace: the gate is open while our estimated nutrition is below this (0: only when
                                #      Weak) -- 200 leaves before Hungry, the food we carry uneaten
     "pace_ac": 0.0,            # with pace: the gate compares XL - pace_ac * AC with the schedule (0.5: two points of
