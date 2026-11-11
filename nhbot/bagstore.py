@@ -26,6 +26,7 @@ STORE_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS)
 STORE_MENU = ("Potions", "Scrolls")              # their lines in a container's "what type of objects?" menu
 BAG_OK_NAME = "ok"                               # bag_test: the name given to a "bag" that opened (#name, one object)
 BAG_TEST_HP = 15                                 # bag_test: only above this HP (a bag of tricks bites for d10)
+HANDS_RETRY = 500                                # turns before a bag is tried again after "You have no free hand"
 
 
 class BagStoreState:
@@ -34,6 +35,7 @@ class BagStoreState:
         self.held = []                # (class, text) of what we put in and did not take out (texts as when put in)
         self.bag_letter = None        # the letter of the bag they are in (while held)
         self.test = None              # bag_test: (level key, square, phase "dropped" / "looted", it opened)
+        self.hands_busy = -HANDS_RETRY  # the turn a bag would not open for want of a free hand
         self.stats = Counter()
 
 
@@ -96,10 +98,26 @@ class BagStoreMixin:
         """Something in the bag of a BUC not known (altar.altar_untested's test on our texts)."""
         return any(not BUC_RE.search(t) and buc_key(t) not in self.altar.known for _, t in self.bstore.held)
 
+    def hands_busy(self):
+        return self.turn() - self.bstore.hands_busy < HANDS_RETRY
+
+    def store_open(self, bag):
+        """bag_open; "You have no free hand" (a welded two-hander, or a welded weapon and a cursed shield: apply.c
+        use_container, freehand -- 80648 tried 79046 times) says nothing of the bag: tried again HANDS_RETRY turns
+        on."""
+        seq0 = self.msg_seq
+        if self.bag_open(bag):
+            return True
+        if "no free hand" in self.text_since(seq0):
+            self.bag.bad.discard(bag.key)
+            self.bstore.hands_busy = self.turn()
+            self.bstore.stats["no_free_hand"] += 1
+        return False
+
     def bag_out_step(self, lv):
         """Housekeeping, before the shop and altar jobs: what is in the bag taken out when a use comes up. True if
         it used the turn."""
-        if not self.opts.bag_store or not self.bstore.held:
+        if not self.opts.bag_store or not self.bstore.held or self.hands_busy():
             return False
         bag = self.store_bag()
         if bag is None:
@@ -115,7 +133,7 @@ class BagStoreMixin:
     def bag_in_step(self, lv):
         """Housekeeping, late: the storable potions and scrolls put in the bag -- not where they'd come out at once.
         True if it used the turn."""
-        if not self.opts.bag_store:
+        if not self.opts.bag_store or self.hands_busy():
             return False
         bag = self.store_bag()
         if bag is None:
@@ -130,7 +148,7 @@ class BagStoreMixin:
 
     def store_put_in(self, bag, put):
         texts = {it.text: it.ocls for it in put}
-        if not self.bag_open(bag):
+        if not self.store_open(bag):
             return True
         self.cur_act = "bag_store"
         self.bag_choose("i")
@@ -150,7 +168,7 @@ class BagStoreMixin:
 
     def store_take_out(self, bag):
         n0 = len(self.items())
-        if not self.bag_open(bag):
+        if not self.store_open(bag):
             return True
         self.cur_act = "bag_store"
         self.bag_choose("o")
@@ -173,7 +191,7 @@ class BagStoreMixin:
     def bag_test_step(self, lv):
         """Housekeeping: tell an unknown bag of ours apart (module notes), one phase a tick -- drop, #loot, pick up
         and name. A bag that holds our gold opened already: named at once. True if it used the turn."""
-        if not self.opts.bag_store:
+        if not self.opts.bag_store or self.hands_busy() and self.bstore.test is None:
             return False
         here = (lv.key, self.pos())
         t = self.bstore.test
@@ -242,6 +260,9 @@ class BagStoreMixin:
             break
         self.settle()
         said = self.text_since(seq0)
+        if "no free hand" in said:
+            self.bstore.hands_busy = self.turn()
+            self.bstore.stats["no_free_hand"] += 1
         if "teeth" in said or "bites you" in said:
             self.bstore.stats["test_tricks"] += 1
             return False
