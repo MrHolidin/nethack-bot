@@ -115,6 +115,7 @@ class Level:
         self.cfi = set()          # squares where a shopkeeper said "Closed for inventory"
         self.search_goal = None   # square chosen for searching, kept until reached
         self.mapped = False       # a magic mapping scroll was read here
+        self.kinds_memo = None    # MapMixin.kinds: (under, terrain, kinds) of its last answer
 
     def set_terrain(self, pos, glyph):
         """What we learned is at pos now (a dried-up fountain, a staircase that isn't): both layers."""
@@ -198,7 +199,18 @@ class MapMixin:
     def kinds(self, lv):
         """Kind of every remembered square: a trap / staircase / door / water under an item is that feature (the
         terrain layer); the item still shows on the squares nothing special lies under. Item goals (gold, piles,
-        corpses) read the top glyph, lv.under, instead."""
+        corpses) read the top glyph, lv.under, instead.
+        Asked many times a tick of a map that seldom changes: the last answer is kept with the two layers it was
+        read from (Level.kinds_memo) and given again, as a copy, while both are unchanged."""
+        memo = lv.kinds_memo
+        if memo is not None and np.array_equal(memo[0], lv.under) and np.array_equal(memo[1], lv.terrain):
+            return memo[2].copy()
+        k = self._kinds(lv)
+        lv.kinds_memo = (lv.under.copy(), lv.terrain.copy(), k.copy())
+        return k
+
+    @staticmethod
+    def _kinds(lv):
         k = G.KIND[lv.under]
         tk = G.KIND[lv.terrain]
         hidden = G.IS_COVERED[k] & G.IS_TERRAIN[tk]
