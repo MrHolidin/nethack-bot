@@ -4,26 +4,38 @@ Why. The score is ~4 x the experience points (botl.c botl_score: u.urexp, raised
 more_experienced), plus 50 a level reached (1000 below Dlvl 20). The game makes a random monster about every 70
 turns on any level (allmain.c moveloop: !rn2(70), 50 below the Castle), of level at most (depth + XL) / 2 (makemon.c
 rndmonst: maxmlev = (zlevel + u.ulevel) / 2) -- so turns spent waiting come back as kills, experience, HP and
-score; turns cost nothing, only keys are limited (Bot.max_steps) and a counted search is 3 keys for 20 turns.
-On base_d1 (983 games) the chance to die on a level falls steeply with the XL we arrive with: Dlvl 7-8 at XL 4-5
-14-22 %, at XL 8-9 3-8 %; Dlvl 10-12 at XL 6-9 11-24 %, at XL 10-11 9-12 %; Dlvl 13-15 at XL 8-9 9-14 %, at
-XL 10-11 3-5 %.
+score. On base_d1 the chance to die on a level falls with the XL and the AC we arrive with (Dlvl 9-12: XL 8-9
+12-18 % a level, XL 10-11 9 %; at XL 10-11 2.8 % with AC -7 or better, 14 % at -3..0; max HP adds nothing), and
+Dlvl 10-12 is where exploring is deadliest: 0.24 deaths per 1000 turns, 0.31-0.44 on Dlvl 10 and 12.
 
-What. A strength gate on the stairs down (pace_gate, asked by explore.go_down as we stand on them): no descent to
-depth d below the experience level the schedule `pace` asks for d. Gated, we wait on the staircase (pace_wait: a
-counted search -- the fight, food, prayer and Elbereth steps before explore go on as ever; NetHack 3.6 lets us
-engrave on stairs, consts.NO_ENGRAVE_CMAP). Valves: pace_wait turns on a level since its gate first closed, and
-hunger -- Weak with no prayer to be had (step_pray acts before us) the level has nothing more for us; pace_food
-opens it earlier, below that much nutrition (survival.nutrition_tick's estimate).
+What. A strength gate on the stairs down (pace_gate, asked by explore.go_down): no descent to depth d below the
+strength the schedule `pace` asks for d -- XL, or XL - pace_ac * AC. Gated, we hold: wait on the staircase
+(pace_wait: a counted search, 3 keys for 20 turns; the fight, food, prayer and Elbereth steps before explore go on
+as ever, the drops of our kills are fetched) -- or by it where at most two can reach us (pace_spot) --, after one
+look at the level below (pace_peek: its depth is ours whatever becomes of the hold). The hold ends with the
+strength reached, after the entry's cap of turns on the level, or by hunger.
 
-Food is what waiting costs: a turn burns a point of nutrition, and a prayer for hunger is no free meal -- one
-said less than rnz(350) - 200 turns after the last angers the god (pray.c can_pray: u.ublesscnt > 200 in major
-trouble; ~8 % of prayers 850 turns apart), and an angry god never helps again. First screens (500 games, valve
-at Weak only): prayers a game 2.4 -> 5-9, games with an angry god 4 % -> 30-40 %, deaths by starvation x 3-5.
-So the gate may only hold us where the kills feed us: pace_food.
+What a hold is (500-game screens against base_d1, hold logs):
+  * the monsters come to us: 8-18 kills per 1000 turns standing on the stairs of an ordinary level, the game's
+    creation rate is 14 (on Medusa's island they cannot: water). 0.35-0.7 keys a turn, fights included.
+  * experience per turn grows with depth as the monsters' level does: 0.01-0.07 on Dlvl 1-5, 0.3-0.6 on 9-12,
+    ~1.1 on 13-19 -- on Dlvl 9-12 the same rate as exploring there.
+  * deaths per 1000 turns of a level held on: Dlvl 9: 0.054, 12: 0.09, 17 and 20: 0.04 -- a fifth of exploring
+    Dlvl 10-12, no better than exploring Dlvl 17-20 (0.06-0.11). So a hold before Dlvl 10-12 pays, a capped hold
+    further down only adds a level's worth of deaths (per arrival, Dlvl 17: 4.9 % -> 12.7 %, Dlvl 20: 4.5 % -> 15.8 %).
+  * food is what it costs: a turn burns a point of nutrition, the corpses of the kills give back ~0.1 on Dlvl 2-5
+    and ~0.5 on Dlvl 8-12; the rest is prayer, and a prayer for hunger is no free meal -- said less than
+    rnz(350) - 200 turns after the last it angers the god for good (pray.c can_pray: u.ublesscnt > 200 in major
+    trouble; ~8 % of prayers 850 turns apart, 1.5 % at 1500). A gate on Dlvl 2-6 (XL 3..8) lost for that: prayers
+    a game 2.4 -> 5-9, an angry god in 30-40 % of the games (4 %), starvation x 3-5 -- for no experience.
+    pace_food / pace_pray open the gate on an emptying stomach unless a safe prayer is ahead.
+  * pace=[[10,10],[13,11],[18,12],[21,13]], 5000 turns a level (pace_late_s): score +9255 [+6331, +12316], depth
+    -0.43 [-0.70, -0.15], J +0.304 [+0.174, +0.440]. The gain is the weak half of the arrivals on Dlvl 9
+    (XL - AC/2 <= 9: 30-43 k -> 41-73 k); the depth is lost in the holds on Dlvl 17 and 20.
 
 The final dive (pace_dive): with that many keys left of the budget, everything optional stops and we go down the
 first stairs we find: a truncated game cannot die, each new level is 50 points (1000 below Dlvl 20) and depth.
+Holds cost so few keys that it almost never fires.
 """
 from collections import Counter
 
