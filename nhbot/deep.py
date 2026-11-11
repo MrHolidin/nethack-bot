@@ -62,7 +62,8 @@ DIG_APPLIES = 40                     # applies / zaps at most on one level
 DIG_NEAR = 3                         # a hostile within this many squares: the weapon back in our hands
 SHAFT_JUMPS = 12                     # falls from the level above Medusa's at most (0.75 ** 12: 3 % never get past)
 PATROL_R = 2                         # patrol: a square is near us within this many squares
-PATROL_WAIT = 10                     # ... nothing stale in reach: search this many turns (the count: cheap keys)
+PATROL_WAIT = 10                     # ... nothing stale in reach: search this many turns (the count: 3 keys); cut
+                                     # short by something in view, single searches for as many turns
 
 
 def dilate(mask):
@@ -97,6 +98,7 @@ class DeepState:
         self.diving = False            # dead_end_dive: the keys are nearly spent -- no patrol any more, down
         self.near_at = {}              # dead_end_patrol: level key -> the turn each square was last within
                                        # PATROL_R of us (0: never)
+        self.wait_short = 0            # ... the turn until which the patrol waits by single searches
         self.mark = {}                 # summary: event -> (turn, score, kills) when it first happened
         self.once = set()              # summary: (event, level key) counted
         self.stats = Counter()
@@ -525,5 +527,10 @@ class DeepMixin:
         if stale.any() and self.walk_to(lv, stale, act="patrol", grids=grids)[0] == "moved":
             return True
         st.stats["patrol_waits"] += 1
+        if t < st.wait_short:
+            self.press("s")                           # the counted search was cut short just now: one key a turn
+            return True
         self.search_turns(PATROL_WAIT)
+        if self.turn() - t <= 1:                      # something in view stops it every turn (3 keys each)
+            st.wait_short = self.turn() + PATROL_WAIT
         return True
