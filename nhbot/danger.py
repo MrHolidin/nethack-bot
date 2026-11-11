@@ -36,8 +36,8 @@ import nle.nethack as nh
 from nhbot.carry import WEAPON_NAME_OF
 from nhbot.events import ItemDestroyed, MonMelee, MonWeapon
 from nhbot.fightmodel import (FIRE_PILLAR, LIGHTNING, PACK_CLASSES, RAY_DESTROY, RESIST_OF, SPELL_DESTROY, ac_reduce,
-                              cast_chance, cast_profile, hp_prior, melee_destroy_events, pack_destroy, spell_picks,
-                              uncancelled)
+                              cast_chance, cast_profile, dice, hp_prior, melee_destroy_events, pack_destroy,
+                              spell_picks, uncancelled)
 from nhbot.items import base_name, erosion, singular_name
 from nhbot.monattacks import ATTACKS
 from nhbot.monsters import M1_REGEN, PM_BY_NAME, PM_INDEX, PM_INDICES
@@ -66,6 +66,7 @@ CLASS_NAME = {nh.POTION_CLASS: "potion", nh.SCROLL_CLASS: "scroll", nh.SPBOOK_CL
               nh.WAND_CLASS: "wand", nh.RING_CLASS: "ring"}
 RAY_OF_AD = {"FIRE": "fire", "COLD": "cold", "ELEC": "lightning"}     # a breath that is a ray destroy_item follows
 WIN_SIMS = 200                   # win_prob: sampled fights
+WIN_MEMO_MAX = 4096              # win_prob: fights remembered (all forgotten when full)
 UNIFORM_BLOCK = 1024            # Uniforms: doubles drawn from numpy at a time
 EXCALIBUR_BONUS = (5, 10)        # artilist.h Excalibur PHYS(5, 10): + rnd(5) to hit, + d10 damage, against anything
 MEAN_EDGES = (0, 1, 3, 6, 10, 15, 25, 1e9)
@@ -73,14 +74,8 @@ P_EDGES = (0, 0.001, 0.01, 0.05, 0.2, 0.5, 1.01)
 
 
 def dice_pmf(n, d):
-    p = np.zeros(n * d + 1)
-    p[0] = 1.0
-    for _ in range(n):
-        q = np.zeros(len(p) + d)
-        for k in range(1, d + 1):
-            q[k:k + len(p)] += p / d
-        p = q[:n * d + 1] if len(q) > n * d + 1 else q
-    return p
+    """The pmf of the sum of n d-sided dice (fightmodel.dice, cached; a fresh array)."""
+    return dice(n, d)
 
 
 def conv(a, b):
@@ -117,6 +112,12 @@ def cdf_draw(rng, cdf):
     """int(rng.choice(len(p), p=p)) for cdf = pmf_cdf(p): the same one uniform draw, the same index -- without
     choice's checks and cumulative sum on every call (a twentieth of the time)."""
     return bisect_right(cdf, rng.random())
+
+
+def rng_key(rng):
+    """The state of a numpy Generator (PCG64) as a hashable value."""
+    st = rng.bit_generator.state
+    return st["state"]["state"], st["state"]["inc"], st["has_uint32"], st["uinteger"]
 
 
 class Uniforms:
@@ -187,6 +188,7 @@ class DangerState:
         self.pending = None                      # (turn, hp, [(pos, pmf, P(instant death), P(we kill it), scared)])
         self.win_rng = np.random.default_rng(12345)   # win_prob's own draws (never the game's RNG)
         self.opening_rng = np.random.default_rng(54321)   # win_prob's draws for the opening zap (wand_ev)
+        self.win_memo = {}                       # win_prob: simple-model fight key -> (wins, win_rng state after)
         self.mean = defaultdict(lambda: [0, 0.0, 0.0])           # bin -> [n, sum predicted, sum actual]
         self.p = defaultdict(lambda: [0, 0.0, 0])                # bin -> [n, sum predicted, deaths]
         # item-loss statistics (items_tick): the item loss predicted for the next turn, scored like pending
@@ -588,6 +590,18 @@ class DangerMixin:
         zrng = self.danger.opening_rng
         sp = self.our_speed()
         k, frac = divmod(sp, 12)
+        # the simple model is a function of its tables, our HP and speed and the generator's state alone: the same
+        # fight again (prey_win asks of every hostile in view every tick, the state restored) is looked up, with
+        # where it left the generator
+        memo_key = None
+        if approach is None and opening is None:
+            memo_key = (hp0, sp, sims, max_turns, rng_key(rng),
+                        tuple((m.hits, m.hit, m.inst, tuple(cdfs[id(m.hp)]), tuple(cdfs[id(m.dmg)]),
+                               tuple(cdfs[id(m.rnd)])) for m in mons))
+            got = self.danger.win_memo.get(memo_key)
+            if got is not None:
+                rng.bit_generator.state = got[1]
+                return got[0] / sims
         # the simple model draws only rng.random(): those come in blocks (Uniforms); walk_fight draws integers too
         uniforms = Uniforms(rng) if approach is None else None
         rnd = uniforms.next if uniforms is not None else rng.random
@@ -650,6 +664,10 @@ class DangerMixin:
                 wins += 1
         if uniforms is not None:
             uniforms.close()
+        if memo_key is not None:
+            if len(self.danger.win_memo) >= WIN_MEMO_MAX:
+                self.danger.win_memo.clear()
+            self.danger.win_memo[memo_key] = (wins, rng.bit_generator.state)
         return wins / sims
 
     def walk_fight(self, mons, hps, hp, approach, opening, rng, zrng, index, max_turns, cdfs, plans=None, hcap=None,
