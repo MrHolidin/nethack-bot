@@ -123,6 +123,25 @@ def main():
         paired_table(recs, a.h, lambda r, lo=lo, hi=hi: lo <= r["feat"]["win_prob"] < hi and r["feat"]["n_adj"] > 0,
                      f"adjacent, win_prob in [{lo}, {hi})")
     fatal_report(recs, a.dirs, a.h)
+    monster_report(recs, a.h)
+
+
+def monster_report(recs, h, top=25, opts=("melee", "elbereth", "zap", "up", "down", "quaff")):
+    """Per monster kind next to us (the commonest): the default's death rate and each option's paired difference."""
+    by = defaultdict(list)
+    for r in recs:
+        for name in {a[0] for a in r.get("adj", [])}:
+            by[name].append(r)
+    print(f"\nBY MONSTER next to us (death within {h} turns, %; per option: diff to default (n))")
+    print(f"  {'monster':18s} {'n':>5s} {'default':>8s}  " + "  ".join(f"{o:>14s}" for o in opts))
+    for name, rs in sorted(by.items(), key=lambda t: -len(t[1]))[:top]:
+        cells = []
+        for o in opts:
+            d = [r["_st"][h][o]["death"] - r["_st"][h]["default"]["death"] for r in rs
+                 if o in r["_st"][h] and r["_st"][h][o]["ok"] == 1 and "default" in r["_st"][h]]
+            cells.append(f"{np.mean(d) * 100:+6.1f} ({len(d):4d})" if d else " " * 14)
+        dd = [r["_st"][h]["default"]["death"] for r in rs if "default" in r["_st"][h]]
+        print(f"  {name:18s} {len(rs):5d} {np.mean(dd) * 100:8.1f}  " + "  ".join(cells))
 
 
 def fatal_report(recs, dirs, h, within=25):
