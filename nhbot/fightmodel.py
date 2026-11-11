@@ -72,9 +72,16 @@ def _dice(n, d):
 
 
 def ac_reduce(pmf, ac):
-    """mhitu.c:1696-1703 hitmu: with a negative AC a hit that does damage does rnd(-AC) less, at least 1."""
+    """mhitu.c:1696-1703 hitmu: with a negative AC a hit that does damage does rnd(-AC) less, at least 1. Cached by
+    the pmf's bytes (the same few damage pmfs every tick); a fresh array."""
     if ac >= 0:
         return pmf
+    return _ac_reduce(np.asarray(pmf, dtype=np.float64).tobytes(), ac).copy()
+
+
+@lru_cache(maxsize=1 << 12)
+def _ac_reduce(pmf_bytes, ac):
+    pmf = np.frombuffer(pmf_bytes, dtype=np.float64)
     out = np.zeros(len(pmf))
     out[0] = pmf[0]
     k = -ac
