@@ -26,7 +26,9 @@ can be added later.
 | `explore.py` | exploration, descending, searching, the Gnomish Mines (`mines_tick`: the per-tick Mines bookkeeping) |
 | `hidden.py` | hidden-passage candidates of the known map (room sides, dead ends) and their features; `search_log` |
 | `truemap.py` | experiments only: the true map of the level read from the game's memory (secret doors and corridors, stairs) -- how, in its docstring |
-| `excalibur.py`, `equipment.py`, `carry.py`, `shop.py`, `scrolls.py`, `pricemem.py`, `focus.py` | Excalibur, armor, valuables, weight and selling (`carry.py`, also the refused diagonal squeeze), shops, good scrolls, price identification, target choice |
+| `excalibur.py`, `equipment.py`, `carry.py`, `shop.py`, `scrolls.py`, `pricemem.py`, `focus.py` | Excalibur (the dip, and holding Elbereth against what a dip lets out), armor, valuables, weight and selling (`carry.py`, also the refused diagonal squeeze), shops, good scrolls, price identification, target choice |
+| `deep.py` | the water dead ends at the bottom of the main dungeon: Medusa's level and the Castle told from the map; `dead_end_patrol` (back up, a patrol of the level above instead of searching walls), `medusa_dig` (a hole past her island); overrides explore / search_mode / stairs_mask / passable_grid / revisit_up / peaceful_now / swap_back (first in `Bot`'s bases) |
+| `retreat.py` | `retreat` (option): leave a melee fight being lost -- by the stairs, Elbereth, a teleport scroll or a wand of digging; rest on the arrival staircase after a flight |
 | `vault.py`, `digging.py`, `digthrough.py` | vaults (rob, find, the guard's question); diggers: which one, wielding it, applying it; digging through a refused squeeze / a stuck boulder |
 | `consts.py`, `monsters.py`, `glyphs.py`, `monattacks.py`, `weapondice.py` | shared tables (`monsters.py`: monster lists, name -> index maps, monflag / mresists bits) |
 
@@ -38,7 +40,8 @@ Top level:
   per game the outcome and a hash of every key sent, against `golden.json`
   (`python regress.py check`; `--level outcome` for changes that only drop free actions; `--kw` plays with
   options, e.g. record with an A/B flag on before making it the default).
-- `tools/`: `cases.py` (death analysis from `hist`), `random_baseline.py`.
+- `tools/`: `cases.py` (death analysis from `hist`), `random_baseline.py`; debugging of no-time loops and keys:
+  `keytrace.py`, `loopstack.py`, `farlook_check.py`, `luckdbg.py`.
 - `python -m nhbot SEED` plays one game and prints its summary.
 
 Parallel evaluation runs on GitHub Actions: workflow **eval** (`workflow_dispatch`), sharded by character and
