@@ -72,8 +72,8 @@ class BagStoreMixin:
         """carry_drop_step is about to drop it (Burdened, a squeeze refused for our weight, a smaller form): if it is
         the bag our things are in, they come out first and are weighed one by one (the bag went with all of them --
         80080, 80144, 80341, 80461, 80644, 80880 dropped it at a squeeze). True if it used the turn."""
-        if not self.store_holds(it):
-            return False
+        if not self.store_holds(it) or self.hands_busy():
+            return False                          # can't open it now: it goes as it is
         bag = self.store_bag()
         if bag is None:
             return False
@@ -117,15 +117,17 @@ class BagStoreMixin:
         return self.turn() - self.bstore.hands_busy < HANDS_RETRY
 
     def store_open(self, bag):
-        """bag_open; "You have no free hand" (a welded two-hander, or a welded weapon and a cursed shield: apply.c
-        use_container, freehand -- 80648 tried 79046 times) says nothing of the bag: tried again HANDS_RETRY turns
-        on."""
+        """bag_open; one that fails leaves our bag alone HANDS_RETRY turns -- "You have no free hand" (a welded
+        two-hander, or a welded weapon and a cursed shield: apply.c use_container, freehand -- 80648 tried 79046
+        times), a form that can't apply (80657, a wererat: 66521 tries) -- and "no free hand" says nothing of the
+        bag itself."""
         seq0 = self.msg_seq
         if self.bag_open(bag):
             return True
+        self.bstore.hands_busy = self.turn()
+        self.bstore.stats["open_failed"] += 1
         if "no free hand" in self.text_since(seq0):
             self.bag.bad.discard(bag.key)
-            self.bstore.hands_busy = self.turn()
             self.bstore.stats["no_free_hand"] += 1
         return False
 
