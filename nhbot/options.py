@@ -24,6 +24,8 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "corpse_names": False,     # A/B: the corpse we stand on is known by its kind's own name -- "uruk-hai" read from
+                               #      the lowercased question was no kind: Uruk-hai, Mordor orcs, elves never eaten
     "mines_end_xl": 0,         # A/B: below this XL no descent below Minetown: done there, we climb out of the Mines
                                #      (mines_return "weak"; they are finished then) -- 99: never to Mines' End
     "pace": None,              # A/B: the strength gate on the stairs down (nhbot.pace): a list of [depth, XL] -- no
