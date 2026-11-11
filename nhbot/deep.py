@@ -165,16 +165,17 @@ class DeepMixin:
     def rise_step(self, lv):
         """patrol_rise: on the way up from the level above the dead end to the patrol level (DeepState.rise_to) by
         the stairs we know (explore.level_travel_step). True if it used the turn; with no way up known the patrol
-        is where we are."""
+        is where we are, for now."""
         st = self.deep
-        if lv.key[0] == 0 and lv.key[1] > st.rise_to[1]:
-            st.above = lv.key                         # its down stairs hidden while we pass, and if we stay
-            if self.level_travel_step(lv, self.grids(lv), st.rise_to, "patrol", "patrol_rise"):
-                return True
-        st.rise_to = None
-        if lv.key[0] == 0:
-            st.above = lv.key
-        return False
+        if lv.key[0] != 0:
+            st.rise_to = None                         # off the main dungeon (a trap sent us): no patrol to climb to
+            return False
+        st.above = lv.key                             # its down stairs hidden: while we pass, and where we stay
+        if lv.key[1] <= st.rise_to[1]:
+            st.rise_to = None
+            return False
+        # no way up in our map (we fell through this level): the patrol is here until its up stairs show
+        return self.level_travel_step(lv, self.grids(lv), st.rise_to, "patrol", "patrol_rise")
 
     def search_mode(self, lv, grids):
         """explore has nothing left on this level but walls to search: at a water dead end, the hole / the way
