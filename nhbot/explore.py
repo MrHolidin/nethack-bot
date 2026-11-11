@@ -181,7 +181,7 @@ class ExploreMixin:
         have been on (level_travel_step), no gate."""
         start = self.pos()
         gated = not known and self.pace_gate(lv)
-        if gated and self.pace_patrol_step(lv, grids):
+        if gated and (self.pace_patrol_step(lv, grids) or self.pace_spot_step(lv, grids, downstairs)):
             return True
         if downstairs[start]:
             if gated:

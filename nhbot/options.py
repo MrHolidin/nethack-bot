@@ -42,6 +42,8 @@ DEFAULTS = {
                                #      many turns after the last one (0: never count on a prayer)
     "pace_patrol": 0,         # with pace: gated, a walk to a far square of the level and back every this many turns
                                #      (0: never) -- it brings out the monsters that stand behind walls
+    "pace_spot": False,        # with pace: the hold is on a corridor square / in an open door by the stairs, where
+                               #      at most two monsters reach us at once, not on the staircase in the open
     "pace_peek": False,        # with pace: before the wait at a gate, down the stairs once and straight back up --
                                #      the depth is reached whatever becomes of the hold
     "pace_dive": 0,           # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,

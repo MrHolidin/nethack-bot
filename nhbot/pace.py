@@ -31,10 +31,12 @@ import numpy as np
 import nle.nethack as nh
 
 from nhbot import glyphs as G
-from nhbot.consts import WEAK
+from nhbot.consts import COLS, CORRIDOR_GLYPHS, FLOOR_GLYPH, NEIGH, ROWS, WEAK
 
 WAIT_COUNT = 20             # turns of one counted search at the gate with nothing in view (3 keys)
 WAIT_COUNT_SEEN = 5         # ... with a hostile in view that no step went for (2 keys)
+SPOT_MAX = 25               # pace_spot: path cost at most from the stairs to the square we hold on
+SPOT_EVERY = 500            # ... chosen again after this many turns (the map may have grown)
 PATROL_HP = 0.8             # a patrol trip only from this fraction of max HP on
 PATROL_MAX = 150            # path cost at most to a patrol goal; turns at most on the way out
 
@@ -54,6 +56,7 @@ class PaceState:
         # next trip starts / this one is given up, the last goals (the next one lies away from them)
         self.patrol_key, self.patrol_goal, self.patrol_next, self.patrol_until = None, None, 0, 0
         self.patrol_seen = []
+        self.spot = (None, 0, None)      # pace_spot: (level key, turn chosen, the square we hold on or None)
         # pace_peek: the levels we looked below from, the one we are looking below from now (None: not), and
         # whether the stairs back up were taken
         self.peeked, self.peek_from, self.peek_up = set(), None, False
@@ -191,6 +194,59 @@ class PaceMixin:
         score = np.where(ok, score, -1)
         best = np.unravel_index(np.argmax(score), score.shape)
         return (int(best[0]), int(best[1])) if score[best] > 5 else None
+
+    def pace_spot_step(self, lv, grids, downstairs):
+        """pace_spot, gated: hold where at most two can come at us at once -- a corridor square or an open door
+        (no diagonal step through a door: hack.c test_move) within SPOT_MAX of the stairs -- not on the staircase
+        in the open, where a pack stands all round us (the holds lost at Dlvl 9: four hill orcs, ants). The look
+        below (pace_peek) comes first, from the stairs. True if it used the turn."""
+        if not self.opts.pace_spot:
+            return False
+        if self.opts.pace_peek and lv.key not in self.pace.peeked \
+                and any(p not in lv.stairs_to for p in zip(*map(lambda a: a.tolist(), np.nonzero(downstairs)))):
+            return False
+        key, t, spot = self.pace.spot
+        if key != lv.key or self.turn() - t >= SPOT_EVERY:
+            spot = self.pace_spot(lv, grids, downstairs)
+            self.pace.spot = (lv.key, self.turn(), spot)
+        if spot is None:
+            return False
+        if self.pos() == spot:
+            return self.pace_wait(lv)
+        mask = np.zeros_like(grids[2])
+        mask[spot] = True
+        if self.walk_to(lv, mask, act="pace", grids=grids)[0] == "moved":
+            return True
+        self.pace.spot = (lv.key, self.turn(), None)       # out of reach now: the stairs until chosen again
+        return False
+
+    def pace_spot(self, lv, grids, downstairs):
+        """The square to hold on: plain floor, corridor or an open door within SPOT_MAX (by path) of the down
+        staircase nearest to us, outside shops, with the fewest neighbours a monster can step at us from (at most
+        two; the nearest to the stairs among equals). None: the staircase is as good as anything."""
+        k_mem, k_live, passable = grids
+        y, x = self.pos()
+        stair = min(zip(*map(lambda a: a.tolist(), np.nonzero(downstairs))),
+                    key=lambda p: max(abs(p[0] - y), abs(p[1] - x)), default=None)
+        if stair is None:
+            return None
+        dist, _, _ = self.dijkstra(lv, k_mem, k_live, passable, stair, None, max_cost=SPOT_MAX)
+        door = (k_mem == G.DOOR_OPEN) | (k_mem == G.DOOR_CLOSED) | lv.door_intact | lv.no_diag
+        plain = np.isin(self.terrain_glyphs(lv), (FLOOR_GLYPH,) + CORRIDOR_GLYPHS) & (k_mem == G.FLOOR)
+        ok = passable & (dist <= SPOT_MAX) & (plain | (k_mem == G.DOOR_OPEN)) & ~lv.shop
+        best = None
+        for sy, sx in zip(*map(lambda a: a.tolist(), np.nonzero(ok))):
+            n, shop = 0, False
+            for dy, dx in NEIGH:
+                qy, qx = sy + dy, sx + dx
+                if not (0 <= qy < ROWS and 0 <= qx < COLS):
+                    continue
+                shop |= bool(lv.shop[qy, qx])
+                if passable[qy, qx] and not (dy and dx and (door[sy, sx] or door[qy, qx])):
+                    n += 1
+            if n and not shop and (best is None or (n, dist[sy, sx]) < best[0]):
+                best = ((n, int(dist[sy, sx])), (sy, sx))
+        return best[1] if best is not None and best[0][0] <= 2 else None
 
     def pace_peek(self, lv, pos):
         """pace_peek, gated on a staircase never taken: one look at the level below before the wait -- down and
