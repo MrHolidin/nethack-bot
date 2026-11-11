@@ -5,8 +5,8 @@ above it, Dlvl 21-28; ordinary levels between). On Medusa's level we arrive on a
 of medusa-1/-3/-4) or in a closed building whose only doors are secret and lead to the water (medusa-2); the down
 stairs are on her island across the lake. The Castle has no stairs down: its trap doors are behind the raised
 drawbridge and undiggable walls (castle.des). Neither has a hidden passage: searching their walls is what the bot
-did there for 6-15 000 turns a game, making 0.3 kills per 500 turns (6.4 while descending) until gremlins, eels or
-hunger ended it (auto/notes/deep-analysis.md).
+did there for 6-15 000 turns a game (3.7 kills per 500 turns, 4 points a turn) until gremlins, eels or hunger ended
+it (auto/notes/deep-analysis.md).
 
 medusa_dig: past Medusa through the floor.
   - On her level, with a way to dig (digging.dig_means), a hole (vault.dig_down) -- medusa.des sets no hardfloor
@@ -24,8 +24,8 @@ medusa_dig: past Medusa through the floor.
 
 dead_end_patrol: at such a dead end with no way through -- back up the stairs we came by (never onto Medusa's
 island) and walk about the ordinary level above for the rest of the game: the random monsters the game makes (1 in
-70 turns, allmain.c) come at us by greedy steps (monmove.c m_move) and stay stuck behind walls -- a hero who stands
-still meets few of them. On that level its down stairs are hidden from explore (stairs_mask), which goes on taking
+70 turns, allmain.c) come at us by greedy steps (monmove.c m_move) and stay stuck behind walls or across the water: on the
+level above we met 7.0 kills per 500 turns, 5.7 points a turn, and lived half as long again. On that level its down stairs are hidden from explore (stairs_mask), which goes on taking
 items and frontiers; where it would search walls, we walk to the nearest square not seen for patrol_stale turns.
 With no way up we may take (the Castle right below Medusa's level) the patrol is where we are, off the squares
 next to water (castle.des puts giant eels and sharks in the moat).

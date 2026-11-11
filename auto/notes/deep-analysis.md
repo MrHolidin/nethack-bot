@@ -23,12 +23,12 @@ picture. Scripts: `/workspace/agents/deep/an2.py`, `an3.py`, `an4.py` on the mac
   So 150 of 2000 games (7.5 %) end at Medusa or the Castle; only 15 of the 153 games that see Medusa's level get
   below it (trap doors / holes of the level above that drop two levels: trap.c fall_through, 1 in 4 a further
   level), 2 of 14 leave the Castle downward, none through its trap doors.
-- **The score of the deep games is made on the way down, not while stuck.** Kills per 500 turns (snaps):
-  Dlvl 15-20 moving 4.96, stuck 0.80; Dlvl 21-24 moving 6.43, **stuck 0.31**; Dlvl 25+ moving 6.19, stuck 0.78.
-  Score against the turns spent on the terminal stuck level: 0-1000 turns 118.6 k, 3-6 k turns 125 k, 10-15 k turns
-  135 k, 25 k+ turns 179 k: about 1.5-2.5 points a turn stuck, against ~15-20 a turn while descending (each level
-  from 15 to 22 adds ~8-9 k). A level's own monsters are the income; the 1-in-70-turns random monster mostly never
-  reaches a hero who stands on an island or in a dead end.
+- **Most of the score of the deep games is made on the way down.** Each level from 15 to 22 adds ~8-9 k (~15-20
+  points a turn). Stuck at Medusa the bot goes on earning, but less: measured on 29 D1 games from the turn the
+  dead end is reached (the patrol runs share the game up to there, so the state is known): 9 829 more turns, +40 778
+  points, 3.71 kills / 500 turns, 4.15 points / turn, until it dies. (A first version of this note said 0.3 kills /
+  500 turns: that came from reading snaps["kills"] as kills per interval; it is the number of fresh-corpse records
+  alive at the snapshot. Withdrawn.)
 - Deaths at Medusa (132 of 138): gremlins 16.5 (they multiply in the water), starvation / fainting 14, electric
   eels 11.5 (Medusa-2: all of them -- the bot finds the west secret door, which opens on the lake), winged
   gargoyles 8.5, mind flayers 10, Medusa's gaze 4 (see below), vampire bats, jabberwocks, explosions (gas spores /
@@ -71,9 +71,9 @@ picture. Scripts: `/workspace/agents/deep/an2.py`, `an3.py`, `an4.py` on the mac
 1. More levels are worth more than more turns: each new level at Dlvl 21+ is ~6 kills and ~8-10 k points, +1
    depth. Digging down past Medusa (1-4 levels to the Castle) is the only source of new levels the bot can use.
    Expected: ~40 % of the Medusa games (a dry square x a digger) -> ~3 % of all games gain ~2.5 levels.
-2. Standing still when stuck earns almost nothing (0.3 kills / 500 turns) and still dies (gremlins, eels,
-   starvation). "Camp safely until the key limit" is worth little: +2 points a turn. Walking the level above
-   (ordinary, explored) should meet the random monsters that never reach an island -- to be measured (patrol).
+2. Standing on the island earns 4 points a turn and dies of the water (gremlins, eels) and of hunger. Walking the
+   level above (ordinary, explored) meets the random monsters that never reach an island and has neither -- measured
+   below (patrol).
 3. Never climb onto Medusa's level from below (revisit_up to a level never seen at Dlvl 21-28, or the level we
    dug out of).
 4. Not searching walls at Medusa / the Castle saves keys only; the 11 deep truncated games gain little from it.
@@ -86,7 +86,7 @@ picture. Scripts: `/workspace/agents/deep/an2.py`, `an3.py`, `an4.py` on the mac
   explore still takes items). Screen on the D1 seeds that end at Medusa / the Castle in base_d1 (v1, 77c993b, 29 of
   74 games played): score 131 358 -> 172 349, **+40 990 a game** (80 % CI [+23 794, +58 275]), depth +0.24,
   truncated 2 -> 5. On patrol: 14 861 turns a game, +84 011 points, 7.0 kills / 500 turns, 5.65 points / turn --
-  against 0.3 kills / 500 turns on the island. Income holds for 25 000 turns (3 500 -> 2 000 points per 500 turns).
+  against 3.7 kills / 500 turns and 4.15 points / turn for 9 829 turns on the island in the base. Income holds for 25 000 turns (3 500 -> 2 000 points per 500 turns).
   Ends: 16 died on the patrol level (soldiers in groups, winged gargoyles, Olog-hai, giants, a purple worm, a wand
   of death -- no single cause), 5 below Medusa after a trap door of the patrol level (3 minotaurs), 5 truncated.
 - Patrol games spend their keys on looks at peaceful monsters, which pile up on the level (farlooks a game 3.7 k ->
