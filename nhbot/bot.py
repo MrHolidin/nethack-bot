@@ -155,7 +155,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             self.gift_apply()
             while True:
                 t0 = self.turn()
-                self.cur_act = "other"
+                self.prev_act, self.cur_act = self.cur_act, "other"
                 self.tick()
                 dt = self.turn() - t0
                 if self.klog is not None:

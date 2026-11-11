@@ -118,6 +118,7 @@ class PolicyState:
     """State of the step policy: the tick, its history, loop guard and wait counters (PolicyMixin)."""
     def __init__(self):
         self.last_step = None
+        self.prev_step = None            # the step that acted last tick (step_progress: loop_by)
         self.tick_no = 0
         self.tick_seq = 0                # msg_seq at the start of this tick
         self.hist = deque()              # step_history: the fight state of the last 40 ticks (summary 'hist')
@@ -144,7 +145,7 @@ class PolicyMixin:
     def tick(self):
         lv = self.update_memory()
         self.cur_key = lv.key
-        self.pol.last_step = None
+        self.pol.prev_step, self.pol.last_step = self.pol.last_step, None
         self.goal_tick_start()
         self.pol.tick_no += 1
         self.nutrition_tick()                    # survival.py: hunger
@@ -175,7 +176,7 @@ class PolicyMixin:
             self.pol.loop_turn, self.pol.loop_steps = t, self.steps
         elif self.steps - self.pol.loop_steps > 300:      # stuck in a no-time loop
             self.pol.loops += 1
-            self.pol.loop_by[f"{self.pol.last_step}/{self.cur_act}"] += 1
+            self.pol.loop_by[f"{self.pol.prev_step}/{self.prev_act}"] += 1
             self.pol.loop_steps = self.steps
             self.raw_step(27); self.press("s")
             return True
