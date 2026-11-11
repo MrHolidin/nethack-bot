@@ -53,3 +53,25 @@ So "alive 300 turns later" overrates options that slow the game down. Actions ta
     point, `horizon.py` gives deaths and score by horizon 50 … 3000).
 - The collection now records the start state (`state0`) and a richer end state; `d6`/`d7` have them (`d1`–`d5`
   do not: death tables only).
+
+### 21:42 — merged `auto` (perf's memoised fight simulation)
+
+`git merge box/auto` clean. The memo key of `win_prob` holds the generator's state, and the features' win_prob
+runs on a generator of its own swapped into `danger.win_rng` — both still right. Re-checked on the merged code:
+`regress.py check` strict 32 / 32; selftest 6 seeds, 197 forks: isolation 6 / 6, determinism 197 / 197, reseeded
+children differ in 184 / 197 (as before: the bot's own numpy generator is copied by the fork and gives every
+child the same *estimates*; the game's dice are NetHack's RNG, which `fork.reseed` re-inits). Collection is ~3×
+faster (80 decision points a minute on 10 procs).
+
+### 21:52 — first long rollouts (3000 turns, 162 points; wide intervals, direction only)
+
+- `v:elb70`: deaths ±0 up to 1000 turns, score gap growing: −39 at 300, −139 at 1000, −563 at 2000, −834 at
+  3000 (default 5628: −15 %) — the size of the owner's whole-game −18 %. `v:elbexit100` the same shape (−245 at
+  1000 [−463, −32], −1117 at 3000).
+- So the 300-turn death gain of "more Elbereth" is a postponement: the window ends with the bot still on its
+  square and the monster still there. And turns are not free: deaths by turn 3000 are the same (~50 %) in both
+  hands, so the score is made by pace.
+- Fixes: `settle` (a child plays on until the fight is over, ≤ 1200 turns more; `d9` is collected that way);
+  `value_v2` blind to the HP fraction (V_v1 priced 30 % HP at 0.06–0.24 J against 0.008–0.04 J for 300 turns: by
+  that rate resting always pays). V does price time (−205 … −1124 score per 300 turns at depth < 12), kills
+  (+10 kills: +534 … +5556) and a used prayer (−1462 … −2137).
