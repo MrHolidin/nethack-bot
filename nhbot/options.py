@@ -24,6 +24,12 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "pace": None,              # A/B: the strength gate on the stairs down (nhbot.pace): a list of [depth, XL] -- no
+                               #      descent to that depth or deeper below that experience level; we wait on the
+                               #      staircase instead (counted searches), e.g. [[5, 6], [8, 8], [11, 10]]
+    "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens)
+    "pace_dive": 0,            # A/B: the final dive -- with this many keys of the budget (Bot.max_steps) left,
+                               #      down the first stairs found, nothing optional (0: never)
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
