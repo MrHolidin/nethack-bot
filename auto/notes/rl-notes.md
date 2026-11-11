@@ -125,3 +125,21 @@ as **sustained** rules (the bot with `tactic_model` = the rule file, tools/rollo
 `x3` (10 procs): 3000-turn rollouts at critically low HP (default / pray / melee / elbereth / quaff,
 pray_gap 150 / 300 sustained) for R2's long-run cost (an unheard prayer angers the god: the bot never prays
 again).
+
+### 22:45 — after the orchestrator's reply
+
+- Confirmation of R1 on fresh seeds (`m1`, 414000–414065, sustained rule, 1000 turns + calm; 111 pairs, 24
+  games): dead ≤ 50 turns −22.5 [−34.4, −13.5], ≤ 300 −19.8 [−30.3, −9.1], ≤ 1000 turns −23.4 [−33.3, −12.4],
+  J +342 [+150, +533]. R2 there: 24 pairs, 7 games, −8.3 at 300, J +133 [−109, +467].
+- R2 changed once after the pre-registration, to defer to the script: not while a healing potion is in the pack
+  (the script's heal step quaffs it when no prayer is due; the tactic step runs before it).
+- `x3` (3000-turn rollouts at critically low HP): praying against the timer −17.5 pp at 300 turns, −8.7
+  [−22.6, +2.0] at 3000; `pray_gap` 150 sustained −11.5 [−25.7, −1.0] at 3000, score +1508 [+234, +3049].
+- Whole game: `rl_r12c_s` (commit a7475f2: the summary now has `tactic`, how often the chooser took each option,
+  so R1 and R2 can be told apart per game); `rl_r12_s` / `rl_r12b_s` were cancelled before they started (older
+  rule file / no counter).
+- Asked for: R1 against flee's retreat step where their triggers differ. Branch `a/rl-eval` = a/rl + a/flee
+  (one conflict in bot.py: both add a mixin), tree at /workspace/agents/rl/evaltree. `e1` (10 procs, seeds
+  424000+): at every decision point with win_prob <= 0.5, four hands of the same futures — script, `retreat`
+  on, R1 on, both on — 1000 turns and on until calm, 2 futures. The variants are plain option sets now
+  (`{"name": ..., "opts": {...}}` in `--cfg`), so any branch's option can be screened this way.
