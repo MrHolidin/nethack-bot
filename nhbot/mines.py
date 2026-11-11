@@ -71,9 +71,9 @@ class MinesMixin:
                 self.excal_give_up(fk)
                 return False
             hp, maxhp = self.bl(nh.NLE_BL_HP), self.bl(nh.NLE_BL_HPMAX)
-            if hp >= maxhp * self.opts.excal_hp or self.visible_hostiles(lv):
+            if (hp >= maxhp * self.opts.excal_hp and self.dip_prayer_ok()) or self.visible_hostiles(lv):
                 return False
-            self.cur_act = "rest"                # excal_step dips from excal_hp of max HP on
+            self.cur_act = "rest"                # excal_step dips from excal_hp of max HP on (and dip_pray)
             self.mines.trip_stats["excal_rest"] += 1
             self.search_turns(20)
             return True

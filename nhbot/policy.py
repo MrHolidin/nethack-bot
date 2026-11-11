@@ -41,6 +41,7 @@ STEPS = (
                          # nothing, the hit made before is counted on the next (danger_tick keeps its pending entry).
                          # A/B history_always (perceive + history first, every tick): -477 [-870, -77]
     "loot_here",         # loot_now: standing where our things fell -- picked up at once, fight or not
+    "fountain_trouble",  # dip_elb: a dip let out moccasins / a water demon -- off the fountain, Elbereth, hold it
     "elbereth",
     "thieves",
     "regen",             # ring of regeneration on below full HP, off at full (nothing next to us)

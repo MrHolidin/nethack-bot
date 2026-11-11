@@ -59,6 +59,15 @@ DEFAULTS = {
     "farm_dlvl": 0,            # experiments: this level of the main dungeon is not left downward but walked (the patrol
                                #      of dead_end_patrol) until farm_keys keys are sent; 0: off (nhbot.deep)
     "farm_keys": 150_000,
+    "dip_pray": 0,             # A/B: dip into a fountain (any reason) only this many turns after the last prayer (none
+                               #      yet: from turn 100) and with the god not angry -- the prayer is the rescue from
+                               #      the water demon (excalibur.dip_prayer_ok); 0: off. 500 = survival.can_pray's gap
+    "dip_elb": 0.0,            # A/B: a dip let out water moccasins, or a water demon we beat with P below this
+                               #      (danger.win_prob): off the fountain, Elbereth, hold it while they are in view
+                               #      (excalibur.step_fountain_trouble); 0: off, 1.01: against every demon
+    "dip_mines": False,        # A/B: the Mines' fountains that no watch minds -- Mines' End's, Orcish Town's -- used too
+                               #      (excalibur.fountains); a watched Minetown's never (Excalibur there angers the watch)
+    "dip_hold": 200,           # with dip_elb: turns at most holding that Elbereth
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
