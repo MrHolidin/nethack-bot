@@ -31,8 +31,8 @@ With no way up we may take (the Castle right below Medusa's level) the patrol is
 next to water (castle.des puts giant eels and sharks in the moat).
 
 The steps hang on methods explore calls, overridden here (the mixin comes first in Bot): search_mode -- the dead end
-is told where explore has nothing left but walls to search --, stairs_mask, revisit_up; and weapons.swap_back (the
-digger stays in our hands while the only hostiles in view are far). With both options off each override is the
+is told where explore has nothing left but walls to search --, stairs_mask, passable_grid, revisit_up; and
+weapons.swap_back (the digger stays in our hands while the only hostiles in view are far). With both options off each override is the
 method it replaces.
 """
 from collections import Counter
@@ -50,6 +50,7 @@ LAKE_MIN = 100                       # liquid squares known: Medusa's lake (its 
 MOAT_MIN = 3                         # ... with the drawbridge in our map: the Castle
 DBRIDGE_GLYPHS = tuple(nh.GLYPH_CMAP_OFF + i for i in (35, 36, 37, 38))    # S_vodbridge .. S_hcdbridge: the Castle
 SHAFT_GLYPHS = (nh.GLYPH_CMAP_OFF + 54, nh.GLYPH_CMAP_OFF + 55)            # S_hole, S_trap_door
+WAY_OUT_GLYPHS = SHAFT_GLYPHS + (nh.GLYPH_CMAP_OFF + 57,)                  # ... and S_level_teleporter
 BARE_FLOOR = (FLOOR_GLYPH, nh.GLYPH_CMAP_OFF + 20) + tuple(CORRIDOR_GLYPHS)   # S_room, S_darkroom, corridors
 DIG_HP = 0.7                         # rest before the hole / the jump below this share of max HP (we land among
                                      # strangers)
@@ -193,6 +194,15 @@ class DeepMixin:
         elif kind == G.DOWNSTAIR and lv.key == self.deep.above:
             mask[:] = False
         return mask
+
+    def passable_grid(self, lv, k_mem, k_live):
+        """mapmem.passable_grid, less the holes, trap doors and level teleporters our map shows on the level we
+        patrol: a path over one (the only way to some corner) dropped us onto Medusa's island again and again, or
+        past it into the mazes. Not while the shaft is what we want (dig_now)."""
+        p = super().passable_grid(lv, k_mem, k_live)
+        if lv.key == self.deep.above and not self.dig_now():
+            p[np.isin(lv.terrain, WAY_OUT_GLYPHS)] = False
+        return p
 
     def revisit_up(self, lv, grids):
         """explore.revisit_up -- never to Medusa's level: the stairs up to it end on her island."""
