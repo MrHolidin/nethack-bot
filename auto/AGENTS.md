@@ -12,6 +12,7 @@ started you) owns priorities, merges and the documents in `auto/`; you own your 
 - The game makes a random monster every ~70 turns anywhere; its level is at most (depth + our XL) / 2.
 - Games end by death, or are **truncated at 200 000 keys sent** (`Bot(max_steps=200_000)`, a fixed rule of the
   evaluation — do not change it). Today ~1 % of games are truncated; the bot spends ~4.4 keys per game turn.
+- (Corrected: the bot sends ~1.85 keys per game turn on average, 2.4 in long games — not 4.4.)
 - The score is heavy-tailed: on 2000 baseline games the 14 % that reach depth 21+ hold 59 % of the total score;
   half of the games die with under 9 000. Deep games stand for tens of thousands of turns in `search`
   (stuck at Medusa / the Castle) and collect score from the monsters that come to them.
@@ -28,6 +29,10 @@ started you) owns priorities, merges and the documents in `auto/`; you own your 
 - One idea = one option in `nhbot/options.py`, **off by default**, documented there like the others. Behaviour
   with the option off must be byte-identical (`regress.py check`, see below). The orchestrator turns accepted
   options into plain behaviour at merge time.
+- **Improve the player, do not game the evaluation.** Nothing may depend on the evaluation's own rules — above
+  all the 200 000-key cut-off (no "dive when the keys run out, a truncated game cannot die", no behaviour that
+  reads the remaining key budget). The test: would this be better play in a game with no key limit? (Owner's
+  rule, 2026-11-11.)
 - The bot plays from the screen only: no reading of the game's memory at play time (`truemap.py`, `gift.py` and
   process forks are for experiments and training data only).
 - Facts about NetHack 3.6.6 come from its source or the wiki (you may search the web: nethackwiki.com, the
