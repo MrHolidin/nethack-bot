@@ -37,6 +37,8 @@ class PaceState:
         self.keys = 0                    # keys sent for them
         self.stats = Counter()           # holds (levels gated), valve_time, valve_food (ticks), dive (levels)
         self.dive_from = None            # (turn, depth) the final dive began at
+        self.hold = None                 # the hold in progress: [level key, depth, turn, XL, exp] at its start
+        self.log = []                    # holds over: [key, depth, turn, XL, exp, turn, XL, exp, how it ended]
 
 
 class PaceMixin:
@@ -64,21 +66,36 @@ class PaceMixin:
         """The gate of this level's stairs down is closed: we are below the XL asked for the next depth, no valve
         is open (pace_wait turns here since it first closed; Weak or worse -- step_pray had no prayer) and the
         final dive is not on."""
-        if not self.opts.pace or lv.key in self.pace.opened or self.pace_diving():
+        if not self.opts.pace or lv.key in self.pace.opened:
             return False
+        if self.pace_diving():
+            return self.pace_hold_end("dive")
         if self.bl(nh.NLE_BL_XP) >= self.pace_need(self.bl(nh.NLE_BL_DEPTH) + 1):
-            return False
+            return self.pace_hold_end("xl")
         if lv.key not in self.pace.since:
             self.pace.since[lv.key] = lv.turns_here
             self.pace.stats["holds"] += 1
         if lv.turns_here - self.pace.since[lv.key] >= self.opts.pace_wait:
             self.pace.opened.add(lv.key)
             self.pace.stats["valve_time"] += 1
-            return False
+            return self.pace_hold_end("time")
         if self.bl(nh.NLE_BL_HUNGER) >= WEAK:
             self.pace.stats["valve_food"] += 1
-            return False
+            return self.pace_hold_end("food")
+        if self.pace.hold is None:
+            self.pace.hold = [list(lv.key)] + self.pace_now()
         return True
+
+    def pace_now(self):
+        return [int(self.bl(f)) for f in (nh.NLE_BL_DEPTH, nh.NLE_BL_TIME, nh.NLE_BL_XP, nh.NLE_BL_EXP)]
+
+    def pace_hold_end(self, how):
+        """The gate lets us through (how: "xl", "time", "food", "dive"; "end": the game is over): the hold in
+        progress goes to the log (summary 'pace'). False."""
+        if self.pace.hold is not None:
+            self.pace.log.append(self.pace.hold + self.pace_now()[1:] + [how])
+            self.pace.hold = None
+        return False
 
     def pace_wait(self, lv):
         """Gated, on the stairs down: a counted search (the game stops it when something shows up or hits us:
@@ -95,5 +112,6 @@ class PaceMixin:
     def pace_summary(self):
         if not self.opts.pace and not self.opts.pace_dive:
             return {}
+        self.pace_hold_end("end")
         return {"pace": dict(self.pace.stats, turns=self.pace.turns, keys=self.pace.keys,
-                             dive_from=self.pace.dive_from)}
+                             dive_from=self.pace.dive_from, log=self.pace.log)}
