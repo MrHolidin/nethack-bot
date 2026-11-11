@@ -173,8 +173,17 @@ class Collector:
         self.n_dp, self.last_t, self.secs, self.triggered = 0, -10 ** 9, 0.0, 0
         self.root = None
         self.records = []
+        self.models = {}
         bot.tac.hook = self.hook
         atexit.register(self.close)              # the parent's exit only: a child leaves by os._exit
+
+    def model(self, path):
+        """The chooser of a "model=PATH" variant, loaded once (to know where it would act)."""
+        if path not in self.models:
+            from nhbot.tacticmodel import TacticModel
+            with open(path) as fh:
+                self.models[path] = TacticModel(json.load(fh))
+        return self.models[path]
 
     def trigger(self, f):
         """A decision point: a hostile next to us and we are hurt, or danger.py says the fight is a risk; or hurt
@@ -205,7 +214,16 @@ class Collector:
         legal = bot.tactic_legal(c, hostiles)
         opts = [o for o in legal if cfg["options"] is None or o in cfg["options"]]
         names = VARIANTS if cfg["variants"] == "all" else cfg["variants"]
-        opts += ["v:" + v for v in names if v.startswith("model=") or VARIANTS[v][1](feat)]
+        for v in names:
+            if v.startswith("model="):
+                # a chooser in the loop: rolled out where it would act otherwise than the script right now (its
+                # pick is recorded); elsewhere its child would only repeat the default
+                pick = self.model(v[6:]).choose(feat, legal) if self.model(v[6:]).wants(feat) else "default"
+                if pick != "default":
+                    opts.append("v:" + v)
+                    feat = dict(feat, **{"pick:" + os.path.basename(v[6:]): legal.index(pick)})
+            elif VARIANTS[v][1](feat):
+                opts.append("v:" + v)
         if len(opts) < 2:
             return                                   # nothing to compare the default with here
         t = time.monotonic()

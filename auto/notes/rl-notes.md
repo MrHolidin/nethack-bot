@@ -95,3 +95,33 @@ faster (80 decision points a minute on 10 procs).
   are dead within 20 turns and 3.5 % within 50; unseen attackers ('I': win_prob 1.0 by construction) 16.7 % dead
   within 50; dwarf, jackal packs, hill orc, fire ant worse than modelled; pony, giant bat, giant ant, rothe much
   safer than modelled.
+
+### 22:27 — two rules written down before their confirmation (pre-registration)
+
+Search sample: d1–d9 + x1 (seeds 400100..403105, 406000..406030; ~4 000 decision points, 300 games; x1 = fights
+nearly lost, with `settle`). What it shows in the fights nearly lost (win_prob < 0.3; default dead within 50
+turns in 51 %):
+
+- Elbereth forced where the script does something else: dead ≤ 50 turns −13.4 pp [−21.1, −6.6], ≤ 300 turns
+  −5.0 [−12.8, +1.9], J +151 ×10⁻³ [−8, +342] (298 pairs, 90 games). The script was not writing because of
+  `elb_blocked` in 250 of them (a monster in view that ignores Elbereth or may shoot). Concentrated where two or
+  more of the monsters next to us respect it (164 pairs, 58 games: ≤ 300 turns −10.4 [−20.2, −0.6], J +308
+  [+69, +538]) and HP < 75 %; at HP ≥ 75 % nothing (+4.0, J −64).
+- A prayer against the script's timer (critically low HP, < 500 turns since the last): dead ≤ 300 turns −13.6
+  [−27.3, −5.6] (66 pairs, only 14 games). NetHack's rule (pray.c, rnz(350), my Monte Carlo): a prayer at
+  critically low HP g turns after the last one is heard with P = 0.50 at g = 150, 0.55 at 200, 0.66 at 300,
+  0.77 at 400, 0.87 at 500 — the script waits for 500.
+- Melee instead of the script: +2.8 … +4.9 pp worse; quaff: nothing; stairs up / down at win_prob < 0.3: −6 / −10
+  pp with intervals over zero.
+
+The cells were picked after looking, so they are hypotheses. Written down now, tested on fresh seeds (414000+)
+as **sustained** rules (the bot with `tactic_model` = the rule file, tools/rollout/rule.py, against the script,
+1000 turns + until calm, 3 futures, only where the rule acts at once; `m1`):
+
+- **R1** `elbereth: n_adj >= 2, adj_respect >= 2, win_prob <= 0.3, hp_frac <= 0.75` (where Elbereth can be written)
+- **R2** `pray: critically low HP, the script's timer says no, pray_gap > 150` (god not angry)
+- files: nhbot/data/rule_r1.json, rule_r2.json, rule_r12.json (both).
+
+`x3` (10 procs): 3000-turn rollouts at critically low HP (default / pray / melee / elbereth / quaff,
+pray_gap 150 / 300 sustained) for R2's long-run cost (an unheard prayer angers the god: the bot never prays
+again).
