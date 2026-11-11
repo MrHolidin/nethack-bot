@@ -102,6 +102,7 @@ class PickupState:
         self.lift_last = None          # lift_heavy: (type, turn) of the last pick-up let through into Burdened
         self.never_take = set()        # bare names dropped to make room (sokoban.soko_make_room): never taken again
         self.food_picked = 0           # food stacks taken from piles (armor_pickup_here)
+        self.look_at, self.look_names = -1, ()      # look_here: keys sent when the last look ended, its answer
 
 
 class PickupMixin:
@@ -279,7 +280,13 @@ class PickupMixin:
 
     # ------------------------------------------------------------------ the square
     def look_here(self):
-        """Names of items on our square (':' look), without consuming a turn."""
+        """Names of items on our square (':' look), without consuming a turn. Asked again with no key sent since
+        (armor_pickup_here, then pickup): the same answer, told again (price tags, pile_readers), without the keys."""
+        if self.pick.look_at == self.steps:
+            names = list(self.pick.look_names)
+            self.price_note_text(" | ".join(names))
+            self.pile_listed(" | ".join(names))
+            return names
         self.raw_step(ord(":"))
         names = []
         for _ in range(20):
@@ -299,6 +306,7 @@ class PickupMixin:
                 continue
             break
         self.settle()
+        self.pick.look_at, self.pick.look_names = self.steps, tuple(names)
         self.price_note_text(" | ".join(names))
         self.pile_listed(" | ".join(names))
         return names

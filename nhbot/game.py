@@ -3,6 +3,7 @@ import re
 from collections import Counter, deque
 
 import nle.nethack as nh
+import numpy as np
 
 from nhbot.consts import DELTA2KEY
 from nhbot.events import RESHOW_KEYS, Message
@@ -15,6 +16,22 @@ MENU_ITEM_GOLD_RE = re.compile(r"^\s*([a-zA-Z$]) - (.*)$")   # gold's line too: 
 PAGE_RE = re.compile(r"\((\d+) of (\d+)\)")       # a menu page: "(1 of 2)"
 
 
+LONG_WORM_TAIL = nh.GLYPH_MON_OFF + 326      # monnum_to_glyph(PM_LONG_WORM_TAIL): not in the 'm' list of a farlook
+
+
+def cursor_keys(dy, dx):
+    """The keys that move a farlook / getpos cursor by (dy, dx): diagonal first, by 8 with the capital keys."""
+    keys = []
+    while dy or dx:
+        sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
+        n = min(abs(dy), abs(dx)) if sy and sx else max(abs(dy), abs(dx))
+        step = 8 if n >= 8 else 1
+        key = DELTA2KEY[(sy, sx)]
+        keys.append(key.upper() if step == 8 else key)
+        dy, dx = dy - sy * step, dx - sx * step
+    return keys
+
+
 class GameOver(Exception):
     pass
 
@@ -22,6 +39,8 @@ class GameOver(Exception):
 class GameMixin:
     def game_init(self):
         self.steps = 0                   # keys sent so far
+        self.klog = [] if self.opts.key_stats else None     # key_stats: the keys of this tick
+        self.kcount = Counter()          # key_stats: keys sent by describe_at ("farlook"), --More-- returns of settle
         self.last_key = None             # the key sent last (log_msg: a message NLE shows again after it)
         self.reward = 0.0
         self.done = False
@@ -50,6 +69,8 @@ class GameMixin:
         self.obs, r, term, trunc, info = self.env.step(self.key2act[code])
         self.steps += 1
         self.last_key = code
+        if self.klog is not None:
+            self.klog.append(code)
         self.reward += r
         self.done = term or trunc
         if not self.done:
@@ -96,7 +117,15 @@ class GameMixin:
             self.note_feature_here(tty if "Things that are here" in tty else self.top_line())
             if "--More--" in flat or (self.obs["misc"][2] and not menu):
                 self.log_msg(msg if msg else self.top_line().replace("--More--", ""))
+                self.kcount["more"] += 1
                 self.raw_step(13)
+                continue
+            if "want to be teleported?" in flat:
+                # teleport control (teleport.c:519 tele): left open, the cursor prompt took the keys of the next ticks
+                # as cursor moves (failed steps marking squares blocked) till the loop guard's ESC (300008: 68 times);
+                # ESC aborts the teleport (teleport.c:522) -- we stay
+                self.msg_audit["tele_prompt_esc"] += 1
+                self.raw_step(27)
                 continue
             if expect_prompt:
                 self.log_msg(msg)
@@ -117,12 +146,14 @@ class GameMixin:
                 if "who are you" in (msg + self.top_line()).lower():
                     self.answer_guard()                     # vault.py
                     continue
+                self.kcount["getlin_esc"] += 1
                 self.raw_step(27)
                 continue
             if id_menu:
                 self.answer_identify_menu(tty)                   # jewelry.py
                 continue
             if menu:
+                self.kcount["menu_esc"] += 1
                 self.raw_step(27)
                 continue
             self.log_msg(msg)
@@ -343,22 +374,51 @@ class GameMixin:
         return n
 
     def describe_at(self, pos):
-        """Farlook (';' with autodescribe) at any square: the cursor goes there by single steps, by 8 with
-        the capital keys; next to us this is ";" and one direction key."""
+        """Farlook (';' with autodescribe) at any square. The cursor goes there by direction keys (by 8 with the
+        capital keys; next to us this is ";" and one direction key) -- or, when fewer keys, by 'm' / 'M', which step
+        through the monsters shown on the map nearest first (monster_rank); the cursor read back (tty_cursor) and
+        whatever is left walked with direction keys (farlook_jump). The description is the same either way
+        (do_name.c getpos: auto_describe(cx, cy) after every key), and the look takes no game time -- but it is not
+        free of effects: describing a square on the way that shows an object no longer there makes a stand-in object
+        (pager.c:190 object_from_map -> mksobj; mkobj.c:783 o_id = context.ident++), so another path changes the game."""
         y, x = self.pos()
-        dy, dx = pos[0] - y, pos[1] - x
+        n0 = self.steps
         self.raw_step(ord(";"))
-        while dy or dx:
-            sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
-            n = min(abs(dy), abs(dx)) if sy and sx else max(abs(dy), abs(dx))
-            step = 8 if n >= 8 else 1
-            key = DELTA2KEY[(sy, sx)]
-            self.raw_step(ord(key.upper() if step == 8 else key))
-            dy, dx = dy - sy * step, dx - sx * step
+        keys = cursor_keys(pos[0] - y, pos[1] - x)
+        jump = self.monster_rank(pos) if self.opts.farlook_jump else None
+        if jump is not None and jump[1] < len(keys):
+            for _ in range(jump[1]):
+                self.raw_step(ord(jump[0]))
+            cy, cx = int(self.obs["tty_cursor"][0]) - 1, int(self.obs["tty_cursor"][1])
+            if (cy, cx) != pos:
+                self.msg_audit["farlook_jump_missed"] += 1
+            keys = cursor_keys(pos[0] - cy, pos[1] - cx)
+        for k in keys:
+            self.raw_step(ord(k))
         desc = self.top_line()
         self.raw_step(27)
+        self.kcount["farlook"] += self.steps - n0
+        self.kcount["farlook_far" if max(abs(pos[0] - y), abs(pos[1] - x)) > 1 else "farlook_adj"] += 1
         self.settle()
         return desc
+
+    def monster_rank(self, pos):
+        """The cursor keys of a farlook that bring it from us to the monster shown on pos: ('m', k) -- 'm' k times -- or
+        ('M', n - k), whichever is fewer; None if no monster is shown there. do_name.c gather_locs (GLOC_MONS): our
+        square and every square showing a monster glyph (glyph_is_monster: also pets, detected and ridden ones; not
+        the plain long worm tail), sorted by cmp_coord_distu -- Chebyshev distance from us, then y, then x -- our
+        square first; 'm' steps forward through them from it, 'M' backward."""
+        g = self.obs["glyphs"]
+        mon = ((g < nh.GLYPH_INVIS_OFF) | ((g >= nh.GLYPH_DETECT_OFF) & (g < nh.GLYPH_DETECT_OFF + nh.NUMMONS))
+               | ((g >= nh.GLYPH_RIDDEN_OFF) & (g < nh.GLYPH_RIDDEN_OFF + nh.NUMMONS))) & (g != LONG_WORM_TAIL)
+        if not mon[pos]:
+            return None
+        y, x = self.pos()
+        ys, xs = np.nonzero(mon)
+        locs = sorted({(int(a), int(b)) for a, b in zip(ys, xs)} | {(y, x)},
+                      key=lambda p: (max(abs(p[0] - y), abs(p[1] - x)), p[0], p[1]))
+        k = locs.index(pos)
+        return ("m", k) if k <= len(locs) - k else ("M", len(locs) - k)
 
     def on_message(self, msg):
         """Every logged message, parsed once (events.Message), to each domain in this order: the raw-text readers get

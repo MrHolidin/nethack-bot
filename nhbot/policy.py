@@ -118,10 +118,12 @@ class PolicyState:
     """State of the step policy: the tick, its history, loop guard and wait counters (PolicyMixin)."""
     def __init__(self):
         self.last_step = None
+        self.prev_step = None            # the step that acted last tick (step_progress: loop_by)
         self.tick_no = 0
         self.tick_seq = 0                # msg_seq at the start of this tick
         self.hist = deque()              # step_history: the fight state of the last 40 ticks (summary 'hist')
         self.loop_turn, self.loop_steps, self.loops = -1, 0, 0     # step_progress: the no-time loop guard
+        self.loop_ticks = 0              # step_progress: ticks played in this turn (loop_ticks)
         self.loop_by = Counter()         # the guard fired: "last step/activity" then (summary 'loop_by')
         self.resets = 0
         self.desperations = 0
@@ -144,7 +146,7 @@ class PolicyMixin:
     def tick(self):
         lv = self.update_memory()
         self.cur_key = lv.key
-        self.pol.last_step = None
+        self.pol.prev_step, self.pol.last_step = self.pol.last_step, None
         self.goal_tick_start()
         self.pol.tick_no += 1
         self.nutrition_tick()                    # survival.py: hunger
@@ -172,13 +174,18 @@ class PolicyMixin:
         if (G.KIND[self.obs["glyphs"]] == G.PET).any():
             self.pol.pet_last_seen = t
         if t != self.pol.loop_turn:
-            self.pol.loop_turn, self.pol.loop_steps = t, self.steps
-        elif self.steps - self.pol.loop_steps > 300:      # stuck in a no-time loop
+            self.pol.loop_turn, self.pol.loop_steps, self.pol.loop_ticks = t, self.steps, 0
+        elif self.steps - self.pol.loop_steps > 300 or 0 < self.opts.loop_ticks <= self.pol.loop_ticks:
+            # stuck in a no-time loop: 300 keys in one turn, or (loop_ticks) that many ticks -- a step that acts
+            # with no time passing does the same again next tick (a squeeze refused, a step into rock, keys typed
+            # into a cursor prompt): ESC and a turn of search
+            self.pol.loop_ticks = 0
             self.pol.loops += 1
-            self.pol.loop_by[f"{self.pol.last_step}/{self.cur_act}"] += 1
+            self.pol.loop_by[f"{self.pol.prev_step}/{self.prev_act}"] += 1
             self.pol.loop_steps = self.steps
             self.raw_step(27); self.press("s")
             return True
+        self.pol.loop_ticks += 1
         stall = t - max(lv.last_progress, lv.entered_turn)
         if stall > 500 and t - lv.last_reset > 500:
             # forget learned obstacles: they are often transient (monsters, misreads)

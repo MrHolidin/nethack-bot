@@ -62,7 +62,8 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
           LuckstoneMixin):
-    OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
+    OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc",
+                "tty_cursor")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
                  role_opts=None, **options):
@@ -155,9 +156,11 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             self.gift_apply()
             while True:
                 t0 = self.turn()
-                self.cur_act = "other"
+                self.prev_act, self.cur_act = self.cur_act, "other"
                 self.tick()
                 dt = self.turn() - t0
+                if self.klog is not None:
+                    self.key_stats_tick(dt)
                 if dt > 0:
                     # time per activity: the label an action set (fight, rest, explore, search, ...), else the
                     # policy step that acted
@@ -178,6 +181,37 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         except GameOver:
             pass
         return self.summary()
+
+    def key_stats_tick(self, dt):
+        """key_stats: the keys of the tick just played, by activity (the time_by label), free (no turn passed) or
+        not; the tick's key sequence (runs of one key shortened) by activity."""
+        if not hasattr(self, "kstat"):
+            from collections import Counter
+            self.kstat = {"keys": Counter(), "free": Counter(), "turns": Counter(), "ticks": Counter(),
+                          "key": Counter(), "seq": Counter(), "seqk": Counter()}
+        k, ks = self.klog, self.kstat
+        act = self.cur_act if self.cur_act != "other" else (self.pol.last_step or "other")
+        ks["keys"][act] += len(k)
+        ks["turns"][act] += dt
+        ks["ticks"][act] += 1
+        if dt == 0:
+            ks["free"][act] += len(k)
+        for c in k:
+            ks["key"][c] += 1
+        s = "".join(chr(c) if 32 < c < 127 else {13: "<CR>", 27: "<ESC>", 32: "<SP>"}.get(c, f"<{c}>") for c in k)
+        s = re.sub(r"(.)\1{3,}", lambda m: f"{m.group(1)}*{len(m.group(0))}", s)[:40]
+        ks["seq"][f"{act}|{dt > 0}|{s}"] += 1
+        ks["seqk"][f"{act}|{dt > 0}|{s}"] += len(k)
+        self.klog = []
+
+    def key_stats_summary(self):
+        ks = getattr(self, "kstat", None)
+        if ks is None:
+            return {}
+        return {"key_stats": {"keys": dict(ks["keys"]), "free": dict(ks["free"]), "turns": dict(ks["turns"]),
+                              "ticks": dict(ks["ticks"]), "key": {str(c): n for c, n in ks["key"].items()},
+                              "count": dict(self.kcount),
+                              "seq": {q: [ks["seq"][q], n] for q, n in ks["seqk"].most_common(80)}}}
 
     def snapshot(self):
         """State every SNAP_EVERY turns (stats "snaps"): to see where two runs of one seed part, and in what."""
@@ -270,6 +304,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             **self.hidden_summary(),
             "mines_return_descents": self.mines.return_descents,
             "peaceful_waits": self.nav.peaceful_waits,
+            "peace_wait_blocks": self.nav.peace_wait_blocks,
             "msg_audit": dict(self.msg_audit),
             "farlooks": self.perc.farlooks,
             "peaceful_hits": dict(self.perc.peaceful_hits),
@@ -297,4 +332,5 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             "race": self.race,
             "dnum": self.bl(nh.NLE_BL_DNUM),
             "last_msgs": self.death_msgs or last,
+            **self.key_stats_summary(),
         }

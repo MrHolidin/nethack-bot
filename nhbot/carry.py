@@ -244,6 +244,11 @@ class CarryMixin:
         same = lambda it: looks[appearance(it.text)] if appearance(it.text) is not None else 1
         it = min(inv, key=lambda it: self.value_per_weight(it, same(it)))
         it = self.lift_undo(it, inv, same)
+        if self.gold_bag_stuck(it):
+            inv = [x for x in inv if x.letter != it.letter]       # the next one instead
+            if not inv:
+                return False
+            it = min(inv, key=lambda it: self.value_per_weight(it, same(it)))
         if self.gold_bag_unload(it):
             return True                      # gold_bag: the gold out of the bag first, loose gold is kept
         if it.on_body:
