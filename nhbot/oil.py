@@ -7,7 +7,8 @@ starting with an oil lamp knows it (u_init.c ini_inv) -- the game won't offer an
 thing to use or apply.", apply.c setapplyclasses): the test is over (81190 looped on it 99338 times).
 Rust: the weapon in our hands rusty or corroded, a potion of oil not known cursed -- #dip the weapon into it, one
 level of rust and one of corrosion off a dip (potion.c dodip; not burnt, not ammo; a cursed potion spills instead:
-slippery fingers, d(2,10) turns); again while some is left."""
+slippery fingers, d(2,10) turns); again while some is left. With no Excalibur (rustproof, never needs it) one stack
+of oil not known cursed is kept (carry.needed: never dropped for weight or sold)."""
 
 from collections import Counter
 
@@ -72,6 +73,17 @@ class OilMixin:
             return
         self.press(lit.letter)
         self.oil.stats["snuffed"] += 1
+
+    def oil_needed(self, it):
+        """carry.needed: it is the one stack of oil we keep (module notes)."""
+        if not self.opts.oil or it.ocls != nh.POTION_CLASS or " of oil" not in it.text:
+            return False
+        items = self.items()
+        if any("Excalibur" in x.text for x in items):
+            return False
+        keep = next((x for x in items if x.ocls == nh.POTION_CLASS and " of oil" in x.text and LIT not in x.text
+                     and not x.cursed and not x.unpaid), None)
+        return keep is not None and keep.letter == it.letter
 
     def oil_fix_step(self):
         """Housekeeping: the rusty / corroded weapon in our hands dipped into a potion of oil (module notes). True
