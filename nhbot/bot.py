@@ -52,6 +52,7 @@ from nhbot.digthrough import DigThroughMixin
 from nhbot.rockdig import RockDigMixin
 from nhbot.locktools import LockToolMixin
 from nhbot.luckstone import LuckstoneMixin
+from nhbot.tactic import TacticMixin
 
 SNAP_EVERY = 500                 # turns between state snapshots (stats "snaps")
 MAGIC_CLASSES = (nh.POTION_CLASS, nh.SCROLL_CLASS, nh.RING_CLASS, nh.WAND_CLASS, nh.AMULET_CLASS)
@@ -61,7 +62,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
           CarryMixin, PickupMixin, FocusMixin, ScrollMixin, PriceMemoryMixin, ValueMixin, WandIdMixin, DangerMixin, TinMixin, AltarMixin,
           PotionTestMixin, JewelryMixin, GiftMixin, HiddenMixin, WishMixin, BoxMixin, WandChargeMixin, ThreatMixin,
           SacrificeMixin, SokobanMixin, GoldBagMixin, VaultMixin, DiggingMixin, DigThroughMixin, RockDigMixin, LockToolMixin, PolyMixin,
-          LuckstoneMixin):
+          LuckstoneMixin, TacticMixin):
     OBS_KEYS = ("glyphs", "blstats", "message", "inv_strs", "inv_letters", "inv_oclasses", "tty_chars", "misc")
 
     def __init__(self, seed=None, character="@", verbose=False, max_steps=200_000, max_turns=None,
@@ -136,6 +137,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
         self.box_init()
         self.wishing_init()
         self.value_init()
+        self.tactic_init()
         self.policy_init()
         self.goals_init()
         self.pickup_init()
@@ -154,30 +156,39 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             self.start_ac = self.bl(nh.NLE_BL_AC)
             self.gift_apply()
             while True:
-                t0 = self.turn()
-                self.cur_act = "other"
-                self.tick()
-                dt = self.turn() - t0
-                if dt > 0:
-                    # time per activity: the label an action set (fight, rest, explore, search, ...), else the
-                    # policy step that acted
-                    act = self.cur_act if self.cur_act != "other" else (self.pol.last_step or "other")
-                    self.time_by[act] = self.time_by.get(act, 0) + dt
-                    if self.goals.chasing:
-                        self.goals.stats[self.goals.chasing]["chase_turns"] += dt
-                    lvc = self.levels.get(self.cur_key)
-                    if lvc is not None:
-                        lvc.turns_here += dt
-                        if self.cur_act == "search":
-                            lvc.search_turns += dt
-                if self.gift.stats and self.turn() // 50 != t0 // 50:
-                    self.gift_check()
-                while self.turn() >= self.next_snap:
-                    self.snaps.append(self.snapshot())
-                    self.next_snap += SNAP_EVERY
+                self.play_tick()
         except GameOver:
             pass
         return self.summary()
+
+    def play_tick(self):
+        """One tick of the game loop: the policy's tick, then its bookkeeping (after_tick)."""
+        t0 = self.turn()
+        self.cur_act = "other"
+        self.tick()
+        self.after_tick(t0)
+
+    def after_tick(self, t0):
+        """The loop's bookkeeping after a tick that began at turn t0: time per activity, the level's clocks, the gift
+        check, the snapshots. (tools/rollout finishes a tick it took over by hand, then calls this.)"""
+        dt = self.turn() - t0
+        if dt > 0:
+            # time per activity: the label an action set (fight, rest, explore, search, ...), else the
+            # policy step that acted
+            act = self.cur_act if self.cur_act != "other" else (self.pol.last_step or "other")
+            self.time_by[act] = self.time_by.get(act, 0) + dt
+            if self.goals.chasing:
+                self.goals.stats[self.goals.chasing]["chase_turns"] += dt
+            lvc = self.levels.get(self.cur_key)
+            if lvc is not None:
+                lvc.turns_here += dt
+                if self.cur_act == "search":
+                    lvc.search_turns += dt
+        if self.gift.stats and self.turn() // 50 != t0 // 50:
+            self.gift_check()
+        while self.turn() >= self.next_snap:
+            self.snaps.append(self.snapshot())
+            self.next_snap += SNAP_EVERY
 
     def snapshot(self):
         """State every SNAP_EVERY turns (stats "snaps"): to see where two runs of one seed part, and in what."""

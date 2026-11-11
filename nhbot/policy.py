@@ -26,6 +26,7 @@ STEPS = (
     "progress",          # no-time loop guard; forget obstacles / go desperate on a stalled level
     "engulfed",
     "unihorn_sick",      # food poisoning / illness: a unicorn horn before a prayer
+    "tactic",            # experiments (nhbot.tactic): a forced fight option / the rollout hook / tactic_model's choice
     "pray",              # low HP, Weak / Fainting, lycanthropy, deadly conditions
     "weight",            # a squeeze refused for our weight: shed a unit (carry.squeeze_step); never Burdened
     "perceive",          # #enhance; hostiles next to us (blind / hallucinating: only proven attackers)
@@ -161,10 +162,19 @@ class PolicyMixin:
         y, x = self.pos()
         c = Tick(bot=self, lv=lv, y=y, x=x, t=self.turn(), hp=self.bl(nh.NLE_BL_HP),
                  maxhp=self.bl(nh.NLE_BL_HPMAX), hunger=self.bl(nh.NLE_BL_HUNGER))
-        for name, step in self.steps_by_name:
+        self.run_steps(c)
+
+    def run_steps(self, c, after=None):
+        """The steps in order until one acts (its name: pol.last_step); after: only the steps that follow this one
+        (nhbot.tactic: the rest of a tick the tactic step began). True if one acted."""
+        steps = self.steps_by_name
+        if after is not None:
+            steps = steps[next(i for i, (n, _) in enumerate(steps) if n == after) + 1:]
+        for name, step in steps:
             if step(c):
                 self.pol.last_step = name
-                return
+                return True
+        return False
 
     # ------------------------------------------------------------------ emergencies
     def step_progress(self, c):
@@ -230,6 +240,9 @@ class PolicyMixin:
             self.pol.deadly_prayers += 1
             self.pray(); return True
         return False
+
+    def step_tactic(self, c):
+        return self.tactic_step(c)
 
     def step_weight(self, c):
         return self.squeeze_step(c.lv) or self.carry_drop_step()
