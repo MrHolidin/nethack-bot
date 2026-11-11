@@ -24,6 +24,11 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
+    "loop_ticks": 0,           # A/B: the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
+                               #      too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn
+    "peace_cache": 0,          # A/B: a look (';') telling a monster peaceful or not holds this many turns (0: the turn
+                               #      only) -- for the monster on that square, or followed to a square within 2 when no
+                               #      other one of its glyph is near (perception.peace_followed); looks cost 3-15 keys
     "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
                                #      "key_stats" (Bot.key_stats_tick); no effect on play
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified

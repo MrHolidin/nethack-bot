@@ -209,6 +209,7 @@ class Bot(PolicyMixin, GoalsMixin, GameMixin, ActionsMixin, MapMixin, NavMixin, 
             return {}
         return {"key_stats": {"keys": dict(ks["keys"]), "free": dict(ks["free"]), "turns": dict(ks["turns"]),
                               "ticks": dict(ks["ticks"]), "key": {str(c): n for c, n in ks["key"].items()},
+                              "count": dict(self.kcount),
                               "seq": {q: [ks["seq"][q], n] for q, n in ks["seqk"].most_common(80)}}}
 
     def snapshot(self):

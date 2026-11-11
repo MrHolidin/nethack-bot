@@ -23,6 +23,7 @@ class GameMixin:
     def game_init(self):
         self.steps = 0                   # keys sent so far
         self.klog = [] if self.opts.key_stats else None     # key_stats: the keys of this tick
+        self.kcount = Counter()          # key_stats: keys sent by describe_at ("farlook"), --More-- returns of settle
         self.last_key = None             # the key sent last (log_msg: a message NLE shows again after it)
         self.reward = 0.0
         self.done = False
@@ -98,6 +99,7 @@ class GameMixin:
             self.note_feature_here(tty if "Things that are here" in tty else self.top_line())
             if "--More--" in flat or (self.obs["misc"][2] and not menu):
                 self.log_msg(msg if msg else self.top_line().replace("--More--", ""))
+                self.kcount["more"] += 1
                 self.raw_step(13)
                 continue
             if expect_prompt:
@@ -119,12 +121,14 @@ class GameMixin:
                 if "who are you" in (msg + self.top_line()).lower():
                     self.answer_guard()                     # vault.py
                     continue
+                self.kcount["getlin_esc"] += 1
                 self.raw_step(27)
                 continue
             if id_menu:
                 self.answer_identify_menu(tty)                   # jewelry.py
                 continue
             if menu:
+                self.kcount["menu_esc"] += 1
                 self.raw_step(27)
                 continue
             self.log_msg(msg)
@@ -340,6 +344,7 @@ class GameMixin:
         the capital keys; next to us this is ";" and one direction key."""
         y, x = self.pos()
         dy, dx = pos[0] - y, pos[1] - x
+        n0 = self.steps
         self.raw_step(ord(";"))
         while dy or dx:
             sy, sx = (dy > 0) - (dy < 0), (dx > 0) - (dx < 0)
@@ -350,6 +355,8 @@ class GameMixin:
             dy, dx = dy - sy * step, dx - sx * step
         desc = self.top_line()
         self.raw_step(27)
+        self.kcount["farlook"] += self.steps - n0
+        self.kcount["farlook_far" if max(abs(pos[0] - y), abs(pos[1] - x)) > 1 else "farlook_adj"] += 1
         self.settle()
         return desc
 

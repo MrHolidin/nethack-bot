@@ -97,6 +97,10 @@ class PerceptionMixin:
             return False
         ck = (lv.key, g, pos)
         s = self.perc.peace_seen.get(ck)
+        if self.opts.peace_cache:
+            slack = max(slack, self.opts.peace_cache)
+            if s is None:
+                s = self.peace_followed(lv, g, pos)
         if s is not None and s[0] >= self.turn() - slack:
             return s[1]
         cls = self.peace_class(nh.glyph_to_mon(g))
@@ -113,7 +117,8 @@ class PerceptionMixin:
                 self.perc.empty_looks += 1
             if len(self.perc.peace_seen) > 400:
                 t = self.turn()
-                self.perc.peace_seen = {k: v for k, v in self.perc.peace_seen.items() if v[0] >= t - 2}
+                keep = max(2, self.opts.peace_cache)
+                self.perc.peace_seen = {k: v for k, v in self.perc.peace_seen.items() if v[0] >= t - keep}
             self.perc.peace_seen[ck] = (self.turn(), peaceful)
             if cls > 0 and not peaceful:
                 self.perc.peace_turned += 1
@@ -122,6 +127,27 @@ class PerceptionMixin:
                     marks.append((g, pos))           # stays hostile while we can follow it
             return peaceful
         return cls > 0
+
+    def peace_followed(self, lv, g, pos):
+        """peace_cache: what a look within the last peace_cache turns found about the monster now on pos, which has
+        moved there: the one look at a monster of its glyph within 2 squares of pos -- unless another monster of that
+        glyph in view is within 2 squares of that look's square too (which one went where is not known). Its
+        (turn, peaceful), moved to pos; None if there is no such look. A monster we took for peaceful that attacks
+        us is marked hostile anyway (msg_peace)."""
+        t0 = self.turn() - self.opts.peace_cache
+        near = [(q, v) for (k, gl, q), v in self.perc.peace_seen.items()
+                if k == lv.key and gl == g and v[0] >= t0 and q != pos
+                and max(abs(q[0] - pos[0]), abs(q[1] - pos[1])) <= 2]
+        if len(near) != 1:
+            return None
+        q, v = near[0]
+        gm = self.obs["glyphs"]
+        if any(int(gm[m]) == g and m != pos and max(abs(m[0] - q[0]), abs(m[1] - q[1])) <= 2
+               for m in self.visible_monsters()):
+            return None
+        del self.perc.peace_seen[(lv.key, g, q)]        # it left q: moved to pos
+        self.perc.peace_seen[(lv.key, g, pos)] = v
+        return v
 
     def msg_peace(self, msg, lv):
         """A monster we take for peaceful attacked us: count it (by kind), and every one of that kind next to
