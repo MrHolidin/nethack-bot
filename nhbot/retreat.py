@@ -242,12 +242,22 @@ class RetreatMixin:
         fl = self.retreat.flight
         if fl is None or fl["key"] != c.lv.key or self.opts.retreat_rest <= 0:
             return False
-        if fl["rested"] >= RETREAT_REST_MAX or not self.hp_below(self.opts.retreat_rest) \
-                or c.hunger >= HUNGRY or c.hostiles or c.vis or self.stairs_kind_here(c.lv) is None:
+        if fl["rested"] >= RETREAT_REST_MAX or not self.hp_below(self.opts.retreat_rest) or c.hostiles:
             return False
+        if c.hunger >= HUNGRY or self.stairs_kind_here(c.lv) is None:
+            self.retreat.stats["rest_no_" + ("hungry" if c.hunger >= HUNGRY else "stairs")] += 1
+            return False
+        if c.vis and self.turn() - self.combat.last_shot_turn <= 5:
+            return False                                    # shot at: the fight steps answer it
         t0 = self.turn()
         self.cur_act = "rest"
-        self.search_turns(20)
+        if c.vis:
+            # something in view, not next to us: wait a turn on the staircase rather than let explore take it back
+            # down to what we fled from (300116: down again at half HP into five hill orcs, three times)
+            self.retreat.stats["rest_waits"] += 1
+            self.press("s")
+        else:
+            self.search_turns(20)
         dt = max(1, self.turn() - t0)
         fl["rested"] += dt
         self.retreat.stats["rest_turns"] += dt
