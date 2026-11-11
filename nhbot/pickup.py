@@ -187,7 +187,7 @@ class PickupMixin:
         pieces, what carry goes for, the corpses on what our kills carried; not in a shop, not looked at yet.
         (A/B pile_one: -494 [-980, +4], median 7726 -> 7726, 67 of 1000 changed)"""
         mask = G.ARMOR_GLYPH[lv.under] | (CARRY_GLYPH | MORE_GLYPH | WANTED_WEAPON_GLYPH | ALL_GLYPH)[lv.under]
-        if self.food_count() < MAX_FOOD:
+        if self.food_count() < (self.opts.max_food or MAX_FOOD):
             mask |= G.FOOD_GLYPH[lv.under]
         for p in self.corpse_piles(lv):
             mask[p] = True
