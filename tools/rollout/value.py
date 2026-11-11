@@ -9,7 +9,10 @@ game: what it had at its death, or V(state at the window's end) if it is alive, 
     V(state) = E[J at the end of the game | turn, depth, max depth, XL, HP, max HP, AC, gold, prayers, kills]
 
 is fitted on the snapshots (every 500 turns) of baseline games (`fit`: LightGBM, squared loss -- the mean, heavy
-tail and all). Two hands of the same game that differ at the window's end in kills, XL, depth, HP or prayers used
+tail and all). value_v2 (the default) is fitted blind to the HP fraction (--no-hp): across snapshots low HP marks
+a game in trouble, and V read it as worth 0.06-0.24 J per 30 % of HP against 0.008-0.04 J per 300 turns -- by that
+exchange rate resting to full HP always pays, which the whole-game A/Bs deny (rest_frac 0.7: -418, elb_hp 0.7:
+-1209). With `settle` both hands end calm with HP >= rest_frac, where the script itself thinks HP good enough. Two hands of the same game that differ at the window's end in kills, XL, depth, HP or prayers used
 get different values; equal turn counts cancel. This is one step of fitted value iteration: V is the scripted
 policy's value, the rollout adds the option's first 300 turns in front of it.
 
@@ -24,6 +27,7 @@ import numpy as np
 
 FEATS = ("t", "depth", "max_depth", "xl", "hp_frac", "maxhp", "ac", "gold", "prayers", "kills")
 SCORE0, DEPTH0 = 27000.0, 11.0
+HP_INDEX = FEATS.index("hp_frac")
 
 
 def j_index(score, max_depth):
@@ -38,13 +42,17 @@ class Value:
     """V from its json (trees in nhbot.tacticmodel's format)."""
 
     def __init__(self, path=None):
-        path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "value_v1.json")
+        path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "value_v2.json")
         with open(path) as fh:
             spec = json.load(fh)
         assert tuple(spec["features"]) == FEATS
         self.trees = [tuple(np.asarray(t[k]) for k in "ftlrv") for t in spec["trees"]]
+        self.no_hp = bool(spec["meta"].get("no_hp"))
 
     def __call__(self, x):
+        if self.no_hp:
+            x = list(x)
+            x[HP_INDEX] = 1.0
         total = 0.0
         for f, t, l, r, v in self.trees:
             i = 0
@@ -108,6 +116,8 @@ def fit(a):
             y.append(target)
             g.append(r["seed"])
     X, y, g = np.array(X, float), np.array(y), np.array(g)
+    if a.no_hp:
+        X[:, HP_INDEX] = 1.0
     params = dict(objective="regression", learning_rate=0.05, num_leaves=16, min_data_in_leaf=200,
                   feature_fraction=0.8, bagging_fraction=0.8, bagging_freq=1, lambda_l2=10.0, verbose=-1, num_threads=8)
     te = g % 5 == 0
@@ -123,7 +133,8 @@ def fit(a):
         export_tree(t["tree_structure"], arr)
         trees.append(arr)
     with open(a.out, "w") as fh:
-        json.dump({"features": FEATS, "trees": trees, "meta": {"snapshots": len(y), "games": len(set(g)), "r2": r2}},
+        json.dump({"features": FEATS, "trees": trees,
+                   "meta": {"snapshots": len(y), "games": len(set(g)), "r2": r2, "no_hp": a.no_hp}},
                   fh, separators=(",", ":"))
     imp = sorted(zip(m.feature_importance("gain"), FEATS), reverse=True)
     print("importance (gain):", ", ".join(f"{n} {v / sum(i for i, _ in imp) * 100:.0f}%" for v, n in imp))
@@ -135,4 +146,5 @@ if __name__ == "__main__":
     ap.add_argument("cmd", choices=["fit"])
     ap.add_argument("paths", nargs="+")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--no-hp", action="store_true", help="V blind to the HP fraction (value_v2: see the docstring)")
     fit(ap.parse_args())

@@ -20,6 +20,24 @@ afterwards. Acting greedily on it is one step of policy improvement.
 | `analyze.py` | the dataset's first reading: every option against the default, paired, by scripted step / HP / win_prob; the fatal fights |
 | `rules.py` | simple rules "when <condition>, do <option>": searched on half of the games, measured on the other half |
 | `train.py` | fits the chooser (`nhbot/tacticmodel.py` reads its json) and scores it on held-out games |
+| `value.py` | a rollout's value in the session's index J for the whole game: banked at a death, V(end state) if alive (V fitted on baseline snapshots: `value_v1.json`) |
+| `horizon.py` | deaths and score of each option by turns since the decision (long rollouts), and the 300-turn label checked against the long window |
+
+## What "better" means here — read before trusting a table
+
+"Fewer deaths within 300 turns" is not "a better game". An option that postpones the fight (sit on Elbereth,
+rest) wins every fixed window it sits through, gains no experience meanwhile, and meets the same monster after
+the window. Three things guard against that, in rising order of cost:
+
+1. the tables show the score gained in the window next to the deaths;
+2. `"settle": N` lets a child play past the horizon until the fight is over (no hostile in view, off Elbereth,
+   HP >= `rest_frac`; at most N more turns), and `value.py` then values the calm end state by what such a hero
+   goes on to score (column `J x1000`);
+3. `"horizon": 3000` + `horizon.py`: play the options out for a third of a game and look at deaths and score by
+   horizon — the calibration of 1 and 2.
+
+The ground truth stays the whole-game A/B on the farm; a rollout verdict that disagrees with a whole-game result
+is a bug in the label until shown otherwise.
 
 ## Use
 
@@ -37,7 +55,7 @@ $PY -m tools.rollout.analyze /dev/shm/rl/d1
 `collect.py` re-executes itself under libfaketime with regress.py's clock. `-j` is games in parallel; the children
 of one game run one at a time (a game with rollouts uses one core), so the farm could run it too.
 
-Settings (`--cfg`, `collect.DEFAULTS`): `horizon`, `reps`, `gap` (turns between decision points), `max_dp`,
+Settings (`--cfg`, `collect.DEFAULTS`): `horizon`, `settle`, `reps`, `gap` (turns between decision points), `max_dp`,
 `max_secs` (rollout budget per game), `options` (subset), the trigger thresholds `hp_frac`, `pdeath`, `win_prob`,
 `keep` (thinning), `max_turn`.
 
