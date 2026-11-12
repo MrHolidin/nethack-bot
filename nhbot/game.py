@@ -385,7 +385,8 @@ class GameMixin:
         n0 = self.steps
         self.raw_step(ord(";"))
         keys = cursor_keys(pos[0] - y, pos[1] - x)
-        jump = self.monster_rank(pos) if self.opts.farlook_jump else None
+        # (A/B farlook_jump, accepted 2026-11-11 with loop_ticks, keys_all4_s: see options.loop_ticks)
+        jump = self.monster_rank(pos)
         if jump is not None and jump[1] < len(keys):
             for _ in range(jump[1]):
                 self.raw_step(ord(jump[0]))

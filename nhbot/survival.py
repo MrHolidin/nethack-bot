@@ -272,10 +272,12 @@ class SurvivalMixin:
             kind = name.group(1) if name else None
             if kind and kind.startswith("partly eaten "):
                 kind = kind[len("partly eaten "):]   # a meal we were interrupted in: resumed
-            if kind and self.opts.corpse_names:
+            if kind:
                 # the message is read in lower case, the kinds named with a capital were unknown to corpse_ok and
                 # never eaten: Uruk-hai, Mordor orc, Woodland- / Green- / Grey-elf (base_d1, games past Dlvl 8:
                 # 0 of 1435 Uruk-hai, 0 of 1125 Mordor orcs, 0 of 496 elves; hill orcs 40 % -- ~600 nutrition a game)
+                # (A/B corpse_names, a bug fix: on base D1 +3017 [+802, +5282], depth +0.490; on gen1 D1 +4703
+                # [-347, +10083], depth +0.236)
                 kind = PM_LOWER.get(kind, kind)
             if kind and self.corpse_ok(kind):
                 seq0 = self.msg_seq

@@ -270,7 +270,7 @@ class ValueMixin:
             n += base_name(it.text)[0]
         n = 0
         for _, it in sorted(food, key=lambda c: c[0]):
-            if n >= (self.opts.max_food or MAX_FOOD):
+            if n >= MAX_FOOD:
                 break
             plan.setdefault(it.letter, "food")
             n += base_name(it.text)[0]

@@ -1,11 +1,13 @@
-"""Every tunable option of the bot, with its default.
+"""Every tunable option of the bot, with its default: experiments and A/B flags (all off), HP thresholds,
+parameters (the accepted values, with the A/B that set them).
 
 Bot(role_opts={...}) and extra Bot keyword arguments override these (eval.py --kw accepts both forms);
 an unknown name raises, so a typo cannot silently run the default configuration.
 """
 
 DEFAULTS = {
-    # ---- off by default (accepted features are plain behaviour, not options)
+    # ---- experiments and A/B flags, all off (accepted features are plain behaviour, not options; their A/B result
+    #      is a comment at the code)
     "sacrifice": False,        # A/B: a neutral hero offers fresh corpses of its kills at a neutral altar, carried there
                                #      in time (nhbot.sacrifice: Mjollnir, the Valkyrie's first gift)
     "sokoban": False,          # A/B: up into Sokoban from the level below the Oracle (full HP), its four levels solved
@@ -17,107 +19,24 @@ DEFAULTS = {
                                #      mattock, wand of digging) and walked round; a boulder that won't move -- broken
                                #      with the pick-axe / mattock (nhbot.digthrough); not in Sokoban, Minetown (but
                                #      Orcish Town: its watch is dead), by shops
-    "stair_refuse": False,     # A/B: "You can't go down here" clears a staircase remembered in the terrain layer under an
-                               #      item too (not only a shown one): no '>' pressed again and again for no time
-    "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side / dead end
-                               #      of the known map gets a predicted chance (hidden.hidden_prob), lowered by every
-                               #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
+    "stair_refuse": False,     # A/B: "You can't go down here" clears a staircase remembered in the terrain layer
+                               #      under an item too (not only a shown one): no '>' pressed again and again for no
+                               #      time
+    "search_v2": False,        # A/B: search where a hidden passage is likeliest per turn spent: each room side /
+                               #      dead end of the known map gets a predicted chance (hidden.hidden_prob), lowered
+                               #      by every search next to it (1 - 1/7 a turn); walking there counted
+                               #      (hidden.search_v2_goal)
+    "dip_mines": False,        # A/B: the Mines' fountains that no watch minds -- Mines' End's, Orcish Town's -- used
+                               #      too (excalibur.fountains); a watched Minetown's never (Excalibur there angers the
+                               #      watch)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    "corpse_names": True,      # accepted 2026-11-12 (old base D1: +3017 [+802, +5282], depth +0.490; on gen1 D1: +4703
-                               #      [-347, +10083], depth +0.236): a plain bug fix. the corpse we stand on is known by its kind's own name -- "uruk-hai" read from
-                               #      the lowercased question was no kind: Uruk-hai, Mordor orcs, elves never eaten
-    "max_food": 0,             # A/B: pieces of food kept in the pack and fetched from the floor (0: pickup.MAX_FOOD,
-                               #      6) -- food is what a hold at the pace gate lives on
-    "mines_end_xl": 0,         # A/B: below this XL no descent below Minetown: done there, we climb out of the Mines
-                               #      (mines_return "weak"; they are finished then) -- 99: never to Mines' End
-    "pace": None,              # A/B: the strength gate on the stairs down (nhbot.pace): a list of [depth, XL] -- no
-                               #      descent to that depth or deeper below that experience level; we wait on the
-                               #      staircase instead (counted searches), e.g. [[5, 6], [8, 8], [11, 10]]
-    "pace_wait": 3000,         # with pace: turns at most on one level since its gate first closed (then it opens);
-                               #      an entry [depth, XL, turns] of the schedule has its own
-    "pace_food": 0,            # with pace: the gate is open while our estimated nutrition is below this (0: only when
-                               #      Weak) -- 200 leaves before Hungry, the food we carry uneaten
-    "pace_ac": 0.0,            # with pace: the gate compares XL - pace_ac * AC with the schedule (0.5: two points of
-                               #      AC below zero count as an experience level)
-    "pace_pray": 0,           # with pace_food: ... unless the prayer for hunger we then come to will be at least this
-                               #      many turns after the last one (0: never count on a prayer)
-    "pace_patrol": 0,         # with pace: gated, a walk to a far square of the level and back every this many turns
-                               #      (0: never) -- it brings out the monsters that stand behind walls
-    "pace_spot": False,        # with pace: the hold is on a corridor square / in an open door by the stairs, where
-                               #      at most two monsters reach us at once, not on the staircase in the open
-    "pace_retreat": 0,         # A/B: from this depth on, a level with no way down found (Medusa's island) is left by
-                               #      the stairs up after 200 turns of searching: we hold for good on the level above
-    "loop_ticks": 20,          # A/B: the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
-                               #      too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn;
-                               #      accepted 2026-11-11, keys_all4_s vs base_d1, 500 games: keys/game 20134 -> 12753,
-                               #      CPU 86 -> 35 s, depth +0.410 [+0.026, +0.772], score +791 [-1880, +3455],
-                               #      truncated 7 -> 0
-    "peace_cache": 20,         # A/B: a look (';') telling a monster peaceful or not holds this many turns (0: the turn
-                               #      only) -- for the monster on that square, or followed to a square within 2 when no
-                               #      other one of its glyph is near (perception.peace_followed); looks cost 3-15 keys;
-                               #      accepted with loop_ticks (keys_all4_s)
-    "elb_rest_count": 20,      # A/B: resting on our Elbereth with nothing in view, search this many turns at once
-                               #      ("20s"; the game stops it for a monster that ignores Elbereth) instead of one a tick
-                               #      with a ':' read every 4 (0: off); accepted with loop_ticks (keys_all4_s)
-    "peace_wait_max": 20,      # A/B: a peaceful monster in our way waited for this many turns in a row -- its square
-                               #      shut (Level.blocked) and the path goes round (nav.move; 0: wait for ever);
-                               #      accepted with loop_ticks (keys_all4_s)
-    "farlook_jump": True,      # A/B: a farlook's cursor jumps to the monster with 'm' / 'M' when that takes fewer keys
-                               #      (game.describe_at, monster_rank); not neutral: other squares are described on the way
-                               #      (accepted with loop_ticks: keys_all4_s)
-    "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick -> summary
-                               #      "key_stats" (Bot.key_stats_tick); no effect on play
-    "medusa_dig": False,       # A/B: on Medusa's level (water, Dlvl 21-28, no way down) a hole dug through the floor on a
-                               #      square with no water around it (pick-axe, mattock, wand of digging), past her
-                               #      island; the stairs back up to her level never taken (nhbot.deep)
-    "medusa_dive": False,      # A/B, with medusa_dig: below Medusa's level no exploring (mazes, minotaurs) -- the next
-                               #      hole at once, down to the Castle
-    "dead_end_patrol": True,   # A/B: at Medusa's level with no hole to dig, and at the Castle: no searching of walls --
-                               #      back up the stairs and a patrol of the level above for the rest of the game
-                               #      (nhbot.deep); accepted 2026-11-11, D1, 1000 games (133 seeds replayed):
-                               #      score +4776 [+3784, +5809], depth -0.002
-    "patrol_rise": 0,          # with dead_end_patrol: the patrol is this many levels above the level over the dead
-                               #      end (weaker random monsters: makemon.c rndmonst, (depth + XL) / 2)
-    "patrol_stale": 400,       # with dead_end_patrol: a square not within 2 squares of us for this many turns is
-                               #      walked to again; nothing that old in reach: a counted search
-    "patrol_look": 0,          # with dead_end_patrol: on the patrol level a look (';') at a far monster only every
-                               #      this many turns (0 / 1: every tick, as elsewhere)
-    "patrol_hp": 0.0,          # with dead_end_patrol: below this share of max HP, nothing in view, the patrol rests
-                               #      (0: only step_rest's rest_frac)
-    "dip_pray": 500,           # A/B: dip into a fountain (any reason) only this many turns after the last prayer (none
-                               #      yet: from turn 100) and with the god not angry -- the prayer is the rescue from
-                               #      the water demon (excalibur.dip_prayer_ok); 0: off. 500 = survival.can_pray's gap;
-                               #      accepted 2026-11-11 with dip_elb 1.01, fountain_both3_s vs base_d1, 500 games:
-                               #      score +2526 [+59, +5055], depth +0.646 [+0.336, +0.952], fountain deaths 50 -> 31
-    "dip_elb": 1.01,           # A/B: a dip let out water moccasins, or a water demon we beat with P below this
-                               #      (danger.win_prob): off the fountain, Elbereth, hold it while they are in view
-                               #      (excalibur.step_fountain_trouble); 0: off, 1.01: against every demon;
-                               #      accepted with dip_pray (fountain_both3_s)
-    "dip_mines": False,        # A/B: the Mines' fountains that no watch minds -- Mines' End's, Orcish Town's -- used too
-                               #      (excalibur.fountains); a watched Minetown's never (Excalibur there angers the watch)
-    "dip_hold": 200,           # with dip_elb: turns at most holding that Elbereth
-    "retreat": True,           # accepted 2026-11-12 (old base D2: +3168 [+2381, +3981], depth +0.506; on gen1 D1: +2975
-                               #      [+1601, +4475], depth +0.182): leave a melee fight we are losing (prayer not available, HP below retreat_hp,
-                               #      win_prob below retreat_win): by the stairs, Elbereth, an escape item (nhbot.retreat)
-    "retreat_hp": 0.5,         # with retreat: losing only below this fraction of max HP
-    "retreat_win": 0.5,        # ... and danger.win_prob of the fight next to us below this
-    "retreat_pp_window": 0,    # ... for this many turns after a prayer (0: none) the thresholds below instead
-    "retreat_pp_hp": 0.7,
-    "retreat_pp_win": 0.8,
-    "retreat_far": 30,         # path cost at most to a staircase when no chaser is faster than us
-    "retreat_near": 3,         # ... when one is
-    "retreat_cool": 30,        # turns after a flight a stalker followed: no stairs again
-    "retreat_rest": 0.9,       # after a flight: rest on the arrival staircase up to this fraction of max HP (0: off)
-    "retreat_elb": True,       # Elbereth when only class-C monsters (may carry missiles / wands) block it
-    "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
-                               #      (nhbot.gift)
-    "tactic_model": "data/rule_r1.json",   # accepted 2026-11-12 with rule R1 -- Elbereth when mobbed and losing (on gen1
-                               #      D1: +5781 [+3196, +8424], depth +0.630 [+0.422, +0.850]); None: off. the fight's tactical option (melee / pray / Elbereth / potion / wand / stairs /
-                               #      retreat) chosen by a model trained on counterfactual rollouts (nhbot.tactic,
-                               #      tools/rollout): the path of its weights file, relative to nhbot/
-    "rollout": None,           # experiments: counterfactual rollouts by fork at the fight's decision points, written to
-                               #      <out>/<seed>.jsonl (tools/rollout): {"out": DIR, ...collect.DEFAULTS}
+    "key_stats": False,        # experiments: keys sent per activity, the keys and the key sequences of a tick ->
+                               #      summary "key_stats" (Bot.key_stats_tick, tools/keytrace.py); no effect on play
+    "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start,
+                               #      identified (nhbot.gift)
+    "rollout": None,           # experiments: counterfactual rollouts by fork at the fight's decision points, written
+                               #      to <out>/<seed>.jsonl (tools/rollout): {"out": DIR, ...collect.DEFAULTS}
     # ---- HP thresholds (fractions of max HP; Bot.hp_below)
     "rest_frac": 0.7,          # rest (search 20) below this with nothing in view; rest on our Elbereth below it too
                                #      (accepted 2026-11-11, 0.5 -> 0.7, orc_rest70_s vs base_d1, 500 games: score +3487
@@ -133,6 +52,48 @@ DEFAULTS = {
     "wandid_hp": 0.6,          # engrave-test a wand only from this on
     "excal_hp": 0.7,           # Excalibur trip / dip only from this on
     # ---- parameters
+    "loop_ticks": 20,          # the no-time loop guard (policy.step_progress) fires after this many ticks in one turn
+                               # too, not only after 300 keys (0: off) -- a no-time loop spent up to 300 keys a turn;
+                               # accepted 2026-11-11, keys_all4_s vs base_d1, 500 games: keys/game 20134 -> 12753,
+                               # CPU 86 -> 35 s, depth +0.410 [+0.026, +0.772], score +791 [-1880, +3455],
+                               # truncated 7 -> 0
+    "peace_cache": 20,         # a look (';') telling a monster peaceful or not holds this many turns (0: the turn
+                               # only) -- for the monster on that square, or followed to a square within 2 when no
+                               # other one of its glyph is near (perception.peace_followed); looks cost 3-15 keys;
+                               # accepted with loop_ticks (keys_all4_s)
+    "elb_rest_count": 20,      # resting on our Elbereth with nothing in view, search this many turns at once ("20s";
+                               # the game stops it for a monster that ignores Elbereth) instead of one a tick with a
+                               # ':' read every 4 (0: off); accepted with loop_ticks (keys_all4_s)
+    "peace_wait_max": 20,      # a peaceful monster in our way waited for this many turns in a row -- its square shut
+                               # (Level.blocked) and the path goes round (nav.move; 0: wait for ever); accepted with
+                               # loop_ticks (keys_all4_s)
+    "patrol_stale": 400,       # the dead-end patrol (nhbot.deep): a square not within 2 squares of us for this many
+                               # turns is walked to again; nothing that old in reach: a counted search
+    "dip_pray": 500,           # dip into a fountain (any reason) only this many turns after the last prayer (none yet:
+                               # from turn 100) and with the god not angry -- the prayer is the rescue from the water
+                               # demon (excalibur.dip_prayer_ok); 0: off. 500 = survival.can_pray's gap; accepted
+                               # 2026-11-11 with dip_elb 1.01, fountain_both3_s vs base_d1, 500 games: score +2526
+                               # [+59, +5055], depth +0.646 [+0.336, +0.952], fountain deaths 50 -> 31
+    "dip_elb": 1.01,           # a dip let out water moccasins, or a water demon we beat with P below this
+                               # (danger.win_prob): off the fountain, Elbereth, hold it while they are in view
+                               # (excalibur.step_fountain_trouble); 0: off, 1.01: against every demon; accepted with
+                               # dip_pray (fountain_both3_s)
+    "dip_hold": 200,           # with dip_elb: turns at most holding that Elbereth
+    "retreat_hp": 0.5,         # retreat (nhbot.retreat): losing only below this fraction of max HP
+    "retreat_win": 0.5,        # ... and danger.win_prob of the fight next to us below this
+    "retreat_pp_window": 0,    # ... for this many turns after a prayer (0: none) the thresholds below instead
+    "retreat_pp_hp": 0.7,
+    "retreat_pp_win": 0.8,
+    "retreat_far": 30,         # path cost at most to a staircase when no chaser is faster than us
+    "retreat_near": 3,         # ... when one is
+    "retreat_cool": 30,        # turns after a flight a stalker followed: no stairs again
+    "retreat_rest": 0.9,       # after a flight: rest on the arrival staircase up to this fraction of max HP (0: off)
+    "retreat_elb": True,       # Elbereth when only class-C monsters (may carry missiles / wands) block it
+    "tactic_model": "data/rule_r1.json",   # the fight's tactical option (melee / pray / Elbereth / potion / wand /
+                               # stairs / retreat) chosen by a model trained on counterfactual rollouts (nhbot.tactic,
+                               # tools/rollout): the path of its weights file, relative to nhbot/; None: off.
+                               # accepted 2026-11-12 with rule R1 -- Elbereth when mobbed and losing (on gen1 D1:
+                               # +5781 [+3196, +8424], depth +0.630 [+0.422, +0.850])
     "pray_gap": 500,           # turns since the last prayer before praying for HP (A/B pray500, 1000 -> 500: +639
                                # [+75, +1200], median 7726 -> 8016, 170 of 1000 changed)
     "hunger_gap": 500,         # ... before praying when Weak

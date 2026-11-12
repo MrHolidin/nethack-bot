@@ -77,18 +77,9 @@ class ExploreMixin:
             self.mines_return_start(lv, "no_town")
             if self.mines_return_step(lv, grids):
                 return
-        if want_down and lv.key[0] == 2 and self.mines.minetown_seen and not self.mines.return_on \
-                and self.bl(nh.NLE_BL_XP) < self.opts.mines_end_xl:
-            # mines_end_xl: Minetown seen, done here, and not strong enough for the levels below it (base_d1: 37 %
-            # of the games that go below Minetown die there, 16 % of all games) -- back to the main dungeon
-            self.mines_return_start(lv, "weak")
-            if self.mines_return_step(lv, grids):
-                return
-        if want_down \
-                and (on_level <= self.opts.descend_after or self.pace_holding(lv)):
+        if want_down and on_level <= self.opts.descend_after:
             # explored, but something worth having still lies here: the same goals the target step below
             # will walk to (gold, armor/food/carry piles not yet inspected), so holding off is never idle
-            # (held at the pace gate: at any time -- what our kills there drop)
             stuff = np.zeros_like(gold)
             for kind, m in self.goal_masks(lv, passable, gold).items():
                 if kind in GOALS and GOALS[kind].holds_descent:
@@ -148,8 +139,6 @@ class ExploreMixin:
         # nothing left: map the level if we can, else search for hidden passages
         if self.magic_map_step(lv):
             return
-        if self.pace_retreat_step(lv, grids):
-            return
         self.search_mode(lv, grids)
 
     def revisit_up(self, lv, grids):
@@ -174,17 +163,10 @@ class ExploreMixin:
             return True
         return bool(up.any()) and self.walk_to(lv, up, act="revisit", grids=grids)[0] == "moved"
 
-    def go_down(self, lv, grids, downstairs, known=False):
-        """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest.
-        pace: not strong enough yet for the next depth (pace_gate) -- wait on it; known: the way to a level we
-        have been on (level_travel_step), no gate."""
+    def go_down(self, lv, grids, downstairs):
+        """On a down staircase: take it (after waiting a few turns for the pet); else step toward the nearest."""
         start = self.pos()
-        gated = not known and self.pace_gate(lv)
-        if gated and (self.pace_patrol_step(lv, grids) or self.pace_spot_step(lv, grids, downstairs)):
-            return True
         if downstairs[start]:
-            if gated:
-                return self.pace_wait(lv)
             if self.pet_wait_before_stairs():
                 self.press("s")
                 return True
@@ -272,12 +254,11 @@ class ExploreMixin:
                     out.add(q)
         return out - lv.not_stairs
 
-    def stairs_step(self, lv, grids, mask, key, max_cost=10_000, known=False):
-        """To a staircase of mask and take it (down: go_down, with its pet wait and rest -- and the pace gate
-        unless the level below is known; up: within max_cost). The game saying there is none here: the square is
+    def stairs_step(self, lv, grids, mask, key, max_cost=10_000):
+        """To a staircase of mask and take it (down: go_down, with its pet wait and rest; up: within max_cost). The game saying there is none here: the square is
         noted (Level.not_stairs) -- no turn passed. True if it acted."""
         if key == ">":
-            if not self.go_down(lv, grids, mask, known=known):
+            if not self.go_down(lv, grids, mask):
                 return False
         elif mask[self.pos()]:
             self.take_stairs("<")
@@ -313,8 +294,7 @@ class ExploreMixin:
         self.cur_act = act
         if mask[self.pos()]:
             self.mines_trip_stat(stat + ("_up" if up_way else "_down"))
-        return self.stairs_step(lv, grids, mask, "<" if up_way else ">", max_cost=max_cost,
-                                known=nxt in self.levels)
+        return self.stairs_step(lv, grids, mask, "<" if up_way else ">", max_cost=max_cost)
 
     def magic_map_step(self, lv):
         if lv.mapped:

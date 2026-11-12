@@ -1,4 +1,7 @@
-"""retreat: leave a melee fight we are losing instead of trading blows to the end (option `retreat`, off by default).
+"""retreat: leave a melee fight we are losing instead of trading blows to the end.
+
+Accepted 2026-11-12 (A/B retreat: on base D2 +3168 [+2381, +3981], depth +0.506; on gen1 D1 +2975 [+1601, +4475],
+depth +0.182). Thresholds and limits: the retreat_* options.
 
 Why: in the baseline about half of all deaths come with the prayer on timeout, a median of 40 turns after it: the
 prayer gave the HP back, the bot fought on against the same monsters and lost (auto/notes/diag.md on a/diag).
@@ -105,8 +108,6 @@ class RetreatMixin:
     # ------------------------------------------------------------------ the step
     def step_retreat(self, c):
         """policy step "retreat" (after wands, before melee). True if it acted."""
-        if not self.opts.retreat:
-            return False
         lv = c.lv
         if self.retreat_rest_step(c):
             return True
@@ -309,8 +310,6 @@ class RetreatMixin:
 
     # ------------------------------------------------------------------ summary
     def retreat_summary(self):
-        if not self.opts.retreat:
-            return {}
         out = dict(self.retreat.stats)
         if self.done and not self.truncated and self.retreat.last_act is not None:
             out["died_after"] = int(self.turn() - self.retreat.last_act <= 50)
