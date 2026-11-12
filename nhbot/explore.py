@@ -313,10 +313,10 @@ class ExploreMixin:
         return False
 
     def pet_gone_wait_step(self):
-        """A/B pet_gone_wait: the pet was in view a turn ago and is not now -- wait for it on the spot ("s"), up to
-        PET_GONE_WAIT turns, till it shows again (once per time it goes out of view). True if it waited."""
-        if not self.opts.pet_gone_wait:
-            return False
+        """The pet was in view a turn ago and is not now -- wait for it on the spot ("s"), up to PET_GONE_WAIT turns,
+        till it shows again (once per time it goes out of view; A/B pet_gone_wait, 82k: +536 [-1660, +2679], median
+        8545 -> 9504, dead before turn 3000 164 -> 116, the pet last seen median turn 876 -> 2094; accepted). True if
+        it waited."""
         t, last, st = self.turn(), self.pol.pet_last_seen, self.expl
         if last == t or last == 0:
             return False                      # in view, or never had one

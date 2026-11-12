@@ -1,4 +1,5 @@
-"""oil (A/B, off by default): potions of oil told apart and used on rust.
+"""Potions of oil told apart and used on rust (A/B oil: 81k -1181 [-2307, -45], 82k +1328 [+224, +2406] -- the games
+only lighting one, 2 turns, swing with chance; the games mending: +441 / +452, median +1739 / +3014; accepted).
 Test: with nothing hostile in view (a housekeeping job), every unidentified potion of ours of a look not yet tried is
 applied -- only oil can be (apply.c doapply: any other potion is "Sorry, I don't know how to use that.", no time
 taken); oil lights ("You light ... potion", the type made known: apply.c light_cocktail) and is snuffed at once by a
@@ -40,7 +41,7 @@ class OilMixin:
 
     def oil_test_step(self):
         """Housekeeping: apply the untried unidentified potions (module notes). True if it used game time."""
-        if not self.opts.oil or self.oil.known:
+        if self.oil.known:
             return False
         for it in self.items():
             if it.ocls != nh.POTION_CLASS or it.unpaid:
@@ -76,7 +77,7 @@ class OilMixin:
 
     def oil_needed(self, it):
         """carry.needed: it is the one stack of oil we keep (module notes)."""
-        if not self.opts.oil or it.ocls != nh.POTION_CLASS or " of oil" not in it.text:
+        if it.ocls != nh.POTION_CLASS or " of oil" not in it.text:
             return False
         items = self.items()
         if any("Excalibur" in x.text for x in items):
@@ -88,8 +89,6 @@ class OilMixin:
     def oil_fix_step(self):
         """Housekeeping: the rusty / corroded weapon in our hands dipped into a potion of oil (module notes). True
         if it used the turn."""
-        if not self.opts.oil:
-            return False
         weapon = next((it for it in self.items() if it.wielded), None)
         if weapon is None or not any(w in weapon.text for w in ERODED_WORDS) \
                 or not (weapon.ocls == nh.WEAPON_CLASS or weapon.ocls == nh.TOOL_CLASS and "pick-axe" in weapon.text) \

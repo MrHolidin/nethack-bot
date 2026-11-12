@@ -52,7 +52,7 @@ STEPS = (
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
-    "pet_gone_wait",     # pet_gone_wait: the pet just went out of view -- wait for it (explore.pet_gone_wait_step)
+    "pet_gone_wait",     # the pet just went out of view -- wait for it (explore.pet_gone_wait_step)
     "dig_through",       # dig_through: the corner of a refused squeeze / a boulder that won't move, dug (nhbot.digthrough)
     "rock_dig",          # gold / gems seen inside rock dug out (nhbot.rockdig)
     "ammo_here",
@@ -82,8 +82,8 @@ HOUSEKEEPING = (
                                                                                     # level is solved
     ("lamp", lambda b, c: not b.soko_stealth(c.lv) and b.lamp_step()),              # no lamp's djinni by a sleeping zoo
     ("read_scroll", lambda b, c: b.read_scroll_step(c.lv)),
-    ("oil_fix", lambda b, c: b.oil_fix_step()),           # oil: the rusty weapon in hand dipped into oil
-    ("oil_test", lambda b, c: b.oil_test_step()),         # oil: untried potions applied (only oil lights)
+    ("oil_fix", lambda b, c: b.oil_fix_step()),           # the rusty weapon in hand dipped into oil (nhbot.oil)
+    ("oil_test", lambda b, c: b.oil_test_step()),         # untried potions applied: only oil lights (nhbot.oil)
     ("jewelry_id", lambda b, c: b.jewelry_id_step(c.lv)),
     ("wandid", lambda b, c: b.wandid_step(c.lv)),
     ("quaff_test", lambda b, c: b.quaff_test_step(c.lv)),

@@ -275,7 +275,7 @@ class CarryMixin:
         if c == nh.POTION_CLASS and self.potion_100(s):
             return True                      # maybe healing / extra healing -- kept for quaff_test
         if c == nh.POTION_CLASS and self.oil_needed(it):
-            return True                      # oil: one stack of oil against rust while we have no Excalibur
+            return True                      # one stack of oil against rust while we have no Excalibur (nhbot.oil)
         bag = self.gold_bag() if c == nh.TOOL_CLASS else None
         if bag is not None and bag.letter == it.letter:
             return True                      # gold_bag: the bag our gold goes in (nhbot.goldbag)
