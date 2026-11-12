@@ -24,7 +24,8 @@ DEFAULTS = {
                                #      search next to it (1 - 1/7 a turn); walking there counted (hidden.search_v2_goal)
     "search_log": False,       # experiments: at the first search on a level, the hidden-passage candidates of the
                                #      known map with features and true labels -> summary "search_log" (nhbot.hidden)
-    "corpse_names": False,     # A/B: the corpse we stand on is known by its kind's own name -- "uruk-hai" read from
+    "corpse_names": True,      # accepted 2026-11-12 (old base D1: +3017 [+802, +5282], depth +0.490; on gen1 D1: +4703
+                               #      [-347, +10083], depth +0.236): a plain bug fix. the corpse we stand on is known by its kind's own name -- "uruk-hai" read from
                                #      the lowercased question was no kind: Uruk-hai, Mordor orcs, elves never eaten
     "max_food": 0,             # A/B: pieces of food kept in the pack and fetched from the floor (0: pickup.MAX_FOOD,
                                #      6) -- food is what a hold at the pace gate lives on
@@ -96,7 +97,8 @@ DEFAULTS = {
     "dip_mines": False,        # A/B: the Mines' fountains that no watch minds -- Mines' End's, Orcish Town's -- used too
                                #      (excalibur.fountains); a watched Minetown's never (Excalibur there angers the watch)
     "dip_hold": 200,           # with dip_elb: turns at most holding that Elbereth
-    "retreat": False,          # A/B: leave a melee fight we are losing (prayer not available, HP below retreat_hp,
+    "retreat": True,           # accepted 2026-11-12 (old base D2: +3168 [+2381, +3981], depth +0.506; on gen1 D1: +2975
+                               #      [+1601, +4475], depth +0.182): leave a melee fight we are losing (prayer not available, HP below retreat_hp,
                                #      win_prob below retreat_win): by the stairs, Elbereth, an escape item (nhbot.retreat)
     "retreat_hp": 0.5,         # with retreat: losing only below this fraction of max HP
     "retreat_win": 0.5,        # ... and danger.win_prob of the fight next to us below this
@@ -110,7 +112,8 @@ DEFAULTS = {
     "retreat_elb": True,       # Elbereth when only class-C monsters (may carry missiles / wands) block it
     "gift": None,              # experiments: item names (wish syntax) put into the inventory at the start, identified
                                #      (nhbot.gift)
-    "tactic_model": None,      # A/B: the fight's tactical option (melee / pray / Elbereth / potion / wand / stairs /
+    "tactic_model": "data/rule_r1.json",   # accepted 2026-11-12 with rule R1 -- Elbereth when mobbed and losing (on gen1
+                               #      D1: +5781 [+3196, +8424], depth +0.630 [+0.422, +0.850]); None: off. the fight's tactical option (melee / pray / Elbereth / potion / wand / stairs /
                                #      retreat) chosen by a model trained on counterfactual rollouts (nhbot.tactic,
                                #      tools/rollout): the path of its weights file, relative to nhbot/
     "rollout": None,           # experiments: counterfactual rollouts by fork at the fight's decision points, written to
