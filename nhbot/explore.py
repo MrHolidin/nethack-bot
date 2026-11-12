@@ -14,12 +14,16 @@ from nhbot.goals import GOALS
 REST_DESCEND_MAX = 600      # ... at most this many turns a level
 
 
+PET_GONE_WAIT = 10          # pet_gone_wait: turns at most waiting for a pet that just went out of view
+
 class ExploreState:
     """State of exploring and descending (ExploreMixin)."""
     def __init__(self):
         self.maps_read = 0
         self.pet_waits = 0
         self.pet_waited_total = 0
+        self.pet_gone = None        # pet_gone_wait: (turn the pet was last seen, turn we began waiting)
+        self.pet_gone_waits = 0
         self.descent_rest = Counter()    # level key -> turns rested on its down staircase
         self.items_first_holds = 0       # descents held for an item goal still on the level
         self.revisit_done = set()        # revisit_up: level keys we climbed back to
@@ -307,6 +311,25 @@ class ExploreMixin:
             self.expl.maps_read += 1
             return True
         return False
+
+    def pet_gone_wait_step(self):
+        """A/B pet_gone_wait: the pet was in view a turn ago and is not now -- wait for it on the spot ("s"), up to
+        PET_GONE_WAIT turns, till it shows again (once per time it goes out of view). True if it waited."""
+        if not self.opts.pet_gone_wait:
+            return False
+        t, last, st = self.turn(), self.pol.pet_last_seen, self.expl
+        if last == t or last == 0:
+            return False                      # in view, or never had one
+        if st.pet_gone is None or st.pet_gone[0] != last:
+            if last < t - 1:
+                return False                  # not gone just now
+            st.pet_gone = (last, t)
+        if t - st.pet_gone[1] >= PET_GONE_WAIT:
+            return False
+        self.cur_act = "pet_wait"
+        st.pet_gone_waits += 1
+        self.press("s")
+        return True
 
     def pet_wait_before_stairs(self):
         """True if we should wait a turn on the stairs for a nearby pet."""

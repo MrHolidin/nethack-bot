@@ -52,6 +52,7 @@ STEPS = (
     "hunt_shooter",
     "rest_on_elbereth",
     "throw_at_blocker",  # missiles at monsters we never melee, in a clear line
+    "pet_gone_wait",     # pet_gone_wait: the pet just went out of view -- wait for it (explore.pet_gone_wait_step)
     "dig_through",       # dig_through: the corner of a refused squeeze / a boulder that won't move, dug (nhbot.digthrough)
     "rock_dig",          # gold / gems seen inside rock dug out (nhbot.rockdig)
     "ammo_here",
@@ -374,6 +375,9 @@ class PolicyMixin:
         self.cur_act = "rest"
         self.search_turns(20)
         return True
+
+    def step_pet_gone_wait(self, c):
+        return self.pet_gone_wait_step()
 
     def step_throw_at_blocker(self, c):
         """Ranged attacks on things we refuse to melee."""
