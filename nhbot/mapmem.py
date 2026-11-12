@@ -247,6 +247,7 @@ class MapMixin:
         # stationary dangerous monsters block
         for (y, x) in self.perc.avoid_cells:
             p[y, x] = False
+        self.deep_passable(lv, p)            # no holes / trap doors on the patrol level (nhbot.deep)
         return p
 
     def shop_floor(self, lv):
@@ -381,6 +382,7 @@ class MapMixin:
         mask = (self.kinds(lv) if k_mem is None else k_mem) == kind
         for p in lv.not_stairs:
             mask[p] = False
+        self.deep_stairs(lv, kind, mask)     # never onto Medusa's island, never down from the patrol (nhbot.deep)
         return mask
 
     def stairs_kind_here(self, lv):

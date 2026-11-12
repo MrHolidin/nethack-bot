@@ -31,6 +31,8 @@ class ExploreMixin:
         self.expl = ExploreState()
 
     def explore(self, lv):
+        if self.deep_explore(lv):             # Medusa's level: back up at once (nhbot.deep)
+            return
         self.cur_act = "explore"
         self.goal_observe(lv)
         k_mem, k_live, passable = grids = self.grids(lv)
@@ -147,6 +149,8 @@ class ExploreMixin:
         per level. True if it used the turn. (A/B revisit_up: +194 [-1192, +1616] on 79k with 2 crashes in other
         code, fixed at 10c24b1 -- +431 with those two games replayed; in the 379 games it fired median +2343;
         accepted, the user's decision.)"""
+        if self.deep_up_closed(lv):           # the stairs up end on Medusa's island (nhbot.deep)
+            return False
         if self.mines.return_on or lv.key[1] <= 1:
             return False
         above = (lv.key[0], lv.key[1] - 1)
@@ -196,6 +200,8 @@ class ExploreMixin:
         return not frontier.any() or on_level > self.opts.descend_after
 
     def search_mode(self, lv, grids):
+        if self.dead_end_step(lv, grids):     # Medusa's level, the Castle: the patrol, no walls searched (nhbot.deep)
+            return
         k_mem, k_live, passable = grids
         if self.opts.search_log:
             self.search_log_note(lv, k_mem)
@@ -255,8 +261,9 @@ class ExploreMixin:
         return out - lv.not_stairs
 
     def stairs_step(self, lv, grids, mask, key, max_cost=10_000):
-        """To a staircase of mask and take it (down: go_down, with its pet wait and rest; up: within max_cost). The game saying there is none here: the square is
-        noted (Level.not_stairs) -- no turn passed. True if it acted."""
+        """To a staircase of mask and take it (down: go_down, with its pet wait and rest; up: within max_cost). The
+        game saying there is none here: the square is noted (Level.not_stairs) -- no turn passed. True if it
+        acted."""
         if key == ">":
             if not self.go_down(lv, grids, mask):
                 return False

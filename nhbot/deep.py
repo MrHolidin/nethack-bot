@@ -29,9 +29,9 @@ patrol_hp (it rests while hurt), patrol_look (far looks only every n-th turn) we
 by default. dead_end_dive and the farm_dlvl / farm_keys probe read the evaluation's key budget: no play may
 (owner's rule).
 
-The steps hang on methods explore calls, overridden here (the mixin comes first in Bot): explore itself, search_mode
--- the dead end is told where explore has nothing left but walls to search --, stairs_mask, passable_grid and
-revisit_up.
+The steps hang on hooks in the methods explore uses: explore.explore asks deep_explore first, explore.search_mode
+dead_end_step (the dead end is told where explore has nothing left but walls to search), explore.revisit_up
+deep_up_closed, mapmem.stairs_mask deep_stairs and mapmem.passable_grid deep_passable.
 """
 from collections import Counter
 
@@ -100,10 +100,11 @@ class DeepMixin:
             self.deep.once.add((event, lv.key))
             self.deep.stats[event] += 1
 
-    # ------------------------------------------------------------------ methods of other mixins, overridden
-    def explore(self, lv):
-        """explore.explore; first, on a deep level of the main dungeon: is this Medusa's level (told as soon as its
-        water shows: the stairs up from below are closed at once), are we past it (summary)."""
+    # ------------------------------------------------------------------ hooks in explore / mapmem
+    def deep_explore(self, lv):
+        """explore.explore, first: on a deep level of the main dungeon, is this Medusa's level (told as soon as its
+        water shows: the stairs up from below are closed at once), are we past it (summary). True if it used the
+        turn: back up from her level (back_up_step)."""
         st = self.deep
         if lv.key[0] == 0 and lv.key[1] >= MEDUSA_MIN:
             if lv.key not in st.kind:
@@ -112,40 +113,27 @@ class DeepMixin:
             if past and "past_medusa_at" not in st.mark:
                 self.deep_mark("past_medusa")
             if st.kind.get(lv.key) == "medusa" and self.back_up_step(lv, self.grids(lv)):
-                return                                # her level is reached: nothing to explore on the island
-        super().explore(lv)
+                return True                           # her level is reached: nothing to explore on the island
+        return False
 
-    def search_mode(self, lv, grids):
-        """explore has nothing left on this level but walls to search: at a water dead end, the way back up /
-        the patrol instead (dead_end_step)."""
-        if self.dead_end_step(lv, grids):
-            return
-        super().search_mode(lv, grids)
-
-    def stairs_mask(self, lv, kind, k_mem=None):
-        """mapmem.stairs_mask, less the up stairs that lead onto Medusa's island (no_up) and the down stairs of
-        the level above a dead end we went back up to."""
-        mask = super().stairs_mask(lv, kind, k_mem)
+    def deep_stairs(self, lv, kind, mask):
+        """mapmem.stairs_mask, in place: less the up stairs that lead onto Medusa's island (no_up) and the down
+        stairs of the level above a dead end we went back up to."""
         if kind == G.UPSTAIR and lv.key in self.deep.no_up:
             mask[:] = False
         elif kind == G.DOWNSTAIR and lv.key == self.deep.above:
             mask[:] = False
-        return mask
 
-    def passable_grid(self, lv, k_mem, k_live):
-        """mapmem.passable_grid, less the holes, trap doors and level teleporters our map shows on the level we
-        patrol: a path over one (the only way to some corner) dropped us onto Medusa's island again and again, or
-        past it into the mazes."""
-        p = super().passable_grid(lv, k_mem, k_live)
+    def deep_passable(self, lv, p):
+        """mapmem.passable_grid, in place: less the holes, trap doors and level teleporters our map shows on the
+        level we patrol: a path over one (the only way to some corner) dropped us onto Medusa's island again and
+        again, or past it into the mazes."""
         if lv.key == self.deep.above:
             p[np.isin(lv.terrain, WAY_OUT_GLYPHS)] = False
-        return p
 
-    def revisit_up(self, lv, grids):
-        """explore.revisit_up -- never to Medusa's level: the stairs up to it end on her island."""
-        if lv.key in self.deep.no_up:
-            return False
-        return super().revisit_up(lv, grids)
+    def deep_up_closed(self, lv):
+        """explore.revisit_up: never to Medusa's level -- the stairs up to it end on her island."""
+        return lv.key in self.deep.no_up
 
     # ------------------------------------------------------------------ which level this is
     def water_dead_end(self, lv, k_mem):
@@ -192,8 +180,8 @@ class DeepMixin:
         return None
 
     def dead_end_step(self, lv, grids):
-        """Where explore would search walls. On the level above a dead end we came back up to: the patrol. At a
-        water dead end: the way back up, or the patrol here. True if it used the turn."""
+        """explore.search_mode, first: where explore would search walls. On the level above a dead end we came back
+        up to: the patrol. At a water dead end: the way back up, or the patrol here. True if it used the turn."""
         if self.deep.above == lv.key:
             return self.patrol_step(lv, grids)
         kind = self.water_dead_end(lv, grids[0])
