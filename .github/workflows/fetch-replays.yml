@@ -1,0 +1,19 @@
+name: fetch-replays
+# Human NetHack 3.6.x games (ttyrecs) from public servers: tools/fetch_replays.py. Runs on a push to the replays branch
+# (settings from tools/fetch_replays.env there).
+on:
+  push:
+    branches: [replays]
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - run: set -a; . tools/fetch_replays.env; set +a; python3 tools/fetch_replays.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: replays
+          path: replays
+          if-no-files-found: ignore
