@@ -1,19 +1,25 @@
 name: fetch-replays
-# Human NetHack 3.6.x games (ttyrecs) from public servers: tools/fetch_replays.py. Runs on a push to the replays branch
-# (settings from tools/fetch_replays.env there).
+# Human NetHack 3.6.x games (ttyrecs) from public servers: tools/fetch_replays.py; NLD-NAO availability:
+# tools/nld_probe.py. Runs on a push to the replays branch (settings from tools/fetch_replays.env there). The files go
+# to the replays-data branch (artifact storage is not reachable from the dev box).
 on:
   push:
     branches: [replays]
+permissions:
+  contents: write
 jobs:
   fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+      - run: python3 tools/nld_probe.py
+        continue-on-error: true
       - run: set -a; . tools/fetch_replays.env; set +a; python3 tools/fetch_replays.py
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: replays
-          path: replays
-          if-no-files-found: ignore
+      - name: push the files to replays-data
+        run: |
+          cd replays
+          git init -q -b replays-data
+          git config user.name ci; git config user.email ci@example.invalid
+          git add -A; git commit -qm "replays from ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" replays-data

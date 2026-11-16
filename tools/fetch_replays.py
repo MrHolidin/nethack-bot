@@ -75,6 +75,7 @@ def main():
     games.sort(key=lambda g: (g[1]["version"] != "3.6.7", g[1]["version"] != "3.6.6", -int(g[1].get("endtime", 0))))
     os.makedirs(OUT, exist_ok=True)
     manifest, listings, shown, misses = [], {}, 0, 0
+    raw_shown = set()
     for src, r in games:
         if len(manifest) >= N:
             break
@@ -82,7 +83,11 @@ def main():
         durl = SOURCES[src][1].format(l=name[0], name=name)
         if durl not in listings:
             try:
-                listings[durl] = [urllib.parse.unquote(h) for h in TTY_RE.findall(get(durl))]
+                page = get(durl)
+                listings[durl] = [urllib.parse.unquote(h) for h in TTY_RE.findall(page)]
+                if not listings[durl] and src not in raw_shown:   # a listing format not known yet
+                    raw_shown.add(src)
+                    print(f"  RAW {durl}: {re.findall(r'href=\"[^\"]*\"', page)[:12]}", flush=True)
             except Exception as e:                   # noqa: BLE001
                 print(f"  {src} {name}: listing {durl} failed: {e}", flush=True)
                 listings[durl] = []
