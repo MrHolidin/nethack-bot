@@ -3,9 +3,10 @@ Reads the servers' xlogfiles, keeps NetHack 3.6.x games that reached a depth ove
 ttyrec files in the player's directory (one file per play session; a file's name is its start time, UTC: kept if it
 starts within the game's starttime..endtime) and downloads up to N games into OUT, with manifest.json (the xlogfile
 fields, the files, their URLs). DISCOVER=1 only prints counts and the first directory listings.
-Only games that ended before BEFORE (unix time, default 2025-01-01): a player's ttyrec directory mixes every version
-he played, and NAO hosts NetHack 5.0 since -- a 3.6 game's window could hold sessions of another version's game.
-env: N (default 5), MIN_DEPTH (30), OUT (replays), DISCOVER, BEFORE, MISS_SHOW."""
+NAO keeps only the last days' ttyrecs in a player's directory (seen 2026-11: 2024 games have none left), so only
+recent games are found; the newest first. A player's directory mixes every version he played (NAO hosts NetHack 5.0
+too): a file in a 3.6 game's window may be another game's -- check the last turn in the files against the xlog turns.
+env: N (default 5), MIN_DEPTH (30), OUT (replays), DISCOVER, MISS_SHOW."""
 import datetime
 import json
 import os
@@ -27,7 +28,6 @@ N = int(os.environ.get("N", 5))
 MIN_DEPTH = int(os.environ.get("MIN_DEPTH", 30))
 OUT = os.environ.get("OUT", "replays")
 DISCOVER = bool(os.environ.get("DISCOVER"))
-BEFORE = int(os.environ.get("BEFORE", 1735689600))
 MISS_SHOW = int(os.environ.get("MISS_SHOW", 0))   # games with no file in their window: print the first ones
 # NAO: href="2026-11-12.06%3A22%3A05.645.ttyrec" (url-quoted, milliseconds; older ones .ttyrec.bz2)
 TTY_RE = re.compile(r'href="([^"/?]+?\.ttyrec(?:\.bz2|\.gz|\.xz)?)"')
@@ -64,8 +64,7 @@ def main():
         except Exception as e:                       # noqa: BLE001
             print(f"{src}: xlogfile failed: {e}", flush=True)
             continue
-        deep = [r for r in recs if r.get("version", "").startswith("3.6") and int(r.get("maxlvl", 0)) > MIN_DEPTH
-                and int(r.get("endtime", 0)) < BEFORE]
+        deep = [r for r in recs if r.get("version", "").startswith("3.6") and int(r.get("maxlvl", 0)) > MIN_DEPTH]
         vers = {}
         for r in deep:
             vers[r["version"]] = vers.get(r["version"], 0) + 1
