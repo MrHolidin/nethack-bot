@@ -1,0 +1,1582 @@
+[
+ {
+  "src": "nld-nao",
+  "dir": "nld_peters509_1597873707",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "17152050",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "51",
+   "hp": "1667",
+   "maxhp": "1667",
+   "deaths": "1",
+   "deathdate": "20201111",
+   "birthdate": "20200819",
+   "uid": "5",
+   "role": "Sam",
+   "race": "Hum",
+   "gender": "Mal",
+   "align": "Law",
+   "name": "peters509",
+   "death": "ascended",
+   "conduct": "0x0",
+   "turns": "238692",
+   "achieve": "0xfff",
+   "realtime": "288523",
+   "starttime": "1597873707",
+   "endtime": "1605138676",
+   "gender0": "Mal",
+   "align0": "Law",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-08-20.20:19:20.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 448096
+   },
+   {
+    "file": "2020-08-21.22:00:53.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 336796
+   },
+   {
+    "file": "2020-08-23.00:46:22.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 397546
+   },
+   {
+    "file": "2020-08-23.15:07:34.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 76804
+   },
+   {
+    "file": "2020-08-24.19:09:08.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 499513
+   },
+   {
+    "file": "2020-08-25.14:39:53.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 309032
+   },
+   {
+    "file": "2020-08-25.21:15:22.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 353891
+   },
+   {
+    "file": "2020-08-26.18:58:53.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 411883
+   },
+   {
+    "file": "2020-08-26.21:19:25.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 317615
+   },
+   {
+    "file": "2020-08-28.20:48:45.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 350922
+   },
+   {
+    "file": "2020-08-29.15:42:07.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 121849
+   },
+   {
+    "file": "2020-08-29.16:38:35.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 11052
+   },
+   {
+    "file": "2020-08-29.16:42:57.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 24125
+   },
+   {
+    "file": "2020-08-29.21:21:22.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 252106
+   },
+   {
+    "file": "2020-08-29.23:19:09.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 25710
+   },
+   {
+    "file": "2020-08-31.21:18:03.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 146229
+   },
+   {
+    "file": "2020-08-31.23:24:59.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 70983
+   },
+   {
+    "file": "2020-09-01.23:24:09.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 149040
+   },
+   {
+    "file": "2020-09-02.00:36:31.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 5572
+   },
+   {
+    "file": "2020-09-02.22:03:49.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 245874
+   },
+   {
+    "file": "2020-09-03.22:18:21.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 243576
+   },
+   {
+    "file": "2020-09-04.21:58:05.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 253164
+   },
+   {
+    "file": "2020-09-05.22:55:57.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 208069
+   },
+   {
+    "file": "2020-09-06.22:44:56.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 42199
+   },
+   {
+    "file": "2020-09-08.20:36:52.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 210293
+   },
+   {
+    "file": "2020-09-09.22:02:24.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 268190
+   },
+   {
+    "file": "2020-09-10.21:12:46.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 179240
+   },
+   {
+    "file": "2020-09-10.22:12:43.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 189659
+   },
+   {
+    "file": "2020-09-11.17:56:58.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 245153
+   },
+   {
+    "file": "2020-09-11.19:42:20.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 76493
+   },
+   {
+    "file": "2020-09-11.20:16:56.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 321744
+   },
+   {
+    "file": "2020-09-14.20:00:24.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 321354
+   },
+   {
+    "file": "2020-09-25.21:45:12.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 93184
+   },
+   {
+    "file": "2020-10-05.22:12:24.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 89471
+   },
+   {
+    "file": "2020-10-16.19:51:02.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 351321
+   },
+   {
+    "file": "2020-10-17.20:15:09.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 366410
+   },
+   {
+    "file": "2020-10-19.22:34:14.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 215280
+   },
+   {
+    "file": "2020-10-20.22:59:52.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 103144
+   },
+   {
+    "file": "2020-10-21.21:40:41.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 360948
+   },
+   {
+    "file": "2020-10-24.18:49:08.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 158969
+   },
+   {
+    "file": "2020-10-24.20:10:43.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 304374
+   },
+   {
+    "file": "2020-10-24.22:07:06.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 183649
+   },
+   {
+    "file": "2020-10-25.21:21:21.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 462858
+   },
+   {
+    "file": "2020-10-27.17:39:45.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 39629
+   },
+   {
+    "file": "2020-10-27.17:55:19.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 90774
+   },
+   {
+    "file": "2020-10-27.18:31:25.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 47787
+   },
+   {
+    "file": "2020-10-27.18:50:47.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 76447
+   },
+   {
+    "file": "2020-10-27.19:25:40.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 346330
+   },
+   {
+    "file": "2020-10-28.23:22:25.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 106109
+   },
+   {
+    "file": "2020-10-29.22:42:10.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 98030
+   },
+   {
+    "file": "2020-10-31.20:26:34.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 490699
+   },
+   {
+    "file": "2020-11-02.21:07:21.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 439643
+   },
+   {
+    "file": "2020-11-03.23:06:35.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 105523
+   },
+   {
+    "file": "2020-11-04.23:12:09.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 378711
+   },
+   {
+    "file": "2020-11-09.23:39:08.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 134731
+   },
+   {
+    "file": "2020-11-11.22:22:13.ttyrec.bz2",
+    "part": "nld-nao-dir-az.zip",
+    "bytes": 249300
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_duaifei_1604519997",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "2034349",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "48",
+   "hp": "316",
+   "maxhp": "319",
+   "deaths": "0",
+   "deathdate": "20201111",
+   "birthdate": "20201104",
+   "uid": "5",
+   "role": "Tou",
+   "race": "Hum",
+   "gender": "Fem",
+   "align": "Cha",
+   "name": "duaifei",
+   "death": "ascended",
+   "conduct": "0x500",
+   "turns": "66805",
+   "achieve": "0xfff",
+   "realtime": "72178",
+   "starttime": "1604519997",
+   "endtime": "1605137119",
+   "gender0": "Fem",
+   "align0": "Neu",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-11-04.19:59:51.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 167882
+   },
+   {
+    "file": "2020-11-04.21:54:19.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 149602
+   },
+   {
+    "file": "2020-11-05.04:25:21.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 101115
+   },
+   {
+    "file": "2020-11-05.12:50:31.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 78792
+   },
+   {
+    "file": "2020-11-06.01:10:35.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 201054
+   },
+   {
+    "file": "2020-11-06.03:56:16.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 182757
+   },
+   {
+    "file": "2020-11-06.13:48:14.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 22152
+   },
+   {
+    "file": "2020-11-06.14:55:21.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 58063
+   },
+   {
+    "file": "2020-11-06.16:32:44.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 118842
+   },
+   {
+    "file": "2020-11-06.18:50:24.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 26540
+   },
+   {
+    "file": "2020-11-06.20:09:51.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 128388
+   },
+   {
+    "file": "2020-11-06.21:30:19.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 122500
+   },
+   {
+    "file": "2020-11-06.22:57:58.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 58272
+   },
+   {
+    "file": "2020-11-07.00:02:38.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 97875
+   },
+   {
+    "file": "2020-11-07.13:13:13.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 167857
+   },
+   {
+    "file": "2020-11-07.16:17:51.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 38118
+   },
+   {
+    "file": "2020-11-07.23:57:01.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 207886
+   },
+   {
+    "file": "2020-11-08.03:25:44.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 81164
+   },
+   {
+    "file": "2020-11-08.23:25:52.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 84865
+   },
+   {
+    "file": "2020-11-10.13:44:38.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 103363
+   },
+   {
+    "file": "2020-11-10.16:49:17.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 57285
+   },
+   {
+    "file": "2020-11-10.18:43:04.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 94461
+   },
+   {
+    "file": "2020-11-10.20:50:44.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 135421
+   },
+   {
+    "file": "2020-11-10.23:02:08.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 165569
+   },
+   {
+    "file": "2020-11-11.17:47:08.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 157204
+   },
+   {
+    "file": "2020-11-11.21:29:21.ttyrec.bz2",
+    "part": "nld-nao-dir-aj.zip",
+    "bytes": 290038
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_rodiel256_1604570632",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "639953",
+   "deathdnum": "1",
+   "deathlev": "37",
+   "maxlvl": "37",
+   "hp": "0",
+   "maxhp": "167",
+   "deaths": "2",
+   "deathdate": "20201111",
+   "birthdate": "20201105",
+   "uid": "5",
+   "role": "Wiz",
+   "race": "Elf",
+   "gender": "Mal",
+   "align": "Cha",
+   "name": "rodiel256",
+   "death": "killed by a marilith",
+   "conduct": "0x100",
+   "turns": "50854",
+   "achieve": "0xa07",
+   "realtime": "203539",
+   "starttime": "1604570632",
+   "endtime": "1605125515",
+   "gender0": "Mal",
+   "align0": "Cha",
+   "flags": "0x4"
+  },
+  "files": [
+   {
+    "file": "2020-11-05.10:03:40.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 1600
+   },
+   {
+    "file": "2020-11-05.10:03:45.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 1183
+   },
+   {
+    "file": "2020-11-05.10:03:48.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 51776
+   },
+   {
+    "file": "2020-11-05.15:36:19.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 13401
+   },
+   {
+    "file": "2020-11-07.09:21:18.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 159928
+   },
+   {
+    "file": "2020-11-07.10:57:51.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 6665
+   },
+   {
+    "file": "2020-11-08.09:12:04.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 727054
+   },
+   {
+    "file": "2020-11-09.11:22:59.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 2630
+   },
+   {
+    "file": "2020-11-09.12:47:02.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 117723
+   },
+   {
+    "file": "2020-11-09.16:12:07.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 267602
+   },
+   {
+    "file": "2020-11-09.20:07:25.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 74277
+   },
+   {
+    "file": "2020-11-10.09:45:37.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 73836
+   },
+   {
+    "file": "2020-11-10.12:31:21.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 62214
+   },
+   {
+    "file": "2020-11-10.16:37:23.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 159683
+   },
+   {
+    "file": "2020-11-11.10:05:56.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 104085
+   },
+   {
+    "file": "2020-11-11.12:52:17.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 173897
+   },
+   {
+    "file": "2020-11-11.19:55:13.ttyrec.bz2",
+    "part": "nld-nao-dir-bc.zip",
+    "bytes": 34411
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_Hilliance_1602604084",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "336356",
+   "deathdnum": "1",
+   "deathlev": "48",
+   "maxlvl": "48",
+   "hp": "99",
+   "maxhp": "99",
+   "deaths": "0",
+   "deathdate": "20201111",
+   "birthdate": "20201013",
+   "uid": "5",
+   "role": "Kni",
+   "race": "Hum",
+   "gender": "Mal",
+   "align": "Law",
+   "name": "Hilliance",
+   "death": "quit",
+   "conduct": "0xc00",
+   "turns": "28891",
+   "achieve": "0x61f",
+   "realtime": "66437",
+   "starttime": "1602604084",
+   "endtime": "1605087371",
+   "gender0": "Mal",
+   "align0": "Law",
+   "flags": "0x4"
+  },
+  "files": [
+   {
+    "file": "2020-10-13.15:47:06.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 543835
+   },
+   {
+    "file": "2020-10-13.20:31:21.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 88373
+   },
+   {
+    "file": "2020-10-13.23:50:06.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 296692
+   },
+   {
+    "file": "2020-10-14.09:58:19.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 30481
+   },
+   {
+    "file": "2020-10-14.12:21:17.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 24050
+   },
+   {
+    "file": "2020-10-14.20:34:49.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 280248
+   },
+   {
+    "file": "2020-10-15.20:27:20.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 34118
+   },
+   {
+    "file": "2020-10-16.10:50:25.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 3483
+   },
+   {
+    "file": "2020-11-11.09:36:00.ttyrec.bz2",
+    "part": "nld-nao-dir-ao.zip",
+    "bytes": 1383
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_Vinegar_1604974587",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "1918878",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "49",
+   "hp": "93",
+   "maxhp": "163",
+   "deaths": "0",
+   "deathdate": "20201111",
+   "birthdate": "20201110",
+   "uid": "5",
+   "role": "Sam",
+   "race": "Hum",
+   "gender": "Fem",
+   "align": "Law",
+   "name": "Vinegar",
+   "death": "escaped (in celestial disgrace)",
+   "conduct": "0x480",
+   "turns": "60592",
+   "achieve": "0xeff",
+   "realtime": "61382",
+   "starttime": "1604974587",
+   "endtime": "1605077470",
+   "gender0": "Fem",
+   "align0": "Law",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-11-10.02:16:24.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 181515
+   },
+   {
+    "file": "2020-11-10.02:56:55.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 219837
+   },
+   {
+    "file": "2020-11-10.03:53:29.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 273428
+   },
+   {
+    "file": "2020-11-10.04:59:00.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 190188
+   },
+   {
+    "file": "2020-11-10.05:53:21.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 290525
+   },
+   {
+    "file": "2020-11-10.06:53:39.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 323566
+   },
+   {
+    "file": "2020-11-10.07:53:16.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 24376
+   },
+   {
+    "file": "2020-11-10.17:19:44.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 200912
+   },
+   {
+    "file": "2020-11-10.18:04:34.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 161546
+   },
+   {
+    "file": "2020-11-10.19:01:57.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 314594
+   },
+   {
+    "file": "2020-11-10.19:59:35.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 434340
+   },
+   {
+    "file": "2020-11-10.23:51:04.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 61387
+   },
+   {
+    "file": "2020-11-10.23:59:35.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 210749
+   },
+   {
+    "file": "2020-11-11.01:00:02.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 191428
+   },
+   {
+    "file": "2020-11-11.02:00:41.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 338763
+   },
+   {
+    "file": "2020-11-11.02:59:45.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 338327
+   },
+   {
+    "file": "2020-11-11.04:00:27.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 248083
+   },
+   {
+    "file": "2020-11-11.05:00:29.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 782740
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_inlawBiker_1604942743",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "1793110",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "47",
+   "hp": "258",
+   "maxhp": "258",
+   "deaths": "0",
+   "deathdate": "20201111",
+   "birthdate": "20201109",
+   "uid": "5",
+   "role": "Ran",
+   "race": "Hum",
+   "gender": "Mal",
+   "align": "Neu",
+   "name": "inlawBiker",
+   "death": "ascended",
+   "conduct": "0x500",
+   "turns": "31302",
+   "achieve": "0xfff",
+   "realtime": "49632",
+   "starttime": "1604942743",
+   "endtime": "1605055080",
+   "gender0": "Mal",
+   "align0": "Neu",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-11-09.17:25:34.ttyrec.bz2",
+    "part": "nld-nao-dir-ap.zip",
+    "bytes": 1429756
+   },
+   {
+    "file": "2020-11-10.00:52:16.ttyrec.bz2",
+    "part": "nld-nao-dir-ap.zip",
+    "bytes": 62342
+   },
+   {
+    "file": "2020-11-10.01:15:22.ttyrec.bz2",
+    "part": "nld-nao-dir-ap.zip",
+    "bytes": 252503
+   },
+   {
+    "file": "2020-11-10.02:12:44.ttyrec.bz2",
+    "part": "nld-nao-dir-ap.zip",
+    "bytes": 188340
+   },
+   {
+    "file": "2020-11-10.17:13:27.ttyrec.bz2",
+    "part": "nld-nao-dir-ap.zip",
+    "bytes": 1330321
+   },
+   {
+    "file": "2020-11-10.22:53:24.ttyrec.bz2",
+    "part": "nld-nao-dir-ap.zip",
+    "bytes": 845692
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_Wooble_1592852633",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "638421",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "52",
+   "hp": "116",
+   "maxhp": "149",
+   "deaths": "0",
+   "deathdate": "20201110",
+   "birthdate": "20200622",
+   "uid": "5",
+   "role": "Wiz",
+   "race": "Gno",
+   "gender": "Fem",
+   "align": "Law",
+   "name": "Wooble",
+   "death": "ascended",
+   "conduct": "0x100",
+   "turns": "34177",
+   "achieve": "0xfff",
+   "realtime": "29885",
+   "starttime": "1592852633",
+   "endtime": "1605035655",
+   "gender0": "Fem",
+   "align0": "Neu",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-06-22.19:03:35.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 4578
+   },
+   {
+    "file": "2020-06-22.19:03:50.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 68048
+   },
+   {
+    "file": "2020-06-22.19:52:07.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 153922
+   },
+   {
+    "file": "2020-06-24.17:54:03.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 40390
+   },
+   {
+    "file": "2020-06-24.19:08:29.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 107672
+   },
+   {
+    "file": "2020-07-07.00:24:23.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 1582
+   },
+   {
+    "file": "2020-07-07.00:25:38.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 1377
+   },
+   {
+    "file": "2020-07-07.00:26:14.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 8363
+   },
+   {
+    "file": "2020-07-17.19:31:30.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 84012
+   },
+   {
+    "file": "2020-07-27.15:51:51.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 1198
+   },
+   {
+    "file": "2020-07-28.21:26:07.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 51689
+   },
+   {
+    "file": "2020-09-04.18:34:39.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 2274
+   },
+   {
+    "file": "2020-09-15.17:51:53.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 22673
+   },
+   {
+    "file": "2020-09-22.13:20:03.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 124678
+   },
+   {
+    "file": "2020-09-22.16:38:05.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 136095
+   },
+   {
+    "file": "2020-09-23.17:40:10.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 86406
+   },
+   {
+    "file": "2020-09-24.14:39:45.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 48281
+   },
+   {
+    "file": "2020-09-29.14:59:03.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 21127
+   },
+   {
+    "file": "2020-10-05.12:52:34.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 39529
+   },
+   {
+    "file": "2020-10-05.21:14:29.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 37616
+   },
+   {
+    "file": "2020-10-06.14:04:02.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 104567
+   },
+   {
+    "file": "2020-10-06.17:04:27.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 64465
+   },
+   {
+    "file": "2020-10-08.18:35:12.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 54467
+   },
+   {
+    "file": "2020-10-23.19:13:07.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 17065
+   },
+   {
+    "file": "2020-10-27.18:20:05.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 47298
+   },
+   {
+    "file": "2020-10-31.15:56:25.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 200965
+   },
+   {
+    "file": "2020-11-10.13:30:21.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 15540
+   },
+   {
+    "file": "2020-11-10.13:34:16.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 108005
+   },
+   {
+    "file": "2020-11-10.18:53:41.ttyrec.bz2",
+    "part": "nld-nao-dir-bl.zip",
+    "bytes": 123940
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_Prowler_1604622799",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "2232542",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "50",
+   "hp": "422",
+   "maxhp": "422",
+   "deaths": "0",
+   "deathdate": "20201110",
+   "birthdate": "20201106",
+   "uid": "5",
+   "role": "Cav",
+   "race": "Dwa",
+   "gender": "Mal",
+   "align": "Law",
+   "name": "Prowler",
+   "death": "ascended",
+   "conduct": "0x500",
+   "turns": "46347",
+   "achieve": "0xfff",
+   "realtime": "22158",
+   "starttime": "1604622799",
+   "endtime": "1605018232",
+   "gender0": "Mal",
+   "align0": "Law",
+   "flags": "0x4"
+  },
+  "files": [
+   {
+    "file": "2020-11-06.00:33:16.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 476222
+   },
+   {
+    "file": "2020-11-06.14:14:37.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 933477
+   },
+   {
+    "file": "2020-11-06.23:04:23.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 1738142
+   },
+   {
+    "file": "2020-11-07.01:29:59.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 270081
+   },
+   {
+    "file": "2020-11-07.15:15:31.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 323260
+   },
+   {
+    "file": "2020-11-09.12:56:39.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 795276
+   },
+   {
+    "file": "2020-11-10.00:04:16.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 777086
+   },
+   {
+    "file": "2020-11-10.14:05:40.ttyrec.bz2",
+    "part": "nld-nao-dir-ba.zip",
+    "bytes": 539206
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_CharlieBr0wn_1604847341",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "2441794",
+   "deathdnum": "7",
+   "deathlev": "-5",
+   "maxlvl": "51",
+   "hp": "181",
+   "maxhp": "181",
+   "deaths": "0",
+   "deathdate": "20201110",
+   "birthdate": "20201108",
+   "uid": "5",
+   "role": "Ran",
+   "race": "Hum",
+   "gender": "Fem",
+   "align": "Neu",
+   "name": "CharlieBr0wn",
+   "death": "ascended",
+   "conduct": "0x100",
+   "turns": "42394",
+   "achieve": "0xbff",
+   "realtime": "72812",
+   "starttime": "1604847341",
+   "endtime": "1605013910",
+   "gender0": "Fem",
+   "align0": "Neu",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-11-08.14:55:34.ttyrec.bz2",
+    "part": "nld-nao-dir-af.zip",
+    "bytes": 1641532
+   },
+   {
+    "file": "2020-11-09.13:48:12.ttyrec.bz2",
+    "part": "nld-nao-dir-af.zip",
+    "bytes": 6586
+   },
+   {
+    "file": "2020-11-09.17:25:36.ttyrec.bz2",
+    "part": "nld-nao-dir-af.zip",
+    "bytes": 149901
+   },
+   {
+    "file": "2020-11-10.10:09:00.ttyrec.bz2",
+    "part": "nld-nao-dir-af.zip",
+    "bytes": 1020393
+   }
+  ]
+ },
+ {
+  "src": "nld-nao",
+  "dir": "nld_wadesmill_1601485667",
+  "xlog": {
+   "version": "3.6.6",
+   "points": "748400",
+   "deathdnum": "6",
+   "deathlev": "37",
+   "maxlvl": "39",
+   "hp": "0",
+   "maxhp": "173",
+   "deaths": "1",
+   "deathdate": "20201110",
+   "birthdate": "20200930",
+   "uid": "5",
+   "role": "Kni",
+   "race": "Hum",
+   "gender": "Mal",
+   "align": "Law",
+   "name": "wadesmill",
+   "death": "killed by brainlessness",
+   "conduct": "0x500",
+   "turns": "47872",
+   "achieve": "0xe03",
+   "realtime": "149686",
+   "starttime": "1601485667",
+   "endtime": "1605011469",
+   "gender0": "Mal",
+   "align0": "Law",
+   "flags": "0x0"
+  },
+  "files": [
+   {
+    "file": "2020-09-30.17:07:44.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 15392
+   },
+   {
+    "file": "2020-09-30.18:52:59.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 27570
+   },
+   {
+    "file": "2020-10-01.13:20:59.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 42957
+   },
+   {
+    "file": "2020-10-01.14:18:36.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 29599
+   },
+   {
+    "file": "2020-10-01.16:25:51.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 18876
+   },
+   {
+    "file": "2020-10-01.17:04:25.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 39104
+   },
+   {
+    "file": "2020-10-02.08:45:12.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 28047
+   },
+   {
+    "file": "2020-10-02.10:37:40.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 65142
+   },
+   {
+    "file": "2020-10-02.13:20:01.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 51974
+   },
+   {
+    "file": "2020-10-02.15:34:37.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 27710
+   },
+   {
+    "file": "2020-10-02.16:45:21.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 45372
+   },
+   {
+    "file": "2020-10-03.08:53:47.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 29219
+   },
+   {
+    "file": "2020-10-03.09:59:00.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 10654
+   },
+   {
+    "file": "2020-10-03.12:36:59.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 5109
+   },
+   {
+    "file": "2020-10-03.12:40:26.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 14389
+   },
+   {
+    "file": "2020-10-04.09:28:33.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 8006
+   },
+   {
+    "file": "2020-10-04.12:38:35.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 54774
+   },
+   {
+    "file": "2020-10-05.08:15:37.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 25274
+   },
+   {
+    "file": "2020-10-05.09:09:01.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 30882
+   },
+   {
+    "file": "2020-10-05.13:09:10.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 61205
+   },
+   {
+    "file": "2020-10-05.16:58:13.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 94044
+   },
+   {
+    "file": "2020-10-06.08:05:18.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 26657
+   },
+   {
+    "file": "2020-10-06.08:36:34.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 58366
+   },
+   {
+    "file": "2020-10-06.09:49:33.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 69292
+   },
+   {
+    "file": "2020-10-06.11:37:20.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 21248
+   },
+   {
+    "file": "2020-10-06.13:03:13.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 99158
+   },
+   {
+    "file": "2020-10-06.14:55:43.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 13903
+   },
+   {
+    "file": "2020-10-06.15:42:11.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 59242
+   },
+   {
+    "file": "2020-10-06.16:52:57.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 50054
+   },
+   {
+    "file": "2020-10-07.08:53:17.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 24033
+   },
+   {
+    "file": "2020-10-07.10:21:45.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 46761
+   },
+   {
+    "file": "2020-10-07.10:59:16.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 64251
+   },
+   {
+    "file": "2020-10-07.13:10:25.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 68310
+   },
+   {
+    "file": "2020-10-07.16:52:43.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 63019
+   },
+   {
+    "file": "2020-10-07.19:29:46.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 12335
+   },
+   {
+    "file": "2020-10-08.05:57:03.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 7307
+   },
+   {
+    "file": "2020-10-08.07:40:36.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 169461
+   },
+   {
+    "file": "2020-10-08.10:30:52.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 31958
+   },
+   {
+    "file": "2020-10-08.11:52:18.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 43284
+   },
+   {
+    "file": "2020-10-08.13:18:23.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 42478
+   },
+   {
+    "file": "2020-10-08.17:05:23.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 40604
+   },
+   {
+    "file": "2020-10-18.17:27:39.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 12667
+   },
+   {
+    "file": "2020-10-19.08:20:31.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 42224
+   },
+   {
+    "file": "2020-10-19.09:37:50.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 179729
+   },
+   {
+    "file": "2020-10-19.13:42:40.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 30734
+   },
+   {
+    "file": "2020-10-19.15:39:39.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 157273
+   },
+   {
+    "file": "2020-10-20.08:01:43.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 36610
+   },
+   {
+    "file": "2020-10-20.14:42:12.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 22124
+   },
+   {
+    "file": "2020-10-21.08:42:19.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 84694
+   },
+   {
+    "file": "2020-10-21.15:02:18.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 133426
+   },
+   {
+    "file": "2020-10-21.16:15:44.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 2645
+   },
+   {
+    "file": "2020-10-21.17:06:15.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 32128
+   },
+   {
+    "file": "2020-10-22.08:09:29.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 58135
+   },
+   {
+    "file": "2020-10-22.08:40:49.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 3224
+   },
+   {
+    "file": "2020-10-22.16:55:44.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 108080
+   },
+   {
+    "file": "2020-10-23.07:49:36.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 28451
+   },
+   {
+    "file": "2020-10-26.09:19:50.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 108063
+   },
+   {
+    "file": "2020-10-26.12:22:16.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 59232
+   },
+   {
+    "file": "2020-10-26.14:16:56.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 207930
+   },
+   {
+    "file": "2020-10-26.16:37:16.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 136800
+   },
+   {
+    "file": "2020-10-27.08:39:55.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 82063
+   },
+   {
+    "file": "2020-10-27.10:40:42.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 143660
+   },
+   {
+    "file": "2020-10-27.17:47:48.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 73949
+   },
+   {
+    "file": "2020-10-28.09:08:14.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 159336
+   },
+   {
+    "file": "2020-10-28.13:45:04.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 238878
+   },
+   {
+    "file": "2020-10-28.15:50:56.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 66308
+   },
+   {
+    "file": "2020-10-29.08:36:26.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 118170
+   },
+   {
+    "file": "2020-10-29.12:37:20.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 23209
+   },
+   {
+    "file": "2020-10-29.13:38:01.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 83841
+   },
+   {
+    "file": "2020-10-29.17:25:54.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 68404
+   },
+   {
+    "file": "2020-11-02.17:30:24.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 112910
+   },
+   {
+    "file": "2020-11-09.11:10:07.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 73665
+   },
+   {
+    "file": "2020-11-09.17:14:41.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 136352
+   },
+   {
+    "file": "2020-11-10.09:45:58.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 158100
+   },
+   {
+    "file": "2020-11-10.11:52:00.ttyrec.bz2",
+    "part": "nld-nao-dir-bk.zip",
+    "bytes": 94379
+   }
+  ]
+ }
+]
