@@ -1,6 +1,6 @@
 name: fetch-replays
-# Human NetHack 3.6.x games (ttyrecs) from public servers: tools/fetch_replays.py; NLD-NAO availability:
-# tools/nld_probe.py. Runs on a push to the replays branch (settings from tools/fetch_replays.env there). The files go
+# Human NetHack 3.6.x games (ttyrecs): from the public servers (tools/fetch_replays.py) or out of NLD-NAO
+# (tools/fetch_nld.py), SCRIPT in the env file. Runs on a push to the replays branch (settings from tools/fetch_replays.env there). The files go
 # to the replays-data branch (artifact storage is not reachable from the dev box).
 on:
   push:
@@ -13,9 +13,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - run: python3 tools/nld_probe.py
-        continue-on-error: true
-      - run: set -a; . tools/fetch_replays.env; set +a; python3 tools/fetch_replays.py
+      - run: set -a; . tools/fetch_replays.env; set +a; python3 "tools/$SCRIPT"
       - name: push the files to replays-data
         run: |
           cd replays
