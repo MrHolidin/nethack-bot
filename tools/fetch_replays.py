@@ -79,8 +79,16 @@ def main():
         files = sorted(f for f in set(listings[durl])
                        if int(r["starttime"]) - 60 <= stamp(f) <= int(r["endtime"]))
         if DISCOVER:
-            print(f"  {src} {name} {r['version']} maxlvl {r['maxlvl']} {r.get('death')}: {len(listings[durl])} files "
-                  f"in {durl}; in the game's window: {files[:5]}", flush=True)
+            print(f"  {src} {name} {r['version']} maxlvl {r['maxlvl']} {r.get('death')} start {r['starttime']} end "
+                  f"{r['endtime']}: {len(listings[durl])} files in {durl}; in the game's window: {files[:5]}",
+                  flush=True)
+            if shown < 2 or (src == "nao" and shown < 4):
+                for url in (durl, durl.rsplit("/", 2)[0] + "/"):
+                    try:
+                        page = get(url)
+                        print(f"    RAW {url} ({len(page)} chars): {page[:700]!r}", flush=True)
+                    except Exception as e:           # noqa: BLE001
+                        print(f"    RAW {url} failed: {e}", flush=True)
             shown += 1
             if shown >= 8:
                 break
