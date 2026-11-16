@@ -5,7 +5,7 @@ starts within the game's starttime..endtime) and downloads up to N games into OU
 fields, the files, their URLs). DISCOVER=1 only prints counts and the first directory listings.
 Only games that ended before BEFORE (unix time, default 2025-01-01): a player's ttyrec directory mixes every version
 he played, and NAO hosts NetHack 5.0 since -- a 3.6 game's window could hold sessions of another version's game.
-env: N (default 5), MIN_DEPTH (30), OUT (replays), DISCOVER, BEFORE."""
+env: N (default 5), MIN_DEPTH (30), OUT (replays), DISCOVER, BEFORE, MISS_SHOW."""
 import datetime
 import json
 import os
@@ -28,6 +28,7 @@ MIN_DEPTH = int(os.environ.get("MIN_DEPTH", 30))
 OUT = os.environ.get("OUT", "replays")
 DISCOVER = bool(os.environ.get("DISCOVER"))
 BEFORE = int(os.environ.get("BEFORE", 1735689600))
+MISS_SHOW = int(os.environ.get("MISS_SHOW", 0))   # games with no file in their window: print the first ones
 # NAO: href="2026-11-12.06%3A22%3A05.645.ttyrec" (url-quoted, milliseconds; older ones .ttyrec.bz2)
 TTY_RE = re.compile(r'href="([^"/?]+?\.ttyrec(?:\.bz2|\.gz|\.xz)?)"')
 UA = {"User-Agent": "nethack-bot-research (replay study)"}
@@ -74,7 +75,7 @@ def main():
         games += [(src, r) for r in deep]
     games.sort(key=lambda g: (g[1]["version"] != "3.6.7", g[1]["version"] != "3.6.6", -int(g[1].get("endtime", 0))))
     os.makedirs(OUT, exist_ok=True)
-    manifest, listings, shown = [], {}, 0
+    manifest, listings, shown, misses = [], {}, 0, 0
     for src, r in games:
         if len(manifest) >= N:
             break
@@ -104,6 +105,13 @@ def main():
                 break
             continue
         if not files:
+            misses += 1
+            if misses <= MISS_SHOW:
+                st = sorted(x for x in (stamp(f) for f in listings[durl]) if x is not None)
+                day = lambda t: datetime.datetime.fromtimestamp(t, datetime.timezone.utc).strftime("%Y-%m-%d")
+                print(f"  miss {src} {name} {r['version']} window {day(int(r['starttime']))}..{day(int(r['endtime']))}: "
+                      f"{len(listings[durl])} files" + (f", {day(st[0])}..{day(st[-1])}" if st else "")
+                      + (f" e.g. {listings[durl][:2]}" if listings[durl] and not st else ""), flush=True)
             continue
         gdir = os.path.join(OUT, f"{src}_{name}_{r['starttime']}")
         os.makedirs(gdir, exist_ok=True)
