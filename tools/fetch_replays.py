@@ -3,12 +3,15 @@ Reads the servers' xlogfiles, keeps NetHack 3.6.x games that reached a depth ove
 ttyrec files in the player's directory (one file per play session; a file's name is its start time, UTC: kept if it
 starts within the game's starttime..endtime) and downloads up to N games into OUT, with manifest.json (the xlogfile
 fields, the files, their URLs). DISCOVER=1 only prints counts and the first directory listings.
-env: N (default 5), MIN_DEPTH (30), OUT (replays), DISCOVER."""
+Only games that ended before BEFORE (unix time, default 2025-01-01): a player's ttyrec directory mixes every version
+he played, and NAO hosts NetHack 5.0 since -- a 3.6 game's window could hold sessions of another version's game.
+env: N (default 5), MIN_DEPTH (30), OUT (replays), DISCOVER, BEFORE."""
 import datetime
 import json
 import os
 import re
 import sys
+import urllib.parse
 import urllib.request
 
 SOURCES = {
@@ -24,7 +27,9 @@ N = int(os.environ.get("N", 5))
 MIN_DEPTH = int(os.environ.get("MIN_DEPTH", 30))
 OUT = os.environ.get("OUT", "replays")
 DISCOVER = bool(os.environ.get("DISCOVER"))
-TTY_RE = re.compile(r'href="(\d{4}-\d\d-\d\d\.\d\d:\d\d:\d\d\.ttyrec(?:\.bz2|\.gz)?)"')
+BEFORE = int(os.environ.get("BEFORE", 1735689600))
+# NAO: href="2026-11-12.06%3A22%3A05.645.ttyrec" (url-quoted, milliseconds; older ones .ttyrec.bz2)
+TTY_RE = re.compile(r'href="([^"/?]+?\.ttyrec(?:\.bz2|\.gz|\.xz)?)"')
 UA = {"User-Agent": "nethack-bot-research (replay study)"}
 
 
@@ -42,8 +47,12 @@ def xlog(text):
 
 
 def stamp(name):
-    return datetime.datetime.strptime(name[:19], "%Y-%m-%d.%H:%M:%S").replace(
-        tzinfo=datetime.timezone.utc).timestamp()
+    """A ttyrec file's start time from its (unquoted) name; None if it does not start with one."""
+    try:
+        return datetime.datetime.strptime(name[:19], "%Y-%m-%d.%H:%M:%S").replace(
+            tzinfo=datetime.timezone.utc).timestamp()
+    except ValueError:
+        return None
 
 
 def main():
@@ -54,7 +63,8 @@ def main():
         except Exception as e:                       # noqa: BLE001
             print(f"{src}: xlogfile failed: {e}", flush=True)
             continue
-        deep = [r for r in recs if r.get("version", "").startswith("3.6") and int(r.get("maxlvl", 0)) > MIN_DEPTH]
+        deep = [r for r in recs if r.get("version", "").startswith("3.6") and int(r.get("maxlvl", 0)) > MIN_DEPTH
+                and int(r.get("endtime", 0)) < BEFORE]
         vers = {}
         for r in deep:
             vers[r["version"]] = vers.get(r["version"], 0) + 1
@@ -72,12 +82,12 @@ def main():
         durl = SOURCES[src][1].format(l=name[0], name=name)
         if durl not in listings:
             try:
-                listings[durl] = TTY_RE.findall(get(durl))
+                listings[durl] = [urllib.parse.unquote(h) for h in TTY_RE.findall(get(durl))]
             except Exception as e:                   # noqa: BLE001
                 print(f"  {src} {name}: listing {durl} failed: {e}", flush=True)
                 listings[durl] = []
         files = sorted(f for f in set(listings[durl])
-                       if int(r["starttime"]) - 60 <= stamp(f) <= int(r["endtime"]))
+                       if stamp(f) is not None and int(r["starttime"]) - 60 <= stamp(f) <= int(r["endtime"]))
         if DISCOVER:
             print(f"  {src} {name} {r['version']} maxlvl {r['maxlvl']} {r.get('death')} start {r['starttime']} end "
                   f"{r['endtime']}: {len(listings[durl])} files in {durl}; in the game's window: {files[:5]}",
@@ -99,10 +109,11 @@ def main():
         os.makedirs(gdir, exist_ok=True)
         got = []
         for f in files:
-            data = get(durl + f, binary=True)
-            with open(os.path.join(gdir, f), "wb") as fh:
+            url = durl + urllib.parse.quote(f)
+            data = get(url, binary=True)
+            with open(os.path.join(gdir, f.replace(":", "_")), "wb") as fh:
                 fh.write(data)
-            got.append({"file": f, "url": durl + f, "bytes": len(data)})
+            got.append({"file": f, "url": url, "bytes": len(data)})
         manifest.append({"src": src, "dir": os.path.basename(gdir), "xlog": r, "files": got})
         print(f"  got {src} {name} {r['version']} {r['role']}-{r['race']} maxlvl {r['maxlvl']} turns {r['turns']} "
               f"{r.get('death')}: {len(got)} files, {sum(g['bytes'] for g in got) / 1e6:.1f} MB", flush=True)
