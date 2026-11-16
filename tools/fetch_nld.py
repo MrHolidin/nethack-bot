@@ -5,6 +5,9 @@ over MIN_DEPTH (nld-nao_xlogfiles.zip), newest version first, then the newest; a
 ttyrecs (nld-nao-unzipped/<player>/<start time UTC>.ttyrec.bz2, one per play session) starting within its
 starttime..endtime -- as NLD's own loader (nle.dataset add_altorg_directory) matches them. A player may have played
 another version at the same time on NAO: check the turn counter across the files against the xlog turns.
+The xlogfiles run on past the ttyrecs (games ending up to 2022; the newest ttyrec is from late 2020): a game that ended
+after the newest ttyrec is missing its last sessions, so only games ending before it are taken (seen: a 3.6.6 ascension
+with 27773 of its 40498 turns). xlogfile.full.txt repeats the per-version xlogfiles' games: one per (name, starttime).
 Downloads up to N games into OUT/nld_<player>_<starttime>/ with manifest.json. Run in CI.
 env: N (default 5), MIN_DEPTH (30), OUT (replays)."""
 import io
@@ -62,12 +65,14 @@ def remote_zip(name):
 
 def xlog_games():
     z = remote_zip("nld-nao_xlogfiles.zip")
-    games, files = [], [i for i in z.infolist() if not i.is_dir()]
+    games, seen, files = [], set(), [i for i in z.infolist() if not i.is_dir()]
     print(f"xlogfiles: {[(i.filename, i.file_size) for i in files]}", flush=True)
     for i in files:
         for line in z.read(i).decode("utf-8", "replace").splitlines():
             r = dict(f.split("=", 1) for f in line.split("\t") if "=" in f)
-            if r.get("version", "").startswith("3.6") and int(r.get("maxlvl", 0) or 0) > MIN_DEPTH:
+            if r.get("version", "").startswith("3.6") and int(r.get("maxlvl", 0) or 0) > MIN_DEPTH \
+                    and (r["name"], r["starttime"]) not in seen:
+                seen.add((r["name"], r["starttime"]))
                 games.append(r)
     vers = {}
     for r in games:
@@ -89,16 +94,21 @@ def stamp(fname):
 def main():
     games = xlog_games()
     want = {r["name"] for r in games}
-    where = {}                                       # player -> [(part, member info)]
+    where, newest = {}, 0                            # player -> [(part, member info)]; newest ttyrec start
     for p in PARTS:
         z = remote_zip(p)
         k = 0
         for i in z.infolist():
             bits = i.filename.split("/")
-            if len(bits) == 3 and bits[2] and bits[1] in want:
-                where.setdefault(bits[1], []).append((p, i))
-                k += 1
+            if len(bits) == 3 and bits[2]:
+                newest = max(newest, stamp(bits[2]) or 0)
+                if bits[1] in want:
+                    where.setdefault(bits[1], []).append((p, i))
+                    k += 1
         print(f"{p}: {len(z.infolist())} members, {k} of the deep games' players", flush=True)
+    games = [r for r in games if int(r["endtime"]) <= newest]
+    print(f"newest ttyrec {datetime.datetime.fromtimestamp(newest, datetime.timezone.utc):%Y-%m-%d}: {len(games)} games "
+          f"ended before it", flush=True)
     os.makedirs(OUT, exist_ok=True)
     manifest, zips = [], {}
     for r in games:
